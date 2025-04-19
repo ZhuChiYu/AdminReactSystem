@@ -184,13 +184,24 @@ export const BaseChildrenRoutes = [
       {
         handle: {
           hideInMenu: true,
+          i18nKey: 'route.(base)_course-manage_attachments-detail',
+          icon: 'mdi:paperclip',
+          title: 'course_attachments_detail'
+        },
+        id: 'course_attachments_detail',
+        lazy: () => import('@/pages/(base)/course-manage/attachments').then(convert),
+        path: '/course-manage/attachments/:courseId'
+      },
+      {
+        handle: {
+          hideInMenu: true,
           i18nKey: 'route.(base)_course-manage_attachments',
           icon: 'mdi:paperclip',
           title: 'course_attachments'
         },
         id: 'course_attachments',
         lazy: () => import('@/pages/(base)/course-manage/attachments').then(convert),
-        path: '/course-manage/attachments/:courseId'
+        path: '/course-manage/attachments'
       }
     ],
     handle: {

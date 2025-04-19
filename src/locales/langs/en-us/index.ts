@@ -6,6 +6,11 @@ import route from './route';
 import theme from './theme';
 
 const local: App.I18n.Schema['translation'] = {
+  class: {
+    detail: 'Class Detail',
+    list: 'Class List',
+    title: 'Class Management'
+  },
   code: {
     confirm: 'Are you sure you want to regenerate the code?',
     confirmHelp: 'Regenerating will overwrite the original code, please confirm whether to backup',
@@ -16,6 +21,8 @@ const local: App.I18n.Schema['translation'] = {
   course: {
     attachments: 'Course Attachments',
     category: 'Course Categories',
+    class: 'Class Management',
+    classDetail: 'Class Detail',
     list: 'Course List',
     title: 'Course Management'
   },

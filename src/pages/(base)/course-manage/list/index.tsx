@@ -151,7 +151,7 @@ const CourseList = () => {
   // 监听筛选条件变化时应用筛选
   useEffect(() => {
     applyFilters();
-  }, [searchName, selectedCategory, dateRange]);
+  }, [searchName, selectedCategory, dateRange, courseList]);
 
   // 重置筛选
   const resetFilters = () => {

@@ -29,9 +29,14 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "document_procomponents": "/document/procomponents";
     "document_antd": "/document/antd";
     "(base)_about": "/about";
+    "(base)_class-manage": "/class-manage";
+    "(base)_class-manage_detail": "/class-manage/detail";
+    "(base)_class-manage_list": "/class-manage/list";
     "(base)_course-manage": "/course-manage";
     "(base)_course-manage_attachments": "/course-manage/attachments";
     "(base)_course-manage_category": "/course-manage/category";
+    "(base)_course-manage_class": "/course-manage/class";
+    "(base)_course-manage_class_detail": "/course-manage/class/detail";
     "(base)_course-manage_list": "/course-manage/list";
     "(base)_function": "/function";
     "(base)_function_event-bus": "/function/event-bus";
@@ -139,8 +144,14 @@ declare module "@soybean-react/vite-plugin-react-router" {
   export type LastLevelRouteKey = Extract<
     RouteKey,
     | "(base)_about"
+    | "(base)_class-manage_detail"
+    | "(base)_class-manage"
+    | "(base)_class-manage_list"
     | "(base)_course-manage_attachments"
     | "(base)_course-manage_category"
+    | "(base)_course-manage_class_detail"
+    | "(base)_course-manage_class"
+    | "(base)_course-manage_class"
     | "(base)_course-manage"
     | "(base)_course-manage"
     | "(base)_course-manage_list"

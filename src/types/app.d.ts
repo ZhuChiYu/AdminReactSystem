@@ -285,6 +285,11 @@ declare namespace App {
 
     type Schema = {
       translation: {
+        class: {
+          detail: string;
+          list: string;
+          title: string;
+        };
         code: {
           confirm: string;
           confirmHelp: string;
@@ -339,6 +344,8 @@ declare namespace App {
         course: {
           attachments: string;
           category: string;
+          class: string;
+          classDetail: string;
           list: string;
           title: string;
         };
@@ -637,13 +644,24 @@ declare namespace App {
         route: Record<I18nRouteKey, string> & {
           notFound: string;
           root: string;
+          'route.(base)_about': string;
+          'route.(base)_class-manage': string;
+          'route.(base)_class-manage_detail': string;
+          'route.(base)_class-manage_list': string;
           'route.(base)_course-manage': string;
           'route.(base)_course-manage_attachments': string;
+          'route.(base)_course-manage_attachments_detail': string;
           'route.(base)_course-manage_category': string;
+          'route.(base)_course-manage_class': string;
+          'route.(base)_course-manage_class_detail': string;
           'route.(base)_course-manage_list': string;
           'route.(base)_home': string;
           'route.about': string;
+          'route.class_detail': string;
+          'route.class_list': string;
+          'route.class_manage': string;
           'route.course_attachments': string;
+          'route.course_attachments_detail': string;
           'route.course_category': string;
           'route.course_list': string;
           'route.course_manage': string;

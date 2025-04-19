@@ -5,6 +5,11 @@ import route from './route';
 import theme from './theme';
 
 const local: App.I18n.Schema['translation'] = {
+  class: {
+    detail: '班级详情',
+    list: '班级列表',
+    title: '班级管理'
+  },
   code: {
     confirm: '确认要重新生成代码吗？',
     confirmHelp: '重新生成将覆盖原有代码，请确认是否备份',
@@ -15,6 +20,8 @@ const local: App.I18n.Schema['translation'] = {
   course: {
     attachments: '课程附件',
     category: '课程分类',
+    class: '班级管理',
+    classDetail: '班级详情',
     list: '课程列表',
     title: '课程管理'
   },

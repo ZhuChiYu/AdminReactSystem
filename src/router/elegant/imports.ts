@@ -10,6 +10,8 @@
 
 
 export const layouts: Record<string, () => Promise<any>> = {
+"(base)_class-manage": () => import("@/pages/(base)/class-manage/layout.tsx"),
+"(base)_course-manage_class": () => import("@/pages/(base)/course-manage/class/layout.tsx"),
 "(base)_course-manage": () => import("@/pages/(base)/course-manage/layout.tsx"),
 "(base)": () => import("@/pages/(base)/layout.tsx"),
 "(blank)": () => import("@/pages/(blank)/layout.tsx"),
@@ -19,8 +21,12 @@ export const layouts: Record<string, () => Promise<any>> = {
 
 export const pages: Record<string, () => Promise<any>> = {
 "(base)_about": () => import("@/pages/(base)/about/index.tsx"),
+"(base)_class-manage_detail": () => import("@/pages/(base)/class-manage/detail/index.tsx"),
+"(base)_class-manage_list": () => import("@/pages/(base)/class-manage/list/index.tsx"),
 "(base)_course-manage_attachments": () => import("@/pages/(base)/course-manage/attachments/index.tsx"),
 "(base)_course-manage_category": () => import("@/pages/(base)/course-manage/category/index.tsx"),
+"(base)_course-manage_class_detail": () => import("@/pages/(base)/course-manage/class/detail/index.tsx"),
+"(base)_course-manage_class": () => import("@/pages/(base)/course-manage/class/index.tsx"),
 "(base)_course-manage": () => import("@/pages/(base)/course-manage/index.tsx"),
 "(base)_course-manage_list": () => import("@/pages/(base)/course-manage/list/index.tsx"),
 "(base)_function_event-bus": () => import("@/pages/(base)/function/event-bus/index.tsx"),
