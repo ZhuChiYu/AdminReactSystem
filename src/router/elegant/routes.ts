@@ -34,6 +34,26 @@ export const generatedRoutes: ElegantConstRoute[] = [
             }
           },
           {
+            matchedFiles: [null, '/src/pages/(base)/course-manage/index.tsx', null, null],
+            name: '(base)_course-manage',
+            path: '/course-manage',
+            handle: { i18nKey: 'route.(base)_course-manage', title: '(base)_course-manage', hideInMenu: true },
+            children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/course-manage/category/index.tsx', null, null],
+                name: '(base)_course-manage_category',
+                path: '/course-manage/category',
+                handle: { i18nKey: 'route.(base)_course-manage_category', title: '(base)_course-manage_category', hideInMenu: true }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/course-manage/list/index.tsx', null, null],
+                name: '(base)_course-manage_list',
+                path: '/course-manage/list',
+                handle: { i18nKey: 'route.(base)_course-manage_list', title: '(base)_course-manage_list', hideInMenu: true }
+              }
+            ]
+          },
+          {
             matchedFiles: [null, '/src/pages/(base)/function/index.tsx', null, null],
             name: '(base)_function',
             path: '/function',

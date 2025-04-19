@@ -285,6 +285,12 @@ declare namespace App {
 
     type Schema = {
       translation: {
+        code: {
+          confirm: string;
+          confirmHelp: string;
+          tip: string;
+          title: string;
+        };
         common: {
           action: string;
           add: string;
@@ -329,6 +335,12 @@ declare namespace App {
             no: string;
             yes: string;
           };
+        };
+        course: {
+          attachments: string;
+          category: string;
+          list: string;
+          title: string;
         };
         datatable: {
           itemCount: string;
@@ -611,16 +623,88 @@ declare namespace App {
           };
         };
         request: {
+          apiErrorMsg: string;
+          error: string;
+          errorInfo: string;
           logout: string;
           logoutMsg: string;
           logoutWithModal: string;
           logoutWithModalMsg: string;
           refreshToken: string;
+          resendApiText: string;
           tokenExpired: string;
         };
         route: Record<I18nRouteKey, string> & {
           notFound: string;
           root: string;
+          'route.(base)_course-manage': string;
+          'route.(base)_course-manage_attachments': string;
+          'route.(base)_course-manage_category': string;
+          'route.(base)_course-manage_list': string;
+          'route.(base)_home': string;
+          'route.about': string;
+          'route.course_attachments': string;
+          'route.course_category': string;
+          'route.course_list': string;
+          'route.course_manage': string;
+          'route.document': string;
+          'route.document_antd': string;
+          'route.document_procomponents': string;
+          'route.document_project': string;
+          'route.document_project-link': string;
+          'route.document_react': string;
+          'route.document_unocss': string;
+          'route.document_vite': string;
+          'route.exception': string;
+          'route.exception_403': string;
+          'route.exception_404': string;
+          'route.exception_500': string;
+          'route.function': string;
+          'route.function_form': string;
+          'route.function_form_button': string;
+          'route.function_form_cascade-select': string;
+          'route.function_form_custom-select': string;
+          'route.function_form_date-range-select': string;
+          'route.function_form_date-select': string;
+          'route.function_form_draggable-modal': string;
+          'route.function_form_file-upload': string;
+          'route.function_form_image-upload': string;
+          'route.function_form_input': string;
+          'route.function_form_keyboard': string;
+          'route.function_form_modal': string;
+          'route.function_form_radio': string;
+          'route.function_form_richtext': string;
+          'route.function_form_select': string;
+          'route.function_form_table-select': string;
+          'route.function_form_transfer': string;
+          'route.function_form_tree-select': string;
+          'route.function_form_validate': string;
+          'route.function_hide-child': string;
+          'route.function_hide-child_child1': string;
+          'route.function_hide-child_child2': string;
+          'route.function_hide-child_child3': string;
+          'route.function_request': string;
+          'route.function_tab': string;
+          'route.function_tab_child1': string;
+          'route.function_tab_child2': string;
+          'route.function_toggle-auth': string;
+          'route.home': string;
+          'route.manage': string;
+          'route.manage_auth': string;
+          'route.manage_role': string;
+          'route.manage_route': string;
+          'route.manage_user': string;
+          'route.multi-menu': string;
+          'route.multi-menu_first': string;
+          'route.multi-menu_first_child': string;
+          'route.multi-menu_second': string;
+          'route.multi-menu_second_child': string;
+          'route.multi-menu_second_child_home': string;
+          'route.projects': string;
+          'route.projects_details': string;
+          'route.projects_join': string;
+          'route.projects_list': string;
+          'route.user-center': string;
         };
         system: {
           errorReason: string;
@@ -630,6 +714,16 @@ declare namespace App {
           updateConfirm: string;
           updateContent: string;
           updateTitle: string;
+        };
+        table: {
+          expanded: string;
+          folded: string;
+          page: string;
+          pageSize: string;
+          reset: string;
+          search: string;
+          submit: string;
+          total: string;
         };
         theme: {
           colourWeakness: string;

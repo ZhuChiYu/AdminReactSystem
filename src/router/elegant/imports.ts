@@ -10,6 +10,7 @@
 
 
 export const layouts: Record<string, () => Promise<any>> = {
+"(base)_course-manage": () => import("@/pages/(base)/course-manage/layout.tsx"),
 "(base)": () => import("@/pages/(base)/layout.tsx"),
 "(blank)": () => import("@/pages/(blank)/layout.tsx"),
 "(blank)_login": () => import("@/pages/(blank)/login/layout.tsx"),
@@ -18,6 +19,10 @@ export const layouts: Record<string, () => Promise<any>> = {
 
 export const pages: Record<string, () => Promise<any>> = {
 "(base)_about": () => import("@/pages/(base)/about/index.tsx"),
+"(base)_course-manage_attachments": () => import("@/pages/(base)/course-manage/attachments/index.tsx"),
+"(base)_course-manage_category": () => import("@/pages/(base)/course-manage/category/index.tsx"),
+"(base)_course-manage": () => import("@/pages/(base)/course-manage/index.tsx"),
+"(base)_course-manage_list": () => import("@/pages/(base)/course-manage/list/index.tsx"),
 "(base)_function_event-bus": () => import("@/pages/(base)/function/event-bus/index.tsx"),
 "(base)_function_hide-child": () => import("@/pages/(base)/function/hide-child/index.tsx"),
 "(base)_function_hide-child_one": () => import("@/pages/(base)/function/hide-child/one/index.tsx"),

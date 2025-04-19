@@ -29,6 +29,10 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "document_procomponents": "/document/procomponents";
     "document_antd": "/document/antd";
     "(base)_about": "/about";
+    "(base)_course-manage": "/course-manage";
+    "(base)_course-manage_attachments": "/course-manage/attachments";
+    "(base)_course-manage_category": "/course-manage/category";
+    "(base)_course-manage_list": "/course-manage/list";
     "(base)_function": "/function";
     "(base)_function_event-bus": "/function/event-bus";
     "(base)_function_hide-child": "/function/hide-child";
@@ -135,6 +139,11 @@ declare module "@soybean-react/vite-plugin-react-router" {
   export type LastLevelRouteKey = Extract<
     RouteKey,
     | "(base)_about"
+    | "(base)_course-manage_attachments"
+    | "(base)_course-manage_category"
+    | "(base)_course-manage"
+    | "(base)_course-manage"
+    | "(base)_course-manage_list"
     | "(base)_function_event-bus"
     | "(base)_function_hide-child"
     | "(base)_function_hide-child_one"

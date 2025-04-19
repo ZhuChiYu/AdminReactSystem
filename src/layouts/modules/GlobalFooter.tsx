@@ -8,7 +8,7 @@ const GlobalFooter = () => {
         rel="noopener noreferrer"
         target="_blank"
       >
-        Copyright MIT © 2021 Soybean
+        Copyright © 2025 一品华信
       </a>
     </DarkModeContainer>
   );
