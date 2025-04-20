@@ -8,7 +8,8 @@ import {
   FilePptOutlined,
   FileTextOutlined,
   FileWordOutlined,
-  InboxOutlined
+  InboxOutlined,
+  PaperClipOutlined
 } from '@ant-design/icons';
 import {
   Button,
@@ -21,6 +22,7 @@ import {
   Progress,
   Space,
   Table,
+  Tag,
   Typography,
   Upload,
   message
@@ -64,7 +66,7 @@ const getCourseName = (courseId: string): string => {
 
 function Component() {
   const navigate = useNavigate();
-  const { courseId } = useParams();
+  const { courseId } = useParams<{ courseId: string }>();
 
   const [course, setCourse] = useState<Course | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -472,6 +474,14 @@ function Component() {
           >
             {course ? `${course.name} - 课程附件管理` : '加载中...'}
           </Title>
+          {attachments.length > 0 && (
+            <Tag
+              className="ml-3"
+              color="blue"
+            >
+              <PaperClipOutlined /> {attachments.length}个附件
+            </Tag>
+          )}
         </div>
 
         <Divider />
@@ -519,6 +529,19 @@ function Component() {
               />
             )
           }}
+          summary={() => (
+            <Table.Summary.Row>
+              <Table.Summary.Cell
+                colSpan={5}
+                index={0}
+              >
+                <div className="text-right">
+                  <Text strong>附件总数: </Text>
+                  <Text>{filteredAttachments.length}个</Text>
+                </div>
+              </Table.Summary.Cell>
+            </Table.Summary.Row>
+          )}
         />
       </Card>
 
@@ -526,6 +549,7 @@ function Component() {
       <Modal
         open={isUploadModalVisible}
         title="上传课程附件"
+        width={600}
         footer={[
           <Button
             key="back"
@@ -558,12 +582,42 @@ function Component() {
           </p>
         </Dragger>
 
+        {fileList.length > 0 && (
+          <div className="mt-4">
+            <Text strong>已选择 {fileList.length} 个文件</Text>
+            <div className="mt-2 max-h-40 overflow-y-auto">
+              {fileList.map((file, index) => (
+                <div
+                  className="mb-2 flex items-center"
+                  key={index}
+                >
+                  {getFileIcon(file.name.split('.').pop() || '')}
+                  <Text
+                    ellipsis
+                    className="ml-2"
+                    style={{ maxWidth: '400px' }}
+                  >
+                    {file.name}
+                  </Text>
+                  <Text className="ml-2 text-gray-500">({formatFileSize(file.size || 0)})</Text>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {uploading && (
-          <div style={{ marginTop: 16 }}>
+          <div className="mt-4">
             <Progress
+              format={percent => `${percent}% 完成`}
               percent={uploadProgress}
               status={uploadProgress === 100 ? 'success' : 'active'}
             />
+            <div className="mt-1 text-center">
+              <Text type={uploadProgress === 100 ? 'success' : undefined}>
+                {uploadProgress === 100 ? '上传完成！' : '正在上传...'}
+              </Text>
+            </div>
           </div>
         )}
       </Modal>

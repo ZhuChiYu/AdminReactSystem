@@ -317,18 +317,26 @@ const ClassList = () => {
       width: 180
     },
     {
+      fixed: 'right' as const,
       key: 'action',
       render: (_: unknown, record: any) => (
         <Space size="middle">
           <Button
+            size="small"
             type="link"
             onClick={() => handleViewDetail(record.id)}
           >
             查看
           </Button>
-          <Button type="link">编辑</Button>
+          <Button
+            size="small"
+            type="link"
+          >
+            编辑
+          </Button>
           <Button
             danger
+            size="small"
             type="link"
           >
             删除
@@ -391,7 +399,13 @@ const ClassList = () => {
           dataSource={filteredList}
           loading={loading}
           rowKey="id"
-          scroll={{ y: 'calc(100vh - 300px)' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 300px)' }}
+          pagination={{
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: total => `共 ${total} 条记录`,
+            total: filteredList.length
+          }}
         />
 
         <Modal

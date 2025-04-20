@@ -1,4 +1,4 @@
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from 'antd';
+import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag } from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
@@ -21,6 +21,11 @@ const CourseList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+
+  // 添加编辑课程相关状态
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editForm] = Form.useForm();
+  const [currentCourse, setCurrentCourse] = useState<any>(null);
 
   // 模拟数据加载
   useEffect(() => {
@@ -199,6 +204,23 @@ const CourseList = () => {
     navigate(`/course-manage/attachments/${courseId}`);
   };
 
+  // 打开编辑课程模态框
+  const showEditModal = (course: any) => {
+    setCurrentCourse(course);
+    editForm.setFieldsValue({
+      category: course.category,
+      date: dayjs(course.date),
+      name: course.name,
+      price: course.price
+    });
+    setEditModalOpen(true);
+  };
+
+  // 关闭编辑课程模态框
+  const handleEditCancel = () => {
+    setEditModalOpen(false);
+  };
+
   // 提交添加课程表单
   const handleAddCourse = async () => {
     try {
@@ -245,6 +267,72 @@ const CourseList = () => {
     }
   };
 
+  // 提交编辑课程表单
+  const handleEditCourse = async () => {
+    try {
+      const values = await editForm.validateFields();
+      setSubmitting(true);
+
+      // 模拟API请求延迟
+      setTimeout(() => {
+        // 更新课程对象
+        const updatedCourse = {
+          ...currentCourse,
+          category: values.category,
+          date: values.date.format('YYYY-MM-DD'),
+          name: values.name,
+          price: values.price
+        };
+
+        // 更新课程列表
+        const updatedCourseList = courseList.map(course => (course.id === currentCourse.id ? updatedCourse : course));
+        setCourseList(updatedCourseList);
+        setFilteredList(updatedCourseList);
+
+        // 更新本地存储
+        localStorage.setItem('courseList', JSON.stringify(updatedCourseList));
+
+        // 关闭模态框并重置状态
+        setEditModalOpen(false);
+        setSubmitting(false);
+        setCurrentCourse(null);
+
+        // 显示成功消息
+        Modal.success({
+          content: `课程"${values.name}"已成功更新`,
+          title: '更新成功'
+        });
+      }, 1000);
+    } catch (error) {
+      console.error('表单验证失败:', error);
+      setSubmitting(false);
+    }
+  };
+
+  // 处理删除课程
+  const handleDeleteCourse = (courseId: number) => {
+    // 模拟API删除请求
+    setLoading(true);
+
+    setTimeout(() => {
+      // 从列表中移除课程
+      const updatedCourseList = courseList.filter(course => course.id !== courseId);
+      setCourseList(updatedCourseList);
+      setFilteredList(updatedCourseList);
+
+      // 更新本地存储
+      localStorage.setItem('courseList', JSON.stringify(updatedCourseList));
+
+      setLoading(false);
+
+      // 显示成功消息
+      Modal.success({
+        content: '课程已成功删除',
+        title: '删除成功'
+      });
+    }, 500);
+  };
+
   // 表格列定义
   const columns = [
     {
@@ -282,7 +370,11 @@ const CourseList = () => {
       dataIndex: 'attachment',
       key: 'attachment',
       render: (_text: string, record: any) =>
-        record.attachmentCount > 0 ? <Tag color="blue">{`${record.attachmentCount}个附件`}</Tag> : '无附件',
+        record.attachmentCount > 0 ? (
+          <Tag color="blue">{`${record.attachmentCount}个附件`}</Tag>
+        ) : (
+          <Tag color="default">无附件</Tag>
+        ),
       title: '附件',
       width: 100
     },
@@ -307,6 +399,7 @@ const CourseList = () => {
           <Button
             size="small"
             type="link"
+            onClick={() => showEditModal(record)}
           >
             编辑
           </Button>
@@ -317,17 +410,25 @@ const CourseList = () => {
           >
             附件
           </Button>
-          <Button
-            danger
-            size="small"
-            type="link"
+          <Popconfirm
+            cancelText="取消"
+            description="确定要删除这个课程吗？此操作不可撤销。"
+            okText="确定"
+            title="删除课程"
+            onConfirm={() => handleDeleteCourse(record.id)}
           >
-            删除
-          </Button>
+            <Button
+              danger
+              size="small"
+              type="link"
+            >
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
       ),
       title: '操作',
-      width: 160
+      width: 200
     }
   ];
 
@@ -411,6 +512,76 @@ const CourseList = () => {
           form={form}
           layout="vertical"
           name="add_course_form"
+        >
+          <Form.Item
+            label="课程名称"
+            name="name"
+            rules={[{ message: '请输入课程名称', required: true }]}
+          >
+            <Input placeholder="请输入课程名称" />
+          </Form.Item>
+
+          <Form.Item
+            label="课程分类"
+            name="category"
+            rules={[{ message: '请选择课程分类', required: true }]}
+          >
+            <Select
+              options={categoryOptionsForForm}
+              placeholder="请选择分类"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="课程价格"
+            name="price"
+            rules={[{ message: '请输入课程价格', required: true }]}
+          >
+            <InputNumber
+              addonBefore="¥"
+              min={0}
+              placeholder="请输入价格"
+              precision={2}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="开课日期"
+            name="date"
+            rules={[{ message: '请选择开课日期', required: true }]}
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 编辑课程模态框 */}
+      <Modal
+        open={editModalOpen}
+        title="编辑课程"
+        footer={[
+          <Button
+            key="back"
+            onClick={handleEditCancel}
+          >
+            取消
+          </Button>,
+          <Button
+            key="submit"
+            loading={submitting}
+            type="primary"
+            onClick={handleEditCourse}
+          >
+            保存
+          </Button>
+        ]}
+        onCancel={handleEditCancel}
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          name="edit_course_form"
         >
           <Form.Item
             label="课程名称"
