@@ -37,9 +37,9 @@ export const generatedRoutes: ElegantConstRoute[] = [
             matchedFiles: [null, '/src/pages/(base)/class-manage/layout.tsx', null, null],
             name: '(base)_class-manage',
             path: '/class-manage',
-            handle: { 
-              i18nKey: 'route.(base)_class-manage', 
-              title: '(base)_class-manage', 
+            handle: {
+              i18nKey: 'route.(base)_class-manage',
+              title: '(base)_class-manage',
               hideInMenu: false,
               icon: 'mdi:account-group',
               order: 3
@@ -49,19 +49,19 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/class-manage/detail/index.tsx', null, null],
                 name: '(base)_class-manage_detail',
                 path: '/class-manage/detail',
-                handle: { 
-                  i18nKey: 'route.(base)_class-manage_detail', 
-                  title: '(base)_class-manage_detail', 
-                  hideInMenu: true 
+                handle: {
+                  i18nKey: 'route.(base)_class-manage_detail',
+                  title: '(base)_class-manage_detail',
+                  hideInMenu: true
                 }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/class-manage/list/index.tsx', null, null],
                 name: '(base)_class-manage_list',
                 path: '/class-manage/list',
-                handle: { 
-                  i18nKey: 'route.(base)_class-manage_list', 
-                  title: '(base)_class-manage_list', 
+                handle: {
+                  i18nKey: 'route.(base)_class-manage_list',
+                  title: '(base)_class-manage_list',
                   hideInMenu: false,
                   icon: 'mdi:format-list-bulleted',
                   order: 1
@@ -79,7 +79,11 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/course-manage/attachments/index.tsx', null, null],
                 name: '(base)_course-manage_attachments',
                 path: '/course-manage/attachments',
-                handle: { i18nKey: 'route.(base)_course-manage_attachments', title: '(base)_course-manage_attachments', hideInMenu: true }
+                handle: {
+                  i18nKey: 'route.(base)_course-manage_attachments',
+                  title: '(base)_course-manage_attachments',
+                  hideInMenu: true
+                }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/course-manage/category/index.tsx', null, null],
@@ -95,15 +99,14 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/course-manage/class/layout.tsx', null, null],
                 name: '(base)_course-manage_class',
                 path: '/course-manage/class',
-                handle: { i18nKey: 'route.(base)_course-manage_class', title: '(base)_course-manage_class', hideInMenu: true },
+                handle: {
+                  i18nKey: 'route.(base)_course-manage_class',
+                  title: '(base)_course-manage_class',
+                  hideInMenu: true
+                },
                 children: [
                   {
-                    matchedFiles: [
-                      null,
-                      '/src/pages/(base)/course-manage/class/detail/index.tsx',
-                      null,
-                      null
-                    ],
+                    matchedFiles: [null, '/src/pages/(base)/course-manage/class/detail/index.tsx', null, null],
                     name: '(base)_course-manage_class_detail',
                     path: '/course-manage/class/detail',
                     handle: {

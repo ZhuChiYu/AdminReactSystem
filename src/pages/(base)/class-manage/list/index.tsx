@@ -36,6 +36,7 @@ const ClassList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+  const [editingClassId, setEditingClassId] = useState<number | null>(null);
 
   // 模拟数据加载
   useEffect(() => {
@@ -191,21 +192,56 @@ const ClassList = () => {
     { label: '已结束', value: ClassStatus.COMPLETED }
   ];
 
-  // 打开添加班级模态框
-  const showAddModal = () => {
-    form.resetFields();
-    setIsModalOpen(true);
-  };
-
-  // 关闭添加班级模态框
-  const handleCancel = () => {
-    setIsModalOpen(false);
-  };
-
   // 查看班级详情
   const handleViewDetail = (classId: number) => {
     navigate(`/class-manage/detail/${classId}`);
     console.log('跳转到详情页，URL:', `/class-manage/detail/${classId}`);
+  };
+
+  // 编辑班级
+  const handleEdit = (classId: number) => {
+    // 查找要编辑的班级
+    const classToEdit = classList.find(c => c.id === classId);
+    if (!classToEdit) return;
+
+    // 打开编辑模态框并填充表单
+    form.setFieldsValue({
+      categoryId: classToEdit.categoryId,
+      description: classToEdit.description,
+      endDate: dayjs(classToEdit.endDate),
+      name: classToEdit.name,
+      startDate: dayjs(classToEdit.startDate),
+      teacher: classToEdit.teacher
+    });
+
+    // 设置编辑模式并保存当前编辑的班级ID
+    setEditingClassId(classId);
+    setIsModalOpen(true);
+    console.log('编辑班级:', classId);
+  };
+
+  // 删除班级
+  const handleDelete = (classId: number) => {
+    Modal.confirm({
+      content: '确定要删除该班级吗？此操作不可恢复。',
+      onOk: () => {
+        // 过滤掉要删除的班级
+        const updatedClassList = classList.filter(c => c.id !== classId);
+
+        // 更新状态和本地存储
+        setClassList(updatedClassList);
+        setFilteredList(updatedClassList);
+        localStorage.setItem('classList', JSON.stringify(updatedClassList));
+
+        // 显示成功消息
+        Modal.success({
+          content: '班级已成功删除',
+          title: '删除成功'
+        });
+        console.log('删除班级:', classId);
+      },
+      title: '确认删除'
+    });
   };
 
   // 提交添加班级表单
@@ -214,49 +250,109 @@ const ClassList = () => {
       const values = await form.validateFields();
       setSubmitting(true);
 
-      // 模拟API请求延迟
-      setTimeout(() => {
-        // 生成新班级对象
-        const newClass = {
-          categoryId: values.categoryId,
-          categoryName: categoryOptions.find(item => item.value === values.categoryId)?.label || '未知类型',
-          createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          description: values.description || '',
-          endDate: values.endDate.format('YYYY-MM-DD'),
-          id: classList.length + 1,
-          name: values.name,
-          startDate: values.startDate.format('YYYY-MM-DD'),
-          status:
-            new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime()
-              ? ClassStatus.NOT_STARTED
-              : ClassStatus.IN_PROGRESS,
-          studentCount: 0,
-          teacher: values.teacher
-        };
+      // 判断是编辑模式还是新增模式
+      if (editingClassId !== null) {
+        // 编辑模式
+        setTimeout(() => {
+          // 更新班级信息
+          const updatedClassList = classList.map(c => {
+            if (c.id === editingClassId) {
+              return {
+                ...c,
+                categoryId: values.categoryId,
+                categoryName: categoryOptions.find(item => item.value === values.categoryId)?.label || '未知类型',
+                description: values.description || '',
+                endDate: values.endDate.format('YYYY-MM-DD'),
+                name: values.name,
+                startDate: values.startDate.format('YYYY-MM-DD'),
+                status:
+                  new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime()
+                    ? ClassStatus.NOT_STARTED
+                    : ClassStatus.IN_PROGRESS,
+                teacher: values.teacher
+              };
+            }
+            return c;
+          });
 
-        // 更新班级列表
-        const updatedClassList = [...classList, newClass];
-        setClassList(updatedClassList);
-        setFilteredList(updatedClassList);
+          // 更新班级列表
+          setClassList(updatedClassList);
+          setFilteredList(updatedClassList);
 
-        // 更新本地存储
-        localStorage.setItem('classList', JSON.stringify(updatedClassList));
+          // 更新本地存储
+          localStorage.setItem('classList', JSON.stringify(updatedClassList));
 
-        // 关闭模态框并重置状态
-        setIsModalOpen(false);
-        setSubmitting(false);
-        form.resetFields();
+          // 关闭模态框并重置状态
+          setIsModalOpen(false);
+          setSubmitting(false);
+          setEditingClassId(null);
+          form.resetFields();
 
-        // 显示成功消息
-        Modal.success({
-          content: `班级"${values.name}"已成功创建`,
-          title: '创建成功'
-        });
-      }, 1000);
+          // 显示成功消息
+          Modal.success({
+            content: `班级"${values.name}"已成功更新`,
+            title: '更新成功'
+          });
+        }, 1000);
+      } else {
+        // 新增模式
+        // 模拟API请求延迟
+        setTimeout(() => {
+          // 生成新班级对象
+          const newClass = {
+            categoryId: values.categoryId,
+            categoryName: categoryOptions.find(item => item.value === values.categoryId)?.label || '未知类型',
+            createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+            description: values.description || '',
+            endDate: values.endDate.format('YYYY-MM-DD'),
+            id: classList.length + 1,
+            name: values.name,
+            startDate: values.startDate.format('YYYY-MM-DD'),
+            status:
+              new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime()
+                ? ClassStatus.NOT_STARTED
+                : ClassStatus.IN_PROGRESS,
+            studentCount: 0,
+            teacher: values.teacher
+          };
+
+          // 更新班级列表
+          const updatedClassList = [...classList, newClass];
+          setClassList(updatedClassList);
+          setFilteredList(updatedClassList);
+
+          // 更新本地存储
+          localStorage.setItem('classList', JSON.stringify(updatedClassList));
+
+          // 关闭模态框并重置状态
+          setIsModalOpen(false);
+          setSubmitting(false);
+          form.resetFields();
+
+          // 显示成功消息
+          Modal.success({
+            content: `班级"${values.name}"已成功创建`,
+            title: '创建成功'
+          });
+        }, 1000);
+      }
     } catch (error) {
       console.error('表单验证失败:', error);
       setSubmitting(false);
     }
+  };
+
+  // 打开添加班级模态框
+  const showAddModal = () => {
+    form.resetFields();
+    setEditingClassId(null);
+    setIsModalOpen(true);
+  };
+
+  // 关闭添加班级模态框
+  const handleCancel = () => {
+    setIsModalOpen(false);
+    setEditingClassId(null);
   };
 
   // 表格列定义
@@ -331,6 +427,7 @@ const ClassList = () => {
           <Button
             size="small"
             type="link"
+            onClick={() => handleEdit(record.id)}
           >
             编辑
           </Button>
@@ -338,6 +435,7 @@ const ClassList = () => {
             danger
             size="small"
             type="link"
+            onClick={() => handleDelete(record.id)}
           >
             删除
           </Button>
@@ -411,7 +509,7 @@ const ClassList = () => {
         <Modal
           confirmLoading={submitting}
           open={isModalOpen}
-          title="新增班级"
+          title={editingClassId !== null ? '编辑班级' : '新增班级'}
           onCancel={handleCancel}
           onOk={handleAddClass}
         >

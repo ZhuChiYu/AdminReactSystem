@@ -1,4 +1,13 @@
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined,
+  CheckCircleOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  InboxOutlined,
+  LoadingOutlined,
+  PaperClipOutlined,
+  UploadOutlined
+} from '@ant-design/icons';
 import {
   Avatar,
   Button,
@@ -9,11 +18,15 @@ import {
   Input,
   List,
   Modal,
+  Progress,
   Select,
   Space,
+  Spin,
   Table,
   Tabs,
   Tag,
+  Typography,
+  Upload,
   message
 } from 'antd';
 import dayjs from 'dayjs';
@@ -45,6 +58,17 @@ const ClassDetail = () => {
   // 添加学员弹窗状态
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addForm] = Form.useForm();
+
+  // 课程相关状态
+  const [courseModalVisible, setCourseModalVisible] = useState(false);
+  const [courseDetailVisible, setCourseDetailVisible] = useState(false);
+  const [currentCourse, setCurrentCourse] = useState<any>(null);
+  const [courseForm] = Form.useForm();
+  const [courseAttachments, setCourseAttachments] = useState<any[]>([]);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileList, setFileList] = useState<any[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     // 模拟加载班级数据
@@ -373,7 +397,7 @@ const ClassDetail = () => {
     },
     {
       key: 'action',
-      render: (_: any, record: any) => (
+      render: (_: unknown, record: any) => (
         <Space size="middle">
           <Button
             type="link"
@@ -433,6 +457,130 @@ const ClassDetail = () => {
       addForm.resetFields();
 
       message.success('学员添加成功');
+    } catch (error) {
+      console.error('表单验证失败:', error);
+    }
+  };
+
+  // 查看课程详情
+  const handleViewCourseDetail = (course: any) => {
+    setCurrentCourse(course);
+
+    // 模拟加载课程附件数据
+    const mockAttachments = [
+      {
+        id: 1,
+        name: '课程大纲.pdf',
+        size: '2.5MB',
+        type: 'pdf',
+        uploadTime: '2024-03-01 10:30:00',
+        url: 'https://example.com/syllabus.pdf'
+      },
+      {
+        id: 2,
+        name: '课程资料.zip',
+        size: '15MB',
+        type: 'zip',
+        uploadTime: '2024-03-02 14:20:00',
+        url: 'https://example.com/materials.zip'
+      },
+      {
+        id: 3,
+        name: '课程PPT.pptx',
+        size: '5.8MB',
+        type: 'pptx',
+        uploadTime: '2024-03-03 16:45:00',
+        url: 'https://example.com/slides.pptx'
+      }
+    ];
+
+    setCourseAttachments(mockAttachments);
+    setCourseDetailVisible(true);
+  };
+
+  // 编辑课程信息
+  const handleEditCourse = (course: any) => {
+    setCurrentCourse(course);
+
+    // 设置表单初值
+    courseForm.setFieldsValue({
+      classroom: course.classroom,
+      endDate: dayjs(course.endDate),
+      name: course.name,
+      schedule: course.schedule,
+      startDate: dayjs(course.startDate),
+      teacher: course.teacher
+    });
+
+    setCourseModalVisible(true);
+  };
+
+  // 移除课程
+  const handleRemoveCourse = (courseId: number) => {
+    Modal.confirm({
+      content: '确定要移除该课程吗？此操作不可恢复。',
+      onOk: () => {
+        // 过滤掉要移除的课程
+        const updatedCourseList = courseList.filter(c => c.id !== courseId);
+        setCourseList(updatedCourseList);
+
+        // 显示成功消息
+        message.success('课程已成功移除');
+      },
+      title: '确认移除'
+    });
+  };
+
+  // 添加新课程
+  const handleAddCourse = () => {
+    setCurrentCourse(null);
+    courseForm.resetFields();
+    setCourseModalVisible(true);
+  };
+
+  // 保存课程信息
+  const handleSaveCourse = async () => {
+    try {
+      const values = await courseForm.validateFields();
+
+      if (currentCourse) {
+        // 编辑现有课程
+        const updatedCourseList = courseList.map(c => {
+          if (c.id === currentCourse.id) {
+            return {
+              ...c,
+              classroom: values.classroom,
+              endDate: values.endDate.format('YYYY-MM-DD'),
+              name: values.name,
+              schedule: values.schedule,
+              startDate: values.startDate.format('YYYY-MM-DD'),
+              status: new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime() ? 0 : 1,
+              teacher: values.teacher
+            };
+          }
+          return c;
+        });
+
+        setCourseList(updatedCourseList);
+        message.success('课程信息已更新');
+      } else {
+        // 添加新课程
+        const newCourse = {
+          classroom: values.classroom,
+          endDate: values.endDate.format('YYYY-MM-DD'),
+          id: courseList.length + 1,
+          name: values.name,
+          schedule: values.schedule,
+          startDate: values.startDate.format('YYYY-MM-DD'),
+          status: new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime() ? 0 : 1,
+          teacher: values.teacher
+        };
+
+        setCourseList([...courseList, newCourse]);
+        message.success('新课程已添加');
+      }
+
+      setCourseModalVisible(false);
     } catch (error) {
       console.error('表单验证失败:', error);
     }
@@ -500,6 +648,190 @@ const ClassDetail = () => {
       },
       title: '导出学员数据'
     });
+  };
+
+  // 处理文件上传
+  const handleUploadFile = () => {
+    setUploadModalVisible(true);
+    setFileList([]);
+    setUploadProgress(0);
+  };
+
+  // 处理文件上传完成
+  const handleFileUpload = () => {
+    if (fileList.length === 0) {
+      message.error('请先选择要上传的文件');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    // 计算总文件大小，以便显示
+    const totalSize = fileList.reduce((total, file) => total + file.size, 0);
+    const totalSizeText =
+      totalSize < 1024 * 1024 ? `${(totalSize / 1024).toFixed(2)} KB` : `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+
+    // 显示上传开始消息
+    message.loading({
+      content: `开始上传 ${fileList.length} 个文件 (总大小: ${totalSizeText})`,
+      duration: 1,
+      key: 'uploadMessage'
+    });
+
+    // 模拟上传文件
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+      progress += Math.floor(Math.random() * 3) + 1;
+      if (progress >= 100) {
+        clearInterval(progressInterval);
+        progress = 100;
+      }
+      setUploadProgress(progress);
+
+      // 更新上传消息
+      if (progress < 100) {
+        message.loading({
+          content: `正在上传: ${progress}%`,
+          duration: 0,
+          key: 'uploadMessage'
+        });
+      }
+    }, 100);
+
+    // 模拟上传完成
+    setTimeout(() => {
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // 更新上传完成消息
+      message.success({
+        content: `上传完成!`,
+        duration: 2,
+        key: 'uploadMessage'
+      });
+
+      // 处理所有文件并添加到附件列表
+      const newAttachments = fileList.map(file => {
+        // 获取文件扩展名
+        const fileExtension =
+          file.name && typeof file.name === 'string' ? file.name.split('.').pop()?.toLowerCase() || '' : '';
+
+        // 计算文件大小
+        let fileSize;
+        if (file.size < 1024 * 1024) {
+          fileSize = `${(file.size / 1024).toFixed(2)} KB`;
+        } else {
+          fileSize = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+        }
+
+        // 生成随机ID
+        const fileId = Math.random().toString(36).substring(2);
+
+        return {
+          id: fileId,
+          name: file.name,
+          size: fileSize,
+          type: fileExtension,
+          uploadTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+          url: URL.createObjectURL(file.originFileObj)
+        };
+      });
+
+      // 添加到课程附件列表
+      setCourseAttachments(prev => [...prev, ...newAttachments]);
+
+      // 延迟一会儿显示上传完成状态
+      setTimeout(() => {
+        // 关闭模态框并重置状态
+        setUploading(false);
+        setUploadModalVisible(false);
+        setFileList([]);
+        setUploadProgress(0);
+
+        // 显示最终成功消息
+        message.success({
+          content: `成功上传了 ${newAttachments.length} 个文件`,
+          duration: 3
+        });
+      }, 1500);
+    }, 1500);
+  };
+
+  // 处理附件删除
+  const handleDeleteAttachment = (attachmentId: number) => {
+    Modal.confirm({
+      content: '确定要删除这个附件吗？',
+      onOk: () => {
+        const updatedAttachments = courseAttachments.filter(attachment => attachment.id !== attachmentId);
+        setCourseAttachments(updatedAttachments);
+        message.success('附件已删除');
+      },
+      title: '确认删除'
+    });
+  };
+
+  // 处理附件下载
+  const handleDownloadAttachment = (attachment: any) => {
+    // 在实际应用中，这里应该使用真实的文件URL
+    // 现在我们只是模拟下载操作
+    message.success(`开始下载: ${attachment.name}`);
+
+    // 如果有真实URL，可以这样处理下载
+    if (attachment.url) {
+      const link = document.createElement('a');
+      link.href = attachment.url;
+      link.download = attachment.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // 渲染主要信息区域
+  const renderBasicInfo = () => {
+    if (!classInfo) return null;
+
+    return (
+      <Card
+        bordered={false}
+        className="mb-4"
+      >
+        <Descriptions
+          column={{ lg: 3, md: 2, sm: 1, xl: 4, xs: 1, xxl: 4 }}
+          title={
+            <Space>
+              <Button
+                icon={<ArrowLeftOutlined />}
+                type="link"
+                onClick={handleBack}
+              >
+                返回
+              </Button>
+              <span>班级信息</span>
+            </Space>
+          }
+        >
+          <Descriptions.Item label="班级名称">{classInfo.name}</Descriptions.Item>
+          <Descriptions.Item label="班级ID">{classInfo.id}</Descriptions.Item>
+          <Descriptions.Item label="班级类型">{classInfo.categoryName}</Descriptions.Item>
+          <Descriptions.Item label="班主任">{classInfo.teacher}</Descriptions.Item>
+          <Descriptions.Item label="学员人数">{classInfo.studentCount}</Descriptions.Item>
+          <Descriptions.Item label="状态">
+            <Tag color={getStatusColor(classInfo.status)}>{getStatusText(classInfo.status)}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="开始日期">{classInfo.startDate}</Descriptions.Item>
+          <Descriptions.Item label="结束日期">{classInfo.endDate}</Descriptions.Item>
+          <Descriptions.Item label="创建时间">{classInfo.createdAt}</Descriptions.Item>
+          <Descriptions.Item
+            label="班级描述"
+            span={3}
+          >
+            {classInfo.description || '暂无描述'}
+          </Descriptions.Item>
+        </Descriptions>
+      </Card>
+    );
   };
 
   // 渲染学员列表
@@ -724,13 +1056,24 @@ const ClassDetail = () => {
     },
     {
       key: 'action',
-      render: () => (
+      render: (_: unknown, record: any) => (
         <Space size="middle">
-          <Button type="link">详情</Button>
-          <Button type="link">编辑</Button>
+          <Button
+            type="link"
+            onClick={() => handleViewCourseDetail(record)}
+          >
+            详情
+          </Button>
+          <Button
+            type="link"
+            onClick={() => handleEditCourse(record)}
+          >
+            编辑
+          </Button>
           <Button
             danger
             type="link"
+            onClick={() => handleRemoveCourse(record.id)}
           >
             移除
           </Button>
@@ -741,59 +1084,20 @@ const ClassDetail = () => {
     }
   ];
 
-  // 渲染主要信息区域
-  const renderBasicInfo = () => {
-    if (!classInfo) return null;
-
-    return (
-      <Card
-        bordered={false}
-        className="mb-4"
-      >
-        <Descriptions
-          column={{ lg: 3, md: 2, sm: 1, xl: 4, xs: 1, xxl: 4 }}
-          title={
-            <Space>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                type="link"
-                onClick={handleBack}
-              >
-                返回
-              </Button>
-              <span>班级信息</span>
-            </Space>
-          }
-        >
-          <Descriptions.Item label="班级名称">{classInfo.name}</Descriptions.Item>
-          <Descriptions.Item label="班级ID">{classInfo.id}</Descriptions.Item>
-          <Descriptions.Item label="班级类型">{classInfo.categoryName}</Descriptions.Item>
-          <Descriptions.Item label="班主任">{classInfo.teacher}</Descriptions.Item>
-          <Descriptions.Item label="学员人数">{classInfo.studentCount}</Descriptions.Item>
-          <Descriptions.Item label="状态">
-            <Tag color={getStatusColor(classInfo.status)}>{getStatusText(classInfo.status)}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="开始日期">{classInfo.startDate}</Descriptions.Item>
-          <Descriptions.Item label="结束日期">{classInfo.endDate}</Descriptions.Item>
-          <Descriptions.Item label="创建时间">{classInfo.createdAt}</Descriptions.Item>
-          <Descriptions.Item
-            label="班级描述"
-            span={3}
-          >
-            {classInfo.description || '暂无描述'}
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
-    );
-  };
-
   // 渲染课程列表
   const renderCourseList = () => {
     return (
       <Card
         bordered={false}
-        extra={<Button type="primary">添加课程</Button>}
         title="班级课程"
+        extra={
+          <Button
+            type="primary"
+            onClick={handleAddCourse}
+          >
+            添加课程
+          </Button>
+        }
       >
         <Table
           columns={courseColumns}
@@ -802,6 +1106,443 @@ const ClassDetail = () => {
           rowKey="id"
           scroll={{ x: 1200 }}
         />
+
+        {/* 课程详情模态框 */}
+        <Modal
+          open={courseDetailVisible}
+          title="课程详情"
+          width={700}
+          footer={[
+            <Button
+              key="back"
+              onClick={() => setCourseDetailVisible(false)}
+            >
+              关闭
+            </Button>
+          ]}
+          onCancel={() => setCourseDetailVisible(false)}
+        >
+          {currentCourse && (
+            <>
+              <Descriptions
+                column={2}
+                title="基本信息"
+              >
+                <Descriptions.Item label="课程名称">{currentCourse.name}</Descriptions.Item>
+                <Descriptions.Item label="授课教师">{currentCourse.teacher}</Descriptions.Item>
+                <Descriptions.Item label="上课地点">{currentCourse.classroom}</Descriptions.Item>
+                <Descriptions.Item label="上课时间">{currentCourse.schedule}</Descriptions.Item>
+                <Descriptions.Item label="开始日期">{currentCourse.startDate}</Descriptions.Item>
+                <Descriptions.Item label="结束日期">{currentCourse.endDate}</Descriptions.Item>
+                <Descriptions.Item label="状态">
+                  <Tag color={currentCourse.status === 1 ? 'processing' : 'default'}>
+                    {currentCourse.status === 1 ? '进行中' : '未开始'}
+                  </Tag>
+                </Descriptions.Item>
+              </Descriptions>
+
+              <div className="mt-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-medium">课程附件</h3>
+                  <Button
+                    icon={<UploadOutlined />}
+                    type="primary"
+                    onClick={handleUploadFile}
+                  >
+                    上传附件
+                  </Button>
+                </div>
+                <Table
+                  dataSource={courseAttachments}
+                  pagination={false}
+                  rowKey="id"
+                  columns={[
+                    {
+                      dataIndex: 'name',
+                      key: 'name',
+                      render: (text, record) => {
+                        // 根据文件类型显示不同的图标
+                        const fileExtension = record.type ? record.type.toLowerCase() : '';
+                        let icon = <PaperClipOutlined />;
+
+                        if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="图片文件"
+                              role="img"
+                            >
+                              🖼️
+                            </span>
+                          );
+                        } else if (['doc', 'docx'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="Word文档"
+                              role="img"
+                            >
+                              📝
+                            </span>
+                          );
+                        } else if (['xls', 'xlsx', 'csv'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="Excel表格"
+                              role="img"
+                            >
+                              📊
+                            </span>
+                          );
+                        } else if (['ppt', 'pptx'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="PPT演示文稿"
+                              role="img"
+                            >
+                              📊
+                            </span>
+                          );
+                        } else if (fileExtension === 'pdf') {
+                          icon = (
+                            <span
+                              aria-label="PDF文档"
+                              role="img"
+                            >
+                              📑
+                            </span>
+                          );
+                        } else if (fileExtension === 'zip') {
+                          icon = (
+                            <span
+                              aria-label="压缩文件"
+                              role="img"
+                            >
+                              📦
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <Space>
+                            {icon}
+                            <span>{text}</span>
+                          </Space>
+                        );
+                      },
+                      title: '文件名'
+                    },
+                    {
+                      dataIndex: 'type',
+                      key: 'type',
+                      render: text => (text ? text.toUpperCase() : ''),
+                      title: '类型',
+                      width: 100
+                    },
+                    {
+                      dataIndex: 'size',
+                      key: 'size',
+                      title: '大小',
+                      width: 100
+                    },
+                    {
+                      dataIndex: 'uploadTime',
+                      key: 'uploadTime',
+                      title: '上传时间',
+                      width: 180
+                    },
+                    {
+                      key: 'action',
+                      render: (_, record: any) => (
+                        <Space>
+                          <Button
+                            icon={<DownloadOutlined />}
+                            size="small"
+                            type="primary"
+                            onClick={() => handleDownloadAttachment(record)}
+                          >
+                            下载
+                          </Button>
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            size="small"
+                            onClick={() => handleDeleteAttachment(record.id)}
+                          >
+                            删除
+                          </Button>
+                        </Space>
+                      ),
+                      title: '操作',
+                      width: 180
+                    }
+                  ]}
+                />
+              </div>
+            </>
+          )}
+        </Modal>
+
+        {/* 课程编辑/添加模态框 */}
+        <Modal
+          open={courseModalVisible}
+          title={currentCourse ? '编辑课程' : '添加课程'}
+          onCancel={() => setCourseModalVisible(false)}
+          onOk={handleSaveCourse}
+        >
+          <Form
+            form={courseForm}
+            labelCol={{ span: 6 }}
+            style={{ marginTop: 20 }}
+            wrapperCol={{ span: 16 }}
+          >
+            <Form.Item
+              label="课程名称"
+              name="name"
+              rules={[{ message: '请输入课程名称', required: true }]}
+            >
+              <Input placeholder="请输入课程名称" />
+            </Form.Item>
+            <Form.Item
+              label="授课教师"
+              name="teacher"
+              rules={[{ message: '请输入授课教师', required: true }]}
+            >
+              <Input placeholder="请输入授课教师姓名" />
+            </Form.Item>
+            <Form.Item
+              label="上课地点"
+              name="classroom"
+              rules={[{ message: '请输入上课地点', required: true }]}
+            >
+              <Input placeholder="请输入上课地点" />
+            </Form.Item>
+            <Form.Item
+              label="上课时间"
+              name="schedule"
+              rules={[{ message: '请输入上课时间', required: true }]}
+            >
+              <Input placeholder="如：周一、周三 9:00-10:30" />
+            </Form.Item>
+            <Form.Item
+              label="开始日期"
+              name="startDate"
+              rules={[{ message: '请选择开始日期', required: true }]}
+            >
+              <DatePicker className="w-full" />
+            </Form.Item>
+            <Form.Item
+              label="结束日期"
+              name="endDate"
+              rules={[{ message: '请选择结束日期', required: true }]}
+            >
+              <DatePicker className="w-full" />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* 文件上传模态框 */}
+        <Modal
+          centered
+          footer={null}
+          open={uploadModalVisible}
+          width={600}
+          title={(() => {
+            if (uploading) {
+              if (uploadProgress === 100) {
+                return (
+                  <div className="flex items-center text-success">
+                    <CheckCircleOutlined className="mr-2" />
+                    上传完成
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center">
+                  <LoadingOutlined className="mr-2" />
+                  正在上传文件
+                </div>
+              );
+            }
+            return '上传课程附件';
+          })()}
+          onCancel={() => {
+            if (!uploading) {
+              setUploadModalVisible(false);
+              setFileList([]);
+              setUploadProgress(0);
+            }
+          }}
+        >
+          {!uploading ? (
+            <>
+              <div className="px-10 py-6">
+                <Upload.Dragger
+                  fileList={fileList}
+                  multiple={true}
+                  beforeUpload={file => {
+                    // 文件大小限制为10MB
+                    if (file.size > 10 * 1024 * 1024) {
+                      message.error(`${file.name} 超过10MB限制，无法上传`);
+                      return Upload.LIST_IGNORE;
+                    }
+
+                    // 验证文件类型
+                    const fileExtension =
+                      file.name && typeof file.name === 'string' ? file.name.split('.').pop()?.toLowerCase() || '' : '';
+                    const allowedTypes = [
+                      'doc',
+                      'docx',
+                      'ppt',
+                      'pptx',
+                      'xls',
+                      'xlsx',
+                      'pdf',
+                      'txt',
+                      'jpg',
+                      'jpeg',
+                      'png',
+                      'gif',
+                      'csv',
+                      'zip'
+                    ];
+
+                    if (!fileExtension || !allowedTypes.includes(fileExtension)) {
+                      message.error(`不支持的文件类型: ${fileExtension || '未知'}`);
+                      return Upload.LIST_IGNORE;
+                    }
+
+                    // 添加文件到列表
+                    setFileList([...fileList, file]);
+                    return false; // 阻止自动上传
+                  }}
+                  onRemove={file => {
+                    const updatedFileList = fileList.filter(f => f.uid !== file.uid);
+                    setFileList(updatedFileList);
+                    return true;
+                  }}
+                >
+                  <div className="p-4">
+                    <p className="ant-upload-drag-icon mb-4">
+                      <InboxOutlined style={{ color: '#6366f1', fontSize: 48 }} />
+                    </p>
+                    <p className="ant-upload-text mb-2 text-lg">点击或拖拽文件到此区域上传</p>
+                    <p className="ant-upload-hint text-gray-500">
+                      支持单个或批量上传。支持Word, PowerPoint, Excel, TXT, PDF, CSV和常见图片格式。
+                      单个文件大小不超过10MB。
+                    </p>
+                  </div>
+                </Upload.Dragger>
+
+                {fileList.length > 0 && (
+                  <div className="mt-4 border rounded p-3">
+                    <Typography.Text
+                      strong
+                      className="mb-2 block"
+                    >
+                      已选择 {fileList.length} 个文件
+                      {fileList.length > 0 && (
+                        <Typography.Text
+                          className="ml-2"
+                          type="secondary"
+                        >
+                          (总大小:{' '}
+                          {(() => {
+                            const totalSize = fileList.reduce((total, file) => total + file.size, 0);
+                            return totalSize < 1024 * 1024
+                              ? `${(totalSize / 1024).toFixed(2)} KB`
+                              : `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+                          })()}
+                          )
+                        </Typography.Text>
+                      )}
+                    </Typography.Text>
+                    <Table
+                      pagination={false}
+                      size="small"
+                      columns={[
+                        { dataIndex: 'name', ellipsis: true, title: '文件名' },
+                        { dataIndex: 'type', title: '类型', width: 80 },
+                        { dataIndex: 'size', title: '大小', width: 100 }
+                      ]}
+                      dataSource={fileList.map((file, index) => ({
+                        key: file.uid || index,
+                        name: file.name,
+                        size:
+                          file.size < 1024 * 1024
+                            ? `${(file.size / 1024).toFixed(2)} KB`
+                            : `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                        type: file.name?.split('.')?.pop()?.toUpperCase() || '未知'
+                      }))}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end border-t bg-gray-50 px-6 py-3">
+                <Space>
+                  <Button onClick={() => setUploadModalVisible(false)}>取消</Button>
+                  <Button
+                    disabled={fileList.length === 0}
+                    type="primary"
+                    onClick={handleFileUpload}
+                  >
+                    开始上传
+                  </Button>
+                </Space>
+              </div>
+            </>
+          ) : (
+            <div className="p-6">
+              <div className="mb-4 text-center">
+                {uploadProgress === 100 ? (
+                  <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 48 }} />
+                ) : (
+                  <Spin
+                    indicator={
+                      <LoadingOutlined
+                        spin
+                        style={{ fontSize: 36 }}
+                      />
+                    }
+                  />
+                )}
+
+                <Typography.Title
+                  className="mb-4 mt-3"
+                  level={4}
+                >
+                  {uploadProgress === 100 ? '上传完成！' : '正在上传文件...'}
+                </Typography.Title>
+
+                <Progress
+                  percent={uploadProgress}
+                  status={uploadProgress < 100 ? 'active' : 'success'}
+                  strokeColor={uploadProgress < 100 ? '#6366f1' : '#52c41a'}
+                  strokeWidth={8}
+                />
+
+                <Typography.Paragraph className="mt-3 text-gray-500">
+                  {uploadProgress === 100 ? (
+                    <>
+                      <CheckCircleOutlined className="mr-1 text-success" />
+                      文件上传成功，正在处理中...
+                    </>
+                  ) : (
+                    `正在上传文件 (${uploadProgress}%)...`
+                  )}
+                </Typography.Paragraph>
+              </div>
+
+              <div className="mt-4 flex justify-end border-t pt-3">
+                <Button
+                  disabled={uploadProgress < 100}
+                  onClick={() => setUploadModalVisible(false)}
+                >
+                  {uploadProgress === 100 ? '关闭' : '取消'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
       </Card>
     );
   };
