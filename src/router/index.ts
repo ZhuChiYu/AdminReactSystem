@@ -1,6 +1,6 @@
-import { BaseChildrenRoutes } from './builtin';
 import { generatedRoutes } from './elegant/routes';
 import { filterRoutes, getReactRoutes } from './routes';
+import { BaseChildrenRoutes } from './routes/builtin';
 /**
  * - 初始化路由
  * - 生成所有路由ex
@@ -23,7 +23,11 @@ function initRoutes() {
       'class-manage', // 避免班级管理重复
       'multi-menu', // 多级菜单
       'function', // 系统功能
-      'projects' // 多级动态路由
+      'projects', // 多级动态路由
+      'customer-manage', // 避免客户管理重复
+      'customer-follow', // 避免客户跟进重复
+      'customer-import', // 避免客户导入重复
+      'customer-info' // 避免客户资料重复
     ];
 
     // 移除这些菜单项

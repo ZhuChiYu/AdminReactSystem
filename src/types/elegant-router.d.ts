@@ -38,6 +38,10 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_course-manage_class": "/course-manage/class";
     "(base)_course-manage_class_detail": "/course-manage/class/detail";
     "(base)_course-manage_list": "/course-manage/list";
+    "(base)_customer-manage": "/customer-manage";
+    "(base)_customer-manage_follow": "/customer-manage/follow";
+    "(base)_customer-manage_import": "/customer-manage/import";
+    "(base)_customer-manage_info": "/customer-manage/info";
     "(base)_function": "/function";
     "(base)_function_event-bus": "/function/event-bus";
     "(base)_function_hide-child": "/function/hide-child";
@@ -155,6 +159,10 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_course-manage"
     | "(base)_course-manage"
     | "(base)_course-manage_list"
+    | "(base)_customer-manage_follow"
+    | "(base)_customer-manage_import"
+    | "(base)_customer-manage_info"
+    | "(base)_customer-manage"
     | "(base)_function_event-bus"
     | "(base)_function_hide-child"
     | "(base)_function_hide-child_one"

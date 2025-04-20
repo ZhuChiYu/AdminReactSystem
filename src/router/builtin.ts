@@ -47,50 +47,5 @@ export const BaseChildrenRoutes = [
     },
     id: 'class_manage',
     path: '/class-manage'
-  },
-  {
-    children: [
-      {
-        handle: {
-          i18nKey: 'route.(base)_course-manage_list',
-          icon: 'mdi:book-open-variant',
-          order: 1,
-          title: 'course_list'
-        },
-        id: 'course_list',
-        lazy: () => import('@/pages/(base)/course-manage/list').then(convert),
-        path: '/course-manage/list'
-      },
-      {
-        handle: {
-          i18nKey: 'route.(base)_course-manage_category',
-          icon: 'mdi:folder-multiple-outline',
-          order: 2,
-          title: 'course_category'
-        },
-        id: 'course_category',
-        lazy: () => import('@/pages/(base)/course-manage/category').then(convert),
-        path: '/course-manage/category'
-      },
-      {
-        handle: {
-          hideInMenu: true,
-          i18nKey: 'route.(base)_course-manage_attachments',
-          icon: 'mdi:paperclip',
-          title: 'course_attachments'
-        },
-        id: 'course_attachments',
-        lazy: () => import('@/pages/(base)/course-manage/attachments').then(convert),
-        path: '/course-manage/attachments/:courseId'
-      }
-    ],
-    handle: {
-      i18nKey: 'route.(base)_course-manage',
-      icon: 'mdi:book-open-variant',
-      order: 2,
-      title: 'course_manage'
-    },
-    id: 'course_manage',
-    path: '/course-manage'
   }
 ] satisfies RouteObject[];

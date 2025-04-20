@@ -73,7 +73,13 @@ export const generatedRoutes: ElegantConstRoute[] = [
             matchedFiles: [null, '/src/pages/(base)/course-manage/index.tsx', null, null],
             name: '(base)_course-manage',
             path: '/course-manage',
-            handle: { i18nKey: 'route.(base)_course-manage', title: '(base)_course-manage', hideInMenu: true },
+            handle: {
+              i18nKey: 'route.(base)_course-manage',
+              title: '(base)_course-manage',
+              icon: 'mdi:book-open-variant',
+              order: 2,
+              hideInMenu: true
+            },
             children: [
               {
                 matchedFiles: [null, '/src/pages/(base)/course-manage/attachments/index.tsx', null, null],
@@ -92,6 +98,8 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 handle: {
                   i18nKey: 'route.(base)_course-manage_category',
                   title: '(base)_course-manage_category',
+                  icon: 'mdi:folder-multiple-outline',
+                  order: 2,
                   hideInMenu: true
                 }
               },
@@ -125,7 +133,55 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 handle: {
                   i18nKey: 'route.(base)_course-manage_list',
                   title: '(base)_course-manage_list',
+                  icon: 'mdi:format-list-bulleted',
+                  order: 1,
                   hideInMenu: true
+                }
+              }
+            ]
+          },
+          {
+            matchedFiles: ['(base)_customer-manage', null, null, null],
+            name: '(base)_customer-manage',
+            path: '/customer-manage',
+            handle: {
+              i18nKey: 'route.(base)_customer-manage',
+              title: '(base)_customer-manage',
+              icon: 'mdi:account-supervisor',
+              order: 4
+            },
+            children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/follow/index.tsx', null, null],
+                name: '(base)_customer-manage_follow',
+                path: '/customer-manage/follow',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_follow',
+                  title: '(base)_customer-manage_follow',
+                  icon: 'ic:round-transfer-within-a-station',
+                  order: 1
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/import/index.tsx', null, null],
+                name: '(base)_customer-manage_import',
+                path: '/customer-manage/import',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_import',
+                  title: '(base)_customer-manage_import',
+                  icon: 'ic:round-file-upload',
+                  order: 2
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/info/index.tsx', null, null],
+                name: '(base)_customer-manage_info',
+                path: '/customer-manage/info',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_info',
+                  title: '(base)_customer-manage_info',
+                  icon: 'ic:round-contacts',
+                  order: 3
                 }
               }
             ]

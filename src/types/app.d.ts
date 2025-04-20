@@ -655,6 +655,10 @@ declare namespace App {
           'route.(base)_course-manage_class': string;
           'route.(base)_course-manage_class_detail': string;
           'route.(base)_course-manage_list': string;
+          'route.(base)_customer-manage': string;
+          'route.(base)_customer-manage_follow': string;
+          'route.(base)_customer-manage_import': string;
+          'route.(base)_customer-manage_info': string;
           'route.(base)_home': string;
           'route.about': string;
           'route.class_detail': string;
@@ -665,6 +669,10 @@ declare namespace App {
           'route.course_category': string;
           'route.course_list': string;
           'route.course_manage': string;
+          'route.customer_follow': string;
+          'route.customer_import': string;
+          'route.customer_info': string;
+          'route.customer_manage': string;
           'route.document': string;
           'route.document_antd': string;
           'route.document_procomponents': string;
