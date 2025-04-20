@@ -1,5 +1,22 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Avatar, Button, Card, Descriptions, List, Space, Table, Tabs, Tag } from 'antd';
+import {
+  Avatar,
+  Button,
+  Card,
+  DatePicker,
+  Descriptions,
+  Form,
+  Input,
+  List,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  message
+} from 'antd';
+import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -20,33 +37,66 @@ const ClassDetail = () => {
   const [courseList, setCourseList] = useState<any[]>([]);
   const [announceList, setAnnounceList] = useState<any[]>([]);
 
+  // 编辑学员信息弹窗状态
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [currentStudent, setCurrentStudent] = useState<any>(null);
+  const [editForm] = Form.useForm();
+
+  // 添加学员弹窗状态
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [addForm] = Form.useForm();
+
   useEffect(() => {
     // 模拟加载班级数据
     setLoading(true);
+    console.log('班级ID:', classId);
 
     // 尝试从localStorage获取班级列表数据
     const storedClasses = localStorage.getItem('classList');
+    console.log('从 localStorage 获取的班级列表数据：', storedClasses);
+
     if (storedClasses) {
       try {
         const classes = JSON.parse(storedClasses);
-        const currentClass = classes.find((c: any) => c.id === Number(classId));
+        console.log('解析后的班级列表数据：', classes);
+
+        // 尝试不同的方式匹配ID
+        let currentClass = classes.find((c: any) => c.id === Number(classId));
+
+        if (!currentClass) {
+          // 如果找不到，尝试直接比较字符串
+          currentClass = classes.find((c: any) => String(c.id) === classId);
+          console.log('使用字符串比较找到的班级：', currentClass);
+        }
+
         if (currentClass) {
           setClassInfo(currentClass);
+        } else {
+          console.error('未找到匹配ID的班级信息，classId:', classId, '数据类型:', typeof classId);
+          // 记录所有班级ID用于调试
+          console.log(
+            '所有班级ID:',
+            classes.map((c: any) => ({ id: c.id, type: typeof c.id }))
+          );
         }
       } catch (error) {
         console.error('解析班级数据失败', error);
       }
+    } else {
+      console.error('未找到班级列表数据');
     }
 
     // 加载模拟学员数据
     const mockStudents = [
       {
         attendance: 95.5,
+        avatar: 'https://xsgames.co/randomusers/avatar.php?g=female&id=1',
         company: '阿里巴巴',
         email: 'zhangting@company.cn',
         gender: '女',
         id: 1,
         joinDate: '2024-03-01',
+        landline: '0571-88886666',
         name: '张婷',
         phone: '010-50778734',
         position: '测试工程师',
@@ -54,11 +104,13 @@ const ClassDetail = () => {
       },
       {
         attendance: 92.0,
+        avatar: 'https://xsgames.co/randomusers/avatar.php?g=male&id=2',
         company: '理想科技',
         email: '曾建华@example.com',
         gender: '男',
         id: 2,
         joinDate: '2024-03-02',
+        landline: '010-66667777',
         name: '曾建华',
         phone: '010-12609203',
         position: '后端开发',
@@ -66,11 +118,13 @@ const ClassDetail = () => {
       },
       {
         attendance: 88.5,
+        avatar: 'https://xsgames.co/randomusers/avatar.php?g=male&id=3',
         company: '南京科技',
         email: '董军@company.cn',
         gender: '男',
         id: 3,
         joinDate: '2024-03-01',
+        landline: '025-88889999',
         name: '董军',
         phone: '010-37843376',
         position: '前端开发',
@@ -78,11 +132,13 @@ const ClassDetail = () => {
       },
       {
         attendance: 96.0,
+        avatar: 'https://xsgames.co/randomusers/avatar.php?g=female&id=4',
         company: '腾讯科技',
         email: 'yang格@example.com',
         gender: '女',
         id: 4,
         joinDate: '2024-03-05',
+        landline: '0755-66668888',
         name: '杨格',
         phone: '010-44109487',
         position: '技术主管',
@@ -181,6 +237,78 @@ const ClassDetail = () => {
     navigate('/class-manage/list');
   };
 
+  // 处理查看学员详情
+  const handleViewStudentDetail = (student: any) => {
+    Modal.info({
+      content: (
+        <div>
+          <p>
+            <strong>学员ID：</strong> {student.studentId}
+          </p>
+          <p>
+            <strong>姓名：</strong> {student.name}
+          </p>
+          <p>
+            <strong>性别：</strong> {student.gender}
+          </p>
+          <p>
+            <strong>单位：</strong> {student.company}
+          </p>
+          <p>
+            <strong>职务：</strong> {student.position}
+          </p>
+          <p>
+            <strong>电话：</strong> {student.phone}
+          </p>
+          <p>
+            <strong>座机号：</strong> {student.landline}
+          </p>
+          <p>
+            <strong>邮箱：</strong> {student.email}
+          </p>
+          <p>
+            <strong>加入日期：</strong> {student.joinDate}
+          </p>
+        </div>
+      ),
+      title: '学员详情',
+      width: 500
+    });
+  };
+
+  // 处理编辑学员
+  const handleEditStudent = (student: any) => {
+    setCurrentStudent(student);
+    editForm.setFieldsValue(student);
+    setEditModalVisible(true);
+  };
+
+  // 处理移除学员
+  const handleRemoveStudent = (studentId: number) => {
+    Modal.confirm({
+      content: '确定要移除该学员吗？',
+      onOk: () => {
+        setStudentList(prevList => prevList.filter(student => student.id !== studentId));
+        message.success('学员已移除');
+      },
+      title: '移除学员'
+    });
+  };
+
+  // 保存编辑学员信息
+  const handleSaveEdit = async () => {
+    try {
+      const values = await editForm.validateFields();
+      setStudentList(prevList =>
+        prevList.map(student => (student.id === currentStudent.id ? { ...student, ...values } : student))
+      );
+      setEditModalVisible(false);
+      message.success('学员信息更新成功');
+    } catch (error) {
+      console.error('表单验证失败:', error);
+    }
+  };
+
   // 学员列表表格列配置
   const studentColumns = [
     {
@@ -192,9 +320,9 @@ const ClassDetail = () => {
     {
       dataIndex: 'name',
       key: 'name',
-      render: (text: string) => (
+      render: (text: string, record: any) => (
         <Space>
-          <Avatar src={`https://xsgames.co/randomusers/avatar.php?g=${Math.random()}`} />
+          <Avatar src={record.avatar} />
           {text}
         </Space>
       ),
@@ -226,6 +354,12 @@ const ClassDetail = () => {
       width: 120
     },
     {
+      dataIndex: 'landline',
+      key: 'landline',
+      title: '座机号',
+      width: 120
+    },
+    {
       dataIndex: 'email',
       key: 'email',
       title: '邮箱',
@@ -238,21 +372,25 @@ const ClassDetail = () => {
       width: 120
     },
     {
-      dataIndex: 'attendance',
-      key: 'attendance',
-      render: (attendance: number) => `${attendance}%`,
-      title: '出勤率',
-      width: 100
-    },
-    {
       key: 'action',
-      render: () => (
+      render: (_: any, record: any) => (
         <Space size="middle">
-          <Button type="link">详情</Button>
-          <Button type="link">编辑</Button>
+          <Button
+            type="link"
+            onClick={() => handleViewStudentDetail(record)}
+          >
+            详情
+          </Button>
+          <Button
+            type="link"
+            onClick={() => handleEditStudent(record)}
+          >
+            编辑
+          </Button>
           <Button
             danger
             type="link"
+            onClick={() => handleRemoveStudent(record.id)}
           >
             移除
           </Button>
@@ -262,6 +400,274 @@ const ClassDetail = () => {
       width: 180
     }
   ];
+
+  // 显示添加学员弹窗
+  const handleShowAddModal = () => {
+    addForm.resetFields();
+    setAddModalVisible(true);
+  };
+
+  // 保存新增学员
+  const handleAddStudent = async () => {
+    try {
+      const values = await addForm.validateFields();
+
+      // 生成新的学员ID
+      const newId = studentList.length > 0 ? Math.max(...studentList.map(s => s.id)) + 1 : 1;
+
+      // 创建新学员对象
+      const newStudent = {
+        ...values,
+        // 生成随机学员ID
+        avatar: `https://xsgames.co/randomusers/avatar.php?g=${values.gender === '男' ? 'male' : 'female'}&id=${newId + 10}`,
+        id: newId,
+        joinDate: values.joinDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
+        studentId: `${Date.now()}`.slice(-10)
+      };
+
+      // 更新学员列表
+      setStudentList([...studentList, newStudent]);
+
+      // 关闭弹窗并清空表单
+      setAddModalVisible(false);
+      addForm.resetFields();
+
+      message.success('学员添加成功');
+    } catch (error) {
+      console.error('表单验证失败:', error);
+    }
+  };
+
+  // 导出学员数据
+  const handleExportStudents = () => {
+    Modal.confirm({
+      content: '确定要导出所有学员数据吗？',
+      onOk: () => {
+        // 创建一个假的进度通知
+        const key = 'exportProgress';
+        message.loading({ content: '导出准备中...', key });
+
+        // 模拟进度过程
+        setTimeout(() => {
+          message.loading({ content: '导出进行中 (30%)...', key });
+
+          setTimeout(() => {
+            message.loading({ content: '导出进行中 (60%)...', key });
+
+            setTimeout(() => {
+              message.loading({ content: '导出完成中 (90%)...', key });
+
+              setTimeout(() => {
+                // 构建CSV内容
+                const headers = ['学员ID', '姓名', '性别', '单位', '职务', '电话', '座机号', '邮箱', '加入日期'];
+                const csvContent = [
+                  headers.join(','),
+                  ...studentList.map(student =>
+                    [
+                      student.studentId,
+                      student.name,
+                      student.gender,
+                      student.company,
+                      student.position,
+                      student.phone,
+                      student.landline,
+                      student.email,
+                      student.joinDate
+                    ].join(',')
+                  )
+                ].join('\n');
+
+                // 创建下载链接
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+
+                // 设置下载属性
+                link.href = url;
+                link.setAttribute('download', `班级学员列表_${dayjs().format('YYYYMMDD')}.csv`);
+                document.body.appendChild(link);
+
+                // 触发下载并清理
+                link.click();
+                document.body.removeChild(link);
+
+                // 更新成功消息
+                message.success({ content: '学员数据导出成功！', duration: 2, key });
+              }, 500);
+            }, 500);
+          }, 500);
+        }, 500);
+      },
+      title: '导出学员数据'
+    });
+  };
+
+  // 渲染学员列表
+  const renderStudentList = () => {
+    return (
+      <Card
+        bordered={false}
+        title="班级学员"
+        extra={
+          <Space>
+            <Button
+              type="primary"
+              onClick={handleShowAddModal}
+            >
+              添加学员
+            </Button>
+            <Button onClick={handleExportStudents}>导出学员</Button>
+          </Space>
+        }
+      >
+        <Table
+          columns={studentColumns}
+          dataSource={studentList}
+          loading={loading}
+          rowKey="id"
+          scroll={{ x: 1300 }}
+        />
+
+        {/* 添加学员弹窗 */}
+        <Modal
+          confirmLoading={loading}
+          open={addModalVisible}
+          title="添加学员"
+          onCancel={() => setAddModalVisible(false)}
+          onOk={handleAddStudent}
+        >
+          <Form
+            form={addForm}
+            labelCol={{ span: 6 }}
+            style={{ marginTop: 20 }}
+            wrapperCol={{ span: 16 }}
+          >
+            <Form.Item
+              label="姓名"
+              name="name"
+              rules={[{ message: '请输入学员姓名', required: true }]}
+            >
+              <Input placeholder="请输入学员姓名" />
+            </Form.Item>
+            <Form.Item
+              label="性别"
+              name="gender"
+              rules={[{ message: '请选择性别', required: true }]}
+            >
+              <Select placeholder="请选择性别">
+                <Select.Option value="男">男</Select.Option>
+                <Select.Option value="女">女</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item
+              label="单位"
+              name="company"
+              rules={[{ message: '请输入单位', required: true }]}
+            >
+              <Input placeholder="请输入单位" />
+            </Form.Item>
+            <Form.Item
+              label="职务"
+              name="position"
+            >
+              <Input placeholder="请输入职务" />
+            </Form.Item>
+            <Form.Item
+              label="电话"
+              name="phone"
+              rules={[{ message: '请输入电话', required: true }]}
+            >
+              <Input placeholder="请输入电话" />
+            </Form.Item>
+            <Form.Item
+              label="座机号"
+              name="landline"
+            >
+              <Input placeholder="请输入座机号" />
+            </Form.Item>
+            <Form.Item
+              label="邮箱"
+              name="email"
+            >
+              <Input placeholder="请输入邮箱" />
+            </Form.Item>
+            <Form.Item
+              label="加入日期"
+              name="joinDate"
+            >
+              <DatePicker className="w-full" />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* 编辑学员弹窗 */}
+        <Modal
+          confirmLoading={loading}
+          open={editModalVisible}
+          title="编辑学员信息"
+          onCancel={() => setEditModalVisible(false)}
+          onOk={handleSaveEdit}
+        >
+          <Form
+            form={editForm}
+            labelCol={{ span: 6 }}
+            style={{ marginTop: 20 }}
+            wrapperCol={{ span: 16 }}
+          >
+            <Form.Item
+              label="姓名"
+              name="name"
+              rules={[{ message: '请输入学员姓名', required: true }]}
+            >
+              <Input placeholder="请输入学员姓名" />
+            </Form.Item>
+            <Form.Item
+              label="性别"
+              name="gender"
+              rules={[{ message: '请选择性别', required: true }]}
+            >
+              <Select placeholder="请选择性别">
+                <Select.Option value="男">男</Select.Option>
+                <Select.Option value="女">女</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item
+              label="单位"
+              name="company"
+              rules={[{ message: '请输入单位', required: true }]}
+            >
+              <Input placeholder="请输入单位" />
+            </Form.Item>
+            <Form.Item
+              label="职务"
+              name="position"
+            >
+              <Input placeholder="请输入职务" />
+            </Form.Item>
+            <Form.Item
+              label="电话"
+              name="phone"
+              rules={[{ message: '请输入电话', required: true }]}
+            >
+              <Input placeholder="请输入电话" />
+            </Form.Item>
+            <Form.Item
+              label="座机号"
+              name="landline"
+            >
+              <Input placeholder="请输入座机号" />
+            </Form.Item>
+            <Form.Item
+              label="邮箱"
+              name="email"
+            >
+              <Input placeholder="请输入邮箱" />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Card>
+    );
+  };
 
   // 课程列表表格列配置
   const courseColumns = [
@@ -377,30 +783,6 @@ const ClassDetail = () => {
             {classInfo.description || '暂无描述'}
           </Descriptions.Item>
         </Descriptions>
-      </Card>
-    );
-  };
-
-  // 渲染学员列表
-  const renderStudentList = () => {
-    return (
-      <Card
-        bordered={false}
-        title="班级学员"
-        extra={
-          <Space>
-            <Button type="primary">添加学员</Button>
-            <Button>导入学员</Button>
-          </Space>
-        }
-      >
-        <Table
-          columns={studentColumns}
-          dataSource={studentList}
-          loading={loading}
-          rowKey="id"
-          scroll={{ x: 1300 }}
-        />
       </Card>
     );
   };

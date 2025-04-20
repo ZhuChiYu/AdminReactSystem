@@ -1,6 +1,5 @@
 import FlipText from '@/components/FilpText';
 import SystemLogo from '@/components/SystemLogo';
-import { LangSwitch } from '@/features/lang';
 import { ThemeSchemaSwitch } from '@/features/theme';
 
 const Header = memo(() => {
@@ -20,7 +19,6 @@ const Header = memo(() => {
           className="text-20px lt-sm:text-18px"
           showTooltip={false}
         />
-        <LangSwitch showTooltip={false} />
       </div>
     </header>
   );

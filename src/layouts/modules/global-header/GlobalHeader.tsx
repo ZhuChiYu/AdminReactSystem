@@ -1,7 +1,6 @@
 import DarkModeContainer from '@/components/DarkModeContainer';
 import FullScreen from '@/components/FullScreen';
 import { GLOBAL_HEADER_MENU_ID } from '@/constants/app';
-import { LangSwitch } from '@/features/lang';
 import { MenuToggler } from '@/features/menu';
 import { ThemeSchemaSwitch } from '@/features/theme';
 
@@ -78,8 +77,6 @@ const GlobalHeader: FC<Props> = memo(({ isMobile, mode, reverse, siderWidth }) =
             toggleFullscreen={toggleFullscreen}
           />
         )}
-
-        <LangSwitch className="px-12px" />
 
         <ThemeSchemaSwitch className="px-12px" />
 

@@ -43,9 +43,12 @@ const ClassList = () => {
 
     // 检查是否有缓存的班级列表数据
     const storedClasses = localStorage.getItem('classList');
+    console.log('从 localStorage 获取的班级列表数据：', storedClasses);
+
     if (storedClasses) {
       try {
         const classes = JSON.parse(storedClasses);
+        console.log('解析后的班级列表数据：', classes);
         setClassList(classes);
         setFilteredList(classes);
         setLoading(false);
@@ -99,11 +102,13 @@ const ClassList = () => {
           teacher: '王老师'
         }
       ];
+      console.log('加载的模拟数据：', mockData);
       setClassList(mockData);
       setFilteredList(mockData);
 
       // 保存到localStorage
       localStorage.setItem('classList', JSON.stringify(mockData));
+      console.log('成功保存数据到 localStorage');
 
       setLoading(false);
     }, 500);
@@ -200,6 +205,7 @@ const ClassList = () => {
   // 查看班级详情
   const handleViewDetail = (classId: number) => {
     navigate(`/class-manage/detail/${classId}`);
+    console.log('跳转到详情页，URL:', `/class-manage/detail/${classId}`);
   };
 
   // 提交添加班级表单
