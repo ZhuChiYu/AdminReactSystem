@@ -60,6 +60,28 @@ export const BaseChildrenRoutes = [
         id: 'course_list',
         lazy: () => import('@/pages/(base)/course-manage/list').then(convert),
         path: '/course-manage/list'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_course-manage_category',
+          icon: 'mdi:folder-multiple-outline',
+          order: 2,
+          title: 'course_category'
+        },
+        id: 'course_category',
+        lazy: () => import('@/pages/(base)/course-manage/category').then(convert),
+        path: '/course-manage/category'
+      },
+      {
+        handle: {
+          hideInMenu: true,
+          i18nKey: 'route.(base)_course-manage_attachments',
+          icon: 'mdi:paperclip',
+          title: 'course_attachments'
+        },
+        id: 'course_attachments',
+        lazy: () => import('@/pages/(base)/course-manage/attachments').then(convert),
+        path: '/course-manage/attachments/:courseId'
       }
     ],
     handle: {
