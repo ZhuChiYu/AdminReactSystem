@@ -1,4 +1,4 @@
-import { SearchOutlined, UserAddOutlined } from '@ant-design/icons';
+import { UserAddOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -189,7 +189,7 @@ const CustomerInfo = () => {
     }
 
     if (phone) {
-      filtered = filtered.filter(item => item.phone.includes(phone));
+      filtered = filtered.filter(item => item.phone?.includes(phone) || item.mobile?.includes(phone));
     }
 
     if (company) {
@@ -202,6 +202,11 @@ const CustomerInfo = () => {
 
     setFilteredList(filtered);
   };
+
+  // 添加一个Effect用于在搜索参数变化时自动筛选
+  useEffect(() => {
+    handleSearch();
+  }, [searchParams]);
 
   // 重置搜索条件
   const resetSearch = () => {
@@ -419,13 +424,6 @@ const CustomerInfo = () => {
             }))}
             onChange={value => setSearchParams({ ...searchParams, followStatus: value })}
           />
-          <Button
-            icon={<SearchOutlined />}
-            type="primary"
-            onClick={handleSearch}
-          >
-            搜索
-          </Button>
           <Button onClick={resetSearch}>重置</Button>
           <Button
             icon={<UserAddOutlined />}
