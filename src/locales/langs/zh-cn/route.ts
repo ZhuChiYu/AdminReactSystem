@@ -1,5 +1,5 @@
 // @ts-expect-error 删除了部分路由后类型暂时不匹配
-const route: App.I18n.Schema['translation']['route'] = {
+const route = {
   '(base)_about': '关于',
   '(base)_class-manage': '班级管理',
   '(base)_class-manage_detail': '班级详情',
@@ -199,6 +199,6 @@ const route: App.I18n.Schema['translation']['route'] = {
   'route.projects_join': '已加入项目',
   'route.projects_list': '项目列表',
   'route.user-center': '个人中心'
-};
+} as App.I18n.Schema['translation']['route'];
 
 export default route;
