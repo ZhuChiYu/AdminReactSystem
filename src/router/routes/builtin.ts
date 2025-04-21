@@ -24,7 +24,7 @@ export const BaseChildrenRoutes = [
       {
         handle: {
           i18nKey: 'route.(base)_course-manage_list',
-          icon: 'mdi:format-list-bulleted',
+          icon: 'mdi:book-open-variant',
           order: 1,
           title: 'course_list'
         },
@@ -153,5 +153,199 @@ export const BaseChildrenRoutes = [
     },
     id: 'customer_manage',
     path: '/customer-manage'
+  },
+  {
+    handle: {
+      i18nKey: 'route.(base)_finance-dashboard',
+      icon: 'mdi:finance',
+      order: 5,
+      title: '财务看板'
+    },
+    id: 'finance_dashboard',
+    lazy: () => import('@/pages/(base)/finance-dashboard').then(convert),
+    path: '/finance-dashboard'
+  },
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_project-manage_list',
+          icon: 'mdi:clipboard-list-outline',
+          order: 1,
+          title: '事项列表'
+        },
+        id: 'project_list',
+        lazy: () => import('@/pages/(base)/project-manage/list').then(convert),
+        path: '/project-manage/list'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_project-manage_task',
+          icon: 'mdi:clipboard-check-outline',
+          order: 2,
+          title: '任务管理'
+        },
+        id: 'project_task',
+        lazy: () => import('@/pages/(base)/project-manage/task').then(convert),
+        path: '/project-manage/task'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_project-manage',
+      icon: 'mdi:clipboard-text-outline',
+      order: 6,
+      title: '事项管理'
+    },
+    id: 'project_manage',
+    path: '/project-manage'
+  },
+  // 新增报销流程模块
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_expense-process_apply',
+          icon: 'mdi:file-document-edit-outline',
+          order: 1,
+          title: '报销申请'
+        },
+        id: 'expense_apply',
+        lazy: () => import('@/pages/(base)/expense-process/apply').then(convert),
+        path: '/expense-process/apply'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_expense-process_approve',
+          icon: 'mdi:file-check-outline',
+          order: 2,
+          title: '报销审核'
+        },
+        id: 'expense_approve',
+        lazy: () => import('@/pages/(base)/expense-process/approve').then(convert),
+        path: '/expense-process/approve'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_expense-process',
+      icon: 'mdi:cash-multiple',
+      order: 7,
+      title: '报销流程'
+    },
+    id: 'expense_process',
+    path: '/expense-process'
+  },
+  // 新增会议管理模块
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_list',
+          icon: 'mdi:calendar-text-outline',
+          order: 1,
+          title: '会议列表'
+        },
+        id: 'meeting_list',
+        lazy: () => import('@/pages/(base)/meeting-manage/list').then(convert),
+        path: '/meeting-manage/list'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_record',
+          icon: 'mdi:note-text-outline',
+          order: 2,
+          title: '会议记录'
+        },
+        id: 'meeting_record',
+        lazy: () => import('@/pages/(base)/meeting-manage/record').then(convert),
+        path: '/meeting-manage/record'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_summary',
+          icon: 'mdi:file-document-outline',
+          order: 3,
+          title: '会议总结'
+        },
+        id: 'meeting_summary',
+        lazy: () => import('@/pages/(base)/meeting-manage/summary').then(convert),
+        path: '/meeting-manage/summary'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_approve',
+          icon: 'mdi:check-decagram-outline',
+          order: 4,
+          title: '会议审核'
+        },
+        id: 'meeting_approve',
+        lazy: () => import('@/pages/(base)/meeting-manage/approve').then(convert),
+        path: '/meeting-manage/approve'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_meeting-manage',
+      icon: 'mdi:account-group-outline',
+      order: 8,
+      title: '会议管理'
+    },
+    id: 'meeting_manage',
+    path: '/meeting-manage'
+  },
+  // 新增员工管理模块
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_employee-manage_list',
+          icon: 'mdi:account-multiple-outline',
+          order: 1,
+          title: '员工列表'
+        },
+        id: 'employee_list',
+        lazy: () => import('@/pages/(base)/employee-manage/list').then(convert),
+        path: '/employee-manage/list'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_employee-manage_identity',
+          icon: 'mdi:card-account-details-outline',
+          order: 2,
+          title: '身份证信息'
+        },
+        id: 'employee_identity',
+        lazy: () => import('@/pages/(base)/employee-manage/identity').then(convert),
+        path: '/employee-manage/identity'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_employee-manage_address',
+          icon: 'mdi:map-marker-outline',
+          order: 3,
+          title: '员工住址'
+        },
+        id: 'employee_address',
+        lazy: () => import('@/pages/(base)/employee-manage/address').then(convert),
+        path: '/employee-manage/address'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_employee-manage_contact',
+          icon: 'mdi:phone-outline',
+          order: 4,
+          title: '联系方式'
+        },
+        id: 'employee_contact',
+        lazy: () => import('@/pages/(base)/employee-manage/contact').then(convert),
+        path: '/employee-manage/contact'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_employee-manage',
+      icon: 'mdi:account-cog-outline',
+      order: 9,
+      title: '员工管理'
+    },
+    id: 'employee_manage',
+    path: '/employee-manage'
   }
 ] satisfies RouteObject[];

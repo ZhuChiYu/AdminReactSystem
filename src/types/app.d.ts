@@ -659,7 +659,11 @@ declare namespace App {
           'route.(base)_customer-manage_follow': string;
           'route.(base)_customer-manage_import': string;
           'route.(base)_customer-manage_info': string;
+          'route.(base)_finance-dashboard': string;
           'route.(base)_home': string;
+          'route.(base)_project-manage': string;
+          'route.(base)_project-manage_list': string;
+          'route.(base)_project-manage_task': string;
           'route.about': string;
           'route.class_detail': string;
           'route.class_list': string;
@@ -685,6 +689,7 @@ declare namespace App {
           'route.exception_403': string;
           'route.exception_404': string;
           'route.exception_500': string;
+          'route.finance-dashboard': string;
           'route.function': string;
           'route.function_form': string;
           'route.function_form_button': string;
@@ -726,6 +731,9 @@ declare namespace App {
           'route.multi-menu_second': string;
           'route.multi-menu_second_child': string;
           'route.multi-menu_second_child_home': string;
+          'route.project-manage': string;
+          'route.project-manage_list': string;
+          'route.project-manage_task': string;
           'route.projects': string;
           'route.projects_details': string;
           'route.projects_join': string;
