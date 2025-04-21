@@ -1,32 +1,47 @@
 import { SearchOutlined, UserAddOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Modal, Radio, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 
 /** 跟进状态枚举 */
 enum FollowUpStatus {
-  FOLLOWING = 'following',
-  INITIAL = 'initial',
-  REJECTED = 'rejected',
-  SIGNED = 'signed',
-  VISITED = 'visited'
+  ARRIVED = 'arrived', // 已实到
+  CONSULT = 'consult', // 咨询
+  EARLY_25 = 'early_25', // 早25客户
+  EFFECTIVE_VISIT = 'effective_visit', // 有效回访
+  NEW_DEVELOP = 'new_develop', // 新开发
+  NOT_ARRIVED = 'not_arrived', // 未实到
+  REGISTERED = 'registered', // 已报名
+  REJECTED = 'rejected', // 未通过
+  VIP = 'vip', // 大客户
+  WECHAT_ADDED = 'wechat_added' // 已加微信
 }
 
 /** 跟进状态名称 */
 const followUpStatusNames = {
-  [FollowUpStatus.INITIAL]: '未跟进',
-  [FollowUpStatus.FOLLOWING]: '跟进中',
-  [FollowUpStatus.VISITED]: '已回访',
-  [FollowUpStatus.SIGNED]: '已签约',
-  [FollowUpStatus.REJECTED]: '已拒绝'
+  [FollowUpStatus.WECHAT_ADDED]: '已加微信',
+  [FollowUpStatus.REJECTED]: '未通过',
+  [FollowUpStatus.EARLY_25]: '早25客户',
+  [FollowUpStatus.VIP]: '大客户',
+  [FollowUpStatus.EFFECTIVE_VISIT]: '有效回访',
+  [FollowUpStatus.CONSULT]: '咨询',
+  [FollowUpStatus.REGISTERED]: '已报名',
+  [FollowUpStatus.ARRIVED]: '已实到',
+  [FollowUpStatus.NOT_ARRIVED]: '未实到',
+  [FollowUpStatus.NEW_DEVELOP]: '新开发'
 };
 
 /** 跟进状态颜色 */
 const followUpStatusColors = {
-  [FollowUpStatus.INITIAL]: 'default',
-  [FollowUpStatus.FOLLOWING]: 'processing',
-  [FollowUpStatus.VISITED]: 'success',
-  [FollowUpStatus.SIGNED]: 'success',
-  [FollowUpStatus.REJECTED]: 'error'
+  [FollowUpStatus.WECHAT_ADDED]: 'blue',
+  [FollowUpStatus.REJECTED]: 'error',
+  [FollowUpStatus.EARLY_25]: 'purple',
+  [FollowUpStatus.VIP]: 'gold',
+  [FollowUpStatus.EFFECTIVE_VISIT]: 'success',
+  [FollowUpStatus.CONSULT]: 'cyan',
+  [FollowUpStatus.REGISTERED]: 'success',
+  [FollowUpStatus.ARRIVED]: 'green',
+  [FollowUpStatus.NOT_ARRIVED]: 'orange',
+  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
 };
 
 /** 客户信息管理组件 */
@@ -35,8 +50,10 @@ const CustomerInfo = () => {
   const [customerList, setCustomerList] = useState<any[]>([]);
   const [filteredList, setFilteredList] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState<any>(null);
   const [form] = Form.useForm();
+  const [addForm] = Form.useForm();
 
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
@@ -58,7 +75,7 @@ const CustomerInfo = () => {
           company: '上海民用航空电源系统有限公司',
           createTime: new Date().toLocaleString(),
           followContent: '发计划数智化简章微信15802910233',
-          followStatus: FollowUpStatus.FOLLOWING,
+          followStatus: FollowUpStatus.WECHAT_ADDED,
           id: 1,
           mobile: '',
           name: '马芳',
@@ -70,7 +87,7 @@ const CustomerInfo = () => {
           company: '中国电力工程顾问集团中南电力设计院有限公司',
           createTime: new Date().toLocaleString(),
           followContent: '看看课微信18229295812',
-          followStatus: FollowUpStatus.INITIAL,
+          followStatus: FollowUpStatus.EARLY_25,
           id: 2,
           mobile: '',
           name: '万娜',
@@ -82,7 +99,7 @@ const CustomerInfo = () => {
           company: '太原钢铁（集团）有限公司',
           createTime: new Date().toLocaleString(),
           followContent: '负责培训推荐微信',
-          followStatus: FollowUpStatus.FOLLOWING,
+          followStatus: FollowUpStatus.WECHAT_ADDED,
           id: 3,
           mobile: '',
           name: '陈建英',
@@ -94,7 +111,7 @@ const CustomerInfo = () => {
           company: '中国电力工程顾问集团中南电力设计院有限公司',
           createTime: new Date().toLocaleString(),
           followContent: '数智财务发课程微信18717397529/3.4天接3.5天接2.24天接',
-          followStatus: FollowUpStatus.VISITED,
+          followStatus: FollowUpStatus.EFFECTIVE_VISIT,
           id: 4,
           mobile: '',
           name: '刘老师',
@@ -106,7 +123,7 @@ const CustomerInfo = () => {
           company: '中国能源建设集团江苏省电力设计院有限公司',
           createTime: new Date().toLocaleString(),
           followContent: '数智化还有年计划发一下微信13813844478',
-          followStatus: FollowUpStatus.SIGNED,
+          followStatus: FollowUpStatus.REGISTERED,
           id: 5,
           mobile: '',
           name: '陶主任',
@@ -118,7 +135,7 @@ const CustomerInfo = () => {
           company: '中国能源建设集团天津电力设计院有限公司',
           createTime: new Date().toLocaleString(),
           followContent: '其他单位能学应该是有发文，看一下，课程和计划发过来微信13821110961',
-          followStatus: FollowUpStatus.SIGNED,
+          followStatus: FollowUpStatus.ARRIVED,
           id: 6,
           mobile: '',
           name: '迟主任',
@@ -243,7 +260,42 @@ const CustomerInfo = () => {
 
   // 添加新客户
   const addNewCustomer = () => {
-    message.info('添加客户功能正在开发中');
+    addForm.resetFields();
+    setIsAddModalVisible(true);
+  };
+
+  // 关闭添加客户弹窗
+  const handleAddCancel = () => {
+    setIsAddModalVisible(false);
+  };
+
+  // 提交添加客户
+  const handleAddSubmit = () => {
+    addForm.validateFields().then(values => {
+      const { company, followContent, followStatus, mobile, name, phone, position, source } = values;
+
+      // 创建新客户记录
+      const newCustomer = {
+        company,
+        createTime: new Date().toLocaleString(),
+        followContent,
+        followStatus,
+        id: customerList.length > 0 ? Math.max(...customerList.map(item => item.id)) + 1 : 1,
+        mobile: mobile || '',
+        name,
+        phone: phone || '',
+        position: position || '',
+        source: source || '网站'
+      };
+
+      // 添加到客户列表
+      const updatedList = [newCustomer, ...customerList];
+      setCustomerList(updatedList);
+      setFilteredList([newCustomer, ...filteredList]);
+
+      message.success('添加客户成功');
+      setIsAddModalVisible(false);
+    });
   };
 
   // 表格列定义
@@ -410,18 +462,108 @@ const CustomerInfo = () => {
               name="followStatus"
               rules={[{ message: '请选择跟进状态', required: true }]}
             >
-              <Radio.Group>
-                <Space direction="vertical">
-                  {Object.values(FollowUpStatus).map(status => (
-                    <Radio
-                      key={status}
-                      value={status}
-                    >
+              <Select
+                placeholder="请选择跟进状态"
+                options={Object.values(FollowUpStatus).map(status => ({
+                  label: (
+                    <Space>
                       <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>
-                    </Radio>
-                  ))}
-                </Space>
-              </Radio.Group>
+                    </Space>
+                  ),
+                  value: status
+                }))}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal
+          open={isAddModalVisible}
+          title="添加客户"
+          width={600}
+          onCancel={handleAddCancel}
+          onOk={handleAddSubmit}
+        >
+          <Form
+            form={addForm}
+            labelCol={{ span: 6 }}
+            wrapperCol={{ span: 16 }}
+          >
+            <Form.Item
+              label="单位名称"
+              name="company"
+              rules={[{ message: '请输入单位名称', required: true }]}
+            >
+              <Input placeholder="请输入单位名称" />
+            </Form.Item>
+            <Form.Item
+              label="姓名"
+              name="name"
+              rules={[{ message: '请输入客户姓名', required: true }]}
+            >
+              <Input placeholder="请输入客户姓名" />
+            </Form.Item>
+            <Form.Item
+              label="职位"
+              name="position"
+            >
+              <Input placeholder="请输入职位" />
+            </Form.Item>
+            <Form.Item
+              label="电话"
+              name="phone"
+            >
+              <Input placeholder="请输入电话号码" />
+            </Form.Item>
+            <Form.Item
+              label="手机"
+              name="mobile"
+            >
+              <Input placeholder="请输入手机号码" />
+            </Form.Item>
+            <Form.Item
+              initialValue="网站"
+              label="来源"
+              name="source"
+            >
+              <Select
+                placeholder="请选择客户来源"
+                options={[
+                  { label: '网站', value: '网站' },
+                  { label: '朋友推荐', value: '朋友推荐' },
+                  { label: '广告', value: '广告' },
+                  { label: '展会', value: '展会' },
+                  { label: '其他', value: '其他' }
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              initialValue={FollowUpStatus.NEW_DEVELOP}
+              label="跟进状态"
+              name="followStatus"
+              rules={[{ message: '请选择跟进状态', required: true }]}
+            >
+              <Select
+                placeholder="请选择跟进状态"
+                options={Object.values(FollowUpStatus).map(status => ({
+                  label: (
+                    <Space>
+                      <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>
+                    </Space>
+                  ),
+                  value: status
+                }))}
+              />
+            </Form.Item>
+            <Form.Item
+              label="跟进内容"
+              name="followContent"
+              rules={[{ message: '请输入跟进内容', required: true }]}
+            >
+              <Input.TextArea
+                placeholder="请输入跟进内容"
+                rows={4}
+              />
             </Form.Item>
           </Form>
         </Modal>

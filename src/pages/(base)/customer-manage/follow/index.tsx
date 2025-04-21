@@ -20,29 +20,44 @@ import { useEffect, useState } from 'react';
 
 /** 跟进状态枚举 */
 enum FollowUpStatus {
-  FOLLOWING = 'following',
-  INITIAL = 'initial',
+  ARRIVED = 'arrived',
+  CONSULT = 'consult',
+  EARLY_25 = 'early_25',
+  EFFECTIVE_VISIT = 'effective_visit',
+  NEW_DEVELOP = 'new_develop',
+  NOT_ARRIVED = 'not_arrived',
+  REGISTERED = 'registered',
   REJECTED = 'rejected',
-  SIGNED = 'signed',
-  VISITED = 'visited'
+  VIP = 'vip',
+  WECHAT_ADDED = 'wechat_added'
 }
 
 /** 跟进状态名称 */
 const followUpStatusNames = {
-  [FollowUpStatus.INITIAL]: '未跟进',
-  [FollowUpStatus.FOLLOWING]: '跟进中',
-  [FollowUpStatus.VISITED]: '已回访',
-  [FollowUpStatus.SIGNED]: '已签约',
-  [FollowUpStatus.REJECTED]: '已拒绝'
+  [FollowUpStatus.WECHAT_ADDED]: '已加微信',
+  [FollowUpStatus.REJECTED]: '未通过',
+  [FollowUpStatus.EARLY_25]: '早25客户',
+  [FollowUpStatus.VIP]: '大客户',
+  [FollowUpStatus.EFFECTIVE_VISIT]: '有效回访',
+  [FollowUpStatus.CONSULT]: '咨询',
+  [FollowUpStatus.REGISTERED]: '已报名',
+  [FollowUpStatus.ARRIVED]: '已实到',
+  [FollowUpStatus.NOT_ARRIVED]: '未实到',
+  [FollowUpStatus.NEW_DEVELOP]: '新开发'
 };
 
 /** 跟进状态颜色 */
 const followUpStatusColors = {
-  [FollowUpStatus.INITIAL]: 'default',
-  [FollowUpStatus.FOLLOWING]: 'processing',
-  [FollowUpStatus.VISITED]: 'success',
-  [FollowUpStatus.SIGNED]: 'success',
-  [FollowUpStatus.REJECTED]: 'error'
+  [FollowUpStatus.WECHAT_ADDED]: 'blue',
+  [FollowUpStatus.REJECTED]: 'error',
+  [FollowUpStatus.EARLY_25]: 'purple',
+  [FollowUpStatus.VIP]: 'gold',
+  [FollowUpStatus.EFFECTIVE_VISIT]: 'success',
+  [FollowUpStatus.CONSULT]: 'cyan',
+  [FollowUpStatus.REGISTERED]: 'success',
+  [FollowUpStatus.ARRIVED]: 'green',
+  [FollowUpStatus.NOT_ARRIVED]: 'orange',
+  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
 };
 
 /** 客户跟进管理组件 */
@@ -83,7 +98,7 @@ const CustomerFollow = () => {
           createdBy: '管理员',
           createdTime: new Date().toLocaleString(),
           followContent: '发计划数智化简章微信15802910233',
-          followStatus: FollowUpStatus.FOLLOWING,
+          followStatus: FollowUpStatus.WECHAT_ADDED,
           id: 1,
           mobile: '',
           name: '马芳',
@@ -96,7 +111,7 @@ const CustomerFollow = () => {
           createdBy: '销售顾问',
           createdTime: new Date().toLocaleString(),
           followContent: '看看课微信18229295812',
-          followStatus: FollowUpStatus.INITIAL,
+          followStatus: FollowUpStatus.EARLY_25,
           id: 2,
           mobile: '',
           name: '万娜',
@@ -109,7 +124,7 @@ const CustomerFollow = () => {
           createdBy: '咨询师',
           createdTime: new Date().toLocaleString(),
           followContent: '负责培训推荐微信',
-          followStatus: FollowUpStatus.FOLLOWING,
+          followStatus: FollowUpStatus.WECHAT_ADDED,
           id: 3,
           mobile: '',
           name: '陈建英',
@@ -122,7 +137,7 @@ const CustomerFollow = () => {
           createdBy: '班主任',
           createdTime: new Date().toLocaleString(),
           followContent: '数智财务发课程微信18717397529/3.4天接3.5天接2.24天接',
-          followStatus: FollowUpStatus.VISITED,
+          followStatus: FollowUpStatus.EFFECTIVE_VISIT,
           id: 4,
           mobile: '',
           name: '刘老师',
@@ -135,7 +150,7 @@ const CustomerFollow = () => {
           createdBy: '管理员',
           createdTime: new Date().toLocaleString(),
           followContent: '数智化还有年计划发一下微信13813844478',
-          followStatus: FollowUpStatus.SIGNED,
+          followStatus: FollowUpStatus.REGISTERED,
           id: 5,
           mobile: '',
           name: '陶主任',
@@ -148,7 +163,7 @@ const CustomerFollow = () => {
           createdBy: '销售顾问',
           createdTime: new Date().toLocaleString(),
           followContent: '其他单位能学应该是有发文，看一下，课程和计划发过来微信13821110961',
-          followStatus: FollowUpStatus.SIGNED,
+          followStatus: FollowUpStatus.REGISTERED,
           id: 6,
           mobile: '',
           name: '迟主任',

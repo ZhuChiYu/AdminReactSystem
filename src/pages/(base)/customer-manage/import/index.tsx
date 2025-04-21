@@ -1,33 +1,48 @@
-import { InboxOutlined, UploadOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Divider, Row, Table, Tabs, Tag, Upload, message } from 'antd';
+import { InboxOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Divider, Form, Input, Row, Select, Space, Table, Tabs, Tag, Upload, message } from 'antd';
 import type { UploadFile, UploadProps } from 'antd';
 import { useState } from 'react';
 
 /** 客户跟进状态枚举 */
 enum FollowUpStatus {
-  FOLLOWING = 'following',
-  INITIAL = 'initial',
+  ARRIVED = 'arrived',
+  CONSULT = 'consult',
+  EARLY_25 = 'early_25',
+  EFFECTIVE_VISIT = 'effective_visit',
+  NEW_DEVELOP = 'new_develop',
+  NOT_ARRIVED = 'not_arrived',
+  REGISTERED = 'registered',
   REJECTED = 'rejected',
-  SIGNED = 'signed',
-  VISITED = 'visited'
+  VIP = 'vip',
+  WECHAT_ADDED = 'wechat_added'
 }
 
 /** 客户跟进状态名称 */
 const followUpStatusNames: Record<FollowUpStatus, string> = {
-  [FollowUpStatus.INITIAL]: '未跟进',
-  [FollowUpStatus.FOLLOWING]: '跟进中',
-  [FollowUpStatus.VISITED]: '已回访',
-  [FollowUpStatus.SIGNED]: '已签约',
-  [FollowUpStatus.REJECTED]: '已拒绝'
+  [FollowUpStatus.WECHAT_ADDED]: '已加微信',
+  [FollowUpStatus.REJECTED]: '未通过',
+  [FollowUpStatus.EARLY_25]: '早25客户',
+  [FollowUpStatus.VIP]: '大客户',
+  [FollowUpStatus.EFFECTIVE_VISIT]: '有效回访',
+  [FollowUpStatus.CONSULT]: '咨询',
+  [FollowUpStatus.REGISTERED]: '已报名',
+  [FollowUpStatus.ARRIVED]: '已实到',
+  [FollowUpStatus.NOT_ARRIVED]: '未实到',
+  [FollowUpStatus.NEW_DEVELOP]: '新开发'
 };
 
 /** 客户跟进状态颜色 */
 const followUpStatusColors: Record<FollowUpStatus, string> = {
-  [FollowUpStatus.INITIAL]: 'default',
-  [FollowUpStatus.FOLLOWING]: 'processing',
-  [FollowUpStatus.VISITED]: 'success',
-  [FollowUpStatus.SIGNED]: 'success',
-  [FollowUpStatus.REJECTED]: 'error'
+  [FollowUpStatus.WECHAT_ADDED]: 'blue',
+  [FollowUpStatus.REJECTED]: 'error',
+  [FollowUpStatus.EARLY_25]: 'purple',
+  [FollowUpStatus.VIP]: 'gold',
+  [FollowUpStatus.EFFECTIVE_VISIT]: 'success',
+  [FollowUpStatus.CONSULT]: 'cyan',
+  [FollowUpStatus.REGISTERED]: 'success',
+  [FollowUpStatus.ARRIVED]: 'green',
+  [FollowUpStatus.NOT_ARRIVED]: 'orange',
+  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
 };
 
 /** 客户导入组件 */
@@ -37,6 +52,9 @@ const CustomerImport = () => {
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<string>('excel');
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus | ''>('');
+  const [manualForm] = Form.useForm();
+  const [manualEntryList, setManualEntryList] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   /** 文件上传属性配置 */
   const uploadProps: UploadProps = {
@@ -79,7 +97,7 @@ const CustomerImport = () => {
           {
             company: '上海民用航空电源系统有限公司',
             createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.FOLLOWING,
+            followStatus: FollowUpStatus.WECHAT_ADDED,
             followUp: '发计划数智化简章微信15802910233',
             id: 1,
             mobile: '',
@@ -90,7 +108,7 @@ const CustomerImport = () => {
           {
             company: '中国电力工程顾问集团中南电力设计院有限公司',
             createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.INITIAL,
+            followStatus: FollowUpStatus.EARLY_25,
             followUp: '看看课微信18229295812',
             id: 2,
             mobile: '',
@@ -101,7 +119,7 @@ const CustomerImport = () => {
           {
             company: '太原钢铁（集团）有限公司',
             createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.FOLLOWING,
+            followStatus: FollowUpStatus.WECHAT_ADDED,
             followUp: '负责培训推荐微信',
             id: 3,
             mobile: '',
@@ -112,7 +130,7 @@ const CustomerImport = () => {
           {
             company: '中国电力工程顾问集团中南电力设计院有限公司',
             createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.VISITED,
+            followStatus: FollowUpStatus.EFFECTIVE_VISIT,
             followUp: '数智财务发课程微信18717397529/3.4天接3.5天接2.24天接',
             id: 4,
             mobile: '',
@@ -123,7 +141,7 @@ const CustomerImport = () => {
           {
             company: '中国能源建设集团江苏省电力设计院有限公司',
             createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.SIGNED,
+            followStatus: FollowUpStatus.REGISTERED,
             followUp: '数智化还有年计划发一下微信13813844478',
             id: 5,
             mobile: '',
@@ -134,7 +152,7 @@ const CustomerImport = () => {
           {
             company: '中国能源建设集团天津电力设计院有限公司',
             createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.SIGNED,
+            followStatus: FollowUpStatus.REGISTERED,
             followUp: '其他单位能学应该是有发文，看一下，课程和计划发过来微信13821110961',
             id: 6,
             mobile: '',
@@ -249,26 +267,89 @@ const CustomerImport = () => {
       label: '全部'
     },
     {
-      key: FollowUpStatus.INITIAL,
-      label: followUpStatusNames[FollowUpStatus.INITIAL]
+      key: FollowUpStatus.EARLY_25,
+      label: followUpStatusNames[FollowUpStatus.EARLY_25]
     },
     {
-      key: FollowUpStatus.FOLLOWING,
-      label: followUpStatusNames[FollowUpStatus.FOLLOWING]
+      key: FollowUpStatus.VIP,
+      label: followUpStatusNames[FollowUpStatus.VIP]
     },
     {
-      key: FollowUpStatus.VISITED,
-      label: followUpStatusNames[FollowUpStatus.VISITED]
+      key: FollowUpStatus.EFFECTIVE_VISIT,
+      label: followUpStatusNames[FollowUpStatus.EFFECTIVE_VISIT]
     },
     {
-      key: FollowUpStatus.SIGNED,
-      label: followUpStatusNames[FollowUpStatus.SIGNED]
+      key: FollowUpStatus.CONSULT,
+      label: followUpStatusNames[FollowUpStatus.CONSULT]
     },
     {
-      key: FollowUpStatus.REJECTED,
-      label: followUpStatusNames[FollowUpStatus.REJECTED]
+      key: FollowUpStatus.REGISTERED,
+      label: followUpStatusNames[FollowUpStatus.REGISTERED]
+    },
+    {
+      key: FollowUpStatus.ARRIVED,
+      label: followUpStatusNames[FollowUpStatus.ARRIVED]
+    },
+    {
+      key: FollowUpStatus.NOT_ARRIVED,
+      label: followUpStatusNames[FollowUpStatus.NOT_ARRIVED]
+    },
+    {
+      key: FollowUpStatus.NEW_DEVELOP,
+      label: followUpStatusNames[FollowUpStatus.NEW_DEVELOP]
     }
   ];
+
+  /** 手动录入表单提交 */
+  const handleManualSubmit = async () => {
+    try {
+      const values = await manualForm.validateFields();
+      setSubmitting(true);
+
+      // 模拟处理表单数据
+      setTimeout(() => {
+        // 创建新客户记录
+        const newCustomer = {
+          company: values.company,
+          createTime: new Date().toLocaleString(),
+          followStatus: values.followStatus,
+          followUp: values.followUp,
+          id: manualEntryList.length > 0 ? Math.max(...manualEntryList.map(item => item.id)) + 1 : 1,
+          mobile: values.mobile || '',
+          name: values.name,
+          phone: values.phone || '',
+          position: values.position || ''
+        };
+
+        // 添加到手动录入列表
+        setManualEntryList([newCustomer, ...manualEntryList]);
+
+        // 重置表单
+        manualForm.resetFields();
+        message.success('客户添加成功');
+        setSubmitting(false);
+      }, 1000);
+    } catch (error) {
+      console.error('表单验证失败:', error);
+    }
+  };
+
+  /** 批量导入手动录入的客户 */
+  const handleBatchImport = () => {
+    if (manualEntryList.length === 0) {
+      message.warning('请先添加客户');
+      return;
+    }
+
+    setSubmitting(true);
+
+    // 模拟导入过程
+    setTimeout(() => {
+      message.success(`成功导入 ${manualEntryList.length} 名客户`);
+      setManualEntryList([]);
+      setSubmitting(false);
+    }, 1500);
+  };
 
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
@@ -347,14 +428,121 @@ const CustomerImport = () => {
             {
               children: (
                 <div className="mt-4">
-                  <Row>
-                    <Col span={24}>
+                  <Row gutter={[16, 16]}>
+                    <Col span={12}>
                       <Card
                         bordered={false}
-                        title="手动添加客户信息"
+                        title="客户信息录入"
                       >
-                        <p className="text-center">此功能正在开发中...</p>
-                        {/* 这里可以添加表单用于手动录入客户信息 */}
+                        <Form
+                          form={manualForm}
+                          labelCol={{ span: 6 }}
+                          wrapperCol={{ span: 16 }}
+                        >
+                          <Form.Item
+                            label="单位名称"
+                            name="company"
+                            rules={[{ message: '请输入单位名称', required: true }]}
+                          >
+                            <Input placeholder="请输入单位名称" />
+                          </Form.Item>
+                          <Form.Item
+                            label="姓名"
+                            name="name"
+                            rules={[{ message: '请输入客户姓名', required: true }]}
+                          >
+                            <Input placeholder="请输入客户姓名" />
+                          </Form.Item>
+                          <Form.Item
+                            label="职位"
+                            name="position"
+                          >
+                            <Input placeholder="请输入职位" />
+                          </Form.Item>
+                          <Form.Item
+                            label="电话"
+                            name="phone"
+                          >
+                            <Input placeholder="请输入电话号码" />
+                          </Form.Item>
+                          <Form.Item
+                            label="手机"
+                            name="mobile"
+                          >
+                            <Input placeholder="请输入手机号码" />
+                          </Form.Item>
+                          <Form.Item
+                            initialValue={FollowUpStatus.NEW_DEVELOP}
+                            label="跟进状态"
+                            name="followStatus"
+                            rules={[{ message: '请选择跟进状态', required: true }]}
+                          >
+                            <Select
+                              placeholder="请选择跟进状态"
+                              options={Object.values(FollowUpStatus).map(status => ({
+                                label: (
+                                  <Space>
+                                    <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>
+                                  </Space>
+                                ),
+                                value: status
+                              }))}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            label="跟进内容"
+                            name="followUp"
+                            rules={[{ message: '请输入跟进内容', required: true }]}
+                          >
+                            <Input.TextArea
+                              placeholder="请输入跟进内容"
+                              rows={4}
+                            />
+                          </Form.Item>
+                          <Form.Item wrapperCol={{ offset: 6, span: 16 }}>
+                            <Button
+                              icon={<PlusOutlined />}
+                              loading={submitting}
+                              type="primary"
+                              onClick={handleManualSubmit}
+                            >
+                              添加客户
+                            </Button>
+                          </Form.Item>
+                        </Form>
+                      </Card>
+                    </Col>
+                    <Col span={12}>
+                      <Card
+                        bordered={false}
+                        extra={
+                          <Button
+                            disabled={manualEntryList.length === 0}
+                            loading={submitting}
+                            type="primary"
+                            onClick={handleBatchImport}
+                          >
+                            批量导入
+                          </Button>
+                        }
+                        title={
+                          <div>
+                            已添加客户 <Tag color="blue">{manualEntryList.length}</Tag>
+                          </div>
+                        }
+                      >
+                        {manualEntryList.length > 0 ? (
+                          <Table
+                            columns={columns}
+                            dataSource={manualEntryList}
+                            pagination={{ pageSize: 5 }}
+                            rowKey="id"
+                            scroll={{ x: 800, y: 300 }}
+                            size="small"
+                          />
+                        ) : (
+                          <div className="py-10 text-center text-gray-400">暂无添加的客户信息</div>
+                        )}
                       </Card>
                     </Col>
                   </Row>

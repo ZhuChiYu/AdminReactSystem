@@ -27,14 +27,7 @@ function initRoutes() {
       'customer-manage', // 避免客户管理重复
       'customer-follow', // 避免客户跟进重复
       'customer-import', // 避免客户导入重复
-      'customer-info', // 避免客户资料重复
-      'meeting-manage', // 避免会议管理重复
-      'employee-manage', // 避免员工管理重复
-      'about', // 删除关于
-      'finance-dashboard', // 删除财务看板
-      'finance_dashboard', // 删除财务看板(另一种可能的ID)
-      'project_manage', // 删除事项管理重复
-      'project-manage' // 删除自动生成的事项管理菜单(elegant路由中的ID)
+      'customer-info' // 避免客户资料重复
     ];
 
     // 移除这些菜单项
@@ -48,12 +41,6 @@ function initRoutes() {
 
   // 添加自定义复用路由至基础路由
   baseRoute?.children?.push(...BaseChildrenRoutes);
-
-  // 调整系统管理显示在最底部
-  const systemManage = baseRoute?.children?.find(route => route.path === '/manage');
-  if (systemManage && systemManage.handle) {
-    systemManage.handle.order = 99;
-  }
 
   const authRoutes: Router.SingleAuthRoute[] = [];
 

@@ -23,6 +23,12 @@ export const generatedRoutes: ElegantConstRoute[] = [
         name: '(base)',
         children: [
           {
+            matchedFiles: [null, '/src/pages/(base)/about/index.tsx', null, null],
+            name: '(base)_about',
+            path: '/about',
+            handle: { i18nKey: 'route.(base)_about', title: '(base)_about' }
+          },
+          {
             matchedFiles: [null, '/src/pages/(base)/class-manage/layout.tsx', null, null],
             name: '(base)_class-manage',
             path: '/class-manage',
@@ -177,10 +183,67 @@ export const generatedRoutes: ElegantConstRoute[] = [
           },
           {
             matchedFiles: [null, null, null, null],
+            name: '(base)_employee-manage',
+            path: '/employee-manage',
+            handle: {
+              i18nKey: 'route.(base)_employee-manage',
+              icon: 'mdi:account-cog-outline',
+              order: 11,
+              title: '(base)_employee-manage'
+            },
+            children: [
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_address',
+                path: '/employee-manage/address',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_address',
+                  icon: 'mdi:map-marker-outline',
+                  order: 3,
+                  title: '(base)_employee-manage_address'
+                }
+              },
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_contact',
+                path: '/employee-manage/contact',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_contact',
+                  icon: 'mdi:phone-outline',
+                  order: 4,
+                  title: '(base)_employee-manage_contact'
+                }
+              },
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_identity',
+                path: '/employee-manage/identity',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_identity',
+                  icon: 'mdi:card-account-details-outline',
+                  order: 2,
+                  title: '(base)_employee-manage_identity'
+                }
+              },
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_list',
+                path: '/employee-manage/list',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_list',
+                  icon: 'mdi:account-multiple-outline',
+                  order: 1,
+                  title: '(base)_employee-manage_list'
+                }
+              }
+            ]
+          },
+          {
+            matchedFiles: [null, null, null, null],
             name: '(base)_expense-process',
             path: '/expense-process',
-            handle: { 
-              i18nKey: 'route.(base)_expense-process', 
+            handle: {
+              i18nKey: 'route.(base)_expense-process',
               title: '报销流程',
               icon: 'mdi:file-document-edit-outline',
               order: 5
@@ -190,8 +253,8 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/expense-process/apply/index.tsx', null, null],
                 name: '(base)_expense-process_apply',
                 path: '/expense-process/apply',
-                handle: { 
-                  i18nKey: 'route.(base)_expense-process_apply', 
+                handle: {
+                  i18nKey: 'route.(base)_expense-process_apply',
                   title: '报销申请',
                   icon: 'mdi:file-document-plus-outline',
                   order: 1
@@ -201,14 +264,20 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/expense-process/approve/index.tsx', null, null],
                 name: '(base)_expense-process_approve',
                 path: '/expense-process/approve',
-                handle: { 
-                  i18nKey: 'route.(base)_expense-process_approve', 
+                handle: {
+                  i18nKey: 'route.(base)_expense-process_approve',
                   title: '报销审核',
                   icon: 'mdi:file-check-outline',
                   order: 2
                 }
               }
             ]
+          },
+          {
+            matchedFiles: [null, '/src/pages/(base)/finance-dashboard/index.tsx', null, null],
+            name: '(base)_finance-dashboard',
+            path: '/finance-dashboard',
+            handle: { i18nKey: 'route.(base)_finance-dashboard', title: '(base)_finance-dashboard' }
           },
           {
             matchedFiles: [null, null, null, null],
@@ -504,13 +573,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
             matchedFiles: [null, null, null, null],
             name: '(base)_project-manage',
             path: '/project-manage',
-            handle: { 
-              i18nKey: 'route.(base)_project-manage', 
-              title: '事项管理',
-              icon: 'mdi:clipboard-text-outline',
-              order: 10,
-              hideInMenu: false
-            },
+            handle: { i18nKey: 'route.(base)_project-manage', title: '(base)_project-manage' },
             children: [
               {
                 matchedFiles: [null, '/src/pages/(base)/project-manage/list/index.tsx', null, null],
@@ -577,63 +640,6 @@ export const generatedRoutes: ElegantConstRoute[] = [
             name: '(base)_user-center',
             path: '/user-center',
             handle: { hideInMenu: true, i18nKey: 'route.(base)_user-center', title: 'user-center' }
-          },
-          {
-            matchedFiles: [null, null, null, null],
-            name: '(base)_employee-manage',
-            path: '/employee-manage',
-            handle: {
-              i18nKey: 'route.(base)_employee-manage',
-              icon: 'mdi:account-cog-outline',
-              order: 11,
-              title: '员工管理'
-            },
-            children: [
-              {
-                matchedFiles: [null, null, null, null],
-                name: '(base)_employee-manage_list',
-                path: '/employee-manage/list',
-                handle: {
-                  i18nKey: 'route.(base)_employee-manage_list',
-                  icon: 'mdi:account-multiple-outline',
-                  order: 1,
-                  title: '员工列表'
-                }
-              },
-              {
-                matchedFiles: [null, null, null, null],
-                name: '(base)_employee-manage_identity',
-                path: '/employee-manage/identity',
-                handle: {
-                  i18nKey: 'route.(base)_employee-manage_identity',
-                  icon: 'mdi:card-account-details-outline',
-                  order: 2,
-                  title: '身份证信息'
-                }
-              },
-              {
-                matchedFiles: [null, null, null, null],
-                name: '(base)_employee-manage_address',
-                path: '/employee-manage/address',
-                handle: {
-                  i18nKey: 'route.(base)_employee-manage_address',
-                  icon: 'mdi:map-marker-outline',
-                  order: 3,
-                  title: '员工住址'
-                }
-              },
-              {
-                matchedFiles: [null, null, null, null],
-                name: '(base)_employee-manage_contact',
-                path: '/employee-manage/contact',
-                handle: {
-                  i18nKey: 'route.(base)_employee-manage_contact',
-                  icon: 'mdi:phone-outline',
-                  order: 4,
-                  title: '联系方式'
-                }
-              }
-            ]
           }
         ],
         path: null
