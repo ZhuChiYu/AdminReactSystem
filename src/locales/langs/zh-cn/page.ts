@@ -224,10 +224,11 @@ const page: App.I18n.Schema['translation']['page'] = {
         '[...slug] 是匹配所有多级动态路由的语法 以[...any]为格式,匹配到的数据会在useRoute的params中以数组的形式存在'
     },
     user: {
-      addUser: '新增用户',
-      editUser: '编辑用户',
+      addUser: '新增员工',
+      editUser: '编辑员工',
       form: {
         nickName: '请输入昵称',
+        password: '请输入初始密码',
         userEmail: '请输入邮箱',
         userGender: '请选择性别',
         userName: '请输入用户名',
@@ -239,8 +240,10 @@ const page: App.I18n.Schema['translation']['page'] = {
         female: '女',
         male: '男'
       },
+      initialPassword: '初始密码',
       nickName: '昵称',
-      title: '用户列表',
+      password: '密码',
+      title: '员工列表',
       userEmail: '邮箱',
       userGender: '性别',
       userName: '用户名',

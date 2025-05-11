@@ -315,6 +315,7 @@ declare namespace App {
           error: string;
           errorHint: string;
           expandColumn: string;
+          hide: string;
           index: string;
           keywordSearch: string;
           logout: string;
@@ -328,6 +329,7 @@ declare namespace App {
           refresh: string;
           reset: string;
           search: string;
+          show: string;
           switch: string;
           tip: string;
           trigger: string;
@@ -603,6 +605,7 @@ declare namespace App {
               editUser: string;
               form: {
                 nickName: string;
+                password: string;
                 userEmail: string;
                 userGender: string;
                 userName: string;
@@ -614,7 +617,9 @@ declare namespace App {
                 female: string;
                 male: string;
               };
+              initialPassword: string;
               nickName: string;
+              password: string;
               title: string;
               userEmail: string;
               userGender: string;

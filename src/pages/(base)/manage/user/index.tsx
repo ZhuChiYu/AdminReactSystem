@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 
 import { enableStatusRecord, userGenderRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
@@ -16,12 +16,20 @@ const tagUserGenderMap: Record<Api.SystemManage.UserGender, string> = {
 
 const UserManage = () => {
   const { t } = useTranslation();
+  const [passwordVisible, setPasswordVisible] = useState<Record<number, boolean>>({});
 
   const { scrollConfig, tableWrapperRef } = useTableScroll();
 
   const nav = useNavigate();
 
   const isMobile = useMobile();
+
+  const togglePasswordVisibility = (id: number) => {
+    setPasswordVisible(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   const { columnChecks, data, run, searchProps, setColumnChecks, tableProps } = useTable(
     {
@@ -52,6 +60,31 @@ const UserManage = () => {
           key: 'userName',
           minWidth: 100,
           title: t('page.manage.user.userName')
+        },
+        {
+          align: 'center',
+          dataIndex: 'password',
+          key: 'password',
+          minWidth: 150,
+          render: (_, record) => {
+            const password = record.password || '123456';
+            return (
+              <div className="flex-center gap-4px">
+                <span>{passwordVisible[record.id] ? password : '******'}</span>
+                <AButton
+                  size="small"
+                  type="link"
+                  onClick={e => {
+                    e.stopPropagation();
+                    togglePasswordVisibility(record.id);
+                  }}
+                >
+                  {passwordVisible[record.id] ? t('common.hide') : t('common.show')}
+                </AButton>
+              </div>
+            );
+          },
+          title: t('page.manage.user.password')
         },
         {
           align: 'center',

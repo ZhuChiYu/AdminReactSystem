@@ -76,6 +76,17 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
           <Input placeholder={t('page.manage.user.form.userName')} />
         </Form.Item>
 
+        {operateType === 'add' && (
+          <Form.Item
+            initialValue="123456"
+            label={t('page.manage.user.initialPassword')}
+            name="password"
+            rules={[defaultRequiredRule]}
+          >
+            <Input.Password placeholder={t('page.manage.user.form.password')} />
+          </Form.Item>
+        )}
+
         <Form.Item
           label={t('page.manage.user.userGender')}
           name="userGender"

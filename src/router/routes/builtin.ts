@@ -199,41 +199,6 @@ export const BaseChildrenRoutes = [
     id: 'project_manage',
     path: '/project-manage'
   },
-  // 新增报销流程模块
-  {
-    children: [
-      {
-        handle: {
-          i18nKey: 'route.(base)_expense-process_apply',
-          icon: 'mdi:file-document-edit-outline',
-          order: 1,
-          title: '报销申请'
-        },
-        id: 'expense_apply',
-        lazy: () => import('@/pages/(base)/expense-process/apply').then(convert),
-        path: '/expense-process/apply'
-      },
-      {
-        handle: {
-          i18nKey: 'route.(base)_expense-process_approve',
-          icon: 'mdi:file-check-outline',
-          order: 2,
-          title: '报销审核'
-        },
-        id: 'expense_approve',
-        lazy: () => import('@/pages/(base)/expense-process/approve').then(convert),
-        path: '/expense-process/approve'
-      }
-    ],
-    handle: {
-      i18nKey: 'route.(base)_expense-process',
-      icon: 'mdi:cash-multiple',
-      order: 7,
-      title: '报销流程'
-    },
-    id: 'expense_process',
-    path: '/expense-process'
-  },
   // 新增会议管理模块
   {
     children: [

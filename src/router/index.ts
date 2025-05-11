@@ -34,7 +34,8 @@ function initRoutes() {
       'finance-dashboard', // 删除财务看板
       'finance_dashboard', // 删除财务看板(另一种可能的ID)
       'project_manage', // 删除事项管理重复
-      'project-manage' // 删除自动生成的事项管理菜单(elegant路由中的ID)
+      'project-manage', // 删除自动生成的事项管理菜单(elegant路由中的ID)
+      'home' // 删除首页
     ];
 
     // 移除这些菜单项

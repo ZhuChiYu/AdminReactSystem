@@ -39,6 +39,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_course-manage_class_detail": "/course-manage/class/detail";
     "(base)_course-manage_list": "/course-manage/list";
     "(base)_customer-manage": "/customer-manage";
+    "(base)_customer-manage_assign": "/customer-manage/assign";
     "(base)_customer-manage_follow": "/customer-manage/follow";
     "(base)_customer-manage_import": "/customer-manage/import";
     "(base)_customer-manage_info": "/customer-manage/info";
@@ -65,6 +66,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_function_use-request": "/function/use-request";
     "(base)_home": "/home";
     "(base)_manage": "/manage";
+    "(base)_manage_permission": "/manage/permission";
     "(base)_manage_role": "/manage/role";
     "(base)_manage_role_[...slug]": "/manage/role/*";
     "(base)_manage_user": "/manage/user";
@@ -82,7 +84,9 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_multi-menu_second_child_home": "/multi-menu/second/child/home";
     "(base)_project-manage": "/project-manage";
     "(base)_project-manage_list": "/project-manage/list";
+    "(base)_project-manage_monthly-task": "/project-manage/monthly-task";
     "(base)_project-manage_task": "/project-manage/task";
+    "(base)_project-manage_weekly-task": "/project-manage/weekly-task";
     "(base)_projects": "/projects";
     "(base)_projects_[pid]": "/projects/:pid";
     "(base)_projects_[pid]_edit": "/projects/:pid/edit";
@@ -176,6 +180,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_course-manage"
     | "(base)_course-manage"
     | "(base)_course-manage_list"
+    | "(base)_customer-manage_assign"
     | "(base)_customer-manage_follow"
     | "(base)_customer-manage_import"
     | "(base)_customer-manage_info"
@@ -202,6 +207,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_home"
     | "(base)"
     | "(base)_manage"
+    | "(base)_manage_permission"
     | "(base)_manage_role_[...slug]"
     | "(base)_manage_role"
     | "(base)_manage_user_[id]"
@@ -217,7 +223,9 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_multi-menu_second_child"
     | "(base)_multi-menu_second"
     | "(base)_project-manage_list"
+    | "(base)_project-manage_monthly-task"
     | "(base)_project-manage_task"
+    | "(base)_project-manage_weekly-task"
     | "(base)_projects_[pid]_edit_[id]"
     | "(base)_projects_[pid]_edit"
     | "(base)_projects_[pid]"

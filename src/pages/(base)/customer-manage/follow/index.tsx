@@ -69,8 +69,13 @@ const CustomerFollow = () => {
   const [selectedFollowStatus, setSelectedFollowStatus] = useState<string>('all');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
-  // 用户角色，用于区分管理员和普通用户的权限
-  const userRole = 'admin'; // 当前用户为管理员
+  // 用户角色状态，可以在开发环境下切换测试
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('admin');
+
+  // 切换用户角色（仅供开发测试使用）
+  const toggleUserRole = () => {
+    setUserRole(prev => (prev === 'admin' ? 'user' : 'admin'));
+  };
 
   // 模拟获取跟进数据
   const fetchFollowData = () => {
@@ -103,8 +108,7 @@ const CustomerFollow = () => {
           mobile: '',
           name: '马芳',
           phone: '029-81112543',
-          position: '财务负责培训',
-          team: 'A组'
+          position: '财务负责培训'
         },
         {
           company: '中国电力工程顾问集团中南电力设计院有限公司',
@@ -116,8 +120,7 @@ const CustomerFollow = () => {
           mobile: '',
           name: '万娜',
           phone: '027-65263855',
-          position: '财务负责培训',
-          team: 'B组'
+          position: '财务负责培训'
         },
         {
           company: '太原钢铁（集团）有限公司',
@@ -129,8 +132,7 @@ const CustomerFollow = () => {
           mobile: '',
           name: '陈建英',
           phone: '微信',
-          position: '财务负责培训',
-          team: 'A组'
+          position: '财务负责培训'
         },
         {
           company: '中国电力工程顾问集团中南电力设计院有限公司',
@@ -142,8 +144,7 @@ const CustomerFollow = () => {
           mobile: '',
           name: '刘老师',
           phone: '027-65263854',
-          position: '财务',
-          team: 'C组'
+          position: '财务'
         },
         {
           company: '中国能源建设集团江苏省电力设计院有限公司',
@@ -155,8 +156,7 @@ const CustomerFollow = () => {
           mobile: '',
           name: '陶主任',
           phone: '025-85081060',
-          position: '财务主任',
-          team: 'A组'
+          position: '财务主任'
         },
         {
           company: '中国能源建设集团天津电力设计院有限公司',
@@ -168,8 +168,7 @@ const CustomerFollow = () => {
           mobile: '',
           name: '迟主任',
           phone: '022-58339303',
-          position: '财务主任',
-          team: 'B组'
+          position: '财务主任'
         }
       ];
 
@@ -220,8 +219,7 @@ const CustomerFollow = () => {
         mobile,
         name,
         phone,
-        position,
-        team: userRole === 'admin' ? 'A组' : '-'
+        position
       };
 
       const updatedRecords = [newRecord, ...followRecords];
@@ -322,18 +320,16 @@ const CustomerFollow = () => {
       title: '状态',
       width: 100
     },
-    {
-      dataIndex: 'createdBy',
-      key: 'createdBy',
-      title: '创建人',
-      width: 100
-    },
-    {
-      dataIndex: 'team',
-      key: 'team',
-      title: '所属组',
-      width: 80
-    },
+    ...(userRole === 'admin'
+      ? [
+          {
+            dataIndex: 'createdBy',
+            key: 'createdBy',
+            title: '创建人',
+            width: 100
+          }
+        ]
+      : []),
     {
       dataIndex: 'createdTime',
       key: 'createdTime',
@@ -364,13 +360,19 @@ const CustomerFollow = () => {
           className="h-full"
           title="客户跟进记录"
           extra={
-            <Button
-              icon={<PlusOutlined />}
-              type="primary"
-              onClick={openAddModal}
-            >
-              新增跟进
-            </Button>
+            <Space>
+              {/* 此按钮仅用于开发环境测试不同角色 */}
+              {import.meta.env.DEV && (
+                <Button onClick={toggleUserRole}>当前角色: {userRole === 'admin' ? '管理员' : '员工'}</Button>
+              )}
+              <Button
+                icon={<PlusOutlined />}
+                type="primary"
+                onClick={openAddModal}
+              >
+                新增跟进
+              </Button>
+            </Space>
           }
         >
           <Space

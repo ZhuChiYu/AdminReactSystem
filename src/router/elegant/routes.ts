@@ -141,18 +141,29 @@ export const generatedRoutes: ElegantConstRoute[] = [
             path: '/customer-manage',
             handle: {
               i18nKey: 'route.(base)_customer-manage',
-              title: '(base)_customer-manage',
+              title: '客户管理',
               icon: 'mdi:account-supervisor',
               order: 4
             },
             children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/assign/index.tsx', null, null],
+                name: '(base)_customer-manage_assign',
+                path: '/customer-manage/assign',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_assign',
+                  title: '客户分配',
+                  icon: 'ic:round-assignment-ind',
+                  order: 0
+                }
+              },
               {
                 matchedFiles: [null, '/src/pages/(base)/customer-manage/follow/index.tsx', null, null],
                 name: '(base)_customer-manage_follow',
                 path: '/customer-manage/follow',
                 handle: {
                   i18nKey: 'route.(base)_customer-manage_follow',
-                  title: '(base)_customer-manage_follow',
+                  title: '客户跟进',
                   icon: 'ic:round-transfer-within-a-station',
                   order: 1
                 }
@@ -163,7 +174,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 path: '/customer-manage/import',
                 handle: {
                   i18nKey: 'route.(base)_customer-manage_import',
-                  title: '(base)_customer-manage_import',
+                  title: '客户导入',
                   icon: 'ic:round-file-upload',
                   order: 2
                 }
@@ -174,7 +185,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 path: '/customer-manage/info',
                 handle: {
                   i18nKey: 'route.(base)_customer-manage_info',
-                  title: '(base)_customer-manage_info',
+                  title: '客户资料',
                   icon: 'ic:round-contacts',
                   order: 3
                 }
@@ -427,10 +438,22 @@ export const generatedRoutes: ElegantConstRoute[] = [
               i18nKey: 'route.(base)_manage',
               icon: 'carbon:cloud-service-management',
               order: 8,
-              roles: ['R_ADMIN'],
+              roles: ['R_SUPER'],
               title: 'manage'
             },
             children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/manage/permission/index.tsx', null, null],
+                name: '(base)_manage_permission',
+                path: '/manage/permission',
+                handle: {
+                  i18nKey: 'route.(base)_manage_permission',
+                  icon: 'carbon:user-admin',
+                  order: 1,
+                  roles: ['R_SUPER'],
+                  title: '权限管理'
+                }
+              },
               {
                 matchedFiles: [null, '/src/pages/(base)/manage/role/index.tsx', null, null],
                 name: '(base)_manage_role',
@@ -464,7 +487,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   icon: 'ic:round-manage-accounts',
                   keepAlive: true,
                   order: 1,
-                  roles: ['R_ADMIN'],
+                  roles: ['R_SUPER'],
                   title: 'manage_user'
                 },
                 children: [
@@ -582,10 +605,28 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 handle: { i18nKey: 'route.(base)_project-manage_list', title: '(base)_project-manage_list' }
               },
               {
+                matchedFiles: [null, '/src/pages/(base)/project-manage/monthly-task/index.tsx', null, null],
+                name: '(base)_project-manage_monthly-task',
+                path: '/project-manage/monthly-task',
+                handle: {
+                  i18nKey: 'route.(base)_project-manage_monthly-task',
+                  title: '(base)_project-manage_monthly-task'
+                }
+              },
+              {
                 matchedFiles: [null, '/src/pages/(base)/project-manage/task/index.tsx', null, null],
                 name: '(base)_project-manage_task',
                 path: '/project-manage/task',
                 handle: { i18nKey: 'route.(base)_project-manage_task', title: '(base)_project-manage_task' }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/project-manage/weekly-task/index.tsx', null, null],
+                name: '(base)_project-manage_weekly-task',
+                path: '/project-manage/weekly-task',
+                handle: {
+                  i18nKey: 'route.(base)_project-manage_weekly-task',
+                  title: '(base)_project-manage_weekly-task'
+                }
               }
             ]
           },
