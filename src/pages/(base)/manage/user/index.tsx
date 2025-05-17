@@ -88,6 +88,13 @@ const UserManage = () => {
         },
         {
           align: 'center',
+          dataIndex: 'nickName',
+          key: 'nickName',
+          minWidth: 100,
+          title: '姓名'
+        },
+        {
+          align: 'center',
           dataIndex: 'userGender',
           key: 'userGender',
           render: (_, record) => {
@@ -104,13 +111,6 @@ const UserManage = () => {
         },
         {
           align: 'center',
-          dataIndex: 'nickName',
-          key: 'nickName',
-          minWidth: 100,
-          title: t('page.manage.user.nickName')
-        },
-        {
-          align: 'center',
           dataIndex: 'userPhone',
           key: 'userPhone',
           title: t('page.manage.user.userPhone'),
@@ -123,6 +123,41 @@ const UserManage = () => {
           minWidth: 200,
           title: t('page.manage.user.userEmail')
         },
+        {
+          align: 'center',
+          dataIndex: 'address',
+          key: 'address',
+          minWidth: 200,
+          title: '家庭住址'
+        } as any,
+        {
+          align: 'center',
+          dataIndex: 'idCard',
+          key: 'idCard',
+          minWidth: 180,
+          title: '身份证号'
+        } as any,
+        {
+          align: 'center',
+          dataIndex: 'bankCard',
+          key: 'bankCard',
+          minWidth: 180,
+          title: '银行卡号'
+        } as any,
+        {
+          align: 'center',
+          dataIndex: 'wechat',
+          key: 'wechat',
+          minWidth: 150,
+          title: '工作微信号'
+        } as any,
+        {
+          align: 'center',
+          dataIndex: 'tim',
+          key: 'tim',
+          minWidth: 150,
+          title: 'TIM号'
+        } as any,
         {
           align: 'center',
           dataIndex: 'status',
@@ -170,7 +205,8 @@ const UserManage = () => {
             </div>
           ),
           title: t('common.operate'),
-          width: 195
+          width: 195,
+          fixed: 'right' as const
         }
       ]
     },
@@ -238,7 +274,7 @@ const UserManage = () => {
       >
         <ATable
           rowSelection={rowSelection}
-          scroll={scrollConfig}
+          scroll={{ x: 'max-content' }}
           size="small"
           {...tableProps}
         />

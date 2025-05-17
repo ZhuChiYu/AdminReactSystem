@@ -13,7 +13,18 @@ interface OptionsProps {
 
 type Model = Pick<
   Api.SystemManage.User,
-  'nickName' | 'status' | 'userEmail' | 'userGender' | 'userName' | 'userPhone' | 'userRoles'
+  | 'address'
+  | 'bankCard'
+  | 'idCard'
+  | 'nickName'
+  | 'status'
+  | 'tim'
+  | 'userEmail'
+  | 'userGender'
+  | 'userName'
+  | 'userPhone'
+  | 'userRoles'
+  | 'wechat'
 >;
 
 type RuleKey = Extract<keyof Model, 'status' | 'userName'>;
@@ -122,6 +133,41 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
           name="email"
         >
           <Input placeholder={t('page.manage.user.form.userEmail')} />
+        </Form.Item>
+
+        <Form.Item
+          label="家庭住址"
+          name="address"
+        >
+          <Input placeholder="请输入家庭住址" />
+        </Form.Item>
+
+        <Form.Item
+          label="身份证号"
+          name="idCard"
+        >
+          <Input placeholder="请输入身份证号" />
+        </Form.Item>
+
+        <Form.Item
+          label="银行卡号"
+          name="bankCard"
+        >
+          <Input placeholder="请输入银行卡号" />
+        </Form.Item>
+
+        <Form.Item
+          label="工作微信号"
+          name="wechat"
+        >
+          <Input placeholder="请输入工作微信号" />
+        </Form.Item>
+
+        <Form.Item
+          label="TIM号"
+          name="tim"
+        >
+          <Input placeholder="请输入TIM号" />
         </Form.Item>
 
         <Form.Item

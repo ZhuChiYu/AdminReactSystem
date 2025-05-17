@@ -128,10 +128,18 @@ declare namespace Api {
 
     /** user */
     type User = Common.CommonRecord<{
+      /** user address */
+      address?: string;
+      /** user bank card */
+      bankCard?: string;
+      /** user ID card */
+      idCard?: string;
       /** user nick name */
       nickName: string;
       /** user password */
       password?: string;
+      /** user TIM */
+      tim?: string;
       /** user email */
       userEmail: string;
       /** user gender */
@@ -142,6 +150,8 @@ declare namespace Api {
       userPhone: string;
       /** user role code collection */
       userRoles: string[];
+      /** user work WeChat */
+      wechat?: string;
     }>;
 
     /** user search params */

@@ -227,7 +227,7 @@ const page: App.I18n.Schema['translation']['page'] = {
       addUser: '新增员工',
       editUser: '编辑员工',
       form: {
-        nickName: '请输入昵称',
+        nickName: '请输入姓名',
         password: '请输入初始密码',
         userEmail: '请输入邮箱',
         userGender: '请选择性别',
@@ -241,7 +241,7 @@ const page: App.I18n.Schema['translation']['page'] = {
         male: '男'
       },
       initialPassword: '初始密码',
-      nickName: '昵称',
+      nickName: '姓名',
       password: '密码',
       title: '员工列表',
       userEmail: '邮箱',
