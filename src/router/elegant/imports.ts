@@ -89,6 +89,7 @@ export const pages: Record<string, () => Promise<any>> = {
 "500": () => import("@/pages/_builtin/500/index.tsx"),
 "iframe-page": () => import("@/pages/_builtin/iframe-page/index.tsx"),
 "root": () => import("@/pages/index.tsx"),
+"notifications": () => import("@/pages/notifications/index.tsx"),
 };
 
 export const errors: Record<string, () => Promise<any>> = {

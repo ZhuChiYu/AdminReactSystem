@@ -100,6 +100,7 @@ export const routeMap: RouteMap = {
  "404": "/404",
  "500": "/500",
  "iframe-page": "/iframe-page",
+ "notifications": "/notifications",
  "root": "/"
 };
 

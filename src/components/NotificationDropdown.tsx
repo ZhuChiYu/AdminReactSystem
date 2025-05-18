@@ -1,10 +1,9 @@
 import { BellOutlined } from '@ant-design/icons';
-import type { MenuProps } from 'antd';
-import { Badge, Button, Dropdown, List, Space, Typography } from 'antd';
+import { Badge, Button, Dropdown, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 interface Notification {
   content: string;
@@ -58,9 +57,7 @@ const NotificationDropdown: React.FC = () => {
   // 标记通知为已读
   const markAsRead = (id: string) => {
     setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
+      prev.map(notification => (notification.id === id ? { ...notification, read: true } : notification))
     );
     // 更新未读数量
     setUnreadCount(prev => Math.max(0, prev - 1));
@@ -88,46 +85,97 @@ const NotificationDropdown: React.FC = () => {
   };
 
   const notificationItems = (
-    <div className="custom-dropdown" style={{ maxHeight: '400px', maxWidth: '350px', overflow: 'auto' }}>
-      <div className="p-2">
-        <div className="mb-2 flex items-center justify-between">
-          <Title level={5} style={{ margin: 0 }}>通知</Title>
-          {unreadCount > 0 && (
-            <Button type="link" size="small" onClick={() => {
-              setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-              setUnreadCount(0);
-            }}>
-              全部标为已读
-            </Button>
-          )}
-        </div>
+    <div
+      className="notification-dropdown"
+      style={{
+        background: '#fff',
+        borderRadius: '8px',
+        boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
+        width: '320px'
+      }}
+    >
+      <div
+        className="notification-header"
+        style={{
+          alignItems: 'center',
+          borderBottom: '1px solid #f0f0f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          padding: '12px 16px'
+        }}
+      >
+        <Text
+          strong
+          style={{ fontSize: '16px' }}
+        >
+          通知
+        </Text>
+        <Button
+          size="small"
+          style={{ height: 'auto', padding: '0' }}
+          type="link"
+          onClick={() => {
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            setUnreadCount(0);
+          }}
+        >
+          全部标为已读
+        </Button>
+      </div>
 
-        <List
-          dataSource={notifications}
-          renderItem={(item) => (
-            <List.Item
-              className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
-              onClick={() => viewNotification(item)}
-            >
-              <List.Item.Meta
-                title={<Text strong>{item.title}</Text>}
-                description={
-                  <Space direction="vertical" size={1}>
-                    <Text>{item.content}</Text>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>{item.datetime}</Text>
-                  </Space>
-                }
-              />
-            </List.Item>
-          )}
-          locale={{ emptyText: '暂无通知' }}
-        />
+      <div
+        className="notification-content"
+        style={{ maxHeight: '400px', overflow: 'auto' }}
+      >
+        {notifications.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center' }}>
+            <Text type="secondary">暂无通知</Text>
+          </div>
+        ) : (
+          <div>
+            {notifications.map(notification => (
+              <div
+                className={`notification-item ${notification.read ? 'read' : 'unread'}`}
+                key={notification.id}
+                style={{
+                  backgroundColor: notification.read ? '#fff' : '#f0f7ff',
+                  borderBottom: '1px solid #f0f0f0',
+                  cursor: 'pointer',
+                  padding: '12px 16px'
+                }}
+                onClick={() => viewNotification(notification)}
+              >
+                <div style={{ marginBottom: '4px' }}>
+                  <Text strong>{notification.title}</Text>
+                </div>
+                <div style={{ marginBottom: '4px' }}>
+                  <Text style={{ fontSize: '14px' }}>{notification.content}</Text>
+                </div>
+                <div>
+                  <Text
+                    style={{ fontSize: '12px' }}
+                    type="secondary"
+                  >
+                    {notification.datetime}
+                  </Text>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        <div className="mt-2 border-t pt-2 text-center">
-          <Button type="link" onClick={viewAllNotifications}>
-            查看全部通知
-          </Button>
-        </div>
+      <div
+        className="notification-footer"
+        style={{ borderTop: '1px solid #f0f0f0', padding: '8px 16px', textAlign: 'center' }}
+      >
+        <Button
+          block
+          type="link"
+          onClick={viewAllNotifications}
+        >
+          查看全部通知
+        </Button>
       </div>
     </div>
   );
@@ -138,11 +186,17 @@ const NotificationDropdown: React.FC = () => {
       placement="bottomRight"
       trigger={['click']}
     >
-      <Button type="text" className="flex items-center">
-        <Badge count={unreadCount} overflowCount={99}>
+      <div
+        className="notification-icon"
+        style={{ cursor: 'pointer', padding: '0 8px' }}
+      >
+        <Badge
+          count={unreadCount}
+          overflowCount={99}
+        >
           <BellOutlined style={{ fontSize: '18px' }} />
         </Badge>
-      </Button>
+      </div>
     </Dropdown>
   );
 };

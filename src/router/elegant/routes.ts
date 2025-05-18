@@ -749,6 +749,12 @@ export const generatedRoutes: ElegantConstRoute[] = [
         handle: { i18nKey: 'route.iframe-page', title: 'iframe-page', constant: true }
       },
       {
+        matchedFiles: [null, '/src/pages/notifications/index.tsx', null, null],
+        name: 'notifications',
+        path: '/notifications',
+        handle: { i18nKey: 'route.notifications', title: 'notifications' }
+      },
+      {
         matchedFiles: [null, '/src/pages/_builtin/404/index.tsx', null, null],
         name: 'notFound',
         path: '*',
