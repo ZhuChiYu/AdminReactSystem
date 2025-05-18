@@ -23,144 +23,6 @@ export const BaseChildrenRoutes = [
     children: [
       {
         handle: {
-          i18nKey: 'route.exception_403',
-          icon: 'ic:baseline-block',
-          title: 'exception_403'
-        },
-        id: 'exception_403',
-        lazy: () => import('@/pages/_builtin/403').then(convert),
-        path: '/exception/403'
-      },
-      {
-        handle: {
-          i18nKey: 'route.exception_404',
-          icon: 'ic:baseline-web-asset-off',
-          title: 'exception_404'
-        },
-        id: 'exception_404',
-        lazy: () => import('@/pages/_builtin/404').then(convert),
-        path: '/exception/404'
-      },
-      {
-        handle: {
-          i18nKey: 'route.exception_500',
-          icon: 'ic:baseline-wifi-off',
-          title: 'exception_500'
-        },
-        id: 'exception_500',
-        lazy: () => import('@/pages/_builtin/500').then(convert),
-        path: '/exception/500'
-      }
-    ],
-    handle: {
-      i18nKey: 'route.exception',
-      icon: 'ant-design:exception-outlined',
-      order: 4,
-      title: 'exception'
-    },
-    id: 'exception',
-    path: '/exception'
-  },
-  {
-    children: [
-      {
-        handle: {
-          i18nKey: 'route.document_antd',
-          icon: 'logos:ant-design',
-          order: 7,
-          title: 'document_antd',
-          url: 'https://ant.design/index-cn'
-        },
-        id: 'document_antd',
-        lazy: () => import('@/pages/_builtin/iframe-page').then(convert),
-        path: '/document/antd'
-      },
-      {
-        handle: {
-          i18nKey: 'route.document_procomponents',
-          icon: 'logos:ant-design',
-          order: 8,
-          title: 'document_procomponents',
-          url: 'https://pro-components.antdigital.dev/'
-        },
-        id: 'document_procomponents',
-        lazy: () => import('@/pages/_builtin/iframe-page').then(convert),
-        path: '/document/procomponents'
-      },
-      {
-        handle: {
-          i18nKey: 'route.document_project',
-          localIcon: 'logo',
-          order: 1,
-          title: 'document_project',
-          url: 'https://react-docs.soybeanjs.cn'
-        },
-        id: 'document_project',
-        lazy: () => import('@/pages/_builtin/iframe-page').then(convert),
-        path: '/document/project'
-      },
-      {
-        handle: {
-          href: 'https://react-docs.soybeanjs.cn',
-          i18nKey: 'route.document_project-link',
-          localIcon: 'logo',
-          order: 2,
-          title: 'document_project-link'
-        },
-        id: 'document_project-link',
-        lazy: () => import('@/pages/_builtin/iframe-page').then(convert),
-        path: '/document/project-link'
-      },
-      {
-        handle: {
-          i18nKey: 'route.document_unocss',
-          icon: 'logos:unocss',
-          order: 5,
-          title: 'document_unocss',
-          url: 'https://unocss.dev/'
-        },
-        id: 'document_unocss',
-        lazy: () => import('@/pages/_builtin/iframe-page').then(convert),
-        path: '/document/unocss'
-      },
-      {
-        handle: {
-          i18nKey: 'route.document_vite',
-          icon: 'logos:vitejs',
-          order: 4,
-          title: 'document_vite',
-          url: 'https://cn.vitejs.dev/'
-        },
-        id: 'document_vite',
-        lazy: () => import('@/pages/_builtin/iframe-page').then(convert),
-        path: '/document/vite'
-      },
-      {
-        handle: {
-          i18nKey: 'route.document_react',
-          icon: 'logos:react',
-          order: 3,
-          title: 'document_react',
-          url: 'https://react.dev/'
-        },
-        id: 'document_react',
-        lazy: () => import('@/pages/_builtin/iframe-page').then(convert),
-        path: '/document/react'
-      }
-    ],
-    handle: {
-      i18nKey: 'route.document',
-      icon: 'mdi:file-document-multiple-outline',
-      order: 3,
-      title: 'document'
-    },
-    id: 'document',
-    path: '/document'
-  },
-  {
-    children: [
-      {
-        handle: {
           i18nKey: 'route.(base)_course-manage_list',
           icon: 'mdi:book-open-variant',
           order: 1,
@@ -212,5 +74,186 @@ export const BaseChildrenRoutes = [
     },
     id: 'course_manage',
     path: '/course-manage'
+  },
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_class-manage_list',
+          icon: 'mdi:format-list-bulleted',
+          order: 1,
+          title: 'class_list'
+        },
+        id: 'class_list',
+        lazy: () => import('@/pages/(base)/class-manage/list').then(convert),
+        path: '/class-manage/list'
+      },
+      {
+        handle: {
+          hideInMenu: true,
+          i18nKey: 'route.(base)_class-manage_detail',
+          icon: 'mdi:card-account-details-outline',
+          title: 'class_detail'
+        },
+        id: 'class_detail',
+        lazy: () => import('@/pages/(base)/class-manage/detail').then(convert),
+        path: '/class-manage/detail/:classId'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_class-manage',
+      icon: 'mdi:account-group',
+      order: 3,
+      title: 'class_manage'
+    },
+    id: 'class_manage',
+    path: '/class-manage'
+  },
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_customer-manage_follow',
+          icon: 'ic:round-transfer-within-a-station',
+          order: 1,
+          title: '客户跟进'
+        },
+        id: 'customer_follow',
+        lazy: () => import('@/pages/(base)/customer-manage/follow').then(convert),
+        path: '/customer-manage/follow'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_customer-manage_import',
+          icon: 'ic:round-file-upload',
+          order: 2,
+          title: '客户导入'
+        },
+        id: 'customer_import',
+        lazy: () => import('@/pages/(base)/customer-manage/import').then(convert),
+        path: '/customer-manage/import'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_customer-manage_info',
+          icon: 'ic:round-contacts',
+          order: 3,
+          title: '客户资料'
+        },
+        id: 'customer_info',
+        lazy: () => import('@/pages/(base)/customer-manage/info').then(convert),
+        path: '/customer-manage/info'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_customer-manage',
+      icon: 'mdi:account-supervisor',
+      order: 4,
+      title: '客户管理'
+    },
+    id: 'customer_manage',
+    path: '/customer-manage'
+  },
+  {
+    handle: {
+      i18nKey: 'route.(base)_finance-dashboard',
+      icon: 'mdi:finance',
+      order: 5,
+      title: '财务看板'
+    },
+    id: 'finance_dashboard',
+    lazy: () => import('@/pages/(base)/finance-dashboard').then(convert),
+    path: '/finance-dashboard'
+  },
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_project-manage_list',
+          icon: 'mdi:clipboard-list-outline',
+          order: 1,
+          title: '事项列表'
+        },
+        id: 'project_list',
+        lazy: () => import('@/pages/(base)/project-manage/list').then(convert),
+        path: '/project-manage/list'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_project-manage_task',
+          icon: 'mdi:clipboard-check-outline',
+          order: 2,
+          title: '任务管理'
+        },
+        id: 'project_task',
+        lazy: () => import('@/pages/(base)/project-manage/task').then(convert),
+        path: '/project-manage/task'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_project-manage',
+      icon: 'mdi:clipboard-text-outline',
+      order: 6,
+      title: '事项管理'
+    },
+    id: 'project_manage',
+    path: '/project-manage'
+  },
+  // 新增会议管理模块
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_list',
+          icon: 'mdi:calendar-text-outline',
+          order: 1,
+          title: '会议列表'
+        },
+        id: 'meeting_list',
+        lazy: () => import('@/pages/(base)/meeting-manage/list').then(convert),
+        path: '/meeting-manage/list'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_record',
+          icon: 'mdi:note-text-outline',
+          order: 2,
+          title: '会议记录'
+        },
+        id: 'meeting_record',
+        lazy: () => import('@/pages/(base)/meeting-manage/record').then(convert),
+        path: '/meeting-manage/record'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_summary',
+          icon: 'mdi:file-document-outline',
+          order: 3,
+          title: '会议总结'
+        },
+        id: 'meeting_summary',
+        lazy: () => import('@/pages/(base)/meeting-manage/summary').then(convert),
+        path: '/meeting-manage/summary'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_meeting-manage_approve',
+          icon: 'mdi:check-decagram-outline',
+          order: 4,
+          title: '会议审核'
+        },
+        id: 'meeting_approve',
+        lazy: () => import('@/pages/(base)/meeting-manage/approve').then(convert),
+        path: '/meeting-manage/approve'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_meeting-manage',
+      icon: 'mdi:account-group-outline',
+      order: 8,
+      title: '会议管理'
+    },
+    id: 'meeting_manage',
+    path: '/meeting-manage'
   }
 ] satisfies RouteObject[];

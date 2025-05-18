@@ -1,7 +1,7 @@
 const page: App.I18n.Schema['translation']['page'] = {
   about: {
     devDep: 'Development Dependency',
-    introduction: `SoybeanAdmin is an elegant and powerful admin template, based on the latest front-end technology stack, including React19.0, Vite6, TypeScript, ReactRouter7,Redux/toolkitand UnoCSS. It has built-in rich theme configuration and components, strict code specifications, and an automated file routing system. In addition, it also uses the online mock data solution based on ApiFox. SoybeanAdmin provides you with a one-stop admin solution, no additional configuration, and out of the box. It is also a best practice for learning cutting-edge technologies quickly.`,
+    introduction: `system is an elegant and powerful admin template, based on the latest front-end technology stack, including React19.0, Vite6, TypeScript, ReactRouter7,Redux/toolkitand UnoCSS. It has built-in rich theme configuration and components, strict code specifications, and an automated file routing system. In addition, it also uses the online mock data solution based on ApiFox. system provides you with a one-stop admin solution, no additional configuration, and out of the box. It is also a best practice for learning cutting-edge technologies quickly.`,
     prdDep: 'Production Dependency',
     projectInfo: {
       githubLink: 'Github Link',
@@ -224,13 +224,14 @@ const page: App.I18n.Schema['translation']['page'] = {
         '[...slug] is the syntax for matching all multi-level dynamic routes. The data is random and may not match.'
     },
     user: {
-      addUser: 'Add User',
-      editUser: 'Edit User',
+      addUser: 'Add Employee',
+      editUser: 'Edit Employee',
       form: {
-        nickName: 'Please enter nick name',
+        nickName: 'Please enter nickname',
+        password: 'Please enter initial password',
         userEmail: 'Please enter email',
         userGender: 'Please select gender',
-        userName: 'Please enter user name',
+        userName: 'Please enter username',
         userPhone: 'Please enter phone number',
         userRole: 'Please select user role',
         userStatus: 'Please select user status'
@@ -239,12 +240,14 @@ const page: App.I18n.Schema['translation']['page'] = {
         female: 'Female',
         male: 'Male'
       },
-      nickName: 'Nick Name',
-      title: 'User List',
+      initialPassword: 'Initial Password',
+      nickName: 'Nickname',
+      password: 'Password',
+      title: 'Employee List',
       userEmail: 'Email',
       userGender: 'Gender',
-      userName: 'User Name',
-      userPhone: 'Phone Number',
+      userName: 'Username',
+      userPhone: 'Phone',
       userRole: 'User Role',
       userStatus: 'User Status'
     },

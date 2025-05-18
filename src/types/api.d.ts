@@ -130,6 +130,8 @@ declare namespace Api {
     type User = Common.CommonRecord<{
       /** user nick name */
       nickName: string;
+      /** user password */
+      password?: string;
       /** user email */
       userEmail: string;
       /** user gender */

@@ -38,6 +38,20 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_course-manage_class": "/course-manage/class";
     "(base)_course-manage_class_detail": "/course-manage/class/detail";
     "(base)_course-manage_list": "/course-manage/list";
+    "(base)_customer-manage": "/customer-manage";
+    "(base)_customer-manage_assign": "/customer-manage/assign";
+    "(base)_customer-manage_follow": "/customer-manage/follow";
+    "(base)_customer-manage_import": "/customer-manage/import";
+    "(base)_customer-manage_info": "/customer-manage/info";
+    "(base)_employee-manage": "/employee-manage";
+    "(base)_employee-manage_address": "/employee-manage/address";
+    "(base)_employee-manage_contact": "/employee-manage/contact";
+    "(base)_employee-manage_identity": "/employee-manage/identity";
+    "(base)_employee-manage_list": "/employee-manage/list";
+    "(base)_expense-process": "/expense-process";
+    "(base)_expense-process_apply": "/expense-process/apply";
+    "(base)_expense-process_approve": "/expense-process/approve";
+    "(base)_finance-dashboard": "/finance-dashboard";
     "(base)_function": "/function";
     "(base)_function_event-bus": "/function/event-bus";
     "(base)_function_hide-child": "/function/hide-child";
@@ -52,16 +66,27 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_function_use-request": "/function/use-request";
     "(base)_home": "/home";
     "(base)_manage": "/manage";
+    "(base)_manage_permission": "/manage/permission";
     "(base)_manage_role": "/manage/role";
     "(base)_manage_role_[...slug]": "/manage/role/*";
     "(base)_manage_user": "/manage/user";
     "(base)_manage_user_[id]": "/manage/user/:id";
+    "(base)_meeting-manage": "/meeting-manage";
+    "(base)_meeting-manage_approve": "/meeting-manage/approve";
+    "(base)_meeting-manage_list": "/meeting-manage/list";
+    "(base)_meeting-manage_record": "/meeting-manage/record";
+    "(base)_meeting-manage_summary": "/meeting-manage/summary";
     "(base)_multi-menu": "/multi-menu";
     "(base)_multi-menu_first": "/multi-menu/first";
     "(base)_multi-menu_first_child": "/multi-menu/first/child";
     "(base)_multi-menu_second": "/multi-menu/second";
     "(base)_multi-menu_second_child": "/multi-menu/second/child";
     "(base)_multi-menu_second_child_home": "/multi-menu/second/child/home";
+    "(base)_project-manage": "/project-manage";
+    "(base)_project-manage_list": "/project-manage/list";
+    "(base)_project-manage_monthly-task": "/project-manage/monthly-task";
+    "(base)_project-manage_task": "/project-manage/task";
+    "(base)_project-manage_weekly-task": "/project-manage/weekly-task";
     "(base)_projects": "/projects";
     "(base)_projects_[pid]": "/projects/:pid";
     "(base)_projects_[pid]_edit": "/projects/:pid/edit";
@@ -155,6 +180,18 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_course-manage"
     | "(base)_course-manage"
     | "(base)_course-manage_list"
+    | "(base)_customer-manage_assign"
+    | "(base)_customer-manage_follow"
+    | "(base)_customer-manage_import"
+    | "(base)_customer-manage_info"
+    | "(base)_customer-manage"
+    | "(base)_employee-manage_address"
+    | "(base)_employee-manage_contact"
+    | "(base)_employee-manage_identity"
+    | "(base)_employee-manage_list"
+    | "(base)_expense-process_apply"
+    | "(base)_expense-process_approve"
+    | "(base)_finance-dashboard"
     | "(base)_function_event-bus"
     | "(base)_function_hide-child"
     | "(base)_function_hide-child_one"
@@ -170,16 +207,25 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_home"
     | "(base)"
     | "(base)_manage"
+    | "(base)_manage_permission"
     | "(base)_manage_role_[...slug]"
     | "(base)_manage_role"
     | "(base)_manage_user_[id]"
     | "(base)_manage_user"
+    | "(base)_meeting-manage_approve"
+    | "(base)_meeting-manage_list"
+    | "(base)_meeting-manage_record"
+    | "(base)_meeting-manage_summary"
     | "(base)_multi-menu_first_child"
     | "(base)_multi-menu_first"
     | "(base)_multi-menu"
     | "(base)_multi-menu_second_child_home"
     | "(base)_multi-menu_second_child"
     | "(base)_multi-menu_second"
+    | "(base)_project-manage_list"
+    | "(base)_project-manage_monthly-task"
+    | "(base)_project-manage_task"
+    | "(base)_project-manage_weekly-task"
     | "(base)_projects_[pid]_edit_[id]"
     | "(base)_projects_[pid]_edit"
     | "(base)_projects_[pid]"

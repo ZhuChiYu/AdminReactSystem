@@ -26,20 +26,15 @@ export const generatedRoutes: ElegantConstRoute[] = [
             matchedFiles: [null, '/src/pages/(base)/about/index.tsx', null, null],
             name: '(base)_about',
             path: '/about',
-            handle: {
-              i18nKey: 'route.(base)_about',
-              icon: 'fluent:book-information-24-regular',
-              order: 9,
-              title: 'about'
-            }
+            handle: { i18nKey: 'route.(base)_about', title: '(base)_about' }
           },
           {
             matchedFiles: [null, '/src/pages/(base)/class-manage/layout.tsx', null, null],
             name: '(base)_class-manage',
             path: '/class-manage',
-            handle: { 
-              i18nKey: 'route.(base)_class-manage', 
-              title: '(base)_class-manage', 
+            handle: {
+              i18nKey: 'route.(base)_class-manage',
+              title: '(base)_class-manage',
               hideInMenu: false,
               icon: 'mdi:account-group',
               order: 3
@@ -49,19 +44,19 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/class-manage/detail/index.tsx', null, null],
                 name: '(base)_class-manage_detail',
                 path: '/class-manage/detail',
-                handle: { 
-                  i18nKey: 'route.(base)_class-manage_detail', 
-                  title: '(base)_class-manage_detail', 
-                  hideInMenu: true 
+                handle: {
+                  i18nKey: 'route.(base)_class-manage_detail',
+                  title: '(base)_class-manage_detail',
+                  hideInMenu: true
                 }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/class-manage/list/index.tsx', null, null],
                 name: '(base)_class-manage_list',
                 path: '/class-manage/list',
-                handle: { 
-                  i18nKey: 'route.(base)_class-manage_list', 
-                  title: '(base)_class-manage_list', 
+                handle: {
+                  i18nKey: 'route.(base)_class-manage_list',
+                  title: '(base)_class-manage_list',
                   hideInMenu: false,
                   icon: 'mdi:format-list-bulleted',
                   order: 1
@@ -73,13 +68,23 @@ export const generatedRoutes: ElegantConstRoute[] = [
             matchedFiles: [null, '/src/pages/(base)/course-manage/index.tsx', null, null],
             name: '(base)_course-manage',
             path: '/course-manage',
-            handle: { i18nKey: 'route.(base)_course-manage', title: '(base)_course-manage', hideInMenu: true },
+            handle: {
+              i18nKey: 'route.(base)_course-manage',
+              title: '(base)_course-manage',
+              icon: 'mdi:book-open-variant',
+              order: 2,
+              hideInMenu: true
+            },
             children: [
               {
                 matchedFiles: [null, '/src/pages/(base)/course-manage/attachments/index.tsx', null, null],
                 name: '(base)_course-manage_attachments',
                 path: '/course-manage/attachments',
-                handle: { i18nKey: 'route.(base)_course-manage_attachments', title: '(base)_course-manage_attachments', hideInMenu: true }
+                handle: {
+                  i18nKey: 'route.(base)_course-manage_attachments',
+                  title: '(base)_course-manage_attachments',
+                  hideInMenu: true
+                }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/course-manage/category/index.tsx', null, null],
@@ -88,6 +93,8 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 handle: {
                   i18nKey: 'route.(base)_course-manage_category',
                   title: '(base)_course-manage_category',
+                  icon: 'mdi:folder-multiple-outline',
+                  order: 2,
                   hideInMenu: true
                 }
               },
@@ -95,15 +102,14 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/course-manage/class/layout.tsx', null, null],
                 name: '(base)_course-manage_class',
                 path: '/course-manage/class',
-                handle: { i18nKey: 'route.(base)_course-manage_class', title: '(base)_course-manage_class', hideInMenu: true },
+                handle: {
+                  i18nKey: 'route.(base)_course-manage_class',
+                  title: '(base)_course-manage_class',
+                  hideInMenu: true
+                },
                 children: [
                   {
-                    matchedFiles: [
-                      null,
-                      '/src/pages/(base)/course-manage/class/detail/index.tsx',
-                      null,
-                      null
-                    ],
+                    matchedFiles: [null, '/src/pages/(base)/course-manage/class/detail/index.tsx', null, null],
                     name: '(base)_course-manage_class_detail',
                     path: '/course-manage/class/detail',
                     handle: {
@@ -122,13 +128,170 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 handle: {
                   i18nKey: 'route.(base)_course-manage_list',
                   title: '(base)_course-manage_list',
+                  icon: 'mdi:format-list-bulleted',
+                  order: 1,
                   hideInMenu: true
                 }
               }
             ]
           },
           {
-            matchedFiles: [null, '/src/pages/(base)/function/index.tsx', null, null],
+            matchedFiles: ['(base)_customer-manage', null, null, null],
+            name: '(base)_customer-manage',
+            path: '/customer-manage',
+            handle: {
+              i18nKey: 'route.(base)_customer-manage',
+              title: '客户管理',
+              icon: 'mdi:account-supervisor',
+              order: 4
+            },
+            children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/assign/index.tsx', null, null],
+                name: '(base)_customer-manage_assign',
+                path: '/customer-manage/assign',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_assign',
+                  title: '客户分配',
+                  icon: 'ic:round-assignment-ind',
+                  order: 0
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/follow/index.tsx', null, null],
+                name: '(base)_customer-manage_follow',
+                path: '/customer-manage/follow',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_follow',
+                  title: '客户跟进',
+                  icon: 'ic:round-transfer-within-a-station',
+                  order: 1
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/import/index.tsx', null, null],
+                name: '(base)_customer-manage_import',
+                path: '/customer-manage/import',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_import',
+                  title: '客户导入',
+                  icon: 'ic:round-file-upload',
+                  order: 2
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/info/index.tsx', null, null],
+                name: '(base)_customer-manage_info',
+                path: '/customer-manage/info',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_info',
+                  title: '客户资料',
+                  icon: 'ic:round-contacts',
+                  order: 3
+                }
+              }
+            ]
+          },
+          {
+            matchedFiles: [null, null, null, null],
+            name: '(base)_employee-manage',
+            path: '/employee-manage',
+            handle: {
+              i18nKey: 'route.(base)_employee-manage',
+              icon: 'mdi:account-cog-outline',
+              order: 11,
+              title: '(base)_employee-manage'
+            },
+            children: [
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_address',
+                path: '/employee-manage/address',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_address',
+                  icon: 'mdi:map-marker-outline',
+                  order: 3,
+                  title: '(base)_employee-manage_address'
+                }
+              },
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_contact',
+                path: '/employee-manage/contact',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_contact',
+                  icon: 'mdi:phone-outline',
+                  order: 4,
+                  title: '(base)_employee-manage_contact'
+                }
+              },
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_identity',
+                path: '/employee-manage/identity',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_identity',
+                  icon: 'mdi:card-account-details-outline',
+                  order: 2,
+                  title: '(base)_employee-manage_identity'
+                }
+              },
+              {
+                matchedFiles: [null, null, null, null],
+                name: '(base)_employee-manage_list',
+                path: '/employee-manage/list',
+                handle: {
+                  i18nKey: 'route.(base)_employee-manage_list',
+                  icon: 'mdi:account-multiple-outline',
+                  order: 1,
+                  title: '(base)_employee-manage_list'
+                }
+              }
+            ]
+          },
+          {
+            matchedFiles: [null, null, null, null],
+            name: '(base)_expense-process',
+            path: '/expense-process',
+            handle: {
+              i18nKey: 'route.(base)_expense-process',
+              title: '报销流程',
+              icon: 'mdi:file-document-edit-outline',
+              order: 5
+            },
+            children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/expense-process/apply/index.tsx', null, null],
+                name: '(base)_expense-process_apply',
+                path: '/expense-process/apply',
+                handle: {
+                  i18nKey: 'route.(base)_expense-process_apply',
+                  title: '报销申请',
+                  icon: 'mdi:file-document-plus-outline',
+                  order: 1
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/expense-process/approve/index.tsx', null, null],
+                name: '(base)_expense-process_approve',
+                path: '/expense-process/approve',
+                handle: {
+                  i18nKey: 'route.(base)_expense-process_approve',
+                  title: '报销审核',
+                  icon: 'mdi:file-check-outline',
+                  order: 2
+                }
+              }
+            ]
+          },
+          {
+            matchedFiles: [null, '/src/pages/(base)/finance-dashboard/index.tsx', null, null],
+            name: '(base)_finance-dashboard',
+            path: '/finance-dashboard',
+            handle: { i18nKey: 'route.(base)_finance-dashboard', title: '(base)_finance-dashboard' }
+          },
+          {
+            matchedFiles: [null, null, null, null],
             name: '(base)_function',
             path: '/function',
             handle: {
@@ -265,7 +428,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
             matchedFiles: [null, '/src/pages/(base)/home/index.tsx', null, null],
             name: '(base)_home',
             path: '/home',
-            handle: { i18nKey: 'route.(base)_home', icon: 'mdi:monitor-dashboard', order: 1, title: 'home' }
+            handle: { i18nKey: 'route.(base)_home', icon: 'mdi:monitor-dashboard', order: 0, title: 'home' }
           },
           {
             matchedFiles: [null, '/src/pages/(base)/manage/index.tsx', null, null],
@@ -275,10 +438,22 @@ export const generatedRoutes: ElegantConstRoute[] = [
               i18nKey: 'route.(base)_manage',
               icon: 'carbon:cloud-service-management',
               order: 8,
-              roles: ['R_ADMIN'],
+              roles: ['R_SUPER'],
               title: 'manage'
             },
             children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/manage/permission/index.tsx', null, null],
+                name: '(base)_manage_permission',
+                path: '/manage/permission',
+                handle: {
+                  i18nKey: 'route.(base)_manage_permission',
+                  icon: 'carbon:user-admin',
+                  order: 1,
+                  roles: ['R_SUPER'],
+                  title: '权限管理'
+                }
+              },
               {
                 matchedFiles: [null, '/src/pages/(base)/manage/role/index.tsx', null, null],
                 name: '(base)_manage_role',
@@ -312,7 +487,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   icon: 'ic:round-manage-accounts',
                   keepAlive: true,
                   order: 1,
-                  roles: ['R_ADMIN'],
+                  roles: ['R_SUPER'],
                   title: 'manage_user'
                 },
                 children: [
@@ -328,6 +503,38 @@ export const generatedRoutes: ElegantConstRoute[] = [
                     }
                   }
                 ]
+              }
+            ]
+          },
+          {
+            matchedFiles: [null, null, null, null],
+            name: '(base)_meeting-manage',
+            path: '/meeting-manage',
+            handle: { i18nKey: 'route.(base)_meeting-manage', title: '(base)_meeting-manage' },
+            children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/meeting-manage/approve/index.tsx', null, null],
+                name: '(base)_meeting-manage_approve',
+                path: '/meeting-manage/approve',
+                handle: { i18nKey: 'route.(base)_meeting-manage_approve', title: '(base)_meeting-manage_approve' }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/meeting-manage/list/index.tsx', null, null],
+                name: '(base)_meeting-manage_list',
+                path: '/meeting-manage/list',
+                handle: { i18nKey: 'route.(base)_meeting-manage_list', title: '(base)_meeting-manage_list' }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/meeting-manage/record/index.tsx', null, null],
+                name: '(base)_meeting-manage_record',
+                path: '/meeting-manage/record',
+                handle: { i18nKey: 'route.(base)_meeting-manage_record', title: '(base)_meeting-manage_record' }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/meeting-manage/summary/index.tsx', null, null],
+                name: '(base)_meeting-manage_summary',
+                path: '/meeting-manage/summary',
+                handle: { i18nKey: 'route.(base)_meeting-manage_summary', title: '(base)_meeting-manage_summary' }
               }
             ]
           },
@@ -382,6 +589,44 @@ export const generatedRoutes: ElegantConstRoute[] = [
                     ]
                   }
                 ]
+              }
+            ]
+          },
+          {
+            matchedFiles: [null, null, null, null],
+            name: '(base)_project-manage',
+            path: '/project-manage',
+            handle: { i18nKey: 'route.(base)_project-manage', title: '(base)_project-manage' },
+            children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/project-manage/list/index.tsx', null, null],
+                name: '(base)_project-manage_list',
+                path: '/project-manage/list',
+                handle: { i18nKey: 'route.(base)_project-manage_list', title: '(base)_project-manage_list' }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/project-manage/monthly-task/index.tsx', null, null],
+                name: '(base)_project-manage_monthly-task',
+                path: '/project-manage/monthly-task',
+                handle: {
+                  i18nKey: 'route.(base)_project-manage_monthly-task',
+                  title: '(base)_project-manage_monthly-task'
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/project-manage/task/index.tsx', null, null],
+                name: '(base)_project-manage_task',
+                path: '/project-manage/task',
+                handle: { i18nKey: 'route.(base)_project-manage_task', title: '(base)_project-manage_task' }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/project-manage/weekly-task/index.tsx', null, null],
+                name: '(base)_project-manage_weekly-task',
+                path: '/project-manage/weekly-task',
+                handle: {
+                  i18nKey: 'route.(base)_project-manage_weekly-task',
+                  title: '(base)_project-manage_weekly-task'
+                }
               }
             ]
           },

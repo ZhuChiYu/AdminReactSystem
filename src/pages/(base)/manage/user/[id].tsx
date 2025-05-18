@@ -1,49 +1,143 @@
-import type { DescriptionsProps } from 'antd';
-import { type LoaderFunctionArgs, useLoaderData } from 'react-router-dom';
+import { useState } from 'react';
+import { type LoaderFunctionArgs, useLoaderData, useNavigate } from 'react-router-dom';
 
 import LookForward from '@/components/LookForward';
+import { enableStatusRecord, userGenderRecord } from '@/constants/business';
+import { ATG_MAP } from '@/constants/common';
 import { fetchGetUserList } from '@/service/api';
 
-type Item<T> = T extends any[] ? T[number] : T;
-
-type ValuesOf<T> = T[keyof T];
-
-type Values = ValuesOf<Api.SystemManage.User>;
-
-function transformDataToItem<T extends string, U extends Values>(
-  tuple: [T, U]
-): NonNullable<Item<DescriptionsProps['items']>> {
-  return {
-    children: tuple[1],
-    key: tuple[0],
-    label: tuple[0]
-  };
-}
-
-// 这个页面仅仅是为了展示 react-router-dom 的 loader 的强大能力，数据是随机的对不上很正常
-// This page is solely for demonstrating the powerful capabilities of react-router-dom's loader. The data is random and may not match.
-
-const Component = () => {
+// 员工详情页面
+const UserDetailPage = () => {
   const data = useLoaderData() as Api.SystemManage.User | undefined;
-
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   if (!data) return <LookForward />;
 
-  const items = Object.entries(data).map(transformDataToItem);
+  const getStatusTag = (status: string | null) => {
+    if (status === null) return null;
+    const label = t(enableStatusRecord[status as Api.Common.EnableStatus]);
+    return <ATag color={ATG_MAP[status as Api.Common.EnableStatus]}>{label}</ATag>;
+  };
+
+  const getGenderLabel = (gender: string | null) => {
+    if (gender === null) return null;
+    return t(userGenderRecord[gender as Api.SystemManage.UserGender]);
+  };
+
+  const togglePasswordVisibility = () => {
+    setPasswordVisible((prev: boolean) => !prev);
+  };
+
+  const password = data.password || '123456';
+  const passwordDisplay = (
+    <div className="flex-center gap-4px">
+      <span>{passwordVisible ? password : '******'}</span>
+      <AButton
+        size="small"
+        type="link"
+        onClick={togglePasswordVisibility}
+      >
+        {passwordVisible ? t('common.hide') : t('common.show')}
+      </AButton>
+    </div>
+  );
+
+  const items = [
+    {
+      children: data.userName || '-',
+      key: 'userName',
+      label: '用户名'
+    },
+    {
+      children: getGenderLabel(data.userGender) || '-',
+      key: 'userGender',
+      label: '性别'
+    },
+    {
+      children: data.nickName || '-',
+      key: 'nickName',
+      label: '昵称'
+    },
+    {
+      children: data.userPhone || '-',
+      key: 'userPhone',
+      label: '手机号'
+    },
+    {
+      children: data.userEmail || '-',
+      key: 'userEmail',
+      label: '邮箱'
+    },
+    {
+      children: getStatusTag(data.status),
+      key: 'status',
+      label: '状态'
+    },
+    {
+      children: passwordDisplay,
+      key: 'password',
+      label: '密码'
+    },
+    {
+      children: data.userRoles?.join(', ') || '-',
+      key: 'userRoles',
+      label: '用户角色',
+      span: 2
+    },
+    {
+      children: data.id,
+      key: 'id',
+      label: 'ID'
+    },
+    {
+      children: data.createBy || '-',
+      key: 'createBy',
+      label: '创建人'
+    },
+    {
+      children: data.createTime || '-',
+      key: 'createTime',
+      label: '创建时间'
+    },
+    {
+      children: data.updateBy || '-',
+      key: 'updateBy',
+      label: '更新人'
+    },
+    {
+      children: data.updateTime || '-',
+      key: 'updateTime',
+      label: '更新时间'
+    }
+  ];
 
   return (
     <ACard
-      className="h-full"
-      title="User Info"
+      bordered={false}
+      className="h-full card-wrapper"
+      extra={<AButton onClick={() => navigate(-1)}>返回</AButton>}
+      title="员工详情信息"
     >
+      <ADivider orientation="left">基本信息</ADivider>
       <ADescriptions
         bordered
-        items={items}
+        column={{ md: 3, sm: 2, xs: 1 }}
+        items={items.slice(0, 8)}
       />
-      <div className="mt-16px text-center text-18px">{t('page.manage.userDetail.explain')}</div>
 
-      <div className="mt-16px text-center text-18px">{t('page.manage.userDetail.content')}</div>
+      <ADivider
+        className="mt-24px"
+        orientation="left"
+      >
+        系统信息
+      </ADivider>
+      <ADescriptions
+        bordered
+        column={{ md: 2, sm: 2, xs: 1 }}
+        items={items.slice(8)}
+      />
     </ACard>
   );
 };
@@ -56,4 +150,4 @@ export async function loader({ params }: LoaderFunctionArgs) {
   return info;
 }
 
-export default Component;
+export default UserDetailPage;

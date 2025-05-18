@@ -1,5 +1,7 @@
-const Component = () => {
-  return <div>Component</div>;
+import { Outlet } from 'react-router-dom';
+
+const CourseManage = () => {
+  return <Outlet />;
 };
 
-export default Component;
+export default CourseManage;
