@@ -1,5 +1,6 @@
 import DarkModeContainer from '@/components/DarkModeContainer';
 import FullScreen from '@/components/FullScreen';
+import NotificationDropdown from '@/components/NotificationDropdown';
 import { GLOBAL_HEADER_MENU_ID } from '@/constants/app';
 import { MenuToggler } from '@/features/menu';
 import { ThemeSchemaSwitch } from '@/features/theme';
@@ -81,6 +82,8 @@ const GlobalHeader: FC<Props> = memo(({ isMobile, mode, reverse, siderWidth }) =
         <ThemeSchemaSwitch className="px-12px" />
 
         <ThemeButton />
+
+        <NotificationDropdown />
 
         <UserAvatar />
       </div>
