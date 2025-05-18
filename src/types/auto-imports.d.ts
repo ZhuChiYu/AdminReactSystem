@@ -71,6 +71,7 @@ declare global {
   const LookForward: typeof import('../components/LookForward')['default']
   const NavLink: typeof import('react-router-dom')['NavLink']
   const Navigate: typeof import('react-router-dom')['Navigate']
+  const NotificationDropdown: typeof import('../components/NotificationDropdown')['default']
   const NumberTicker: typeof import('../components/NumberTicker')['default']
   const Outlet: typeof import('react-router-dom')['Outlet']
   const PinToggler: typeof import('../components/PinToggler')['default']

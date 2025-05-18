@@ -156,6 +156,7 @@ const NotificationsPage: React.FC = () => {
           locale={{ emptyText: <Empty description="暂无通知" /> }}
           renderItem={item => (
             <List.Item
+              className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
               actions={[
                 !item.read ? (
                   <Button
@@ -170,25 +171,28 @@ const NotificationsPage: React.FC = () => {
                   </Button>
                 ) : null
               ]}
-              className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
               onClick={() => viewNotification(item)}
             >
               <List.Item.Meta
-                avatar={
-                  <Avatar icon={getNotificationIcon(item.type)} />
-                }
+                avatar={<Avatar icon={getNotificationIcon(item.type)} />}
+                title={<Text strong>{item.title}</Text>}
                 description={
-                  <Space direction="vertical" size={1}>
+                  <Space
+                    direction="vertical"
+                    size={1}
+                  >
                     <Text>{item.content}</Text>
                     <Space size={8}>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                      <Text
+                        style={{ fontSize: '12px' }}
+                        type="secondary"
+                      >
                         {item.datetime}
                       </Text>
                       {!item.read && <Tag color="blue">未读</Tag>}
                     </Space>
                   </Space>
                 }
-                title={<Text strong>{item.title}</Text>}
               />
             </List.Item>
           )}
@@ -219,7 +223,11 @@ const NotificationsPage: React.FC = () => {
       <Card>
         <div className="mb-4 flex items-center justify-between">
           <Title level={4}>通知中心</Title>
-          <Button type="primary" onClick={markAllAsRead} disabled={!notifications.some(n => !n.read)}>
+          <Button
+            disabled={!notifications.some(n => !n.read)}
+            type="primary"
+            onClick={markAllAsRead}
+          >
             全部标为已读
           </Button>
         </div>

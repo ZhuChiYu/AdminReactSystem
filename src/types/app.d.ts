@@ -453,7 +453,6 @@ declare namespace App {
             todo: string;
             turnover: string;
             visitCount: string;
-            weatherDesc: string;
             work: string;
           };
           login: {

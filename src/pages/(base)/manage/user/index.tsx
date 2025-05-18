@@ -174,6 +174,7 @@ const UserManage = () => {
         },
         {
           align: 'center',
+          fixed: 'right' as const,
           key: 'operate',
           render: (_, record) => (
             <div className="flex-center gap-8px">
@@ -205,8 +206,7 @@ const UserManage = () => {
             </div>
           ),
           title: t('common.operate'),
-          width: 195,
-          fixed: 'right' as const
+          width: 195
         }
       ]
     },

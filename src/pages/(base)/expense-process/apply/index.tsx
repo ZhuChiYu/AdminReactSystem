@@ -51,6 +51,7 @@ const expenseTypes = [
   { label: '招待费', value: 'entertainment' },
   { label: '培训费', value: 'training' },
   { label: '通讯费', value: 'communication' },
+  { label: '物业费', value: 'property' },
   { label: '其他', value: 'other' }
 ];
 

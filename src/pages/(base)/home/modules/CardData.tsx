@@ -17,52 +17,50 @@ function getGradientColor(color: CardDataProps['color']) {
 }
 
 function useGetCardData() {
-  const { t } = useTranslation();
-
   const cardData: CardDataProps[] = [
     {
       color: {
         end: '#b955a4',
         start: '#ec4786'
       },
-      icon: 'ant-design:bar-chart-outlined',
-      key: 'visitCount',
-      title: t('page.home.visitCount'),
+      icon: 'mdi:account-multiple',
+      key: 'clientCount',
+      title: '总客户数',
       unit: '',
-      value: 9725
+      value: 126
     },
     {
       color: {
         end: '#5144b4',
         start: '#865ec0'
       },
-      icon: 'ant-design:money-collect-outlined',
-      key: 'turnover',
-      title: t('page.home.turnover'),
-      unit: '$',
-      value: 1026
+      icon: 'mdi:currency-cny',
+      key: 'totalPerformance',
+      title: '总业绩',
+      unit: '¥',
+      value: 856200
     },
     {
       color: {
         end: '#719de3',
         start: '#56cdf3'
       },
-      icon: 'carbon:document-download',
-      key: 'downloadCount',
-      title: t('page.home.downloadCount'),
-      unit: '',
-      value: 970925
+      icon: 'mdi:chart-line',
+      key: 'monthPerformance',
+      title: '本月业绩',
+      unit: '¥',
+      value: 125800
     },
     {
       color: {
         end: '#f68057',
         start: '#fcbc25'
       },
-      icon: 'ant-design:trademark-circle-outlined',
-      key: 'dealCount',
-      title: t('page.home.dealCount'),
+      icon: 'mdi:file-document-check',
+      key: 'approvalCount',
+      title: '待审批申请',
       unit: '',
-      value: 9527
+      value: 8
     }
   ];
 

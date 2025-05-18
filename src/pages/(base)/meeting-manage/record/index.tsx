@@ -1,9 +1,24 @@
 import { CalendarOutlined, FileTextOutlined, PlusOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
-import { Avatar, Button, Card, DatePicker, Divider, Form, Input, List, Modal, Select, Space, Tag, Typography, message } from 'antd';
+import {
+  Avatar,
+  Button,
+  Card,
+  DatePicker,
+  Divider,
+  Form,
+  Input,
+  List,
+  Modal,
+  Select,
+  Space,
+  Tag,
+  Typography,
+  message
+} from 'antd';
 import dayjs from 'dayjs';
 import React, { useState } from 'react';
 
-const { Paragraph, Title, Text } = Typography;
+const { Paragraph, Text, Title } = Typography;
 const { TextArea } = Input;
 
 interface MeetingParticipantRecord {
@@ -110,42 +125,45 @@ const Component: React.FC = () => {
   };
 
   const handleOk = () => {
-    form.validateFields().then(values => {
-      // 转换日期格式
-      const formattedValues = {
-        ...values,
-        recordDate: values.recordDate.format('YYYY-MM-DD')
-      };
-
-      if (editingRecord) {
-        // 更新记录
-        const updatedRecords = records.map(record => {
-          if (record.id === editingRecord.id) {
-            return {
-              ...record,
-              ...formattedValues
-            };
-          }
-          return record;
-        });
-        setRecords(updatedRecords);
-        message.success('会议记录已更新');
-      } else {
-        // 创建新记录
-        const newRecord: MeetingRecord = {
-          ...formattedValues,
-          id: (records.length + 1).toString(),
-          meetingTitle: getMeetingTitle(formattedValues.meetingId),
-          participantRecords: [],
-          recorder: currentUser
+    form
+      .validateFields()
+      .then(values => {
+        // 转换日期格式
+        const formattedValues = {
+          ...values,
+          recordDate: values.recordDate.format('YYYY-MM-DD')
         };
-        setRecords([...records, newRecord]);
-        message.success('会议记录已创建');
-      }
-      setIsModalVisible(false);
-    }).catch(info => {
-      console.error('表单验证失败:', info);
-    });
+
+        if (editingRecord) {
+          // 更新记录
+          const updatedRecords = records.map(record => {
+            if (record.id === editingRecord.id) {
+              return {
+                ...record,
+                ...formattedValues
+              };
+            }
+            return record;
+          });
+          setRecords(updatedRecords);
+          message.success('会议记录已更新');
+        } else {
+          // 创建新记录
+          const newRecord: MeetingRecord = {
+            ...formattedValues,
+            id: (records.length + 1).toString(),
+            meetingTitle: getMeetingTitle(formattedValues.meetingId),
+            participantRecords: [],
+            recorder: currentUser
+          };
+          setRecords([...records, newRecord]);
+          message.success('会议记录已创建');
+        }
+        setIsModalVisible(false);
+      })
+      .catch(info => {
+        console.error('表单验证失败:', info);
+      });
   };
 
   const getMeetingTitle = (meetingId: string): string => {
@@ -180,32 +198,35 @@ const Component: React.FC = () => {
   };
 
   const handleAddParticipantRecord = () => {
-    participantRecordForm.validateFields().then(values => {
-      if (editingRecord) {
-        const newParticipantRecord: MeetingParticipantRecord = {
-          content: values.content,
-          createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
-          id: Date.now().toString(),
-          recorder: currentUser
-        };
+    participantRecordForm
+      .validateFields()
+      .then(values => {
+        if (editingRecord) {
+          const newParticipantRecord: MeetingParticipantRecord = {
+            content: values.content,
+            createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+            id: Date.now().toString(),
+            recorder: currentUser
+          };
 
-        const updatedRecords = records.map(record => {
-          if (record.id === editingRecord.id) {
-            return {
-              ...record,
-              participantRecords: [...record.participantRecords, newParticipantRecord]
-            };
-          }
-          return record;
-        });
+          const updatedRecords = records.map(record => {
+            if (record.id === editingRecord.id) {
+              return {
+                ...record,
+                participantRecords: [...record.participantRecords, newParticipantRecord]
+              };
+            }
+            return record;
+          });
 
-        setRecords(updatedRecords);
-        message.success('参与记录已添加');
-        setParticipantRecordModalVisible(false);
-      }
-    }).catch(info => {
-      console.error('表单验证失败:', info);
-    });
+          setRecords(updatedRecords);
+          message.success('参与记录已添加');
+          setParticipantRecordModalVisible(false);
+        }
+      })
+      .catch(info => {
+        console.error('表单验证失败:', info);
+      });
   };
 
   return (
@@ -296,6 +317,7 @@ const Component: React.FC = () => {
                   <Divider orientation="left">参与记录 ({item.participantRecords.length})</Divider>
                   <List
                     dataSource={item.participantRecords}
+                    size="small"
                     renderItem={participantRecord => (
                       <List.Item>
                         <List.Item.Meta
@@ -306,7 +328,6 @@ const Component: React.FC = () => {
                         <div>{participantRecord.content}</div>
                       </List.Item>
                     )}
-                    size="small"
                   />
                 </div>
               )}

@@ -169,11 +169,15 @@ export function fetchGetUserList(params?: Api.SystemManage.UserSearchParams) {
   // 使用模拟数据替代API调用，展示实际可登录的用户
   const users: Api.SystemManage.User[] = [
     {
+      address: '北京市朝阳区',
+      bankCard: '6200000000000001',
       createBy: 'system',
       createTime: '2023-01-01 00:00:00',
       id: 1,
+      idCard: '110101199001011234',
       nickName: '超级管理员',
       status: '1',
+      tim: 'tim_super',
       updateBy: 'system',
       updateTime: '2023-01-01 00:00:00',
       userEmail: 'super@example.com',
@@ -181,18 +185,18 @@ export function fetchGetUserList(params?: Api.SystemManage.UserSearchParams) {
       userName: 'Super',
       userPhone: '13800000001',
       userRoles: ['super'],
-      address: '北京市朝阳区',
-      idCard: '110101199001011234',
-      bankCard: '6200000000000001',
-      wechat: 'wx_super',
-      tim: 'tim_super'
+      wechat: 'wx_super'
     },
     {
+      address: '上海市浦东新区',
+      bankCard: '6200000000000002',
       createBy: 'system',
       createTime: '2023-01-01 00:00:00',
       id: 2,
+      idCard: '310101199001012345',
       nickName: '管理员',
       status: '1',
+      tim: 'tim_admin',
       updateBy: 'system',
       updateTime: '2023-01-01 00:00:00',
       userEmail: 'admin@example.com',
@@ -200,18 +204,18 @@ export function fetchGetUserList(params?: Api.SystemManage.UserSearchParams) {
       userName: 'Admin',
       userPhone: '13800000002',
       userRoles: ['admin'],
-      address: '上海市浦东新区',
-      idCard: '310101199001012345',
-      bankCard: '6200000000000002',
-      wechat: 'wx_admin',
-      tim: 'tim_admin'
+      wechat: 'wx_admin'
     },
     {
+      address: '广州市天河区',
+      bankCard: '6200000000000003',
       createBy: 'system',
       createTime: '2023-01-01 00:00:00',
       id: 3,
+      idCard: '440101199001013456',
       nickName: '普通用户',
       status: '1',
+      tim: 'tim_user',
       updateBy: 'system',
       updateTime: '2023-01-01 00:00:00',
       userEmail: 'user@example.com',
@@ -219,11 +223,7 @@ export function fetchGetUserList(params?: Api.SystemManage.UserSearchParams) {
       userName: 'User',
       userPhone: '13800000003',
       userRoles: ['user'],
-      address: '广州市天河区',
-      idCard: '440101199001013456',
-      bankCard: '6200000000000003',
-      wechat: 'wx_user',
-      tim: 'tim_user'
+      wechat: 'wx_user'
     }
   ];
 

@@ -292,12 +292,11 @@ const ClassList = () => {
                 endDate: values.endDate.format('YYYY-MM-DD'),
                 name: values.name,
                 startDate: values.startDate.format('YYYY-MM-DD'),
-                status:
-                  dayjs(values.startDate).isAfter(dayjs())
-                    ? ClassStatus.NOT_STARTED
-                    : dayjs(values.endDate).isBefore(dayjs())
-                      ? ClassStatus.COMPLETED
-                      : ClassStatus.IN_PROGRESS,
+                status: dayjs(values.startDate).isAfter(dayjs())
+                  ? ClassStatus.NOT_STARTED
+                  : dayjs(values.endDate).isBefore(dayjs())
+                    ? ClassStatus.COMPLETED
+                    : ClassStatus.IN_PROGRESS,
                 studentCount: values.studentCount
               };
             }
@@ -325,12 +324,11 @@ const ClassList = () => {
             id: classList.length + 1,
             name: values.name,
             startDate: values.startDate.format('YYYY-MM-DD'),
-            status:
-              dayjs(values.startDate).isAfter(dayjs())
-                ? ClassStatus.NOT_STARTED
-                : dayjs(values.endDate).isBefore(dayjs())
-                  ? ClassStatus.COMPLETED
-                  : ClassStatus.IN_PROGRESS,
+            status: dayjs(values.startDate).isAfter(dayjs())
+              ? ClassStatus.NOT_STARTED
+              : dayjs(values.endDate).isBefore(dayjs())
+                ? ClassStatus.COMPLETED
+                : ClassStatus.IN_PROGRESS,
             studentCount: values.studentCount
           };
 
@@ -560,7 +558,10 @@ const ClassList = () => {
               name="studentCount"
               rules={[{ message: '请输入学员人数', required: true }]}
             >
-              <Input type="number" placeholder="请输入学员人数" />
+              <Input
+                placeholder="请输入学员人数"
+                type="number"
+              />
             </Form.Item>
             <Form.Item
               label="开始日期"

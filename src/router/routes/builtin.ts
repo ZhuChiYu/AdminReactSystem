@@ -20,6 +20,17 @@ function convert(m: any) {
  */
 export const BaseChildrenRoutes = [
   {
+    handle: {
+      i18nKey: 'route.(base)_home',
+      icon: 'mdi:home',
+      order: 1,
+      title: '首页'
+    },
+    id: 'home',
+    lazy: () => import('@/pages/(base)/home').then(convert),
+    path: '/home'
+  },
+  {
     children: [
       {
         handle: {

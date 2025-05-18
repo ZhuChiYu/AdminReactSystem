@@ -13,11 +13,12 @@ interface MeetingItem {
   location: string;
   organizer: string;
   participants: string[];
+  // 会议总结内容
+  record?: string;
   startTime: string;
   status: 'cancelled' | 'completed' | 'ongoing' | 'pending';
-  title: string;
-  summary?: string; // 会议总结内容
-  record?: string; // 会议记录内容
+  summary?: string;
+  title: string; // 会议记录内容
 }
 
 const Component: React.FC = () => {
@@ -42,11 +43,11 @@ const Component: React.FC = () => {
       location: '会议室A',
       organizer: '张三',
       participants: ['李四', '王五', '赵六'],
+      record: '讨论了项目当前进度，确定了下一阶段的目标和任务分配。张三负责前端开发，李四负责后端开发，王五负责测试。',
       startTime: '2023-10-20 14:00',
       status: 'completed',
-      title: '项目进度汇报会',
-      record: '讨论了项目当前进度，确定了下一阶段的目标和任务分配。张三负责前端开发，李四负责后端开发，王五负责测试。',
-      summary: '项目总体进度良好，但后端性能优化任务需要加快推进。'
+      summary: '项目总体进度良好，但后端性能优化任务需要加快推进。',
+      title: '项目进度汇报会'
     },
     {
       approvalStatus: 'pending',
@@ -205,30 +206,26 @@ const Component: React.FC = () => {
           {/* 只有会议被批准且已结束才能添加记录和总结 */}
           {record.approvalStatus === 'approved' && record.status === 'completed' && (
             <>
-          <Button
-            size="small"
-            type="link"
+              <Button
+                size="small"
+                type="link"
                 onClick={() => showRecordModal(record)}
-          >
+              >
                 {record.record ? '查看记录' : '添加记录'}
-          </Button>
-          <Button
-            size="small"
-            type="link"
+              </Button>
+              <Button
+                size="small"
+                type="link"
                 onClick={() => showSummaryModal(record)}
-          >
+              >
                 {record.summary ? '查看总结' : '添加总结'}
-          </Button>
+              </Button>
             </>
           )}
 
           {/* 显示审批状态消息 */}
-          {record.approvalStatus === 'pending' && (
-            <Tag color="orange">等待审批</Tag>
-          )}
-          {record.approvalStatus === 'rejected' && (
-            <Tag color="red">审批拒绝</Tag>
-          )}
+          {record.approvalStatus === 'pending' && <Tag color="orange">等待审批</Tag>}
+          {record.approvalStatus === 'rejected' && <Tag color="red">审批拒绝</Tag>}
         </Space>
       ),
       title: '操作'
@@ -326,7 +323,7 @@ const Component: React.FC = () => {
       <Modal
         destroyOnClose
         open={recordModalVisible}
-        title={currentMeeting?.record ? "会议记录详情" : "添加会议记录"}
+        title={currentMeeting?.record ? '会议记录详情' : '添加会议记录'}
         width={700}
         onCancel={() => setRecordModalVisible(false)}
         onOk={handleSaveRecord}
@@ -336,9 +333,15 @@ const Component: React.FC = () => {
           layout="vertical"
         >
           <div className="mb-4">
-            <p><strong>会议标题：</strong> {currentMeeting?.title}</p>
-            <p><strong>会议时间：</strong> {currentMeeting?.startTime} 至 {currentMeeting?.endTime}</p>
-            <p><strong>会议地点：</strong> {currentMeeting?.location}</p>
+            <p>
+              <strong>会议标题：</strong> {currentMeeting?.title}
+            </p>
+            <p>
+              <strong>会议时间：</strong> {currentMeeting?.startTime} 至 {currentMeeting?.endTime}
+            </p>
+            <p>
+              <strong>会议地点：</strong> {currentMeeting?.location}
+            </p>
           </div>
 
           <Form.Item
@@ -358,7 +361,7 @@ const Component: React.FC = () => {
       <Modal
         destroyOnClose
         open={summaryModalVisible}
-        title={currentMeeting?.summary ? "会议总结详情" : "添加会议总结"}
+        title={currentMeeting?.summary ? '会议总结详情' : '添加会议总结'}
         width={700}
         onCancel={() => setSummaryModalVisible(false)}
         onOk={handleSaveSummary}
@@ -368,9 +371,15 @@ const Component: React.FC = () => {
           layout="vertical"
         >
           <div className="mb-4">
-            <p><strong>会议标题：</strong> {currentMeeting?.title}</p>
-            <p><strong>会议时间：</strong> {currentMeeting?.startTime} 至 {currentMeeting?.endTime}</p>
-            <p><strong>会议地点：</strong> {currentMeeting?.location}</p>
+            <p>
+              <strong>会议标题：</strong> {currentMeeting?.title}
+            </p>
+            <p>
+              <strong>会议时间：</strong> {currentMeeting?.startTime} 至 {currentMeeting?.endTime}
+            </p>
+            <p>
+              <strong>会议地点：</strong> {currentMeeting?.location}
+            </p>
           </div>
 
           <Form.Item

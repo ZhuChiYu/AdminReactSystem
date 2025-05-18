@@ -4,7 +4,7 @@ const Index = () => {
   return (
     <Navigate
       replace
-      to="/course-manage/list"
+      to="/home"
     />
   );
 };

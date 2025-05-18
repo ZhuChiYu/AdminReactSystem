@@ -1,9 +1,7 @@
 import CardData from './modules/CardData';
-import CreativityBanner from './modules/CreativityBanner';
 import HeaderBanner from './modules/HeaderBanner';
-import LineChart from './modules/LineChart';
-import PieChart from './modules/PieChart';
-import ProjectNews from './modules/ProjectNews';
+import PerformanceChart from './modules/PerformanceChart';
+import TodayMeetingsAndTasks from './modules/TodayMeetingsAndTasks';
 
 const Home = () => {
   return (
@@ -18,30 +16,16 @@ const Home = () => {
 
       <ARow gutter={[16, 16]}>
         <ACol
-          lg={14}
+          lg={12}
           span={24}
         >
-          <LineChart />
+          <TodayMeetingsAndTasks />
         </ACol>
         <ACol
-          lg={10}
+          lg={12}
           span={24}
         >
-          <PieChart />
-        </ACol>
-      </ARow>
-      <ARow gutter={[16, 16]}>
-        <ACol
-          lg={14}
-          span={24}
-        >
-          <ProjectNews />
-        </ACol>
-        <ACol
-          lg={10}
-          span={24}
-        >
-          <CreativityBanner />
+          <PerformanceChart />
         </ACol>
       </ARow>
     </ASpace>
