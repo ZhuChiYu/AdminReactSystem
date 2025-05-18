@@ -70,6 +70,17 @@ const ClassDetail = () => {
   const [fileList, setFileList] = useState<any[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // 通知公告相关状态
+  const [announceModalVisible, setAnnounceModalVisible] = useState(false);
+  const [currentAnnounce, setCurrentAnnounce] = useState<any>(null);
+  const [announceForm] = Form.useForm();
+  const [announceAttachments, setAnnounceAttachments] = useState<any[]>([]);
+  const [announceDetailVisible, setAnnounceDetailVisible] = useState(false);
+  const [announceUploadModalVisible, setAnnounceUploadModalVisible] = useState(false);
+  const [announceFileList, setAnnounceFileList] = useState<any[]>([]);
+  const [announceUploading, setAnnounceUploading] = useState(false);
+  const [announceUploadProgress, setAnnounceUploadProgress] = useState(0);
+
   useEffect(() => {
     // 模拟加载班级数据
     setLoading(true);
@@ -538,46 +549,47 @@ const ClassDetail = () => {
     setCourseModalVisible(true);
   };
 
-  // 保存课程信息
+  // 提交课程表单
   const handleSaveCourse = async () => {
     try {
       const values = await courseForm.validateFields();
 
+      // 获取课程状态
+      let courseStatus = 1; // 默认为进行中
+      const startDate = dayjs(values.startDate);
+      const endDate = dayjs(values.endDate);
+      const now = dayjs();
+
+      if (startDate.isAfter(now)) {
+        courseStatus = 0; // 未开始
+      } else if (endDate.isBefore(now)) {
+        courseStatus = 2; // 已结束
+      }
+
       if (currentCourse) {
         // 编辑现有课程
-        const updatedCourseList = courseList.map(c => {
-          if (c.id === currentCourse.id) {
+        const updatedCourseList = courseList.map(item => {
+          if (item.id === currentCourse.id) {
             return {
-              ...c,
-              classroom: values.classroom,
-              endDate: values.endDate.format('YYYY-MM-DD'),
-              name: values.name,
-              schedule: values.schedule,
-              startDate: values.startDate.format('YYYY-MM-DD'),
-              status: new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime() ? 0 : 1,
-              teacher: values.teacher
+              ...item,
+              ...values,
+              status: courseStatus
             };
           }
-          return c;
+          return item;
         });
-
         setCourseList(updatedCourseList);
-        message.success('课程信息已更新');
+        message.success('课程已更新');
       } else {
         // 添加新课程
         const newCourse = {
-          classroom: values.classroom,
-          endDate: values.endDate.format('YYYY-MM-DD'),
+          ...values,
+          attachments: [],
           id: courseList.length + 1,
-          name: values.name,
-          schedule: values.schedule,
-          startDate: values.startDate.format('YYYY-MM-DD'),
-          status: new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime() ? 0 : 1,
-          teacher: values.teacher
+          status: courseStatus
         };
-
         setCourseList([...courseList, newCourse]);
-        message.success('新课程已添加');
+        message.success('课程已添加');
       }
 
       setCourseModalVisible(false);
@@ -773,8 +785,7 @@ const ClassDetail = () => {
 
   // 处理附件下载
   const handleDownloadAttachment = (attachment: any) => {
-    // 在实际应用中，这里应该使用真实的文件URL
-    // 现在我们只是模拟下载操作
+    console.log('下载附件:', attachment);
     message.success(`开始下载: ${attachment.name}`);
 
     // 如果有真实URL，可以这样处理下载
@@ -786,6 +797,161 @@ const ClassDetail = () => {
       link.click();
       document.body.removeChild(link);
     }
+  };
+
+  // 通知公告相关处理函数
+  const handlePublishAnnounce = () => {
+    announceForm.resetFields();
+    setCurrentAnnounce(null);
+    setAnnounceModalVisible(true);
+  };
+
+  const handleEditAnnounce = (announce: any) => {
+    setCurrentAnnounce(announce);
+    announceForm.setFieldsValue({
+      content: announce.content,
+      importance: announce.importance,
+      title: announce.title
+    });
+    setAnnounceModalVisible(true);
+  };
+
+  const handleDeleteAnnounce = (announceId: number) => {
+    Modal.confirm({
+      content: '确定要删除该通知吗？此操作不可恢复。',
+      onOk: () => {
+        const updatedAnnounceList = announceList.filter(a => a.id !== announceId);
+        setAnnounceList(updatedAnnounceList);
+        message.success('通知已成功删除');
+      },
+      title: '确认删除'
+    });
+  };
+
+  const handleSaveAnnounce = async () => {
+    try {
+      const values = await announceForm.validateFields();
+
+      if (currentAnnounce) {
+        // 编辑现有通知
+        const updatedAnnounceList = announceList.map(item => {
+          if (item.id === currentAnnounce.id) {
+            return {
+              ...item,
+              ...values,
+              publishDate: dayjs().format('YYYY-MM-DD HH:mm:ss')
+            };
+          }
+          return item;
+        });
+        setAnnounceList(updatedAnnounceList);
+        message.success('通知已更新');
+      } else {
+        // 添加新通知
+        const newAnnounce = {
+          ...values,
+          attachments: [],
+          id: announceList.length + 1,
+          publishDate: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+          status: 1
+        };
+        setAnnounceList([...announceList, newAnnounce]);
+        message.success('通知已发布');
+      }
+
+      setAnnounceModalVisible(false);
+    } catch (error) {
+      console.error('表单验证失败:', error);
+    }
+  };
+
+  const handleViewAnnounceDetail = (announce: any) => {
+    setCurrentAnnounce(announce);
+
+    // 模拟获取附件列表
+    setTimeout(() => {
+      const mockAttachments = [
+        {
+          id: 1,
+          name: '通知附件1.pdf',
+          size: '528.45 KB',
+          type: 'pdf',
+          uploadTime: '2024-05-15 10:00:05',
+          url: '#'
+        },
+        {
+          id: 2,
+          name: '重要说明.docx',
+          size: '125.32 KB',
+          type: 'docx',
+          uploadTime: '2024-05-15 10:01:22',
+          url: '#'
+        }
+      ];
+      setAnnounceAttachments(mockAttachments);
+      setAnnounceDetailVisible(true);
+    }, 500);
+  };
+
+  const handleUploadAnnounceFile = () => {
+    setAnnounceFileList([]);
+    setAnnounceUploadProgress(0);
+    setAnnounceUploading(false);
+    setAnnounceUploadModalVisible(true);
+  };
+
+  const handleAnnounceFileUpload = () => {
+    setAnnounceUploading(true);
+
+    // 模拟上传进度
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.floor(Math.random() * 10) + 5;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(interval);
+
+        // 模拟上传延迟
+        setTimeout(() => {
+          // 生成上传的附件
+          const newAttachments = announceFileList.map((file, index) => {
+            return {
+              id: announceAttachments.length + index + 1,
+              name: file.name,
+              size:
+                file.size < 1024 * 1024
+                  ? `${(file.size / 1024).toFixed(2)} KB`
+                  : `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+              type: file.name.split('.').pop(),
+              uploadTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+              url: '#'
+            };
+          });
+
+          setAnnounceAttachments([...announceAttachments, ...newAttachments]);
+          message.success(`成功上传 ${announceFileList.length} 个文件`);
+
+          // 延迟关闭模态框
+          setTimeout(() => {
+            setAnnounceUploadModalVisible(false);
+            setAnnounceFileList([]);
+          }, 1000);
+        }, 1000);
+      }
+      setAnnounceUploadProgress(progress);
+    }, 200);
+  };
+
+  const handleDeleteAnnounceAttachment = (attachmentId: number) => {
+    Modal.confirm({
+      content: '确定要删除该附件吗？此操作不可恢复。',
+      onOk: () => {
+        const updatedAttachments = announceAttachments.filter(a => a.id !== attachmentId);
+        setAnnounceAttachments(updatedAttachments);
+        message.success('附件已成功删除');
+      },
+      title: '确认删除'
+    });
   };
 
   // 渲染主要信息区域
@@ -815,7 +981,6 @@ const ClassDetail = () => {
           <Descriptions.Item label="班级名称">{classInfo.name}</Descriptions.Item>
           <Descriptions.Item label="班级ID">{classInfo.id}</Descriptions.Item>
           <Descriptions.Item label="班级类型">{classInfo.categoryName}</Descriptions.Item>
-          <Descriptions.Item label="班主任">{classInfo.teacher}</Descriptions.Item>
           <Descriptions.Item label="学员人数">{classInfo.studentCount}</Descriptions.Item>
           <Descriptions.Item label="状态">
             <Tag color={getStatusColor(classInfo.status)}>{getStatusText(classInfo.status)}</Tag>
@@ -1552,8 +1717,15 @@ const ClassDetail = () => {
     return (
       <Card
         bordered={false}
-        extra={<Button type="primary">发布通知</Button>}
         title="通知公告"
+        extra={
+          <Button
+            type="primary"
+            onClick={handlePublishAnnounce}
+          >
+            发布通知
+          </Button>
+        }
       >
         <List
           dataSource={announceList}
@@ -1563,8 +1735,16 @@ const ClassDetail = () => {
             <List.Item
               actions={[
                 <Button
+                  key="list-view"
+                  type="link"
+                  onClick={() => handleViewAnnounceDetail(item)}
+                >
+                  查看
+                </Button>,
+                <Button
                   key="list-edit"
                   type="link"
+                  onClick={() => handleEditAnnounce(item)}
                 >
                   编辑
                 </Button>,
@@ -1572,6 +1752,7 @@ const ClassDetail = () => {
                   danger
                   key="list-delete"
                   type="link"
+                  onClick={() => handleDeleteAnnounce(item.id)}
                 >
                   删除
                 </Button>
@@ -1594,6 +1775,372 @@ const ClassDetail = () => {
             </List.Item>
           )}
         />
+
+        {/* 通知详情模态框 */}
+        <Modal
+          open={announceDetailVisible}
+          title="通知详情"
+          width={700}
+          footer={[
+            <Button
+              key="back"
+              onClick={() => setAnnounceDetailVisible(false)}
+            >
+              关闭
+            </Button>
+          ]}
+          onCancel={() => setAnnounceDetailVisible(false)}
+        >
+          {currentAnnounce && (
+            <>
+              <Descriptions
+                column={2}
+                title="通知信息"
+              >
+                <Descriptions.Item label="通知标题">{currentAnnounce.title}</Descriptions.Item>
+                <Descriptions.Item label="重要程度">
+                  <Tag color={getImportanceColor(currentAnnounce.importance)}>
+                    {getImportanceText(currentAnnounce.importance)}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="发布时间">{currentAnnounce.publishDate}</Descriptions.Item>
+                <Descriptions.Item label="状态">
+                  <Tag color="processing">已发布</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label="通知内容"
+                  span={2}
+                >
+                  <div className="whitespace-pre-wrap">{currentAnnounce.content}</div>
+                </Descriptions.Item>
+              </Descriptions>
+
+              <div className="mt-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-medium">通知附件</h3>
+                  <Button
+                    icon={<UploadOutlined />}
+                    type="primary"
+                    onClick={handleUploadAnnounceFile}
+                  >
+                    上传附件
+                  </Button>
+                </div>
+                <Table
+                  dataSource={announceAttachments}
+                  pagination={false}
+                  rowKey="id"
+                  columns={[
+                    {
+                      dataIndex: 'name',
+                      key: 'name',
+                      render: (text, record) => {
+                        // 根据文件类型显示不同的图标
+                        const fileExtension = record.type ? record.type.toLowerCase() : '';
+                        let icon = <PaperClipOutlined />;
+
+                        if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="图片文件"
+                              role="img"
+                            >
+                              🖼️
+                            </span>
+                          );
+                        } else if (['doc', 'docx'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="Word文档"
+                              role="img"
+                            >
+                              📝
+                            </span>
+                          );
+                        } else if (['xls', 'xlsx', 'csv'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="Excel表格"
+                              role="img"
+                            >
+                              📊
+                            </span>
+                          );
+                        } else if (['ppt', 'pptx'].includes(fileExtension)) {
+                          icon = (
+                            <span
+                              aria-label="PPT演示文稿"
+                              role="img"
+                            >
+                              📊
+                            </span>
+                          );
+                        } else if (fileExtension === 'pdf') {
+                          icon = (
+                            <span
+                              aria-label="PDF文档"
+                              role="img"
+                            >
+                              📑
+                            </span>
+                          );
+                        } else if (fileExtension === 'zip') {
+                          icon = (
+                            <span
+                              aria-label="压缩文件"
+                              role="img"
+                            >
+                              📦
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <Space>
+                            {icon}
+                            <span>{text}</span>
+                          </Space>
+                        );
+                      },
+                      title: '文件名'
+                    },
+                    {
+                      dataIndex: 'type',
+                      key: 'type',
+                      render: text => (text ? text.toUpperCase() : ''),
+                      title: '类型',
+                      width: 100
+                    },
+                    {
+                      dataIndex: 'size',
+                      key: 'size',
+                      title: '大小',
+                      width: 100
+                    },
+                    {
+                      dataIndex: 'uploadTime',
+                      key: 'uploadTime',
+                      title: '上传时间',
+                      width: 180
+                    },
+                    {
+                      key: 'action',
+                      render: (_, record: any) => (
+                        <Space>
+                          <Button
+                            icon={<DownloadOutlined />}
+                            size="small"
+                            type="primary"
+                            onClick={() => handleDownloadAttachment(record)}
+                          >
+                            下载
+                          </Button>
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            size="small"
+                            onClick={() => handleDeleteAnnounceAttachment(record.id)}
+                          >
+                            删除
+                          </Button>
+                        </Space>
+                      ),
+                      title: '操作',
+                      width: 180
+                    }
+                  ]}
+                />
+              </div>
+            </>
+          )}
+        </Modal>
+
+        {/* 发布/编辑通知模态框 */}
+        <Modal
+          open={announceModalVisible}
+          title={currentAnnounce ? '编辑通知' : '发布通知'}
+          width={700}
+          onCancel={() => setAnnounceModalVisible(false)}
+          onOk={handleSaveAnnounce}
+        >
+          <Form
+            form={announceForm}
+            labelCol={{ span: 4 }}
+            style={{ marginTop: 20 }}
+            wrapperCol={{ span: 18 }}
+          >
+            <Form.Item
+              label="通知标题"
+              name="title"
+              rules={[{ message: '请输入通知标题', required: true }]}
+            >
+              <Input placeholder="请输入通知标题" />
+            </Form.Item>
+            <Form.Item
+              label="重要程度"
+              name="importance"
+              rules={[{ message: '请选择重要程度', required: true }]}
+            >
+              <Select placeholder="请选择重要程度">
+                <Select.Option value={0}>普通</Select.Option>
+                <Select.Option value={1}>重要</Select.Option>
+                <Select.Option value={2}>紧急</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item
+              label="通知内容"
+              name="content"
+              rules={[{ message: '请输入通知内容', required: true }]}
+            >
+              <Input.TextArea
+                placeholder="请输入通知内容"
+                rows={6}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* 附件上传模态框 */}
+        <Modal
+          footer={null}
+          open={announceUploadModalVisible}
+          title="上传附件"
+          width={600}
+          onCancel={() => {
+            if (!announceUploading) {
+              setAnnounceUploadModalVisible(false);
+            }
+          }}
+        >
+          {!announceUploading ? (
+            <>
+              <div className="p-6">
+                <Upload.Dragger
+                  multiple
+                  fileList={[]}
+                  beforeUpload={file => {
+                    setAnnounceFileList(prev => [...prev, file]);
+                    return false;
+                  }}
+                  onRemove={file => {
+                    setAnnounceFileList(files => files.filter(f => f.uid !== file.uid));
+                  }}
+                >
+                  <p className="ant-upload-drag-icon">
+                    <InboxOutlined />
+                  </p>
+                  <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                  <p className="ant-upload-hint">支持单个或批量上传，最大支持10MB的文件</p>
+                </Upload.Dragger>
+
+                {announceFileList.length > 0 && (
+                  <div className="mt-4">
+                    <Typography.Text className="mb-2 block text-sm font-medium">
+                      待上传文件列表:
+                      {announceFileList.length > 0 && (
+                        <Typography.Text
+                          className="ml-2 text-xs text-gray-500"
+                          type="secondary"
+                        >
+                          (总大小:{' '}
+                          {(() => {
+                            const totalSize = announceFileList.reduce((total, file) => total + file.size, 0);
+                            return totalSize < 1024 * 1024
+                              ? `${(totalSize / 1024).toFixed(2)} KB`
+                              : `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+                          })()}
+                          )
+                        </Typography.Text>
+                      )}
+                    </Typography.Text>
+                    <Table
+                      pagination={false}
+                      size="small"
+                      columns={[
+                        { dataIndex: 'name', ellipsis: true, title: '文件名' },
+                        { dataIndex: 'type', title: '类型', width: 80 },
+                        { dataIndex: 'size', title: '大小', width: 100 }
+                      ]}
+                      dataSource={announceFileList.map((file, index) => ({
+                        key: file.uid || index,
+                        name: file.name,
+                        size:
+                          file.size < 1024 * 1024
+                            ? `${(file.size / 1024).toFixed(2)} KB`
+                            : `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                        type: file.name?.split('.')?.pop()?.toUpperCase() || '未知'
+                      }))}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end border-t bg-gray-50 px-6 py-3">
+                <Space>
+                  <Button onClick={() => setAnnounceUploadModalVisible(false)}>取消</Button>
+                  <Button
+                    disabled={announceFileList.length === 0}
+                    type="primary"
+                    onClick={handleAnnounceFileUpload}
+                  >
+                    开始上传
+                  </Button>
+                </Space>
+              </div>
+            </>
+          ) : (
+            <div className="p-6">
+              <div className="mb-4 text-center">
+                {announceUploadProgress === 100 ? (
+                  <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 48 }} />
+                ) : (
+                  <Spin
+                    indicator={
+                      <LoadingOutlined
+                        spin
+                        style={{ fontSize: 36 }}
+                      />
+                    }
+                  />
+                )}
+
+                <Typography.Title
+                  className="mb-4 mt-3"
+                  level={4}
+                >
+                  {announceUploadProgress === 100 ? '上传完成！' : '正在上传文件...'}
+                </Typography.Title>
+
+                <Progress
+                  percent={announceUploadProgress}
+                  status={announceUploadProgress < 100 ? 'active' : 'success'}
+                  strokeColor={announceUploadProgress < 100 ? '#6366f1' : '#52c41a'}
+                  strokeWidth={8}
+                />
+
+                <Typography.Paragraph className="mt-3 text-gray-500">
+                  {announceUploadProgress === 100 ? (
+                    <>
+                      <CheckCircleOutlined className="mr-1 text-success" />
+                      文件上传成功，正在处理中...
+                    </>
+                  ) : (
+                    `正在上传文件 (${announceUploadProgress}%)...`
+                  )}
+                </Typography.Paragraph>
+              </div>
+
+              <div className="mt-4 flex justify-end border-t pt-3">
+                <Button
+                  disabled={announceUploadProgress < 100}
+                  onClick={() => setAnnounceUploadModalVisible(false)}
+                >
+                  {announceUploadProgress === 100 ? '关闭' : '取消'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
       </Card>
     );
   };
