@@ -25,6 +25,7 @@ const ClassList = () => {
   const [loading, setLoading] = useState(false);
   const [classList, setClassList] = useState<any[]>([]);
   const [filteredList, setFilteredList] = useState<any[]>([]);
+  const [courseList, setCourseList] = useState<any[]>([]);
 
   // 筛选条件
   const [searchName, setSearchName] = useState('');
@@ -37,6 +38,32 @@ const ClassList = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [editingClassId, setEditingClassId] = useState<number | null>(null);
+
+  // 获取课程列表数据
+  useEffect(() => {
+    const storedCourses = localStorage.getItem('courseList');
+    if (storedCourses) {
+      try {
+        const courses = JSON.parse(storedCourses);
+        setCourseList(courses);
+      } catch (error) {
+        console.error('解析课程列表数据失败', error);
+        setCourseList([]);
+      }
+    }
+  }, []);
+
+  // 根据类别获取对应课程的价格
+  const getCoursePrice = (categoryName: string) => {
+    const course = courseList.find(c => c.category === categoryName);
+    return course ? course.price : 0;
+  };
+
+  // 计算培训费用（课程价格 × 学员人数）
+  const calculateTrainingFee = (categoryName: string, studentCount: number) => {
+    const price = getCoursePrice(categoryName);
+    return price * studentCount;
+  };
 
   // 模拟数据加载
   useEffect(() => {
@@ -211,7 +238,7 @@ const ClassList = () => {
       endDate: dayjs(classToEdit.endDate),
       name: classToEdit.name,
       startDate: dayjs(classToEdit.startDate),
-      teacher: classToEdit.teacher
+      studentCount: classToEdit.studentCount
     });
 
     // 设置编辑模式并保存当前编辑的班级ID
@@ -250,58 +277,48 @@ const ClassList = () => {
       const values = await form.validateFields();
       setSubmitting(true);
 
-      // 判断是编辑模式还是新增模式
-      if (editingClassId !== null) {
-        // 编辑模式
-        setTimeout(() => {
-          // 更新班级信息
-          const updatedClassList = classList.map(c => {
-            if (c.id === editingClassId) {
+      setTimeout(() => {
+        // 如果是编辑模式
+        if (editingClassId !== null) {
+          // 查找要编辑的班级
+          const updatedClassList = classList.map(classItem => {
+            if (classItem.id === editingClassId) {
+              // 根据表单数据更新班级信息
               return {
-                ...c,
+                ...classItem,
                 categoryId: values.categoryId,
-                categoryName: categoryOptions.find(item => item.value === values.categoryId)?.label || '未知类型',
-                description: values.description || '',
+                categoryName: categoryOptions.find(opt => opt.value === values.categoryId)?.label || '',
+                description: values.description,
                 endDate: values.endDate.format('YYYY-MM-DD'),
                 name: values.name,
                 startDate: values.startDate.format('YYYY-MM-DD'),
                 status:
-                  new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime()
+                  dayjs(values.startDate).isAfter(dayjs())
                     ? ClassStatus.NOT_STARTED
-                    : ClassStatus.IN_PROGRESS,
-                teacher: values.teacher
+                    : dayjs(values.endDate).isBefore(dayjs())
+                      ? ClassStatus.COMPLETED
+                      : ClassStatus.IN_PROGRESS,
+                studentCount: values.studentCount
               };
             }
-            return c;
+            return classItem;
           });
 
-          // 更新班级列表
+          // 更新状态和本地存储
           setClassList(updatedClassList);
           setFilteredList(updatedClassList);
-
-          // 更新本地存储
           localStorage.setItem('classList', JSON.stringify(updatedClassList));
-
-          // 关闭模态框并重置状态
-          setIsModalOpen(false);
-          setSubmitting(false);
-          setEditingClassId(null);
-          form.resetFields();
 
           // 显示成功消息
           Modal.success({
-            content: `班级"${values.name}"已成功更新`,
+            content: '班级信息已成功更新',
             title: '更新成功'
           });
-        }, 1000);
-      } else {
-        // 新增模式
-        // 模拟API请求延迟
-        setTimeout(() => {
-          // 生成新班级对象
+        } else {
+          // 添加新班级
           const newClass = {
             categoryId: values.categoryId,
-            categoryName: categoryOptions.find(item => item.value === values.categoryId)?.label || '未知类型',
+            categoryName: categoryOptions.find(opt => opt.value === values.categoryId)?.label || '',
             createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
             description: values.description || '',
             endDate: values.endDate.format('YYYY-MM-DD'),
@@ -309,36 +326,35 @@ const ClassList = () => {
             name: values.name,
             startDate: values.startDate.format('YYYY-MM-DD'),
             status:
-              new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime()
+              dayjs(values.startDate).isAfter(dayjs())
                 ? ClassStatus.NOT_STARTED
-                : ClassStatus.IN_PROGRESS,
-            studentCount: 0,
-            teacher: values.teacher
+                : dayjs(values.endDate).isBefore(dayjs())
+                  ? ClassStatus.COMPLETED
+                  : ClassStatus.IN_PROGRESS,
+            studentCount: values.studentCount
           };
 
-          // 更新班级列表
+          // 更新状态和本地存储
           const updatedClassList = [...classList, newClass];
           setClassList(updatedClassList);
           setFilteredList(updatedClassList);
-
-          // 更新本地存储
           localStorage.setItem('classList', JSON.stringify(updatedClassList));
-
-          // 关闭模态框并重置状态
-          setIsModalOpen(false);
-          setSubmitting(false);
-          form.resetFields();
 
           // 显示成功消息
           Modal.success({
-            content: `班级"${values.name}"已成功创建`,
-            title: '创建成功'
+            content: '班级已成功添加',
+            title: '添加成功'
           });
-        }, 1000);
-      }
+        }
+
+        // 重置状态和关闭模态框
+        setIsModalOpen(false);
+        setSubmitting(false);
+        setEditingClassId(null);
+        form.resetFields();
+      }, 1000);
     } catch (error) {
       console.error('表单验证失败:', error);
-      setSubmitting(false);
     }
   };
 
@@ -361,13 +377,13 @@ const ClassList = () => {
       dataIndex: 'id',
       key: 'id',
       title: 'ID',
-      width: 80
+      width: 50
     },
     {
       dataIndex: 'name',
       key: 'name',
       title: '班级名称',
-      width: 200
+      width: 180
     },
     {
       dataIndex: 'categoryName',
@@ -376,10 +392,13 @@ const ClassList = () => {
       width: 150
     },
     {
-      dataIndex: 'teacher',
-      key: 'teacher',
-      title: '班主任',
-      width: 120
+      key: 'trainingFee',
+      render: (_: unknown, record: any) => {
+        const fee = calculateTrainingFee(record.categoryName, record.studentCount);
+        return `¥${fee.toFixed(2)}`;
+      },
+      title: '培训费',
+      width: 150
     },
     {
       dataIndex: 'studentCount',
@@ -537,11 +556,11 @@ const ClassList = () => {
               />
             </Form.Item>
             <Form.Item
-              label="班主任"
-              name="teacher"
-              rules={[{ message: '请输入班主任姓名', required: true }]}
+              label="学员人数"
+              name="studentCount"
+              rules={[{ message: '请输入学员人数', required: true }]}
             >
-              <Input placeholder="请输入班主任姓名" />
+              <Input type="number" placeholder="请输入学员人数" />
             </Form.Item>
             <Form.Item
               label="开始日期"
