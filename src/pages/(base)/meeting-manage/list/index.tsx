@@ -205,20 +205,20 @@ const Component: React.FC = () => {
           {/* 只有会议被批准且已结束才能添加记录和总结 */}
           {record.approvalStatus === 'approved' && record.status === 'completed' && (
             <>
-              <Button
-                size="small"
-                type="link"
+          <Button
+            size="small"
+            type="link"
                 onClick={() => showRecordModal(record)}
-              >
+          >
                 {record.record ? '查看记录' : '添加记录'}
-              </Button>
-              <Button
-                size="small"
-                type="link"
+          </Button>
+          <Button
+            size="small"
+            type="link"
                 onClick={() => showSummaryModal(record)}
-              >
+          >
                 {record.summary ? '查看总结' : '添加总结'}
-              </Button>
+          </Button>
             </>
           )}
 
