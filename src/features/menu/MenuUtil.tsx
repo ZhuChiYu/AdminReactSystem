@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router-dom';
 
 import BeyondHiding from '@/components/BeyondHiding';
 import { $t } from '@/locales';
+import { isSuperAdmin } from '@/utils/auth';
 
 /**
  * Get global menus by auth routes
@@ -15,7 +16,22 @@ export function filterRoutesToMenus(routes: RouteObject[]) {
   const menus: App.Global.Menu[] = [];
 
   for (const route of sortedRoutes) {
-    // 如果节点存在 path（注意：这里假设空字符串或 undefined 均视为无 path）
+    // 检查auth权限，如果设置了auth="super_admin"但当前用户不是超级管理员，则跳过该路由
+    if (route.handle?.auth === 'super_admin' && !isSuperAdmin()) {
+      continue;
+    }
+
+    // 检查roles权限，如果设置了roles但当前用户不具备所需角色，则跳过该路由
+    if (route.handle?.roles && route.handle.roles.length > 0) {
+      // 获取当前用户角色
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{"roles":[]}');
+      const userRoles = userInfo.roles || [];
+
+      // 如果当前用户没有这个路由所需的任何一个角色，跳过该路由
+      if (!route.handle.roles.some((role: string) => userRoles.includes(role))) {
+        continue;
+      }
+    }
 
     if (route.path && !route.handle?.hideInMenu) {
       // 如果存在 children，则递归处理

@@ -33,6 +33,10 @@ import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import type { UserPermission } from '@/store/permissionStore';
+import usePermissionStore, { PermissionType } from '@/store/permissionStore';
+import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
+
 /** 班级状态枚举 */
 enum ClassStatus {
   NOT_STARTED = 0,
@@ -80,6 +84,17 @@ const ClassDetail = () => {
   const [announceFileList, setAnnounceFileList] = useState<any[]>([]);
   const [announceUploading, setAnnounceUploading] = useState(false);
   const [announceUploadProgress, setAnnounceUploadProgress] = useState(0);
+
+  // 添加用于权限管理的状态
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [currentStaff, setCurrentStaff] = useState<any>(null);
+  const [permissionForm] = Form.useForm();
+  const [permissionType, setPermissionType] = useState<string | null>(null);
+
+  const { hasPermission } = usePermissionStore();
+  const currentUserId = getCurrentUserId();
+  const isUserSuperAdmin = isSuperAdmin();
 
   useEffect(() => {
     // 模拟加载班级数据
@@ -235,6 +250,29 @@ const ClassDetail = () => {
       }
     ];
     setAnnounceList(mockAnnouncements);
+
+    // 加载员工列表
+    const mockStaff = [
+      {
+        department: '人事部',
+        id: '1',
+        name: '张三',
+        role: '员工'
+      },
+      {
+        department: '技术部',
+        id: '2',
+        name: '李四',
+        role: '主管'
+      },
+      {
+        department: '营销部',
+        id: '3',
+        name: '王五',
+        role: '经理'
+      }
+    ];
+    setStaffList(mockStaff);
 
     setLoading(false);
   }, [classId]);
@@ -408,29 +446,39 @@ const ClassDetail = () => {
     },
     {
       key: 'action',
-      render: (_: unknown, record: any) => (
-        <Space size="middle">
-          <Button
-            type="link"
-            onClick={() => handleViewStudentDetail(record)}
-          >
-            详情
-          </Button>
-          <Button
-            type="link"
-            onClick={() => handleEditStudent(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            type="link"
-            onClick={() => handleRemoveStudent(record.id)}
-          >
-            移除
-          </Button>
-        </Space>
-      ),
+      render: (_: unknown, record: any) => {
+        // 权限判断：超级管理员或有特定权限才显示编辑和删除按钮
+        const canEditStudent =
+          isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_STUDENT, undefined, record.id);
+
+        return (
+          <Space size="middle">
+            <Button
+              type="link"
+              onClick={() => handleViewStudentDetail(record)}
+            >
+              详情
+            </Button>
+            {canEditStudent && (
+              <Button
+                type="link"
+                onClick={() => handleEditStudent(record)}
+              >
+                编辑
+              </Button>
+            )}
+            {canEditStudent && (
+              <Button
+                danger
+                type="link"
+                onClick={() => handleRemoveStudent(record.id)}
+              >
+                移除
+              </Button>
+            )}
+          </Space>
+        );
+      },
       title: '操作',
       width: 180
     }
@@ -954,6 +1002,51 @@ const ClassDetail = () => {
     });
   };
 
+  // 处理授权
+  const handleGrantPermission = (staffId: string, staffName: string, permType: string) => {
+    setCurrentStaff({ id: staffId, name: staffName });
+    setPermissionType(permType);
+    setPermissionModalVisible(true);
+  };
+
+  // 保存权限设置
+  const handleSavePermission = async () => {
+    try {
+      const values = await permissionForm.validateFields();
+
+      if (permissionType && currentStaff) {
+        // 获取权限类型
+        const permType = permissionType === 'student' ? PermissionType.EDIT_STUDENT : PermissionType.EDIT_ANNOUNCE;
+
+        // 授予特定班级的权限
+        if (classInfo && classInfo.id) {
+          // 设置授权期限
+          const expiryDate = values.expiry ? values.expiry.format('YYYY-MM-DD HH:mm:ss') : undefined;
+
+          // 创建带有到期时间的权限对象
+          const permission: UserPermission = {
+            classId: classInfo.id,
+            expiryTime: expiryDate,
+            grantedBy: currentUserId,
+            permissionType: permType,
+            userId: currentStaff.id
+          };
+
+          // 添加权限
+          usePermissionStore.getState().addPermission(permission);
+
+          message.success(
+            `已成功授予 ${currentStaff.name} ${permissionType === 'student' ? '编辑学员' : '编辑通知'} 权限`
+          );
+        }
+      }
+
+      setPermissionModalVisible(false);
+    } catch (error) {
+      console.error('表单验证失败:', error);
+    }
+  };
+
   // 渲染主要信息区域
   const renderBasicInfo = () => {
     if (!classInfo) return null;
@@ -1221,29 +1314,37 @@ const ClassDetail = () => {
     },
     {
       key: 'action',
-      render: (_: unknown, record: any) => (
-        <Space size="middle">
-          <Button
-            type="link"
-            onClick={() => handleViewCourseDetail(record)}
-          >
-            详情
-          </Button>
-          <Button
-            type="link"
-            onClick={() => handleEditCourse(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            type="link"
-            onClick={() => handleRemoveCourse(record.id)}
-          >
-            移除
-          </Button>
-        </Space>
-      ),
+      render: (_: unknown, record: any) => {
+        const canEdit =
+          isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, classInfo?.id);
+        return (
+          <Space size="middle">
+            <Button
+              type="link"
+              onClick={() => handleViewCourseDetail(record)}
+            >
+              详情
+            </Button>
+            {canEdit && (
+              <Button
+                type="link"
+                onClick={() => handleEditCourse(record)}
+              >
+                编辑
+              </Button>
+            )}
+            {isUserSuperAdmin && (
+              <Button
+                danger
+                type="link"
+                onClick={() => handleRemoveCourse(record.id)}
+              >
+                移除
+              </Button>
+            )}
+          </Space>
+        );
+      },
       title: '操作',
       width: 180
     }
@@ -1251,17 +1352,21 @@ const ClassDetail = () => {
 
   // 渲染课程列表
   const renderCourseList = () => {
+    const canEdit =
+      isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, classInfo?.id);
     return (
       <Card
         bordered={false}
         title="班级课程"
         extra={
-          <Button
-            type="primary"
-            onClick={handleAddCourse}
-          >
-            添加课程
-          </Button>
+          canEdit && (
+            <Button
+              type="primary"
+              onClick={handleAddCourse}
+            >
+              添加课程
+            </Button>
+          )
         }
       >
         <Table
@@ -1714,17 +1819,22 @@ const ClassDetail = () => {
 
   // 渲染通知公告
   const renderAnnouncements = () => {
+    const canEditAnnounce =
+      isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_ANNOUNCE, undefined, classInfo?.id);
+
     return (
       <Card
         bordered={false}
         title="通知公告"
         extra={
-          <Button
-            type="primary"
-            onClick={handlePublishAnnounce}
-          >
-            发布通知
-          </Button>
+          canEditAnnounce && (
+            <Button
+              type="primary"
+              onClick={handlePublishAnnounce}
+            >
+              发布通知
+            </Button>
+          )
         }
       >
         <List
@@ -1741,21 +1851,25 @@ const ClassDetail = () => {
                 >
                   查看
                 </Button>,
-                <Button
-                  key="list-edit"
-                  type="link"
-                  onClick={() => handleEditAnnounce(item)}
-                >
-                  编辑
-                </Button>,
-                <Button
-                  danger
-                  key="list-delete"
-                  type="link"
-                  onClick={() => handleDeleteAnnounce(item.id)}
-                >
-                  删除
-                </Button>
+                canEditAnnounce && (
+                  <Button
+                    key="list-edit"
+                    type="link"
+                    onClick={() => handleEditAnnounce(item)}
+                  >
+                    编辑
+                  </Button>
+                ),
+                canEditAnnounce && (
+                  <Button
+                    danger
+                    key="list-delete"
+                    type="link"
+                    onClick={() => handleDeleteAnnounce(item.id)}
+                  >
+                    删除
+                  </Button>
+                )
               ]}
             >
               <List.Item.Meta
@@ -2145,6 +2259,116 @@ const ClassDetail = () => {
     );
   };
 
+  // 渲染权限管理
+  const renderPermissions = () => {
+    if (!isUserSuperAdmin) {
+      return (
+        <div className="h-64 flex items-center justify-center">
+          <Typography.Text className="text-lg text-gray-500">您没有查看此页面的权限</Typography.Text>
+        </div>
+      );
+    }
+
+    const columns = [
+      {
+        dataIndex: 'name',
+        key: 'name',
+        title: '姓名',
+        width: 150
+      },
+      {
+        dataIndex: 'role',
+        key: 'role',
+        title: '角色',
+        width: 150
+      },
+      {
+        dataIndex: 'department',
+        key: 'department',
+        title: '部门',
+        width: 200
+      },
+      {
+        key: 'action',
+        render: (_: unknown, record: any) => (
+          <Space size="middle">
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => handleGrantPermission(record.id, record.name, 'student')}
+            >
+              授予编辑学员权限
+            </Button>
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => handleGrantPermission(record.id, record.name, 'announce')}
+            >
+              授予编辑通知权限
+            </Button>
+          </Space>
+        ),
+        title: '操作',
+        width: 350
+      }
+    ];
+
+    return (
+      <Card
+        bordered={false}
+        title="权限管理"
+      >
+        <Typography.Paragraph className="mb-4">在此管理员工和管理员对当前班级的特殊权限。</Typography.Paragraph>
+
+        <Table
+          columns={columns}
+          dataSource={staffList}
+          rowKey="id"
+        />
+
+        <Modal
+          open={permissionModalVisible}
+          title={`授予 ${currentStaff?.name || ''} ${permissionType === 'student' ? '编辑学员' : '编辑通知'} 权限`}
+          onCancel={() => setPermissionModalVisible(false)}
+          onOk={handleSavePermission}
+        >
+          <Form
+            form={permissionForm}
+            labelCol={{ span: 6 }}
+            style={{ marginTop: 20 }}
+            wrapperCol={{ span: 16 }}
+          >
+            <Form.Item label="权限类型">
+              <Input
+                disabled
+                value={permissionType === 'student' ? '编辑学员权限' : '编辑通知权限'}
+              />
+            </Form.Item>
+            <Form.Item
+              label="权限到期时间"
+              name="expiry"
+            >
+              <DatePicker
+                showTime
+                placeholder="不设置则永久有效"
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="备注"
+              name="remark"
+            >
+              <Input.TextArea
+                placeholder="可选备注信息"
+                rows={4}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Card>
+    );
+  };
+
   if (!classInfo && !loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -2181,6 +2405,11 @@ const ClassDetail = () => {
             children: renderAnnouncements(),
             key: 'announcements',
             label: '通知公告'
+          },
+          {
+            children: renderPermissions(),
+            key: 'permissions',
+            label: '权限管理'
           }
         ]}
       />

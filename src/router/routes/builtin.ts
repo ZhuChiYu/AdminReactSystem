@@ -210,7 +210,43 @@ export const BaseChildrenRoutes = [
     id: 'project_manage',
     path: '/project-manage'
   },
-  // 新增会议管理模块
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_expense-process_apply',
+          title: '报销申请',
+          icon: 'mdi:file-document-plus-outline',
+          order: 1
+        },
+        id: 'expense_apply',
+        lazy: () => import('@/pages/(base)/expense-process/apply').then(convert),
+        path: '/expense-process/apply'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_expense-process_approve',
+          title: '报销审核',
+          icon: 'mdi:file-check-outline',
+          order: 2,
+          auth: 'super_admin',
+          hideInMenu: true,
+          roles: ['super_admin', 'R_SUPER']
+        },
+        id: 'expense_approve',
+        lazy: () => import('@/pages/(base)/expense-process/approve').then(convert),
+        path: '/expense-process/approve'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_expense-process',
+      title: '报销流程',
+      icon: 'mdi:file-document-edit-outline',
+      order: 7
+    },
+    id: 'expense_process',
+    path: '/expense-process'
+  },
   {
     children: [
       {
@@ -251,7 +287,8 @@ export const BaseChildrenRoutes = [
           i18nKey: 'route.(base)_meeting-manage_approve',
           icon: 'mdi:check-decagram-outline',
           order: 4,
-          title: '会议审核'
+          title: '会议审核',
+          auth: 'super_admin'
         },
         id: 'meeting_approve',
         lazy: () => import('@/pages/(base)/meeting-manage/approve').then(convert),

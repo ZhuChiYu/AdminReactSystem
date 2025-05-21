@@ -3,6 +3,8 @@ import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import usePermissionStore, { PermissionType } from '@/store/permissionStore';
+import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -38,6 +40,10 @@ const ClassList = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [editingClassId, setEditingClassId] = useState<number | null>(null);
+
+  const { hasPermission } = usePermissionStore();
+  const currentUserId = getCurrentUserId();
+  const isUserSuperAdmin = isSuperAdmin();
 
   // 获取课程列表数据
   useEffect(() => {
@@ -432,32 +438,40 @@ const ClassList = () => {
     {
       fixed: 'right' as const,
       key: 'action',
-      render: (_: unknown, record: any) => (
-        <Space size="middle">
-          <Button
-            size="small"
-            type="link"
-            onClick={() => handleViewDetail(record.id)}
-          >
-            查看
-          </Button>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => handleEdit(record.id)}
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            size="small"
-            type="link"
-            onClick={() => handleDelete(record.id)}
-          >
-            删除
-          </Button>
-        </Space>
-      ),
+      render: (_: unknown, record: any) => {
+        // 权限判断：超级管理员或有EDIT_CLASS权限才显示编辑按钮
+        const canEdit = isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, record.id);
+        return (
+          <Space size="middle">
+            <Button
+              size="small"
+              type="link"
+              onClick={() => handleViewDetail(record.id)}
+            >
+              查看
+            </Button>
+            {canEdit && (
+              <Button
+                size="small"
+                type="link"
+                onClick={() => handleEdit(record.id)}
+              >
+                编辑
+              </Button>
+            )}
+            {isUserSuperAdmin && (
+              <Button
+                danger
+                size="small"
+                type="link"
+                onClick={() => handleDelete(record.id)}
+              >
+                删除
+              </Button>
+            )}
+          </Space>
+        );
+      },
       title: '操作',
       width: 200
     }

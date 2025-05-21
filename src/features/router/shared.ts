@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router-dom';
+import { isSuperAdmin } from '@/utils/auth';
 
 export function filterCacheRoutes(routes: RouteObject[]) {
   const cacheRoutes: string[] = [];
@@ -72,6 +73,11 @@ export function filterAuthRoutesByRoles(routes: { parent: string | null; route: 
       }
 
       const filteredRoute = item.route.filter(routeObj => {
+        // 检查auth权限，如果设置了auth="super_admin"但当前用户不是超级管理员，则过滤掉该路由
+        if (routeObj.handle?.auth === 'super_admin' && !isSuperAdmin()) {
+          return false;
+        }
+
         const routeRoles: string[] = (routeObj.handle && routeObj.handle.roles) || [];
 
         // if the route's "roles" is empty, then it is allowed to access

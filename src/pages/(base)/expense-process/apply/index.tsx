@@ -27,6 +27,9 @@ import {
 import type { UploadFile, UploadProps } from 'antd';
 import type dayjs from 'dayjs';
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { isSuperAdmin } from '@/utils/auth';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -79,6 +82,8 @@ const Component: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const isUserSuperAdmin = isSuperAdmin();
 
   // 添加报销项目
   const handleAddItem = () => {
@@ -155,20 +160,48 @@ const Component: React.FC = () => {
 
     setSubmitting(true);
 
-    const submitData = {
-      ...values,
-      invoices: fileList.map(file => file.name),
+    // 准备报销数据
+    const newExpenseApplication = {
+      amount: expenseItems.reduce((sum, item) => sum + item.amount, 0),
+      applicant: values.applicant || '匿名用户',
+      date: new Date().toLocaleDateString(),
+      department: values.department
+        ? departments.find(d => d.value === values.department)?.label || values.department
+        : '未指定部门',
+      id: Date.now().toString(),
       items: expenseItems,
-      submitTime: new Date().toISOString(),
-      totalAmount: expenseItems.reduce((sum, item) => sum + item.amount, 0)
+      status: 'pending',
+      title: values.title,
+      type:
+        expenseItems.length > 0 ? expenseTypes.find(t => t.value === expenseItems[0].itemType)?.label || '其他' : '其他'
     };
-
-    console.log('提交的表单数据:', submitData);
 
     // 模拟提交
     setTimeout(() => {
+      // 保存到本地存储
+      const existingExpenses = JSON.parse(localStorage.getItem('expenseApplications') || '[]');
+      localStorage.setItem('expenseApplications', JSON.stringify([newExpenseApplication, ...existingExpenses]));
+
+      // 发送通知给超级管理员
+      const notification = {
+        content: `${values.applicant || '员工'}提交了新的报销申请: ${values.title}，请尽快审核`,
+        createdAt: new Date().toISOString(),
+        id: Date.now().toString(),
+        read: false,
+        title: '新报销申请待审核',
+        type: 'expense'
+      };
+
+      // 存储通知到本地存储
+      const existingNotifications = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
+      localStorage.setItem('adminNotifications', JSON.stringify([notification, ...existingNotifications]));
+
+      console.log('已发送通知给超级管理员', notification);
+      console.log('已保存报销申请', newExpenseApplication);
+
       setSubmitting(false);
       message.success('报销申请提交成功');
+
       // 提交成功后清空表单
       form.resetFields();
       setExpenseItems([]);
@@ -227,10 +260,26 @@ const Component: React.FC = () => {
 
   const totalAmount = expenseItems.reduce((sum, item) => sum + item.amount, 0);
 
+  // 跳转到审核页面 (仅超级管理员可见)
+  const handleGoToApprove = () => {
+    navigate('/expense-process/approve');
+  };
+
   return (
     <div className="p-4">
       <Card>
-        <Title level={4}>报销申请</Title>
+        <div className="mb-4 flex items-center justify-between">
+          <Title level={4}>报销申请</Title>
+          {isUserSuperAdmin && (
+            <Button
+              type="primary"
+              onClick={handleGoToApprove}
+            >
+              查看待审批报销
+            </Button>
+          )}
+        </div>
+
         <Form
           autoComplete="off"
           form={form}

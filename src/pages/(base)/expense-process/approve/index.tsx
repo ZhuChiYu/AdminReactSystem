@@ -1,5 +1,6 @@
-import { Button, Card, Form, Input, Modal, Radio, Space, Table, Tag, Typography } from 'antd';
-import React, { useState } from 'react';
+import { Button, Card, Form, Input, Modal, Radio, Space, Table, Tag, Typography, message } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { isSuperAdmin } from '@/utils/auth';
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -17,12 +18,62 @@ interface ExpenseItem {
 
 const Component: React.FC = () => {
   const [visible, setVisible] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_currentItem, setCurrentItem] = useState<ExpenseItem | null>(null);
+  const [currentItem, setCurrentItem] = useState<ExpenseItem | null>(null);
   const [form] = Form.useForm();
+  const [expenseData, setExpenseData] = useState<ExpenseItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 检查用户是否为超级管理员
+  const isUserSuperAdmin = isSuperAdmin();
+
+  // 页面加载时获取报销数据
+  useEffect(() => {
+    if (!isUserSuperAdmin) {
+      return;
+    }
+
+    setLoading(true);
+
+    // 获取本地存储中的通知
+    const notifications = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
+
+    // 获取报销申请数据 (实际项目中应从API获取)
+    const storedExpenses = localStorage.getItem('expenseApplications');
+
+    setTimeout(() => {
+      // 如果有存储的报销数据，使用它们
+      if (storedExpenses) {
+        try {
+          const parsedExpenses = JSON.parse(storedExpenses);
+          setExpenseData(parsedExpenses);
+        } catch (error) {
+          console.error('解析报销数据失败:', error);
+          // 如果解析失败，使用模拟数据
+          setExpenseData(mockExpenseData);
+        }
+      } else {
+        // 否则使用模拟数据
+        setExpenseData(mockExpenseData);
+      }
+
+      // 标记通知为已读 (如果有相关通知)
+      const expenseNotifications = notifications.filter((n: any) => n.type === 'expense');
+      if (expenseNotifications.length > 0) {
+        const updatedNotifications = notifications.map((n: any) => {
+          if (n.type === 'expense') {
+            return { ...n, read: true };
+          }
+          return n;
+        });
+        localStorage.setItem('adminNotifications', JSON.stringify(updatedNotifications));
+      }
+
+      setLoading(false);
+    }, 500);
+  }, [isUserSuperAdmin]);
 
   // 模拟数据
-  const mockData: ExpenseItem[] = [
+  const mockExpenseData: ExpenseItem[] = [
     {
       amount: 2500,
       applicant: '张三',
@@ -64,7 +115,26 @@ const Component: React.FC = () => {
   const handleApprove = () => {
     form.validateFields().then(values => {
       console.log('审批结果:', values);
-      // 实际项目中这里会调用API
+
+      // 更新报销项目状态
+      const updatedData = expenseData.map(item => {
+        if (item.id === currentItem?.id) {
+          return {
+            ...item,
+            status: values.result
+          };
+        }
+        return item;
+      });
+
+      setExpenseData(updatedData);
+
+      // 保存到本地存储 (实际项目中应调用API)
+      localStorage.setItem('expenseApplications', JSON.stringify(updatedData));
+
+      // 显示成功消息
+      message.success(`已${values.result === 'approved' ? '通过' : '拒绝'}该报销申请`);
+
       setVisible(false);
     });
   };
@@ -140,13 +210,28 @@ const Component: React.FC = () => {
     }
   ];
 
+  if (!isUserSuperAdmin) {
+    return (
+      <div className="p-4">
+        <Card>
+          <div className="flex h-64 items-center justify-center">
+            <Typography.Text className="text-lg text-gray-500">
+              您没有权限访问此页面
+            </Typography.Text>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4">
       <Card>
         <Title level={4}>报销审核</Title>
         <Table
           columns={columns}
-          dataSource={mockData}
+          dataSource={expenseData}
+          loading={loading}
           rowKey="id"
         />
       </Card>
