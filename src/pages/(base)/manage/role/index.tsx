@@ -146,7 +146,7 @@ const Role = () => {
   return (
     <div className="h-full min-h-500px flex-col-stretch gap-16px overflow-hidden lt-sm:overflow-auto">
       <ACollapse
-        bordered={false}
+        variant="borderless"
         className="card-wrapper"
         defaultActiveKey={isMobile ? undefined : '1'}
         items={[

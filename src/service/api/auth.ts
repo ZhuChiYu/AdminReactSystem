@@ -1,48 +1,71 @@
-import { request } from '../request';
+import { apiClient, createMockResponse } from './client';
+import { UserApi } from './types';
 
 /**
- * Login
- *
- * @param userName User name
- * @param password Password
+ * 认证相关API服务
  */
-export function fetchLogin(userName: string, password: string) {
-  return request<Api.Auth.LoginToken>({
-    data: {
-      password,
-      userName
-    },
-    method: 'post',
-    url: '/auth/login'
-  });
+export class AuthService {
+  /**
+   * 用户登录
+   */
+  async login(params: UserApi.LoginRequest): Promise<UserApi.LoginResponse> {
+    // 使用真实API调用
+    return apiClient.post('/auth/login', params);
+  }
+
+  /**
+   * 用户登出
+   */
+  async logout(): Promise<void> {
+    return apiClient.post('/auth/logout');
+  }
+
+  /**
+   * 刷新Token
+   */
+  async refreshToken(refreshToken: string): Promise<{ token: string; refreshToken: string }> {
+    return apiClient.post('/auth/refresh', { refreshToken });
 }
 
-/** Get user info */
-export function fetchGetUserInfo() {
-  return request<Api.Auth.UserInfo>({ url: '/auth/getUserInfo' });
-}
-
-/**
- * Refresh token
- *
- * @param refreshToken Refresh token
- */
-export function fetchRefreshToken(refreshToken: string) {
-  return request<Api.Auth.LoginToken>({
-    data: {
-      refreshToken
-    },
-    method: 'post',
-    url: '/auth/refreshToken'
-  });
+  /**
+   * 获取用户信息
+   */
+  async getUserInfo(): Promise<UserApi.UserInfo> {
+    return apiClient.get('/auth/me');
 }
 
 /**
- * return custom backend error
- *
- * @param code error code
- * @param msg error message
- */
-export function fetchCustomBackendError(code: string, msg: string) {
-  return request({ params: { code, msg }, url: '/auth/error' });
+   * 获取路由菜单
+   */
+  async getRoutes(): Promise<UserApi.MenuRoute[]> {
+    return apiClient.get('/auth/routes');
+  }
 }
+
+// 导出认证服务实例
+export const authService = new AuthService();
+
+// 为了兼容现有的导入，导出独立的函数
+export const fetchRefreshToken = (refreshToken: string) => {
+  return authService.refreshToken(refreshToken);
+};
+
+export const fetchLogin = (params: UserApi.LoginRequest) => {
+  return authService.login(params);
+};
+
+export const fetchLogout = () => {
+  return authService.logout();
+};
+
+export const fetchUserInfo = () => {
+  return authService.getUserInfo();
+};
+
+export const fetchGetUserInfo = () => {
+  return authService.getUserInfo();
+};
+
+export const fetchRoutes = () => {
+  return authService.getRoutes();
+};

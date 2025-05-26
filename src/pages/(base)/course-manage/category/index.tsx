@@ -245,7 +245,7 @@ const CourseCategory = () => {
   return (
     <div className="p-16px">
       <Card
-        bordered={false}
+        variant="borderless"
         title={t('course.category')}
         extra={
           <Button

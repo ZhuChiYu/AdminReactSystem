@@ -49,15 +49,16 @@ export function useInitAuth() {
     if (loading) return;
 
     startLoading();
-    const { data: loginToken, error } = await fetchLogin(userName, password);
 
-    if (!error) {
+    try {
+      const loginToken = await fetchLogin({ userName, password });
+
       localStg.set('token', loginToken.token);
       localStg.set('refreshToken', loginToken.refreshToken);
 
-      const { data: info, error: userInfoError } = await fetchGetUserInfo();
+      try {
+        const info = await fetchGetUserInfo();
 
-      if (!userInfoError) {
         // 2. store user info
         localStg.set('userInfo', info);
 
@@ -76,7 +77,19 @@ export function useInitAuth() {
           description: t('page.login.common.welcomeBack', { userName: info.userName }),
           message: t('page.login.common.loginSuccess')
         });
+      } catch (userInfoError) {
+        console.error('获取用户信息失败:', userInfoError);
+        window.$notification?.error({
+          message: t('page.login.common.loginFail'),
+          description: '获取用户信息失败'
+        });
       }
+    } catch (loginError) {
+      console.error('登录失败:', loginError);
+      window.$notification?.error({
+        message: t('page.login.common.loginFail'),
+        description: loginError instanceof Error ? loginError.message : '登录失败'
+      });
     }
 
     endLoading();

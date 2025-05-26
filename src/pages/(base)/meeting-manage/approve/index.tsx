@@ -313,7 +313,7 @@ const Component: React.FC = () => {
           <div>
             <Card
               bodyStyle={{ padding: 0 }}
-              bordered={false}
+              variant="borderless"
               className="mb-4"
             >
               <div className="mb-3 flex items-center justify-between">

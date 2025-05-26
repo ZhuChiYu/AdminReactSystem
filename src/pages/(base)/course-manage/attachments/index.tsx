@@ -460,7 +460,7 @@ function Component() {
 
   return (
     <div className="p-16px">
-      <Card bordered={false}>
+      <Card variant="borderless">
         <div className="mb-4 flex items-center">
           <Button
             className="mr-4"

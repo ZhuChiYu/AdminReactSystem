@@ -97,12 +97,21 @@ declare namespace Api {
   namespace SystemManage {
     type CommonSearchParams = Pick<Common.PaginatingCommonParams, 'current' | 'size'>;
 
+    /** common params of paginating */
+    type CommonSearchRequest = CommonType.RecordNullable<{
+      endTime: string;
+      keywords: string;
+      startTime: string;
+    }>;
+
     /** role */
     type Role = Common.CommonRecord<{
       /** role code */
       roleCode: string;
       /** role description */
       roleDesc: string;
+      /** role home */
+      roleHome: string;
       /** role name */
       roleName: string;
     }>;
@@ -116,7 +125,10 @@ declare namespace Api {
     type RoleList = Common.PaginatingQueryRecord<Role>;
 
     /** all role */
-    type AllRole = Pick<Role, 'id' | 'roleCode' | 'roleName'>;
+    type AllRole = Pick<Role, 'roleCode' | 'roleName'>;
+
+    /** all role list */
+    type AllRoleList = Common.CommonRecord<AllRole>;
 
     /**
      * user gender
@@ -134,6 +146,10 @@ declare namespace Api {
       bankCard?: string;
       /** user ID card */
       idCard?: string;
+      /** 管理的员工ID列表 */
+      managedEmployees?: number[];
+      /** 上级管理员ID */
+      managerId?: number;
       /** user nick name */
       nickName: string;
       /** user password */
@@ -157,11 +173,54 @@ declare namespace Api {
     /** user search params */
     type UserSearchParams = CommonType.RecordNullable<
       Pick<Api.SystemManage.User, 'nickName' | 'status' | 'userEmail' | 'userGender' | 'userName' | 'userPhone'> &
-        CommonSearchParams
+        CommonSearchParams & {
+          /** 管理员ID过滤 */
+          managerId?: number;
+          /** 角色过滤 */
+          role?: string;
+        }
     >;
 
     /** user list */
     type UserList = Common.PaginatingQueryRecord<User>;
+
+    /** 员工-管理员关系 */
+    type EmployeeManagerRelation = Common.CommonRecord<{
+      /** 分配人ID */
+      assignedBy: number;
+      /** 分配人姓名 */
+      assignedByName: string;
+      /** 分配时间 */
+      assignedTime: string;
+      /** 员工ID */
+      employeeId: number;
+      /** 员工姓名 */
+      employeeName: string;
+      /** 管理员ID */
+      managerId: number;
+      /** 管理员姓名 */
+      managerName: string;
+    }>;
+
+    /** 客户分配记录 */
+    type CustomerAssignment = Common.CommonRecord<{
+      /** 分配人ID（管理员） */
+      assignedById: number;
+      /** 分配人姓名 */
+      assignedByName: string;
+      /** 分配时间 */
+      assignedTime: string;
+      /** 分配给的员工ID */
+      assignedToId: number;
+      /** 分配给的员工姓名 */
+      assignedToName: string;
+      /** 客户ID */
+      customerId: number;
+      /** 客户姓名 */
+      customerName: string;
+      /** 分配备注 */
+      remark?: string;
+    }>;
 
     /**
      * menu type

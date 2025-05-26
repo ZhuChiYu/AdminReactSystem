@@ -341,7 +341,7 @@ const ClassDetail = () => {
 
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         className="mb-4"
       >
         <Descriptions
@@ -385,7 +385,7 @@ const ClassDetail = () => {
   const renderStudentList = () => {
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         title="班级学员"
         extra={
           <Space>
@@ -409,7 +409,7 @@ const ClassDetail = () => {
   const renderCourseList = () => {
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         extra={<Button type="primary">添加课程</Button>}
         title="班级课程"
       >
@@ -428,7 +428,7 @@ const ClassDetail = () => {
   const renderAnnouncements = () => {
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         extra={<Button type="primary">发布通知</Button>}
         title="通知公告"
       >

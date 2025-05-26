@@ -1,9 +1,10 @@
 import { Suspense, lazy, useState } from 'react';
+import { DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 
 import { enableStatusRecord, userGenderRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
 import { TableHeaderOperation, useTable, useTableOperate, useTableScroll } from '@/features/table';
-import { fetchGetUserList } from '@/service/api';
+import { type EmployeeApi, employeeService } from '@/service/api';
 
 import UserSearch from './modules/UserSearch';
 
@@ -17,6 +18,7 @@ const tagUserGenderMap: Record<Api.SystemManage.UserGender, string> = {
 const UserManage = () => {
   const { t } = useTranslation();
   const [passwordVisible, setPasswordVisible] = useState<Record<number, boolean>>({});
+  const [importLoading, setImportLoading] = useState(false);
 
   const { scrollConfig, tableWrapperRef } = useTableScroll();
 
@@ -31,21 +33,111 @@ const UserManage = () => {
     }));
   };
 
+  // 下载导入模板
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await employeeService.downloadTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'employee_import_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      window.$message?.success('模板下载成功');
+    } catch (error) {
+      console.error('下载模板失败:', error);
+      window.$message?.error('下载模板失败');
+    }
+  };
+
+  // 处理文件导入
+  const handleImport = async (file: File) => {
+    setImportLoading(true);
+    try {
+      const result = await employeeService.importEmployees(file);
+
+      // 显示导入结果
+      const { total, success, failed, errorList } = result;
+
+      if (failed === 0) {
+        window.$message?.success(`导入成功！共导入 ${success} 条记录`);
+      } else {
+        const errorMsg = errorList.slice(0, 3).map(item =>
+          `第${item.row}行: ${item.error}`
+        ).join('\n');
+
+        window.$message?.warning(
+          `导入完成！成功 ${success} 条，失败 ${failed} 条。${failed > 0 ? '\n失败原因:\n' + errorMsg : ''}`
+        );
+      }
+
+      // 刷新表格数据
+      run();
+    } catch (error) {
+      console.error('导入失败:', error);
+      window.$message?.error('导入失败，请检查文件格式');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // 创建适配器函数来匹配表格组件的API格式
+  const fetchEmployeeListAdapter = async (params: any) => {
+    try {
+      const response = await employeeService.getEmployeeList({
+        current: params.current || 1,
+        size: params.size || 10,
+        userName: params.userName || undefined,
+        nickName: params.nickName || undefined,
+        department: params.department || undefined,
+        status: params.status || undefined
+      });
+
+      return {
+        data: {
+          records: response.records.map((record, index) => ({
+            ...record,
+            index: (response.current - 1) * response.size + index + 1,
+            userGender: record.gender === 'male' ? 1 : record.gender === 'female' ? 2 : null,
+            userPhone: record.phone,
+            userEmail: record.email,
+            password: '123456', // 默认密码显示
+            // 添加TableData必需的字段
+            createBy: 'system',
+            createTime: record.createdAt,
+            updateBy: 'system',
+            updateTime: record.updatedAt,
+            status: (record.status === 'active' ? '1' : record.status === 'inactive' ? '2' : null) as Api.Common.EnableStatus | null
+          })),
+          total: response.total,
+          current: response.current,
+          size: response.size
+        },
+        error: null,
+        response: {} as any
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error as any,
+        response: {} as any
+      };
+    }
+  };
+
   const { columnChecks, data, run, searchProps, setColumnChecks, tableProps } = useTable(
     {
-      apiFn: fetchGetUserList,
+      apiFn: fetchEmployeeListAdapter,
       apiParams: {
         current: 1,
         nickName: null,
         size: 10,
-        // if you want to use the searchParams in Form, you need to define the following properties, and the value is null
-        // the value can not be undefined, otherwise the property in Form will not be reactive
         status: null,
-        userEmail: null,
-        userGender: null,
         userName: null,
-        userPhone: null
-      },
+        department: null
+      } as any,
       columns: () => [
         {
           align: 'center',
@@ -66,7 +158,7 @@ const UserManage = () => {
           dataIndex: 'password',
           key: 'password',
           minWidth: 150,
-          render: (_, record) => {
+          render: (_, record: any) => {
             const password = record.password || '123456';
             return (
               <div className="flex-center gap-4px">
@@ -97,14 +189,14 @@ const UserManage = () => {
           align: 'center',
           dataIndex: 'userGender',
           key: 'userGender',
-          render: (_, record) => {
+          render: (_, record: any) => {
             if (record?.userGender === null) {
               return null;
             }
 
-            const label = t(userGenderRecord[record.userGender]);
+            const label = t(userGenderRecord[record.userGender as keyof typeof userGenderRecord]);
 
-            return <ATag color={tagUserGenderMap[record.userGender]}>{label}</ATag>;
+            return <ATag color={tagUserGenderMap[record.userGender as keyof typeof tagUserGenderMap]}>{label}</ATag>;
           },
           title: t('page.manage.user.userGender'),
           width: 100
@@ -132,13 +224,6 @@ const UserManage = () => {
         } as any,
         {
           align: 'center',
-          dataIndex: 'idCard',
-          key: 'idCard',
-          minWidth: 180,
-          title: '身份证号'
-        } as any,
-        {
-          align: 'center',
           dataIndex: 'bankCard',
           key: 'bankCard',
           minWidth: 180,
@@ -160,14 +245,46 @@ const UserManage = () => {
         } as any,
         {
           align: 'center',
+          dataIndex: 'contractYears',
+          key: 'contractYears',
+          render: (_: any, record: any) => {
+            return record.contractYears ? `${record.contractYears}年` : '-';
+          },
+          title: '合同年限',
+          width: 100
+        } as any,
+        {
+          align: 'center',
+          dataIndex: 'contractStartDate',
+          key: 'contractStartDate',
+          render: (_: any, record: any) => {
+            if (!record.contractStartDate) return '-';
+            return new Date(record.contractStartDate).toLocaleDateString('zh-CN');
+          },
+          title: '合同开始时间',
+          width: 120
+        } as any,
+        {
+          align: 'center',
+          dataIndex: 'contractEndDate',
+          key: 'contractEndDate',
+          render: (_: any, record: any) => {
+            if (!record.contractEndDate) return '-';
+            return new Date(record.contractEndDate).toLocaleDateString('zh-CN');
+          },
+          title: '合同结束时间',
+          width: 120
+        } as any,
+        {
+          align: 'center',
           dataIndex: 'status',
           key: 'status',
-          render: (_, record) => {
+          render: (_, record: any) => {
             if (record.status === null) {
               return null;
             }
-            const label = t(enableStatusRecord[record.status]);
-            return <ATag color={ATG_MAP[record.status]}>{label}</ATag>;
+            const label = t(enableStatusRecord[record.status as keyof typeof enableStatusRecord]);
+            return <ATag color={ATG_MAP[record.status as keyof typeof ATG_MAP]}>{label}</ATag>;
           },
           title: t('page.manage.user.userStatus'),
           width: 100
@@ -176,7 +293,7 @@ const UserManage = () => {
           align: 'center',
           fixed: 'right' as const,
           key: 'operate',
-          render: (_, record) => (
+          render: (_, record: any) => (
             <div className="flex-center gap-8px">
               <AButton
                 ghost
@@ -241,11 +358,11 @@ const UserManage = () => {
     handleEdit(id);
   }
   return (
-    <div className="h-full min-h-500px flex-col-stretch gap-16px overflow-hidden lt-sm:overflow-auto">
+    <div className="h-full min-h-600px flex-col-stretch gap-16px overflow-auto p-16px">
       <ACollapse
-        bordered={false}
         className="card-wrapper"
         defaultActiveKey={isMobile ? undefined : '1'}
+        ghost={true}
         items={[
           {
             children: <UserSearch {...searchProps} />,
@@ -256,28 +373,64 @@ const UserManage = () => {
       />
 
       <ACard
-        className="flex-col-stretch sm:flex-1-hidden card-wrapper"
+        className="flex-col-stretch flex-1 card-wrapper"
         ref={tableWrapperRef}
-        title={t('page.manage.user.title')}
+        title="员工管理"
         variant="borderless"
         extra={
-          <TableHeaderOperation
-            add={handleAdd}
-            columns={columnChecks}
-            disabledDelete={checkedRowKeys.length === 0}
-            loading={tableProps.loading}
-            refresh={run}
-            setColumnChecks={setColumnChecks}
-            onDelete={handleBatchDelete}
-          />
+          <div className="flex gap-8px">
+            <AButton
+              type="default"
+              icon={<DownloadOutlined />}
+              onClick={handleDownloadTemplate}
+            >
+              下载模板
+            </AButton>
+            <AUpload
+              accept=".xlsx,.xls"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                handleImport(file);
+                return false; // 阻止自动上传
+              }}
+            >
+              <AButton
+                type="primary"
+                icon={<UploadOutlined />}
+                loading={importLoading}
+              >
+                导入员工
+              </AButton>
+            </AUpload>
+            <TableHeaderOperation
+              add={handleAdd}
+              columns={columnChecks}
+              disabledDelete={checkedRowKeys.length === 0}
+              loading={tableProps.loading}
+              refresh={run}
+              setColumnChecks={setColumnChecks}
+              onDelete={handleBatchDelete}
+            />
+          </div>
         }
+        styles={{
+          body: { padding: '0', height: '100%', display: 'flex', flexDirection: 'column' }
+        }}
       >
-        <ATable
-          rowSelection={rowSelection}
-          scroll={{ x: 'max-content' }}
-          size="small"
-          {...tableProps}
-        />
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <ATable
+            rowSelection={rowSelection}
+            scroll={{ x: 'max-content' }}
+            size="small"
+            {...tableProps}
+            pagination={{
+              ...tableProps.pagination,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`
+            }}
+          />
+        </div>
         <Suspense>
           <UserOperateDrawer {...generalPopupOperation} />
         </Suspense>

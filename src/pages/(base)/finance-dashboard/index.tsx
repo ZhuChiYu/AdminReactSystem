@@ -614,7 +614,7 @@ const FinanceDashboard = () => {
         <div className="mt-4">
           <Row gutter={[16, 16]}>
             <Col span={24}>
-              <Card bordered={false}>
+              <Card variant="borderless">
                 <Table
                   columns={employeeColumns}
                   dataSource={employeeData}
@@ -639,7 +639,7 @@ const FinanceDashboard = () => {
           <Row gutter={[16, 16]}>
             <Col span={24}>
               <Card
-                bordered={false}
+                variant="borderless"
                 title={`${selectedYear}年财务数据图表`}
                 extra={
                   <DatePicker
@@ -693,7 +693,7 @@ const FinanceDashboard = () => {
           <Row gutter={[16, 16]}>
             <Col span={24}>
               <Card
-                bordered={false}
+                variant="borderless"
                 title={`${selectedYear}年${selectedMonth}月财务分析`}
                 extra={
                   <Space>
@@ -746,7 +746,7 @@ const FinanceDashboard = () => {
 
             <Col span={12}>
               <Card
-                bordered={false}
+                variant="borderless"
                 title="支出类型分布"
               >
                 <div style={{ height: '400px', position: 'relative' }}>
@@ -781,7 +781,7 @@ const FinanceDashboard = () => {
 
             <Col span={12}>
               <Card
-                bordered={false}
+                variant="borderless"
                 title="支出类型明细"
               >
                 <Table
@@ -796,7 +796,7 @@ const FinanceDashboard = () => {
 
             <Col span={24}>
               <Card
-                bordered={false}
+                variant="borderless"
                 title="月度支出趋势分析"
               >
                 <div style={{ height: '400px', position: 'relative' }}>
@@ -831,7 +831,7 @@ const FinanceDashboard = () => {
 
             <Col span={24}>
               <Card
-                bordered={false}
+                variant="borderless"
                 title="收支趋势分析"
               >
                 <div style={{ height: '400px', position: 'relative' }}>
@@ -874,7 +874,7 @@ const FinanceDashboard = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        bordered={false}
+        variant="borderless"
         className="h-full"
         title="财务看板"
       >

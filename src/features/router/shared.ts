@@ -80,6 +80,11 @@ export function filterAuthRoutesByRoles(routes: { parent: string | null; route: 
 
         const routeRoles: string[] = (routeObj.handle && routeObj.handle.roles) || [];
 
+        // 超级管理员可以访问所有路由，包括需要R_SUPER角色的路由
+        if (isSuperAdmin()) {
+          return true;
+        }
+
         // if the route's "roles" is empty, then it is allowed to access
         const isEmptyRoles = !routeRoles.length;
 

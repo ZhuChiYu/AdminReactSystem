@@ -1,44 +1,12 @@
 import { FileDoneOutlined, UserOutlined } from '@ant-design/icons';
-import {
-  Button,
-  Card,
-  Checkbox,
-  Col,
-  Divider,
-  Form,
-  Input,
-  Modal,
-  Row,
-  Select,
-  Space,
-  Table,
-  Tabs,
-  Tag,
-  Tooltip,
-  message
-} from 'antd';
+import { Button, Card, Checkbox, Col, Form, Input, Modal, Row, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { type EmployeeApi, employeeService } from '@/service/api';
 import useCustomerStore from '@/store/customerStore';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
-import { UserRole, getCurrentUserId, getCurrentUserName, isSuperAdmin } from '@/utils/auth';
-
-// 模拟获取用户列表
-const mockUsers = [
-  { id: '1', name: '张三', role: UserRole.SUPER_ADMIN },
-  { id: '2', name: '李四', role: UserRole.ADMIN },
-  { id: '3', name: '王五', role: UserRole.EMPLOYEE },
-  { id: '4', name: '赵六', role: UserRole.EMPLOYEE },
-  { id: '5', name: '钱七', role: UserRole.EMPLOYEE }
-];
-
-// 模拟获取班级列表
-const mockClasses = [
-  { capacity: 30, id: 1, name: '高级开发班', teacher: '张老师' },
-  { capacity: 25, id: 2, name: '中级开发班', teacher: '李老师' },
-  { capacity: 20, id: 3, name: '初级开发班', teacher: '王老师' }
-];
+import { UserRole, getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 
 // 权限类型中文名称映射
 const permissionTypeNames = {
@@ -55,7 +23,12 @@ const permissionTypeNames = {
 const roleNames = {
   [UserRole.SUPER_ADMIN]: '超级管理员',
   [UserRole.ADMIN]: '管理员',
-  [UserRole.EMPLOYEE]: '员工'
+  [UserRole.CONSULTANT]: '顾问',
+  [UserRole.MARKETING_MANAGER]: '市场部经理',
+  [UserRole.HR_SPECIALIST]: '人力专员',
+  [UserRole.HR_BP]: '人力BP',
+  [UserRole.SALES_MANAGER]: '销售经理',
+  [UserRole.SALES_DIRECTOR]: '销售总监'
 };
 
 // 权限管理组件
@@ -64,7 +37,6 @@ const PermissionManagement = () => {
 
   // 获取当前用户信息
   const currentUserId = getCurrentUserId();
-  const currentUserName = getCurrentUserName();
 
   // 从状态管理器获取权限相关方法
   const {
@@ -82,6 +54,10 @@ const PermissionManagement = () => {
   // 从客户状态管理器获取客户数据
   const { customers } = useCustomerStore();
 
+  // 员工列表数据
+  const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
   // 检查是否为超级管理员
   useEffect(() => {
     if (!isSuperAdmin()) {
@@ -91,7 +67,25 @@ const PermissionManagement = () => {
     }
   }, [navigate]);
 
-  // 当前选择的用户
+  // 加载员工数据
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        setLoading(true);
+        const response = await employeeService.getEmployeeList({ current: 1, size: 1000 });
+        setEmployees(response.records);
+      } catch (error) {
+        console.error('获取员工列表失败:', error);
+        message.error('获取员工列表失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
+
+  // 当前选择的员工
   const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; role: string } | null>(null);
 
   // 权限表单
@@ -108,58 +102,65 @@ const PermissionManagement = () => {
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isClassModalVisible, setIsClassModalVisible] = useState(false);
 
-  // 用户搜索关键字
+  // 员工搜索关键字
   const [userSearchKey, setUserSearchKey] = useState('');
 
-  // 过滤后的用户列表
-  const [filteredUsers, setFilteredUsers] = useState(mockUsers);
+  // 过滤后的员工列表
+  const [filteredUsers, setFilteredUsers] = useState<EmployeeApi.EmployeeListItem[]>([]);
 
-  // 用户权限列表
+  // 员工权限列表
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
 
-  // 过滤用户列表
+  // 过滤员工列表
   useEffect(() => {
     if (!userSearchKey) {
-      setFilteredUsers(mockUsers);
+      setFilteredUsers(employees);
       return;
     }
 
-    const filtered = mockUsers.filter(
-      user =>
-        user.id.toLowerCase().includes(userSearchKey.toLowerCase()) ||
-        user.name.toLowerCase().includes(userSearchKey.toLowerCase())
+    const filtered = employees.filter(
+      employee =>
+        String(employee.id).toLowerCase().includes(userSearchKey.toLowerCase()) ||
+        employee.nickName.toLowerCase().includes(userSearchKey.toLowerCase())
     );
 
     setFilteredUsers(filtered);
-  }, [userSearchKey]);
+  }, [userSearchKey, employees]);
 
-  // 当选中用户变化时，获取该用户的权限
+  // 当选中员工变化时，获取该员工的权限
   useEffect(() => {
     if (!selectedUser) {
       setUserPermissions([]);
       return;
     }
 
-    // 获取用户权限
+    // 获取员工权限
     const permissions = getUserPermissions(selectedUser.id);
 
     // 格式化权限数据用于显示
-    const formattedPermissions = permissions.map(permission => ({
-      ...permission,
-      grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-      key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-      permissionName: permissionTypeNames[permission.permissionType],
-      scope: permission.customerId
-        ? `客户: ${customers.find(c => c.id === permission.customerId)?.name || 'Unknown'}`
-        : permission.classId
-          ? `班级: ${mockClasses.find(c => c.id === permission.classId)?.name || 'Unknown'}`
-          : '全局'
-    }));
+    const formattedPermissions = permissions.map(permission => {
+      let scope = '全局';
+      if (permission.customerId) {
+        const customer = customers.find(c => c.id === permission.customerId);
+        scope = `客户: ${customer?.name || 'Unknown'}`;
+      } else if (permission.classId) {
+        const employee = employees.find(e => e.id === permission.classId);
+        scope = `班级: ${employee?.nickName || 'Unknown'}`;
+      }
+
+      return {
+        ...permission,
+        grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
+        key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
+        permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
+        scope
+      };
+    });
 
     setUserPermissions(formattedPermissions);
-  }, [selectedUser, getUserPermissions, customers]);
+  }, [selectedUser, getUserPermissions, customers, employees]);
 
-  // 处理选择用户
+  // 处理选择员工
   const handleUserSelect = (user: { id: string; name: string; role: string }) => {
     setSelectedUser(user);
   };
@@ -167,7 +168,7 @@ const PermissionManagement = () => {
   // 打开全局权限设置对话框
   const openGlobalPermissionModal = () => {
     if (!selectedUser) {
-      message.warning('请先选择用户');
+      message.warning('请先选择员工');
       return;
     }
 
@@ -189,7 +190,7 @@ const PermissionManagement = () => {
   // 打开客户权限设置对话框
   const openCustomerPermissionModal = () => {
     if (!selectedUser) {
-      message.warning('请先选择用户');
+      message.warning('请先选择员工');
       return;
     }
 
@@ -201,7 +202,7 @@ const PermissionManagement = () => {
   // 打开班级权限设置对话框
   const openClassPermissionModal = () => {
     if (!selectedUser) {
-      message.warning('请先选择用户');
+      message.warning('请先选择员工');
       return;
     }
 
@@ -216,7 +217,7 @@ const PermissionManagement = () => {
       const values = await form.validateFields();
 
       if (!selectedUser) {
-        message.error('未选择用户');
+        message.error('未选择员工');
         return;
       }
 
@@ -244,19 +245,26 @@ const PermissionManagement = () => {
       message.success('权限设置成功');
       setIsGlobalModalVisible(false);
 
-      // 刷新用户权限列表
+      // 刷新员工权限列表
       const permissions = getUserPermissions(selectedUser.id);
-      const formattedPermissions = permissions.map(permission => ({
-        ...permission,
-        grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-        key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-        permissionName: permissionTypeNames[permission.permissionType],
-        scope: permission.customerId
-          ? `客户: ${customers.find(c => c.id === permission.customerId)?.name || 'Unknown'}`
-          : permission.classId
-            ? `班级: ${mockClasses.find(c => c.id === permission.classId)?.name || 'Unknown'}`
-            : '全局'
-      }));
+      const formattedPermissions = permissions.map(permission => {
+        let scope = '全局';
+        if (permission.customerId) {
+          const customer = customers.find(c => c.id === permission.customerId);
+          scope = `客户: ${customer?.name || 'Unknown'}`;
+        } else if (permission.classId) {
+          const employee = employees.find(e => e.id === permission.classId);
+          scope = `班级: ${employee?.nickName || 'Unknown'}`;
+        }
+
+        return {
+          ...permission,
+          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
+          key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
+          permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
+          scope
+        };
+      });
 
       setUserPermissions(formattedPermissions);
     } catch (error) {
@@ -270,7 +278,7 @@ const PermissionManagement = () => {
       const values = await customerForm.validateFields();
 
       if (!selectedUser) {
-        message.error('未选择用户');
+        message.error('未选择员工');
         return;
       }
 
@@ -280,19 +288,26 @@ const PermissionManagement = () => {
       message.success('客户权限设置成功');
       setIsCustomerModalVisible(false);
 
-      // 刷新用户权限列表
+      // 刷新员工权限列表
       const permissions = getUserPermissions(selectedUser.id);
-      const formattedPermissions = permissions.map(permission => ({
-        ...permission,
-        grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-        key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-        permissionName: permissionTypeNames[permission.permissionType],
-        scope: permission.customerId
-          ? `客户: ${customers.find(c => c.id === permission.customerId)?.name || 'Unknown'}`
-          : permission.classId
-            ? `班级: ${mockClasses.find(c => c.id === permission.classId)?.name || 'Unknown'}`
-            : '全局'
-      }));
+      const formattedPermissions = permissions.map(permission => {
+        let scope = '全局';
+        if (permission.customerId) {
+          const customer = customers.find(c => c.id === permission.customerId);
+          scope = `客户: ${customer?.name || 'Unknown'}`;
+        } else if (permission.classId) {
+          const employee = employees.find(e => e.id === permission.classId);
+          scope = `班级: ${employee?.nickName || 'Unknown'}`;
+        }
+
+        return {
+          ...permission,
+          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
+          key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
+          permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
+          scope
+        };
+      });
 
       setUserPermissions(formattedPermissions);
     } catch (error) {
@@ -306,7 +321,7 @@ const PermissionManagement = () => {
       const values = await classForm.validateFields();
 
       if (!selectedUser) {
-        message.error('未选择用户');
+        message.error('未选择员工');
         return;
       }
 
@@ -316,19 +331,26 @@ const PermissionManagement = () => {
       message.success('班级权限设置成功');
       setIsClassModalVisible(false);
 
-      // 刷新用户权限列表
+      // 刷新员工权限列表
       const permissions = getUserPermissions(selectedUser.id);
-      const formattedPermissions = permissions.map(permission => ({
-        ...permission,
-        grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-        key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-        permissionName: permissionTypeNames[permission.permissionType],
-        scope: permission.customerId
-          ? `客户: ${customers.find(c => c.id === permission.customerId)?.name || 'Unknown'}`
-          : permission.classId
-            ? `班级: ${mockClasses.find(c => c.id === permission.classId)?.name || 'Unknown'}`
-            : '全局'
-      }));
+      const formattedPermissions = permissions.map(permission => {
+        let scope = '全局';
+        if (permission.customerId) {
+          const customer = customers.find(c => c.id === permission.customerId);
+          scope = `客户: ${customer?.name || 'Unknown'}`;
+        } else if (permission.classId) {
+          const employee = employees.find(e => e.id === permission.classId);
+          scope = `班级: ${employee?.nickName || 'Unknown'}`;
+        }
+
+        return {
+          ...permission,
+          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
+          key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
+          permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
+          scope
+        };
+      });
 
       setUserPermissions(formattedPermissions);
     } catch (error) {
@@ -339,7 +361,7 @@ const PermissionManagement = () => {
   // 撤销权限
   const handleRevokePermission = (record: any) => {
     if (!selectedUser) {
-      message.error('未选择用户');
+      message.error('未选择员工');
       return;
     }
 
@@ -356,24 +378,31 @@ const PermissionManagement = () => {
 
     message.success('权限已撤销');
 
-    // 刷新用户权限列表
+    // 刷新员工权限列表
     const permissions = getUserPermissions(selectedUser.id);
-    const formattedPermissions = permissions.map(permission => ({
-      ...permission,
-      grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-      key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-      permissionName: permissionTypeNames[permission.permissionType],
-      scope: permission.customerId
-        ? `客户: ${customers.find(c => c.id === permission.customerId)?.name || 'Unknown'}`
-        : permission.classId
-          ? `班级: ${mockClasses.find(c => c.id === permission.classId)?.name || 'Unknown'}`
-          : '全局'
-    }));
+    const formattedPermissions = permissions.map(permission => {
+      let scope = '全局';
+      if (permission.customerId) {
+        const customer = customers.find(c => c.id === permission.customerId);
+        scope = `客户: ${customer?.name || 'Unknown'}`;
+      } else if (permission.classId) {
+        const employee = employees.find(e => e.id === permission.classId);
+        scope = `班级: ${employee?.nickName || 'Unknown'}`;
+      }
+
+      return {
+        ...permission,
+        grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
+        key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
+        permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
+        scope
+      };
+    });
 
     setUserPermissions(formattedPermissions);
   };
 
-  // 用户表格列定义
+  // 员工表格列定义
   const userColumns = [
     {
       dataIndex: 'id',
@@ -382,28 +411,39 @@ const PermissionManagement = () => {
       width: 100
     },
     {
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'nickName',
+      key: 'nickName',
       title: '姓名',
       width: 150
     },
     {
-      dataIndex: 'role',
-      key: 'role',
-      render: (role: string) => (
-        <Tag color={role === UserRole.SUPER_ADMIN ? 'gold' : role === UserRole.ADMIN ? 'blue' : 'green'}>
-          {roleNames[role as keyof typeof roleNames]}
-        </Tag>
-      ),
+      dataIndex: 'roles',
+      key: 'roles',
+      render: (roles: Array<{code: string; name: string}>) => {
+        const roleCode = roles?.[0]?.code || '';
+        let color = 'green';
+        if (roleCode === 'super_admin') {
+          color = 'gold';
+        } else if (roleCode === 'admin') {
+          color = 'blue';
+        }
+        return <Tag color={color}>{roleNames[roleCode as keyof typeof roleNames] || roleCode || '未知角色'}</Tag>;
+      },
       title: '角色',
       width: 120
     },
     {
       key: 'action',
-      render: (_: unknown, record: any) => (
+      render: (_: unknown, record: EmployeeApi.EmployeeListItem) => (
         <Button
           type="link"
-          onClick={() => handleUserSelect(record)}
+          onClick={() =>
+            handleUserSelect({
+              id: String(record.id),
+              name: record.nickName,
+              role: record.roles?.[0]?.code || ''
+            })
+          }
         >
           选择
         </Button>
@@ -458,8 +498,8 @@ const PermissionManagement = () => {
   return (
     <div className="h-full bg-white p-4 dark:bg-[#141414]">
       <Card
-        bordered={false}
         title="权限管理"
+        variant="borderless"
       >
         <Row gutter={24}>
           <Col span={8}>
@@ -467,9 +507,9 @@ const PermissionManagement = () => {
               bordered
               title={
                 <div className="flex items-center justify-between">
-                  <span>用户列表</span>
+                  <span>员工列表</span>
                   <Input.Search
-                    placeholder="搜索用户"
+                    placeholder="搜索员工"
                     style={{ width: 200 }}
                     onChange={e => setUserSearchKey(e.target.value)}
                   />
@@ -480,7 +520,7 @@ const PermissionManagement = () => {
                 columns={userColumns}
                 dataSource={filteredUsers}
                 pagination={{ pageSize: 5 }}
-                rowClassName={record => (record.id === selectedUser?.id ? 'ant-table-row-selected' : '')}
+                rowClassName={record => (String(record.id) === selectedUser?.id ? 'ant-table-row-selected' : '')}
                 rowKey="id"
                 size="small"
               />
@@ -493,8 +533,8 @@ const PermissionManagement = () => {
                 <div className="flex items-center justify-between">
                   <span>
                     {selectedUser
-                      ? `${selectedUser.name}（${roleNames[selectedUser.role as keyof typeof roleNames]}）的权限`
-                      : '用户权限'}
+                      ? `${selectedUser.name}（${roleNames[selectedUser.role as keyof typeof roleNames] || selectedUser.role || '未知角色'}）的权限`
+                      : '员工权限'}
                   </span>
                   <Space>
                     <Button
@@ -531,7 +571,7 @@ const PermissionManagement = () => {
                 />
               ) : (
                 <div className="h-64 flex items-center justify-center">
-                  <span className="text-gray-400">请先选择一个用户</span>
+                  <span className="text-gray-400">请先选择一个员工</span>
                 </div>
               )}
             </Card>
@@ -643,12 +683,12 @@ const PermissionManagement = () => {
             rules={[{ message: '请选择班级', required: true }]}
           >
             <Select placeholder="请选择班级">
-              {mockClasses.map(classItem => (
+              {employees.map(employee => (
                 <Select.Option
-                  key={classItem.id}
-                  value={classItem.id}
+                  key={employee.id}
+                  value={employee.id}
                 >
-                  {classItem.name} - {classItem.teacher}
+                  {employee.nickName} - {employee.roles?.[0]?.code || ''}
                 </Select.Option>
               ))}
             </Select>

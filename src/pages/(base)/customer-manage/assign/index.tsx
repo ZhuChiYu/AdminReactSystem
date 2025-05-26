@@ -3,24 +3,21 @@ import { Button, Card, Form, Modal, Select, Space, Table, Tag, message } from 'a
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { employeeService, type EmployeeApi } from '@/service/api';
 import useCustomerStore, { type CustomerInfo } from '@/store/customerStore';
 import usePermissionStore from '@/store/permissionStore';
-import { UserRole, getCurrentUserId, isAdminOrSuperAdmin, isSuperAdmin } from '@/utils/auth';
-
-// 模拟用户列表 - 实际应用中应从API获取
-const mockUsers = [
-  { id: '1', name: '张三', role: UserRole.SUPER_ADMIN },
-  { id: '2', name: '李四', role: UserRole.ADMIN },
-  { id: '3', name: '王五', role: UserRole.EMPLOYEE },
-  { id: '4', name: '赵六', role: UserRole.EMPLOYEE },
-  { id: '5', name: '钱七', role: UserRole.EMPLOYEE }
-];
+import { getCurrentUserId, isAdminOrSuperAdmin, isSuperAdmin } from '@/utils/auth';
 
 // 角色名称显示映射
 const roleNames = {
-  [UserRole.SUPER_ADMIN]: '超级管理员',
-  [UserRole.ADMIN]: '管理员',
-  [UserRole.EMPLOYEE]: '员工'
+  super_admin: '超级管理员',
+  admin: '管理员',
+  consultant: '顾问',
+  marketing_manager: '市场部经理',
+  hr_specialist: '人力专员',
+  hr_bp: '人力BP',
+  sales_manager: '销售经理',
+  sales_director: '销售总监'
 };
 
 /** 客户分配组件 */
@@ -38,6 +35,10 @@ const CustomerAssignment = () => {
 
   // 未分配的客户列表
   const [unassignedCustomers, setUnassignedCustomers] = useState<CustomerInfo[]>([]);
+
+  // 员工列表
+  const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // 分配表单
   const [form] = Form.useForm();
@@ -64,6 +65,20 @@ const CustomerAssignment = () => {
     setUnassignedCustomers(unassigned);
   };
 
+  // 加载员工数据
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const response = await employeeService.getEmployeeList({ current: 1, size: 1000 });
+      setEmployees(response.records);
+    } catch (error) {
+      console.error('获取员工列表失败:', error);
+      message.error('获取员工列表失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 检查权限
   useEffect(() => {
     // 超级管理员和管理员都可以访问
@@ -73,10 +88,17 @@ const CustomerAssignment = () => {
     }
   }, [currentUserId, hasPermission, navigate]);
 
-  // 初始化时获取未分配的客户
+  // 初始化时获取数据
   useEffect(() => {
     refreshUnassignedCustomers();
+    fetchEmployees();
   }, []);
+
+  // 获取员工的角色中文名称
+  const getEmployeeRoleName = (employee: EmployeeApi.EmployeeListItem) => {
+    const roleCode = employee.roles?.[0]?.code || '';
+    return roleNames[roleCode as keyof typeof roleNames] || roleCode || '未知角色';
+  };
 
   // 打开单个客户分配弹窗
   const openAssignModal = (customer: CustomerInfo) => {
@@ -216,10 +238,10 @@ const CustomerAssignment = () => {
   const getAvailableEmployees = () => {
     if (isUserSuperAdmin) {
       // 超级管理员可以分配给任何人
-      return mockUsers.filter(user => user.role === UserRole.EMPLOYEE || user.role === UserRole.ADMIN);
+      return employees.filter(employee => employee.roles?.[0]?.code === 'consultant' || employee.roles?.[0]?.code === 'admin');
     }
     // 管理员不能分配给自己
-    return mockUsers.filter(user => user.role === UserRole.EMPLOYEE && user.id !== currentUserId);
+    return employees.filter(employee => employee.roles?.[0]?.code === 'consultant' && employee.id !== Number(currentUserId));
   };
 
   return (
@@ -270,13 +292,29 @@ const CustomerAssignment = () => {
             name="employeeId"
             rules={[{ message: '请选择员工', required: true }]}
           >
-            <Select placeholder="请选择要分配的员工">
+            <Select
+              showSearch
+              placeholder="请选择要分配的员工"
+              filterOption={(input, option) => {
+                const employee = getAvailableEmployees().find(emp => emp.id === option?.value);
+                if (!employee) return false;
+
+                const searchText = input.toLowerCase();
+                const nickName = employee.nickName?.toLowerCase() || '';
+                const userName = employee.userName?.toLowerCase() || '';
+                const roleName = getEmployeeRoleName(employee).toLowerCase();
+
+                return nickName.includes(searchText) ||
+                       userName.includes(searchText) ||
+                       roleName.includes(searchText);
+              }}
+            >
               {getAvailableEmployees().map(employee => (
                 <Select.Option
                   key={employee.id}
                   value={employee.id}
                 >
-                  {employee.name} ({roleNames[employee.role as keyof typeof roleNames]})
+                  {employee.nickName} ({getEmployeeRoleName(employee)})
                 </Select.Option>
               ))}
             </Select>
@@ -300,13 +338,29 @@ const CustomerAssignment = () => {
             name="employeeId"
             rules={[{ message: '请选择员工', required: true }]}
           >
-            <Select placeholder="请选择要分配的员工">
+            <Select
+              showSearch
+              placeholder="请选择要分配的员工"
+              filterOption={(input, option) => {
+                const employee = getAvailableEmployees().find(emp => emp.id === option?.value);
+                if (!employee) return false;
+
+                const searchText = input.toLowerCase();
+                const nickName = employee.nickName?.toLowerCase() || '';
+                const userName = employee.userName?.toLowerCase() || '';
+                const roleName = getEmployeeRoleName(employee).toLowerCase();
+
+                return nickName.includes(searchText) ||
+                       userName.includes(searchText) ||
+                       roleName.includes(searchText);
+              }}
+            >
               {getAvailableEmployees().map(employee => (
                 <Select.Option
                   key={employee.id}
                   value={employee.id}
                 >
-                  {employee.name} ({roleNames[employee.role as keyof typeof roleNames]})
+                  {employee.nickName} ({getEmployeeRoleName(employee)})
                 </Select.Option>
               ))}
             </Select>

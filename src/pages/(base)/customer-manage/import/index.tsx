@@ -354,7 +354,7 @@ const CustomerImport = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        bordered={false}
+        variant="borderless"
         className="h-full"
         title="客户导入"
       >
@@ -366,7 +366,7 @@ const CustomerImport = () => {
                 <div className="mt-4">
                   <Row gutter={[16, 16]}>
                     <Col span={24}>
-                      <Card bordered={false}>
+                      <Card variant="borderless">
                         <Row justify="center">
                           <Col span={12}>
                             <Upload.Dragger {...uploadProps}>
@@ -431,7 +431,7 @@ const CustomerImport = () => {
                   <Row gutter={[16, 16]}>
                     <Col span={12}>
                       <Card
-                        bordered={false}
+                        variant="borderless"
                         title="客户信息录入"
                       >
                         <Form
@@ -514,7 +514,7 @@ const CustomerImport = () => {
                     </Col>
                     <Col span={12}>
                       <Card
-                        bordered={false}
+                        variant="borderless"
                         extra={
                           <Button
                             disabled={manualEntryList.length === 0}

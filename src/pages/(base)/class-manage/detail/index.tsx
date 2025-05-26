@@ -1053,7 +1053,7 @@ const ClassDetail = () => {
 
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         className="mb-4"
       >
         <Descriptions
@@ -1096,7 +1096,7 @@ const ClassDetail = () => {
   const renderStudentList = () => {
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         title="班级学员"
         extra={
           <Space>
@@ -1356,7 +1356,7 @@ const ClassDetail = () => {
       isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, classInfo?.id);
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         title="班级课程"
         extra={
           canEdit && (
@@ -1824,7 +1824,7 @@ const ClassDetail = () => {
 
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         title="通知公告"
         extra={
           canEditAnnounce && (
@@ -2315,7 +2315,7 @@ const ClassDetail = () => {
 
     return (
       <Card
-        bordered={false}
+        variant="borderless"
         title="权限管理"
       >
         <Typography.Paragraph className="mb-4">在此管理员工和管理员对当前班级的特殊权限。</Typography.Paragraph>

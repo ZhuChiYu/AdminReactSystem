@@ -34,17 +34,6 @@ export const BaseChildrenRoutes = [
     children: [
       {
         handle: {
-          i18nKey: 'route.(base)_course-manage_list',
-          icon: 'mdi:book-open-variant',
-          order: 1,
-          title: 'course_list'
-        },
-        id: 'course_list',
-        lazy: () => import('@/pages/(base)/course-manage/list').then(convert),
-        path: '/course-manage/list'
-      },
-      {
-        handle: {
           i18nKey: 'route.(base)_course-manage_category',
           icon: 'mdi:folder-multiple-outline',
           order: 2,
@@ -215,9 +204,9 @@ export const BaseChildrenRoutes = [
       {
         handle: {
           i18nKey: 'route.(base)_expense-process_apply',
-          title: '报销申请',
           icon: 'mdi:file-document-plus-outline',
-          order: 1
+          order: 1,
+          title: '报销申请'
         },
         id: 'expense_apply',
         lazy: () => import('@/pages/(base)/expense-process/apply').then(convert),
@@ -225,13 +214,12 @@ export const BaseChildrenRoutes = [
       },
       {
         handle: {
+          auth: 'super_admin',
           i18nKey: 'route.(base)_expense-process_approve',
-          title: '报销审核',
           icon: 'mdi:file-check-outline',
           order: 2,
-          auth: 'super_admin',
-          hideInMenu: true,
-          roles: ['super_admin', 'R_SUPER']
+          roles: ['super_admin'],
+          title: '报销审核'
         },
         id: 'expense_approve',
         lazy: () => import('@/pages/(base)/expense-process/approve').then(convert),
@@ -240,9 +228,9 @@ export const BaseChildrenRoutes = [
     ],
     handle: {
       i18nKey: 'route.(base)_expense-process',
-      title: '报销流程',
       icon: 'mdi:file-document-edit-outline',
-      order: 7
+      order: 7,
+      title: '报销流程'
     },
     id: 'expense_process',
     path: '/expense-process'
@@ -284,11 +272,11 @@ export const BaseChildrenRoutes = [
       },
       {
         handle: {
+          auth: 'super_admin',
           i18nKey: 'route.(base)_meeting-manage_approve',
           icon: 'mdi:check-decagram-outline',
           order: 4,
-          title: '会议审核',
-          auth: 'super_admin'
+          title: '会议审核'
         },
         id: 'meeting_approve',
         lazy: () => import('@/pages/(base)/meeting-manage/approve').then(convert),

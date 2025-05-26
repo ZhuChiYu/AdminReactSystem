@@ -1,25 +1,13 @@
-import { PlusOutlined } from '@ant-design/icons';
-import {
-  Button,
-  Card,
-  Col,
-  Divider,
-  Form,
-  Input,
-  Modal,
-  Row,
-  Segmented,
-  Select,
-  Space,
-  Statistic,
-  Table,
-  Tag,
-  message
-} from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, message } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 
+import type { CustomerApi } from '@/service/api';
+import { customerService } from '@/service/api';
+
 /** 跟进状态枚举 */
-enum FollowUpStatus {
+export enum FollowUpStatus {
   ARRIVED = 'arrived',
   CONSULT = 'consult',
   EARLY_25 = 'early_25',
@@ -32,40 +20,66 @@ enum FollowUpStatus {
   WECHAT_ADDED = 'wechat_added'
 }
 
-/** 跟进状态名称 */
-const followUpStatusNames = {
-  [FollowUpStatus.WECHAT_ADDED]: '已加微信',
-  [FollowUpStatus.REJECTED]: '未通过',
-  [FollowUpStatus.EARLY_25]: '早25客户',
-  [FollowUpStatus.VIP]: '大客户',
-  [FollowUpStatus.EFFECTIVE_VISIT]: '有效回访',
-  [FollowUpStatus.CONSULT]: '咨询',
-  [FollowUpStatus.REGISTERED]: '已报名',
-  [FollowUpStatus.ARRIVED]: '已实到',
-  [FollowUpStatus.NOT_ARRIVED]: '未实到',
-  [FollowUpStatus.NEW_DEVELOP]: '新开发'
+/** 跟进状态选项 */
+const followUpStatusOptions = [
+  { bgColor: '#f5f5f5', color: 'default', label: '全部', textColor: '#666', value: 'all' },
+  { bgColor: '#e6f7ff', color: 'blue', label: '咨询', textColor: '#1890ff', value: FollowUpStatus.CONSULT },
+  { bgColor: '#f6ffed', color: 'green', label: '已加微信', textColor: '#52c41a', value: FollowUpStatus.WECHAT_ADDED },
+  { bgColor: '#fff7e6', color: 'orange', label: '已报名', textColor: '#fa8c16', value: FollowUpStatus.REGISTERED },
+  { bgColor: '#e6fffb', color: 'cyan', label: '已实到', textColor: '#13c2c2', value: FollowUpStatus.ARRIVED },
+  { bgColor: '#f9f0ff', color: 'purple', label: '新开发', textColor: '#722ed1', value: FollowUpStatus.NEW_DEVELOP },
+  { bgColor: '#fff0f6', color: 'magenta', label: '早25客户', textColor: '#eb2f96', value: FollowUpStatus.EARLY_25 },
+  { bgColor: '#fffbe6', color: 'gold', label: '有效回访', textColor: '#faad14', value: FollowUpStatus.EFFECTIVE_VISIT },
+  { bgColor: '#fff2f0', color: 'red', label: '未实到', textColor: '#ff4d4f', value: FollowUpStatus.NOT_ARRIVED },
+  { bgColor: '#fafafa', color: 'default', label: '未通过', textColor: '#8c8c8c', value: FollowUpStatus.REJECTED },
+  { bgColor: '#fff2e8', color: 'volcano', label: '大客户', textColor: '#fa541c', value: FollowUpStatus.VIP }
+];
+
+/** 获取状态标签颜色 */
+const getStatusColor = (status: string) => {
+  const option = followUpStatusOptions.find(opt => opt.value === status);
+  return option?.color || 'default';
 };
 
-/** 跟进状态颜色 */
-const followUpStatusColors = {
-  [FollowUpStatus.WECHAT_ADDED]: 'blue',
-  [FollowUpStatus.REJECTED]: 'error',
-  [FollowUpStatus.EARLY_25]: 'purple',
-  [FollowUpStatus.VIP]: 'gold',
-  [FollowUpStatus.EFFECTIVE_VISIT]: 'success',
-  [FollowUpStatus.CONSULT]: 'cyan',
-  [FollowUpStatus.REGISTERED]: 'success',
-  [FollowUpStatus.ARRIVED]: 'green',
-  [FollowUpStatus.NOT_ARRIVED]: 'orange',
-  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
+/** 获取状态标签文本 */
+const getStatusLabel = (status: string) => {
+  const option = followUpStatusOptions.find(opt => opt.value === status);
+  return option?.label || status;
 };
+
+// 添加CSS样式
+const cardStyles = `
+  .statistic-card {
+    transition: all 0.3s ease !important;
+  }
+
+  .statistic-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  }
+
+  .statistic-card.selected {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2) !important;
+  }
+`;
+
+// 注入样式
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = cardStyles;
+  if (!document.head.querySelector('style[data-card-styles]')) {
+    styleElement.setAttribute('data-card-styles', 'true');
+    document.head.appendChild(styleElement);
+  }
+}
 
 /** 客户跟进管理组件 */
 const CustomerFollow = () => {
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState<Record<string, number>>({});
-  const [followRecords, setFollowRecords] = useState<any[]>([]);
-  const [filteredRecords, setFilteredRecords] = useState<any[]>([]);
+  const [followRecords, setFollowRecords] = useState<CustomerApi.CustomerListItem[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<CustomerApi.CustomerListItem[]>([]);
   const [selectedFollowStatus, setSelectedFollowStatus] = useState<string>('all');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -77,388 +91,376 @@ const CustomerFollow = () => {
     setUserRole(prev => (prev === 'admin' ? 'user' : 'admin'));
   };
 
-  // 模拟获取跟进数据
-  const fetchFollowData = () => {
+  // 获取跟进数据
+  const fetchFollowData = async () => {
     setLoading(true);
+    try {
+      // 获取统计数据
+      const statisticsData = await customerService.getCustomerStatistics();
+      setStatistics(statisticsData);
 
-    // 模拟API请求
-    setTimeout(() => {
-      // 生成各类型的随机统计数据
-      const stats: Record<string, number> = {
-        all: 0
-      };
-
-      Object.values(FollowUpStatus).forEach(type => {
-        const count = Math.floor(Math.random() * 50) + 1;
-        stats[type] = count;
-        stats.all += count;
+      // 获取客户列表数据
+      const customerData = await customerService.getCustomerList({
+        current: 1,
+        size: 100 // 获取更多数据用于演示
       });
 
-      setStatistics(stats);
+      // 转换数据格式以匹配前端类型
+      const formattedRecords = customerData.records.map(customer => ({
+        ...customer,
+        canViewEmail: true,
+        canViewMobile: true,
+        canViewPhone: true,
+        canViewRealName: true,
+        // 兼容性映射
+        createTime: customer.createdAt,
+        customerLevel: customer.level,
+        employee: customer.assignedTo,
+        followContent: customer.remark || '暂无跟进内容',
+        updateTime: customer.updatedAt
+      }));
 
-      // 生成跟进记录数据
-      const records = [
-        {
-          company: '上海民用航空电源系统有限公司',
-          createdBy: '管理员',
-          createdTime: new Date().toLocaleString(),
-          followContent: '发计划数智化简章微信15802910233',
-          followStatus: FollowUpStatus.WECHAT_ADDED,
-          id: 1,
-          mobile: '',
-          name: '马芳',
-          phone: '029-81112543',
-          position: '财务负责培训'
-        },
-        {
-          company: '中国电力工程顾问集团中南电力设计院有限公司',
-          createdBy: '销售顾问',
-          createdTime: new Date().toLocaleString(),
-          followContent: '看看课微信18229295812',
-          followStatus: FollowUpStatus.EARLY_25,
-          id: 2,
-          mobile: '',
-          name: '万娜',
-          phone: '027-65263855',
-          position: '财务负责培训'
-        },
-        {
-          company: '太原钢铁（集团）有限公司',
-          createdBy: '咨询师',
-          createdTime: new Date().toLocaleString(),
-          followContent: '负责培训推荐微信',
-          followStatus: FollowUpStatus.WECHAT_ADDED,
-          id: 3,
-          mobile: '',
-          name: '陈建英',
-          phone: '微信',
-          position: '财务负责培训'
-        },
-        {
-          company: '中国电力工程顾问集团中南电力设计院有限公司',
-          createdBy: '班主任',
-          createdTime: new Date().toLocaleString(),
-          followContent: '数智财务发课程微信18717397529/3.4天接3.5天接2.24天接',
-          followStatus: FollowUpStatus.EFFECTIVE_VISIT,
-          id: 4,
-          mobile: '',
-          name: '刘老师',
-          phone: '027-65263854',
-          position: '财务'
-        },
-        {
-          company: '中国能源建设集团江苏省电力设计院有限公司',
-          createdBy: '管理员',
-          createdTime: new Date().toLocaleString(),
-          followContent: '数智化还有年计划发一下微信13813844478',
-          followStatus: FollowUpStatus.REGISTERED,
-          id: 5,
-          mobile: '',
-          name: '陶主任',
-          phone: '025-85081060',
-          position: '财务主任'
-        },
-        {
-          company: '中国能源建设集团天津电力设计院有限公司',
-          createdBy: '销售顾问',
-          createdTime: new Date().toLocaleString(),
-          followContent: '其他单位能学应该是有发文，看一下，课程和计划发过来微信13821110961',
-          followStatus: FollowUpStatus.REGISTERED,
-          id: 6,
-          mobile: '',
-          name: '迟主任',
-          phone: '022-58339303',
-          position: '财务主任'
-        }
-      ];
-
-      setFollowRecords(records);
-      setFilteredRecords(records);
+      setFollowRecords(formattedRecords);
+      setFilteredRecords(formattedRecords);
+    } catch (error) {
+      message.error('获取数据失败');
+      console.error('获取跟进数据失败:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  // 组件初始化时获取数据
-  useEffect(() => {
-    fetchFollowData();
-  }, []);
-
-  // 根据选择的跟进类型过滤记录
-  useEffect(() => {
-    if (selectedFollowStatus === 'all') {
+  // 筛选数据
+  const filterData = (status: string) => {
+    setSelectedFollowStatus(status);
+    if (status === 'all') {
       setFilteredRecords(followRecords);
     } else {
-      setFilteredRecords(followRecords.filter(record => record.followStatus === selectedFollowStatus));
+      const filtered = followRecords.filter(record => record.followStatus === status);
+      setFilteredRecords(filtered);
     }
-  }, [selectedFollowStatus, followRecords]);
+  };
 
-  // 打开添加跟进记录弹窗
-  const openAddModal = () => {
-    form.resetFields();
+  // 添加跟进记录
+  const handleAddFollow = () => {
     setIsModalVisible(true);
   };
 
-  // 关闭弹窗
-  const handleCancel = () => {
-    setIsModalVisible(false);
+  // 处理表单提交
+  const handleFormSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      console.log('提交跟进记录:', values);
+
+      // 这里调用API添加跟进记录
+      // await customerService.addFollowRecord(customerId, values);
+
+      message.success('添加跟进记录成功');
+      setIsModalVisible(false);
+      form.resetFields();
+      fetchFollowData(); // 重新获取数据
+    } catch (error) {
+      console.error('添加跟进记录失败:', error);
+    }
   };
 
-  // 提交添加跟进记录
-  const handleSubmit = () => {
-    form.validateFields().then(values => {
-      const { company, followContent, followStatus, mobile, name, phone, position } = values;
+  // 编辑记录
+  const handleEdit = (record: CustomerApi.CustomerListItem) => {
+    console.log('编辑记录:', record);
+    // 实现编辑功能
+  };
 
-      // 添加新记录
-      const newRecord = {
-        company,
-        createdBy: userRole === 'admin' ? '管理员' : '销售顾问',
-        createdTime: new Date().toLocaleString(),
-        followContent,
-        followStatus,
-        id: followRecords.length + 1,
-        mobile,
-        name,
-        phone,
-        position
-      };
-
-      const updatedRecords = [newRecord, ...followRecords];
-      setFollowRecords(updatedRecords);
-
-      // 更新统计数据
-      const updatedStats = { ...statistics };
-      updatedStats[followStatus] = (updatedStats[followStatus] || 0) + 1;
-      updatedStats.all += 1;
-      setStatistics(updatedStats);
-
-      message.success('添加成功');
-      setIsModalVisible(false);
+  // 删除记录
+  const handleDelete = (_id: number) => {
+    Modal.confirm({
+      content: '确定要删除这条跟进记录吗？',
+      onOk: async () => {
+        try {
+          // await customerService.deleteCustomer(id);
+          message.success('删除成功');
+          fetchFollowData();
+        } catch {
+          message.error('删除失败');
+        }
+      },
+      title: '确认删除'
     });
   };
 
-  // 统计卡片渲染
-  const renderStatistics = () => {
-    return (
-      <Card
-        bordered={false}
-        className="mb-4"
-        title="客户跟进统计"
-      >
-        <Row gutter={[16, 16]}>
-          <Col span={4}>
-            <Statistic
-              title="总客户"
-              value={statistics.all || 0}
-            />
-          </Col>
-          {Object.values(FollowUpStatus).map(type => (
-            <Col
-              key={type}
-              span={4}
-            >
-              <Statistic
-                title={<Tag color={followUpStatusColors[type]}>{followUpStatusNames[type]}</Tag>}
-                value={statistics[type] || 0}
-              />
-            </Col>
-          ))}
-        </Row>
-      </Card>
-    );
-  };
-
   // 表格列定义
-  const columns = [
+  const columns: ColumnsType<CustomerApi.CustomerListItem> = [
     {
-      dataIndex: 'id',
-      key: 'id',
-      title: '序号',
-      width: 60
+      dataIndex: 'customerName',
+      key: 'customerName',
+      render: text => <span>{text}</span>,
+      title: '客户姓名',
+      width: 100
     },
     {
       dataIndex: 'company',
       ellipsis: true,
       key: 'company',
-      title: '单位',
-      width: 220
-    },
-    {
-      dataIndex: 'name',
-      key: 'name',
-      title: '姓名',
-      width: 100
+      title: '公司',
+      width: 200
     },
     {
       dataIndex: 'position',
       key: 'position',
       title: '职位',
-      width: 140
+      width: 120
     },
     {
       dataIndex: 'phone',
       key: 'phone',
+      render: text => <span>{text || '-'}</span>,
       title: '电话',
-      width: 150
+      width: 120
     },
     {
       dataIndex: 'mobile',
       key: 'mobile',
+      render: text => <span>{text || '-'}</span>,
       title: '手机',
       width: 120
     },
     {
-      dataIndex: 'followContent',
-      ellipsis: true,
-      key: 'followContent',
-      title: '跟进内容',
-      width: 250
-    },
-    {
       dataIndex: 'followStatus',
       key: 'followStatus',
-      render: (status: FollowUpStatus) => <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>,
-      title: '状态',
+      render: (status: string) => <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>,
+      title: '跟进状态',
       width: 100
     },
-    ...(userRole === 'admin'
-      ? [
-          {
-            dataIndex: 'createdBy',
-            key: 'createdBy',
-            title: '创建人',
-            width: 100
-          }
-        ]
-      : []),
     {
-      dataIndex: 'createdTime',
-      key: 'createdTime',
+      dataIndex: 'remark',
+      ellipsis: true,
+      key: 'followContent',
+      render: (text: string) => (
+        <span title={text}>{text?.length > 30 ? `${text.slice(0, 30)}...` : text || '暂无跟进内容'}</span>
+      ),
+      title: '跟进内容'
+    },
+    {
+      dataIndex: ['assignedTo', 'name'],
+      key: 'employeeName',
+      render: text => text || '未分配',
+      title: '负责人',
+      width: 100
+    },
+    {
+      dataIndex: 'createdAt',
+      key: 'createTime',
+      render: (text: string) => {
+        if (!text) return '-';
+        const date = new Date(text);
+        return date
+          .toLocaleString('zh-CN', {
+            day: '2-digit',
+            hour: '2-digit',
+            hour12: false,
+            minute: '2-digit',
+            month: '2-digit',
+            second: '2-digit',
+            year: 'numeric'
+          })
+          .replace(/\//g, '-');
+      },
       title: '创建时间',
       width: 150
+    },
+    {
+      key: 'action',
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            icon={<EditOutlined />}
+            size="small"
+            type="link"
+            onClick={() => handleEdit(record)}
+          >
+            编辑
+          </Button>
+          {userRole === 'admin' && (
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              type="link"
+              onClick={() => handleDelete(record.id)}
+            >
+              删除
+            </Button>
+          )}
+        </Space>
+      ),
+      title: '操作',
+      width: 120
     }
   ];
 
-  /** 跟进状态Tab选项 */
-  const followUpStatusOptions = [
-    {
-      label: '全部',
-      value: 'all'
-    },
-    ...Object.values(FollowUpStatus).map(type => ({
-      label: <Tag color={followUpStatusColors[type]}>{followUpStatusNames[type]}</Tag>,
-      value: type
-    }))
-  ];
+  // 组件初始化
+  useEffect(() => {
+    fetchFollowData();
+  }, []);
 
   return (
-    <div className="h-full bg-white dark:bg-[#141414]">
-      <div className="p-4">
-        {userRole === 'admin' && renderStatistics()}
-
-        <Card
-          bordered={false}
-          className="h-full"
-          title="客户跟进记录"
-          extra={
-            <Space>
-              {/* 此按钮仅用于开发环境测试不同角色 */}
-              {import.meta.env.DEV && (
-                <Button onClick={toggleUserRole}>当前角色: {userRole === 'admin' ? '管理员' : '员工'}</Button>
-              )}
-              <Button
-                icon={<PlusOutlined />}
-                type="primary"
-                onClick={openAddModal}
-              >
-                新增跟进
-              </Button>
-            </Space>
-          }
+    <div className="customer-follow">
+      {/* 开发测试：角色切换按钮 */}
+      <div style={{ marginBottom: 16, textAlign: 'right' }}>
+        <Button
+          size="small"
+          type="dashed"
+          onClick={toggleUserRole}
         >
-          <Space
-            className="mb-4"
-            direction="vertical"
-            style={{ width: '100%' }}
-          >
-            <Segmented
-              options={followUpStatusOptions}
-              value={selectedFollowStatus}
-              onChange={value => setSelectedFollowStatus(value as string)}
-            />
-
-            <Divider style={{ margin: '12px 0' }} />
-
-            <Table
-              columns={columns}
-              dataSource={filteredRecords}
-              loading={loading}
-              rowKey="id"
-              scroll={{ x: 1300, y: 'calc(100vh - 450px)' }}
-            />
-          </Space>
-        </Card>
+          当前角色: {userRole === 'admin' ? '管理员' : '普通用户'} (点击切换)
+        </Button>
       </div>
 
+      {/* 统计卡片 */}
+      <Row
+        gutter={[16, 16]}
+        style={{ marginBottom: 16 }}
+      >
+        {followUpStatusOptions.map(option => (
+          <Col
+            key={option.value}
+            lg={6}
+            md={8}
+            sm={12}
+            xl={4}
+            xs={24}
+          >
+            <Card
+              hoverable
+              className={`statistic-card ${selectedFollowStatus === option.value ? 'selected' : ''}`}
+              style={{
+                backgroundColor: selectedFollowStatus === option.value ? option.bgColor : `${option.bgColor}80`, // 未选中时使用50%透明度
+                border:
+                  selectedFollowStatus === option.value
+                    ? `2px solid ${option.textColor}`
+                    : `1px solid ${option.textColor}40`, // 未选中时边框更淡
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onClick={() => filterData(option.value)}
+            >
+              <Statistic
+                value={statistics[option.value] || 0}
+                title={
+                  <span
+                    style={{
+                      color: selectedFollowStatus === option.value ? option.textColor : '#666',
+                      fontWeight: selectedFollowStatus === option.value ? 'bold' : 'normal'
+                    }}
+                  >
+                    {option.label}
+                  </span>
+                }
+                valueStyle={{
+                  color: option.textColor, // 数字始终使用对应颜色
+                  fontSize: selectedFollowStatus === option.value ? '28px' : '24px',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      {/* 操作栏 */}
+      <div style={{ marginBottom: 16, textAlign: 'right' }}>
+        <Space>
+          <Button
+            icon={<PlusOutlined />}
+            type="primary"
+            onClick={handleAddFollow}
+          >
+            添加跟进
+          </Button>
+        </Space>
+      </div>
+
+      {/* 跟进记录表格 */}
+      <Table
+        columns={columns}
+        dataSource={filteredRecords}
+        loading={loading}
+        rowKey="id"
+        scroll={{ x: 1200 }}
+        pagination={{
+          showQuickJumper: true,
+          showSizeChanger: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
+        }}
+      />
+
+      {/* 添加跟进记录模态框 */}
       <Modal
+        destroyOnClose
         open={isModalVisible}
         title="添加跟进记录"
-        onCancel={handleCancel}
-        onOk={handleSubmit}
+        onCancel={() => setIsModalVisible(false)}
+        onOk={handleFormSubmit}
       >
         <Form
           form={form}
-          labelCol={{ span: 6 }}
-          wrapperCol={{ span: 16 }}
+          layout="vertical"
         >
           <Form.Item
-            label="单位"
-            name="company"
-            rules={[{ message: '请输入单位名称', required: true }]}
+            label="客户姓名"
+            name="customerName"
+            rules={[{ message: '请输入客户姓名', required: true }]}
           >
-            <Input placeholder="请输入单位名称" />
+            <Input placeholder="请输入客户姓名" />
           </Form.Item>
+
           <Form.Item
-            label="姓名"
-            name="name"
-            rules={[{ message: '请输入姓名', required: true }]}
+            label="公司"
+            name="company"
+            rules={[{ message: '请输入公司名称', required: true }]}
           >
-            <Input placeholder="请输入姓名" />
+            <Input placeholder="请输入公司名称" />
           </Form.Item>
+
           <Form.Item
             label="职位"
             name="position"
           >
             <Input placeholder="请输入职位" />
           </Form.Item>
+
           <Form.Item
             label="电话"
             name="phone"
           >
-            <Input placeholder="请输入电话" />
+            <Input placeholder="请输入电话号码" />
           </Form.Item>
+
           <Form.Item
             label="手机"
             name="mobile"
           >
             <Input placeholder="请输入手机号码" />
           </Form.Item>
+
           <Form.Item
             label="跟进状态"
             name="followStatus"
             rules={[{ message: '请选择跟进状态', required: true }]}
           >
-            <Select
-              placeholder="请选择跟进状态"
-              options={Object.values(FollowUpStatus).map(type => ({
-                label: (
-                  <Space>
-                    <Tag color={followUpStatusColors[type]}>{followUpStatusNames[type]}</Tag>
-                  </Space>
-                ),
-                value: type
-              }))}
-            />
+            <Select placeholder="请选择跟进状态">
+              {followUpStatusOptions.slice(1).map(option => (
+                <Select.Option
+                  key={option.value}
+                  value={option.value}
+                >
+                  {option.label}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
+
           <Form.Item
             label="跟进内容"
             name="followContent"
@@ -466,7 +468,7 @@ const CustomerFollow = () => {
           >
             <Input.TextArea
               placeholder="请输入跟进内容"
-              rows={4}
+              rows={3}
             />
           </Form.Item>
         </Form>

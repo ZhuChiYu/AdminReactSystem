@@ -1,80 +1,51 @@
 import { Button, Card, Form, Input, Popconfirm, Select, Space, Table, Typography, message } from 'antd';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { employeeService, type EmployeeApi } from '@/service/api';
 
 const { Title } = Typography;
 const { Option } = Select;
 
-interface Employee {
-  age: number;
-  department: string;
-  entryDate: string;
-  gender: 'female' | 'male';
-  id: number;
-  name: string;
-  position: string;
-  status: 'active' | 'leave' | 'retired';
-}
-
-// 模拟数据
-const mockEmployees: Employee[] = [
-  {
-    age: 28,
-    department: '技术部',
-    entryDate: '2020-06-15',
-    gender: 'male',
-    id: 1,
-    name: '张三',
-    position: '前端开发',
-    status: 'active'
-  },
-  {
-    age: 32,
-    department: '市场部',
-    entryDate: '2018-03-22',
-    gender: 'female',
-    id: 2,
-    name: '李四',
-    position: '市场经理',
-    status: 'active'
-  },
-  {
-    age: 45,
-    department: '行政部',
-    entryDate: '2015-08-11',
-    gender: 'male',
-    id: 3,
-    name: '王五',
-    position: '行政总监',
-    status: 'active'
-  },
-  {
-    age: 26,
-    department: '人力资源',
-    entryDate: '2021-11-03',
-    gender: 'female',
-    id: 4,
-    name: '赵六',
-    position: 'HR专员',
-    status: 'active'
-  },
-  {
-    age: 35,
-    department: '技术部',
-    entryDate: '2019-05-20',
-    gender: 'male',
-    id: 5,
-    name: '钱七',
-    position: '后端开发',
-    status: 'leave'
-  }
-];
-
 const Component: React.FC = () => {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    size: 10,
+    total: 0
+  });
   const [form] = Form.useForm();
   const navigate = useNavigate();
+
+  // 获取员工列表
+  const fetchEmployees = async (params?: EmployeeApi.EmployeeQueryParams) => {
+    try {
+      setLoading(true);
+      const response = await employeeService.getEmployeeList({
+        current: pagination.current,
+        size: pagination.size,
+        ...params
+      });
+
+      setEmployees(response.records);
+      setPagination({
+        current: response.current,
+        size: response.size,
+        total: response.total
+      });
+    } catch (error) {
+      console.error('获取员工列表失败:', error);
+      message.error('获取员工列表失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 初始化加载数据
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   // 查看员工详情
   const viewEmployeeDetails = (id: number) => {
@@ -100,90 +71,155 @@ const Component: React.FC = () => {
 
   // 删除员工
   const deleteEmployee = (id: number) => {
-    setEmployees(employees.filter(emp => emp.id !== id));
+    // 这里应该调用删除API
     message.success('员工删除成功');
+    fetchEmployees(); // 重新加载数据
   };
 
   // 搜索员工
   const handleSearch = (values: any) => {
-    setLoading(true);
-    setTimeout(() => {
-      let filteredEmployees = [...mockEmployees];
-
-      if (values.name) {
-        filteredEmployees = filteredEmployees.filter(emp => emp.name.includes(values.name));
-      }
-
-      if (values.department) {
-        filteredEmployees = filteredEmployees.filter(emp => emp.department === values.department);
-      }
-
-      if (values.status) {
-        filteredEmployees = filteredEmployees.filter(emp => emp.status === values.status);
-      }
-
-      setEmployees(filteredEmployees);
-      setLoading(false);
-    }, 500);
+    fetchEmployees(values);
   };
 
   // 重置搜索
   const resetSearch = () => {
     form.resetFields();
-    setEmployees(mockEmployees);
+    fetchEmployees();
+  };
+
+  // 分页变化处理
+  const handlePaginationChange = (page: number, pageSize: number) => {
+    setPagination(prev => ({ ...prev, current: page, size: pageSize }));
+    fetchEmployees({ ...form.getFieldsValue(), current: page, size: pageSize });
+  };
+
+  // 获取状态标签
+  const getStatusTag = (status: string) => {
+    const statusMap = {
+      active: { color: 'green', text: '在职' },
+      inactive: { color: 'red', text: '离职' },
+      suspended: { color: 'orange', text: '停职' }
+    };
+    return statusMap[status as keyof typeof statusMap] || { color: 'default', text: status };
+  };
+
+  // 获取性别显示
+  const getGenderText = (gender: string) => {
+    return gender === 'male' ? '男' : gender === 'female' ? '女' : '-';
   };
 
   const columns = [
     {
       dataIndex: 'id',
       key: 'id',
-      title: '员工ID'
+      title: 'ID',
+      width: 80
     },
     {
-      dataIndex: 'name',
-      key: 'name',
-      title: '姓名'
+      dataIndex: 'userName',
+      key: 'userName',
+      title: '用户名',
+      width: 120
+    },
+    {
+      dataIndex: 'nickName',
+      key: 'nickName',
+      title: '姓名',
+      width: 120
     },
     {
       dataIndex: 'gender',
       key: 'gender',
-      render: (gender: string) => (gender === 'male' ? '男' : '女'),
-      title: '性别'
+      render: (gender: string) => getGenderText(gender),
+      title: '性别',
+      width: 80
     },
     {
-      dataIndex: 'age',
-      key: 'age',
-      title: '年龄'
-    },
-    {
-      dataIndex: 'department',
-      key: 'department',
-      title: '部门'
+      dataIndex: 'roleNames',
+      key: 'roleNames',
+      render: (roleNames: string[]) => roleNames?.join(', ') || '-',
+      title: '角色',
+      width: 150
     },
     {
       dataIndex: 'position',
       key: 'position',
-      title: '职位'
+      render: (text: string) => text || '-',
+      title: '职位',
+      width: 120
     },
     {
-      dataIndex: 'entryDate',
-      key: 'entryDate',
-      title: '入职日期'
+      dataIndex: ['department', 'name'],
+      key: 'department',
+      render: (text: string) => text || '-',
+      title: '部门',
+      width: 120
+    },
+    {
+      dataIndex: 'contractYears',
+      key: 'contractYears',
+      render: (years: number) => years ? `${years}年` : '-',
+      title: '合同年限',
+      width: 100
+    },
+    {
+      dataIndex: 'contractStartDate',
+      key: 'contractStartDate',
+      render: (date: string) => {
+        if (!date) return '-';
+        return new Date(date).toLocaleDateString('zh-CN');
+      },
+      title: '合同开始',
+      width: 120
+    },
+    {
+      dataIndex: 'contractEndDate',
+      key: 'contractEndDate',
+      render: (date: string) => {
+        if (!date) return '-';
+        return new Date(date).toLocaleDateString('zh-CN');
+      },
+      title: '合同结束',
+      width: 120
+    },
+    {
+      dataIndex: 'phone',
+      key: 'phone',
+      render: (text: string) => text || '-',
+      title: '电话',
+      width: 120
+    },
+    {
+      dataIndex: 'email',
+      key: 'email',
+      render: (text: string) => text || '-',
+      title: '邮箱',
+      width: 200
     },
     {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => {
-        if (status === 'active') return '在职';
-        if (status === 'leave') return '离职';
-        if (status === 'retired') return '退休';
-        return status;
+        const { color, text } = getStatusTag(status);
+        return <span style={{ color }}>{text}</span>;
       },
-      title: '状态'
+      title: '状态',
+      width: 100
+    },
+    {
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (text: string) => {
+        if (!text) return '-';
+        const date = new Date(text);
+        return date.toLocaleDateString('zh-CN');
+      },
+      title: '入职日期',
+      width: 120
     },
     {
       key: 'action',
-      render: (_: any, record: Employee) => (
+      render: (_: any, record: EmployeeApi.EmployeeListItem) => (
         <Space size="small">
           <Button
             type="link"
@@ -230,67 +266,44 @@ const Component: React.FC = () => {
 
   return (
     <div className="p-4">
-      <Card className="mb-4">
+      <Card>
         <Title level={4}>员工列表</Title>
 
+        {/* 搜索表单 */}
         <Form
-          className="mb-4"
           form={form}
           layout="inline"
+          style={{ marginBottom: 16 }}
           onFinish={handleSearch}
         >
-          <Form.Item name="name">
-            <Input
-              allowClear
-              placeholder="员工姓名"
-            />
+          <Form.Item name="nickName">
+            <Input placeholder="请输入员工姓名" />
           </Form.Item>
-
+          <Form.Item name="userName">
+            <Input placeholder="请输入用户名" />
+          </Form.Item>
           <Form.Item name="department">
-            <Select
-              allowClear
-              placeholder="选择部门"
-              style={{ width: 150 }}
-            >
-              <Option value="技术部">技术部</Option>
-              <Option value="市场部">市场部</Option>
-              <Option value="行政部">行政部</Option>
-              <Option value="人力资源">人力资源</Option>
-            </Select>
+            <Input placeholder="请输入部门" />
           </Form.Item>
-
           <Form.Item name="status">
-            <Select
-              allowClear
-              placeholder="员工状态"
-              style={{ width: 150 }}
-            >
+            <Select placeholder="请选择状态" style={{ width: 120 }}>
+              <Option value="">全部</Option>
               <Option value="active">在职</Option>
-              <Option value="leave">离职</Option>
-              <Option value="retired">退休</Option>
+              <Option value="inactive">离职</Option>
+              <Option value="suspended">停职</Option>
             </Select>
           </Form.Item>
-
           <Form.Item>
             <Space>
-              <Button
-                htmlType="submit"
-                type="primary"
-              >
+              <Button type="primary" htmlType="submit">
                 搜索
               </Button>
-              <Button onClick={resetSearch}>重置</Button>
+              <Button onClick={resetSearch}>
+                重置
+              </Button>
             </Space>
           </Form.Item>
         </Form>
-
-        <Button
-          className="mb-4"
-          type="primary"
-          onClick={() => message.info('新增员工功能将在此实现')}
-        >
-          新增员工
-        </Button>
 
         <Table
           columns={columns}
@@ -298,9 +311,14 @@ const Component: React.FC = () => {
           loading={loading}
           rowKey="id"
           pagination={{
+            current: pagination.current,
+            pageSize: pagination.size,
+            total: pagination.total,
             showQuickJumper: true,
             showSizeChanger: true,
-            showTotal: total => `共 ${total} 条记录`
+            showTotal: total => `共 ${total} 条记录`,
+            onChange: handlePaginationChange,
+            onShowSizeChange: handlePaginationChange
           }}
         />
       </Card>

@@ -54,6 +54,8 @@ export const pages: Record<string, () => Promise<any>> = {
 "(base)_function_toggle-auth": () => import("@/pages/(base)/function/toggle-auth/index.tsx"),
 "(base)_function_use-request": () => import("@/pages/(base)/function/use-request/index.tsx"),
 "(base)_home": () => import("@/pages/(base)/home/index.tsx"),
+"(base)_manage_customer-assign": () => import("@/pages/(base)/manage/customer-assign/index.tsx"),
+"(base)_manage_employee-manager": () => import("@/pages/(base)/manage/employee-manager/index.tsx"),
 "(base)_manage": () => import("@/pages/(base)/manage/index.tsx"),
 "(base)_manage_permission": () => import("@/pages/(base)/manage/permission/index.tsx"),
 "(base)_manage_role_[...slug]": () => import("@/pages/(base)/manage/role/[...slug].tsx"),

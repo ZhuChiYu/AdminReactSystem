@@ -23,13 +23,16 @@ export function filterRoutesToMenus(routes: RouteObject[]) {
 
     // 检查roles权限，如果设置了roles但当前用户不具备所需角色，则跳过该路由
     if (route.handle?.roles && route.handle.roles.length > 0) {
-      // 获取当前用户角色
-      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{"roles":[]}');
-      const userRoles = userInfo.roles || [];
+      // 超级管理员可以访问所有菜单
+      if (!isSuperAdmin()) {
+        // 获取当前用户角色
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{"roles":[]}');
+        const userRoles = userInfo.roles || [];
 
-      // 如果当前用户没有这个路由所需的任何一个角色，跳过该路由
-      if (!route.handle.roles.some((role: string) => userRoles.includes(role))) {
-        continue;
+        // 如果当前用户没有这个路由所需的任何一个角色，跳过该路由
+        if (!route.handle.roles.some((role: string) => userRoles.includes(role))) {
+          continue;
+        }
       }
     }
 

@@ -1,0 +1,444 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id          Int      @id @default(autoincrement())
+  userName    String   @unique @map("user_name") @db.VarChar(50)
+  nickName    String   @map("nick_name") @db.VarChar(50)
+  email       String?  @unique @db.VarChar(100)
+  phone       String?  @unique @db.VarChar(20)
+  password    String   @db.VarChar(255)
+  avatar      String?  @db.VarChar(500)
+  gender      Int      @default(0) // 0-未知, 1-男, 2-女
+  status      Int      @default(1) // 0-禁用, 1-启用, 2-锁定
+  lastLoginIp String?  @map("last_login_ip") @db.VarChar(50)
+  lastLoginTime DateTime? @map("last_login_time")
+  departmentId Int?    @map("department_id")
+  position    String?  @db.VarChar(100)
+  // 个人信息字段
+  address     String?  @db.VarChar(500) // 家庭住址
+  bankCard    String?  @map("bank_card") @db.VarChar(50) // 银行卡号
+  idCard      String?  @map("id_card") @db.VarChar(18) // 身份证号
+  wechat      String?  @db.VarChar(100) // 工作微信号
+  tim         String?  @db.VarChar(100) // TIM号
+  // 合同相关字段
+  contractYears Int?    @map("contract_years") // 合同年限
+  contractStartDate DateTime? @map("contract_start_date") // 合同开始时间
+  contractEndDate DateTime? @map("contract_end_date") // 合同结束时间
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  department  Department? @relation(fields: [departmentId], references: [id])
+  userRoles   UserRole[]
+  createdCustomers Customer[] @relation("CreatedByUser")
+  assignedCustomers Customer[] @relation("AssignedToUser")
+  followRecords FollowRecord[]
+  organizedMeetings Meeting[] @relation("MeetingOrganizer")
+  meetingParticipants MeetingParticipant[]
+  financialRecords FinancialRecord[]
+  operationLogs OperationLog[]
+
+  @@map("users")
+}
+
+// 部门表
+model Department {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  code      String   @unique @db.VarChar(50)
+  parentId  Int?     @map("parent_id")
+  level     Int      @default(1)
+  sort      Int      @default(0)
+  status    Int      @default(1)
+  remark    String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  parent    Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children  Department[] @relation("DepartmentHierarchy")
+  users     User[]
+
+  @@map("departments")
+}
+
+// 角色表
+model Role {
+  id        Int      @id @default(autoincrement())
+  roleName  String   @map("role_name") @db.VarChar(100)
+  roleCode  String   @unique @map("role_code") @db.VarChar(50)
+  status    Int      @default(1)
+  sort      Int      @default(0)
+  remark    String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  userRoles UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+// 用户角色关联表
+model UserRole {
+  id     Int @id @default(autoincrement())
+  userId Int @map("user_id")
+  roleId Int @map("role_id")
+
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// 权限表
+model Permission {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(100)
+  code       String   @unique @db.VarChar(100)
+  type       String   @db.VarChar(20) // menu, button, api
+  parentId   Int?     @map("parent_id")
+  path       String?  @db.VarChar(200)
+  component  String?  @db.VarChar(200)
+  icon       String?  @db.VarChar(100)
+  sort       Int      @default(0)
+  status     Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  parent     Permission?  @relation("PermissionHierarchy", fields: [parentId], references: [id])
+  children   Permission[] @relation("PermissionHierarchy")
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+// 角色权限关联表
+model RolePermission {
+  id           Int @id @default(autoincrement())
+  roleId       Int @map("role_id")
+  permissionId Int @map("permission_id")
+
+  // 关联关系
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// 客户表
+model Customer {
+  id              Int      @id @default(autoincrement())
+  customerName    String   @map("customer_name") @db.VarChar(100)
+  company         String   @db.VarChar(200)
+  position        String?  @db.VarChar(100)
+  phone           String?  @db.VarChar(20)
+  mobile          String?  @db.VarChar(20)
+  email           String?  @db.VarChar(100)
+  wechat          String?  @db.VarChar(100)
+  industry        String?  @db.VarChar(100)
+  source          String?  @db.VarChar(100)
+  level           Int      @default(1) // 1-普通, 2-重要, 3-VIP
+  followStatus    String   @map("follow_status") @db.VarChar(50)
+  nextFollowTime  DateTime? @map("next_follow_time")
+  assignedToId    Int?     @map("assigned_to_id")
+  assignedTime    DateTime? @map("assigned_time")
+  createdById     Int      @map("created_by_id")
+  remark          String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  assignedTo    User?          @relation("AssignedToUser", fields: [assignedToId], references: [id])
+  createdBy     User           @relation("CreatedByUser", fields: [createdById], references: [id])
+  followRecords FollowRecord[]
+
+  @@map("customers")
+}
+
+// 客户跟进记录表
+model FollowRecord {
+  id             Int      @id @default(autoincrement())
+  customerId     Int      @map("customer_id")
+  followType     String   @map("follow_type") @db.VarChar(50)
+  followContent  String   @map("follow_content") @db.Text
+  followResult   String?  @map("follow_result") @db.Text
+  nextFollowTime DateTime? @map("next_follow_time")
+  followUserId   Int      @map("follow_user_id")
+  attachments    Json?    // 附件信息 JSON 格式
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // 关联关系
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  followUser User     @relation(fields: [followUserId], references: [id])
+
+  @@map("follow_records")
+}
+
+// 课程分类表
+model CourseCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  code        String   @unique @db.VarChar(50)
+  description String?  @db.Text
+  sort        Int      @default(0)
+  status      Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  courses Course[]
+
+  @@map("course_categories")
+}
+
+// 课程表
+model Course {
+  id              Int      @id @default(autoincrement())
+  courseName      String   @map("course_name") @db.VarChar(200)
+  courseCode      String   @unique @map("course_code") @db.VarChar(50)
+  categoryId      Int      @map("category_id")
+  instructor      String   @db.VarChar(100)
+  description     String?  @db.Text
+  objectives      Json?    // 学习目标 JSON 数组
+  outline         Json?    // 课程大纲 JSON 数组
+  duration        Int      // 课程时长（天）
+  price           Decimal  @db.Decimal(10, 2)
+  originalPrice   Decimal  @map("original_price") @db.Decimal(10, 2)
+  maxStudents     Int      @map("max_students")
+  currentStudents Int      @default(0) @map("current_students")
+  startDate       DateTime @map("start_date")
+  endDate         DateTime @map("end_date")
+  location        String   @db.VarChar(200)
+  tags            Json?    // 标签 JSON 数组
+  status          Int      @default(0) // 0-草稿, 1-已发布, 2-已下架
+  rating          Decimal? @default(0) @db.Decimal(3, 2)
+  reviewCount     Int      @default(0) @map("review_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  category    CourseCategory @relation(fields: [categoryId], references: [id])
+  enrollments CourseEnrollment[]
+  reviews     CourseReview[]
+
+  @@map("courses")
+}
+
+// 课程报名表
+model CourseEnrollment {
+  id           Int      @id @default(autoincrement())
+  courseId     Int      @map("course_id")
+  studentName  String   @map("student_name") @db.VarChar(100)
+  studentPhone String   @map("student_phone") @db.VarChar(20)
+  studentEmail String?  @map("student_email") @db.VarChar(100)
+  status       Int      @default(1) // 1-已报名, 2-已完成, 3-已取消
+  paymentStatus Int     @default(0) @map("payment_status") // 0-未支付, 1-已支付, 2-已退款
+  enrollTime   DateTime @default(now()) @map("enroll_time")
+  remark       String?  @db.Text
+
+  // 关联关系
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("course_enrollments")
+}
+
+// 课程评价表
+model CourseReview {
+  id         Int      @id @default(autoincrement())
+  courseId   Int      @map("course_id")
+  studentName String  @map("student_name") @db.VarChar(100)
+  rating     Int      // 1-5星评分
+  comment    String?  @db.Text
+  reviewTime DateTime @default(now()) @map("review_time")
+
+  // 关联关系
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("course_reviews")
+}
+
+// 会议室表
+model MeetingRoom {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  capacity  Int
+  location  String   @db.VarChar(200)
+  equipment Json?    // 设备信息 JSON 数组
+  status    Int      @default(1) // 1-可用, 2-占用, 3-维护
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  meetings Meeting[]
+
+  @@map("meeting_rooms")
+}
+
+// 会议表
+model Meeting {
+  id             Int      @id @default(autoincrement())
+  title          String   @db.VarChar(200)
+  description    String?  @db.Text
+  startTime      DateTime @map("start_time")
+  endTime        DateTime @map("end_time")
+  roomId         Int?     @map("room_id")
+  location       String?  @db.VarChar(200)
+  meetingType    String   @map("meeting_type") @db.VarChar(50)
+  status         Int      @default(1) // 1-已安排, 2-进行中, 3-已完成, 4-已取消
+  organizerId    Int      @map("organizer_id")
+  agenda         Json?    // 议程 JSON 数组
+  attachments    Json?    // 附件 JSON 数组
+  isRecurring    Boolean  @default(false) @map("is_recurring")
+  recurringRule  String?  @map("recurring_rule") @db.VarChar(100)
+  reminderTime   Int      @default(15) @map("reminder_time") // 提醒时间（分钟）
+  approvalStatus Int      @default(1) @map("approval_status") // 1-待审批, 2-已通过, 3-已拒绝
+  approverId     Int?     @map("approver_id")
+  approvalTime   DateTime? @map("approval_time")
+  meetingNotes   String?  @map("meeting_notes") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  room        MeetingRoom? @relation(fields: [roomId], references: [id])
+  organizer   User         @relation("MeetingOrganizer", fields: [organizerId], references: [id])
+  participants MeetingParticipant[]
+
+  @@map("meetings")
+}
+
+// 会议参与者表
+model MeetingParticipant {
+  id        Int      @id @default(autoincrement())
+  meetingId Int      @map("meeting_id")
+  userId    Int      @map("user_id")
+  role      String   @db.VarChar(20) // organizer, participant
+  status    Int      @default(1) // 1-待确认, 2-已接受, 3-已拒绝, 4-待定
+  response  String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 关联关系
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([meetingId, userId])
+  @@map("meeting_participants")
+}
+
+// 财务记录表
+model FinancialRecord {
+  id          Int      @id @default(autoincrement())
+  type        Int      // 1-收入, 2-支出
+  category    String   @db.VarChar(100)
+  amount      Decimal  @db.Decimal(12, 2)
+  description String   @db.Text
+  relatedId   Int?     @map("related_id") // 关联业务ID（如课程ID、客户ID等）
+  relatedType String?  @map("related_type") @db.VarChar(50) // 关联类型
+  recordDate  DateTime @map("record_date")
+  createdById Int      @map("created_by_id")
+  status      Int      @default(1) // 1-正常, 2-作废
+  attachments Json?    // 附件 JSON 数组
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@map("financial_records")
+}
+
+// 系统字典表
+model SystemDict {
+  id        Int      @id @default(autoincrement())
+  dictType  String   @map("dict_type") @db.VarChar(100)
+  dictLabel String   @map("dict_label") @db.VarChar(100)
+  dictValue String   @map("dict_value") @db.VarChar(100)
+  sort      Int      @default(0)
+  status    Int      @default(1)
+  remark    String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([dictType, dictValue])
+  @@map("system_dict")
+}
+
+// 操作日志表
+model OperationLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  userName    String?  @map("user_name") @db.VarChar(50)
+  operation   String   @db.VarChar(200)
+  method      String   @db.VarChar(10)
+  params      Json?    // 请求参数
+  result      Json?    // 返回结果
+  ip          String   @db.VarChar(50)
+  userAgent   String?  @map("user_agent") @db.Text
+  executionTime Int    @map("execution_time") // 执行时间（毫秒）
+  status      Int      // 1-成功, 0-失败
+  errorMsg    String?  @map("error_msg") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // 关联关系
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("operation_logs")
+}
+
+// 班级表
+model Class {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(200)
+  categoryId  Int      @map("category_id")
+  categoryName String  @map("category_name") @db.VarChar(100)
+  teacher     String   @db.VarChar(100)
+  description String?  @db.Text
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  status      Int      @default(0) // 0-未开始, 1-进行中, 2-已结束
+  studentCount Int     @default(0) @map("student_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  students    ClassStudent[]
+
+  @@map("classes")
+}
+
+// 班级学员表
+model ClassStudent {
+  id             Int      @id @default(autoincrement())
+  classId        Int      @map("class_id")
+  name           String   @db.VarChar(100)
+  company        String   @db.VarChar(200)
+  position       String?  @db.VarChar(100)
+  phone          String?  @db.VarChar(20)
+  email          String?  @db.VarChar(100)
+  joinDate       DateTime @map("join_date")
+  attendanceRate Int      @default(100) @map("attendance_rate") // 出勤率
+  status         Int      @default(1) // 1-正常, 2-请假, 3-退学
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@map("class_students")
+}

@@ -435,7 +435,7 @@ const CourseList = () => {
   return (
     <div className="p-16px">
       <Card
-        bordered={false}
+        variant="borderless"
         title={t('course.list')}
       >
         <div className="mb-16px flex flex-wrap gap-16px">

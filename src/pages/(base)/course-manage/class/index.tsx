@@ -337,7 +337,7 @@ const ClassList = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        bordered={false}
+        variant="borderless"
         className="h-full"
         title="班级列表"
       >

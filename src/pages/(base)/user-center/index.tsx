@@ -100,14 +100,45 @@ const UserCenter = () => {
       </Form.Item>
       <Form.Item label="用户角色">
         <Space>
-          {userInfo.roles.map(role => (
-            <Tag
-              color={role === UserRole.ADMIN ? 'gold' : 'blue'}
+          {userInfo.roles.map(role => {
+            let color = 'blue';
+            let label = '员工';
+
+            if (role === UserRole.SUPER_ADMIN) {
+              color = 'red';
+              label = '超级管理员';
+            } else if (role === UserRole.ADMIN) {
+              color = 'gold';
+              label = '管理员';
+            } else if (role === UserRole.SALES_DIRECTOR) {
+              color = 'purple';
+              label = '销售总监';
+            } else if (role === UserRole.SALES_MANAGER) {
+              color = 'orange';
+              label = '销售经理';
+            } else if (role === UserRole.MARKETING_MANAGER) {
+              color = 'cyan';
+              label = '市场部经理';
+            } else if (role === UserRole.HR_BP) {
+              color = 'green';
+              label = '人力BP';
+            } else if (role === UserRole.HR_SPECIALIST) {
+              color = 'blue';
+              label = '人力专员';
+            } else if (role === UserRole.CONSULTANT) {
+              color = 'geekblue';
+              label = '顾问';
+            }
+
+            return (
+              <Tag
+                color={color}
               key={role}
             >
-              {role === UserRole.ADMIN ? '管理员' : '员工'}
+                {label}
             </Tag>
-          ))}
+            );
+          })}
         </Space>
       </Form.Item>
       <Form.Item wrapperCol={{ offset: 5, span: 16 }}>

@@ -389,7 +389,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   i18nKey: 'route.(base)_function_super-page',
                   icon: 'ic:round-supervisor-account',
                   order: 5,
-                  roles: ['R_SUPER'],
+                  roles: ['super_admin'],
                   title: 'function_super-page'
                 }
               },
@@ -438,10 +438,32 @@ export const generatedRoutes: ElegantConstRoute[] = [
               i18nKey: 'route.(base)_manage',
               icon: 'carbon:cloud-service-management',
               order: 8,
-              roles: ['R_SUPER'],
+              roles: ['super_admin'],
               title: 'manage'
             },
             children: [
+              {
+                matchedFiles: [null, '/src/pages/(base)/manage/customer-assign/index.tsx', null, null],
+                name: '(base)_manage_customer-assign',
+                path: '/manage/customer-assign',
+                handle: {
+                  i18nKey: 'route.(base)_manage_customer-assign',
+                  title: '(base)_manage_customer-assign',
+                  icon: 'mdi:account-arrow-right',
+                  order: 1
+                }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/manage/employee-manager/index.tsx', null, null],
+                name: '(base)_manage_employee-manager',
+                path: '/manage/employee-manager',
+                handle: {
+                  i18nKey: 'route.(base)_manage_employee-manager',
+                  title: '(base)_manage_employee-manager',
+                  icon: 'mdi:account-group',
+                  order: 3
+                }
+              },
               {
                 matchedFiles: [null, '/src/pages/(base)/manage/permission/index.tsx', null, null],
                 name: '(base)_manage_permission',
@@ -450,7 +472,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   i18nKey: 'route.(base)_manage_permission',
                   icon: 'carbon:user-admin',
                   order: 1,
-                  roles: ['R_SUPER'],
+                  roles: ['super_admin'],
                   title: '权限管理'
                 }
               },
@@ -462,7 +484,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   i18nKey: 'route.(base)_manage_role',
                   icon: 'carbon:user-role',
                   order: 2,
-                  roles: ['R_SUPER'],
+                  roles: ['super_admin'],
                   title: 'manage_role'
                 },
                 children: [
@@ -487,7 +509,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   icon: 'ic:round-manage-accounts',
                   keepAlive: true,
                   order: 1,
-                  roles: ['R_SUPER'],
+                  roles: ['super_admin'],
                   title: 'manage_user'
                 },
                 children: [

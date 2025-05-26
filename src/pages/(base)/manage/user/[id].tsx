@@ -115,7 +115,7 @@ const UserDetailPage = () => {
 
   return (
     <ACard
-      bordered={false}
+      variant="borderless"
       className="h-full card-wrapper"
       extra={<AButton onClick={() => navigate(-1)}>返回</AButton>}
       title="员工详情信息"

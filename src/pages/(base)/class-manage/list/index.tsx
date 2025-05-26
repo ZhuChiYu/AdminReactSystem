@@ -1,10 +1,11 @@
-import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
+import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
+import { classService, type ClassApi } from '@/service/api';
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -25,9 +26,14 @@ enum ClassCategory {
 const ClassList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [classList, setClassList] = useState<any[]>([]);
-  const [filteredList, setFilteredList] = useState<any[]>([]);
+  const [classList, setClassList] = useState<ClassApi.ClassListItem[]>([]);
+  const [filteredList, setFilteredList] = useState<ClassApi.ClassListItem[]>([]);
   const [courseList, setCourseList] = useState<any[]>([]);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    size: 10,
+    total: 0
+  });
 
   // 筛选条件
   const [searchName, setSearchName] = useState('');
@@ -71,119 +77,62 @@ const ClassList = () => {
     return price * studentCount;
   };
 
-  // 模拟数据加载
-  useEffect(() => {
-    setLoading(true);
+  // 加载班级列表数据
+  const loadClassList = async (params: ClassApi.ClassQueryParams = {}) => {
+    try {
+      setLoading(true);
+      const response = await classService.getClassList({
+        current: pagination.current,
+        size: pagination.size,
+        ...params
+      });
 
-    // 检查是否有缓存的班级列表数据
-    const storedClasses = localStorage.getItem('classList');
-    console.log('从 localStorage 获取的班级列表数据：', storedClasses);
-
-    if (storedClasses) {
-      try {
-        const classes = JSON.parse(storedClasses);
-        console.log('解析后的班级列表数据：', classes);
-        setClassList(classes);
-        setFilteredList(classes);
-        setLoading(false);
-        return;
-      } catch (error) {
-        console.error('解析班级列表数据失败', error);
-      }
-    }
-
-    // 如果没有缓存数据，则加载模拟数据
-    // 模拟API请求
-    setTimeout(() => {
-      const mockData = [
-        {
-          categoryId: ClassCategory.TECHNICAL,
-          categoryName: '技术培训',
-          createdAt: '2024-02-15 14:30:00',
-          description: '2024年春季常规课程',
-          endDate: '2024-06-30',
-          id: 1,
-          name: '2024春季班',
-          startDate: '2024-03-01',
-          status: ClassStatus.IN_PROGRESS,
-          studentCount: 30,
-          teacher: '张老师'
-        },
-        {
-          categoryId: ClassCategory.MANAGEMENT,
-          categoryName: '管理课程',
-          createdAt: '2024-03-15 10:20:00',
-          description: '2024年夏季管理课程',
-          endDate: '2024-08-31',
-          id: 2,
-          name: '2024夏季班',
-          startDate: '2024-07-01',
-          status: ClassStatus.NOT_STARTED,
-          studentCount: 25,
-          teacher: '李老师'
-        },
-        {
-          categoryId: ClassCategory.TRAINING,
-          categoryName: '营销课程',
-          createdAt: '2023-08-10 09:15:00',
-          description: '2023年秋季营销培训',
-          endDate: '2023-12-31',
-          id: 3,
-          name: '2023秋季班',
-          startDate: '2023-09-01',
-          status: ClassStatus.COMPLETED,
-          studentCount: 28,
-          teacher: '王老师'
-        }
-      ];
-      console.log('加载的模拟数据：', mockData);
-      setClassList(mockData);
-      setFilteredList(mockData);
-
-      // 保存到localStorage
-      localStorage.setItem('classList', JSON.stringify(mockData));
-      console.log('成功保存数据到 localStorage');
-
+      setClassList(response.records);
+      setFilteredList(response.records);
+      setPagination({
+        current: response.current,
+        size: response.size,
+        total: response.total
+      });
+    } catch (error) {
+      console.error('获取班级列表失败:', error);
+      message.error('获取班级列表失败');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  };
+
+  // 初始加载数据
+  useEffect(() => {
+    loadClassList();
   }, []);
 
   // 应用筛选
   const applyFilters = () => {
-    let result = [...classList];
+    const params: ClassApi.ClassQueryParams = {
+      current: 1,
+      size: pagination.size
+    };
 
-    // 按班级名称筛选
     if (searchName) {
-      result = result.filter(classItem => classItem.name.toLowerCase().includes(searchName.toLowerCase()));
+      params.name = searchName;
     }
 
-    // 按分类筛选
     if (selectedCategory !== '') {
-      result = result.filter(classItem => classItem.categoryId === selectedCategory);
+      params.categoryId = Number(selectedCategory);
     }
 
-    // 按状态筛选
     if (selectedStatus !== '') {
-      result = result.filter(classItem => classItem.status === selectedStatus);
+      params.status = Number(selectedStatus);
     }
 
-    // 按日期范围筛选
-    if (dateRange && dateRange[0] && dateRange[1]) {
-      const startDate = dateRange[0].format('YYYY-MM-DD');
-      const endDate = dateRange[1].format('YYYY-MM-DD');
-
-      result = result.filter(classItem => {
-        return classItem.startDate >= startDate && classItem.startDate <= endDate;
-      });
-    }
-
-    setFilteredList(result);
+    loadClassList(params);
   };
 
   // 监听筛选条件变化时应用筛选
   useEffect(() => {
     applyFilters();
-  }, [searchName, selectedCategory, selectedStatus, dateRange, classList]);
+  }, [searchName, selectedCategory, selectedStatus]);
 
   // 重置筛选
   const resetFilters = () => {
@@ -191,7 +140,21 @@ const ClassList = () => {
     setSelectedCategory('');
     setSelectedStatus('');
     setDateRange(null);
-    setFilteredList(classList);
+    loadClassList({ current: 1, size: pagination.size });
+  };
+
+  // 处理分页变化
+  const handleTableChange = (page: number, pageSize: number) => {
+    const params: ClassApi.ClassQueryParams = {
+      current: page,
+      size: pageSize
+    };
+
+    if (searchName) params.name = searchName;
+    if (selectedCategory !== '') params.categoryId = Number(selectedCategory);
+    if (selectedStatus !== '') params.status = Number(selectedStatus);
+
+    loadClassList(params);
   };
 
   // 获取状态标签颜色
@@ -232,46 +195,48 @@ const ClassList = () => {
   };
 
   // 编辑班级
-  const handleEdit = (classId: number) => {
-    // 查找要编辑的班级
-    const classToEdit = classList.find(c => c.id === classId);
-    if (!classToEdit) return;
+  const handleEdit = async (classId: number) => {
+    try {
+      // 从API获取班级详情
+      const classDetail = await classService.getClassDetail(classId);
 
-    // 打开编辑模态框并填充表单
-    form.setFieldsValue({
-      categoryId: classToEdit.categoryId,
-      description: classToEdit.description,
-      endDate: dayjs(classToEdit.endDate),
-      name: classToEdit.name,
-      startDate: dayjs(classToEdit.startDate),
-      studentCount: classToEdit.studentCount
-    });
+      // 打开编辑模态框并填充表单
+      form.setFieldsValue({
+        name: classDetail.name,
+        categoryId: classDetail.categoryId,
+        teacher: classDetail.teacher,
+        description: classDetail.description,
+        startDate: dayjs(classDetail.startDate),
+        endDate: dayjs(classDetail.endDate)
+      });
 
-    // 设置编辑模式并保存当前编辑的班级ID
-    setEditingClassId(classId);
-    setIsModalOpen(true);
-    console.log('编辑班级:', classId);
+      // 设置编辑模式并保存当前编辑的班级ID
+      setEditingClassId(classId);
+      setIsModalOpen(true);
+      console.log('编辑班级:', classId);
+    } catch (error) {
+      console.error('获取班级详情失败:', error);
+      message.error('获取班级详情失败');
+    }
   };
 
   // 删除班级
-  const handleDelete = (classId: number) => {
+  const handleDelete = async (classId: number) => {
     Modal.confirm({
       content: '确定要删除该班级吗？此操作不可恢复。',
-      onOk: () => {
-        // 过滤掉要删除的班级
-        const updatedClassList = classList.filter(c => c.id !== classId);
-
-        // 更新状态和本地存储
-        setClassList(updatedClassList);
-        setFilteredList(updatedClassList);
-        localStorage.setItem('classList', JSON.stringify(updatedClassList));
-
-        // 显示成功消息
-        Modal.success({
-          content: '班级已成功删除',
-          title: '删除成功'
-        });
-        console.log('删除班级:', classId);
+      onOk: async () => {
+        try {
+          await classService.deleteClass(classId);
+          message.success('班级删除成功');
+          // 重新加载数据
+          loadClassList({
+            current: pagination.current,
+            size: pagination.size
+          });
+        } catch (error) {
+          console.error('删除班级失败:', error);
+          message.error('删除班级失败');
+        }
       },
       title: '确认删除'
     });
@@ -283,82 +248,41 @@ const ClassList = () => {
       const values = await form.validateFields();
       setSubmitting(true);
 
-      setTimeout(() => {
-        // 如果是编辑模式
-        if (editingClassId !== null) {
-          // 查找要编辑的班级
-          const updatedClassList = classList.map(classItem => {
-            if (classItem.id === editingClassId) {
-              // 根据表单数据更新班级信息
-              return {
-                ...classItem,
-                categoryId: values.categoryId,
-                categoryName: categoryOptions.find(opt => opt.value === values.categoryId)?.label || '',
-                description: values.description,
-                endDate: values.endDate.format('YYYY-MM-DD'),
-                name: values.name,
-                startDate: values.startDate.format('YYYY-MM-DD'),
-                status: dayjs(values.startDate).isAfter(dayjs())
-                  ? ClassStatus.NOT_STARTED
-                  : dayjs(values.endDate).isBefore(dayjs())
-                    ? ClassStatus.COMPLETED
-                    : ClassStatus.IN_PROGRESS,
-                studentCount: values.studentCount
-              };
-            }
-            return classItem;
-          });
+      const classData: ClassApi.CreateClassParams = {
+        name: values.name,
+        categoryId: values.categoryId,
+        categoryName: categoryOptions.find(opt => opt.value === values.categoryId)?.label || '',
+        teacher: values.teacher || '专业讲师',
+        description: values.description,
+        startDate: values.startDate.format('YYYY-MM-DD'),
+        endDate: values.endDate.format('YYYY-MM-DD')
+      };
 
-          // 更新状态和本地存储
-          setClassList(updatedClassList);
-          setFilteredList(updatedClassList);
-          localStorage.setItem('classList', JSON.stringify(updatedClassList));
+      if (editingClassId !== null) {
+        // 编辑模式
+        await classService.updateClass(editingClassId, classData);
+        message.success('班级更新成功');
+      } else {
+        // 添加模式
+        await classService.createClass(classData);
+        message.success('班级创建成功');
+      }
 
-          // 显示成功消息
-          Modal.success({
-            content: '班级信息已成功更新',
-            title: '更新成功'
-          });
-        } else {
-          // 添加新班级
-          const newClass = {
-            categoryId: values.categoryId,
-            categoryName: categoryOptions.find(opt => opt.value === values.categoryId)?.label || '',
-            createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-            description: values.description || '',
-            endDate: values.endDate.format('YYYY-MM-DD'),
-            id: classList.length + 1,
-            name: values.name,
-            startDate: values.startDate.format('YYYY-MM-DD'),
-            status: dayjs(values.startDate).isAfter(dayjs())
-              ? ClassStatus.NOT_STARTED
-              : dayjs(values.endDate).isBefore(dayjs())
-                ? ClassStatus.COMPLETED
-                : ClassStatus.IN_PROGRESS,
-            studentCount: values.studentCount
-          };
+      // 重新加载数据
+      loadClassList({
+        current: pagination.current,
+        size: pagination.size
+      });
 
-          // 更新状态和本地存储
-          const updatedClassList = [...classList, newClass];
-          setClassList(updatedClassList);
-          setFilteredList(updatedClassList);
-          localStorage.setItem('classList', JSON.stringify(updatedClassList));
-
-          // 显示成功消息
-          Modal.success({
-            content: '班级已成功添加',
-            title: '添加成功'
-          });
-        }
-
-        // 重置状态和关闭模态框
-        setIsModalOpen(false);
-        setSubmitting(false);
-        setEditingClassId(null);
-        form.resetFields();
-      }, 1000);
+      // 重置状态和关闭模态框
+      setIsModalOpen(false);
+      setSubmitting(false);
+      setEditingClassId(null);
+      form.resetFields();
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('保存班级失败:', error);
+      message.error('保存班级失败');
+      setSubmitting(false);
     }
   };
 
@@ -480,7 +404,7 @@ const ClassList = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        bordered={false}
+        variant="borderless"
         className="h-full"
         title="班级列表"
       >
@@ -533,7 +457,10 @@ const ClassList = () => {
             showQuickJumper: true,
             showSizeChanger: true,
             showTotal: total => `共 ${total} 条记录`,
-            total: filteredList.length
+            total: filteredList.length,
+            current: pagination.current,
+            pageSize: pagination.size,
+            onChange: handleTableChange
           }}
         />
 

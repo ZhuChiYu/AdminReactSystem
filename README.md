@@ -1,205 +1,314 @@
-<div align="center">
- <img src="./public/favicon.svg" width="160" />
- <h1>React SoybeanAdmin</h1>
-  <span><a href="./README.en-US.md">English</a> | 中文</span>
-</div>
+# React SoybeanAdmin - 企业级管理系统
+
+## 项目简介
+
+React SoybeanAdmin 是一个基于 React 19 + React Router V7 + Ant Design 构建的现代化企业级管理系统。系统专注于培训机构和企业的客户关系管理、课程管理、会议管理、财务管理等核心业务场景，提供完整的 RBAC 权限控制和数据权限管理。
+
+## 🚀 技术栈
+
+### 前端技术
+- **React 19** - 最新的 React 版本，支持并发特性
+- **React Router V7** - 最新的路由管理方案
+- **Ant Design** - 企业级 UI 组件库
+- **TypeScript** - 类型安全的 JavaScript 超集
+- **Vite 6** - 快速的构建工具
+- **UnoCSS** - 原子化 CSS 引擎
+- **Zustand** - 轻量级状态管理
+
+### 开发工具
+- **ESLint** - 代码质量检查
+- **Prettier** - 代码格式化
+- **Husky** - Git hooks 管理
+- **Commitizen** - 规范化提交信息
+
+## 📁 项目结构
+
+```
+src/
+├── components/          # 公共组件
+├── hooks/              # 自定义 Hooks
+├── layouts/            # 布局组件
+├── locales/            # 国际化配置
+├── pages/              # 页面组件
+│   ├── (base)/         # 基础功能页面
+│   │   ├── customer-manage/  # 客户管理
+│   │   ├── course-manage/    # 课程管理
+│   │   ├── meeting-manage/   # 会议管理
+│   │   ├── employee-manage/  # 员工管理
+│   │   ├── finance-manage/   # 财务管理
+│   │   └── system-manage/    # 系统管理
+│   └── login/          # 登录页面
+├── router/             # 路由配置
+├── service/            # API 服务层
+│   ├── api/            # API 接口定义
+│   │   ├── types.ts    # 类型定义
+│   │   ├── client.ts   # API 客户端
+│   │   ├── auth.ts     # 认证服务
+│   │   ├── customer.ts # 客户服务
+│   │   ├── course.ts   # 课程服务
+│   │   ├── meeting.ts  # 会议服务
+│   │   └── index.ts    # 服务入口
+│   └── request/        # 请求封装
+├── store/              # 状态管理
+├── styles/             # 样式文件
+├── types/              # 类型定义
+└── utils/              # 工具函数
+```
+
+## 🎯 核心功能
+
+### 1. 用户权限管理
+- **RBAC 权限模型**：基于角色的访问控制
+- **数据权限控制**：支持部门级、个人级数据权限
+- **菜单权限**：动态菜单生成和权限控制
+- **按钮权限**：细粒度的操作权限控制
+
+### 2. 客户关系管理 (CRM)
+- **客户信息管理**：完整的客户档案管理
+- **客户分配**：支持客户在员工间的分配和转移
+- **跟进记录**：详细的客户跟进历史记录
+- **客户统计**：多维度的客户数据统计分析
+- **数据权限**：基于角色的客户数据访问控制
+
+### 3. 课程管理系统
+- **课程信息管理**：课程基本信息、大纲、目标等
+- **课程分类**：多级课程分类管理
+- **学员管理**：课程学员报名和管理
+- **课程评价**：学员评价和反馈系统
+- **课程统计**：收入、学员数等统计分析
+
+### 4. 会议管理系统
+- **会议创建**：支持定期会议和一次性会议
+- **参会人员**：邀请管理和响应状态跟踪
+- **会议室管理**：会议室预订和冲突检测
+- **会议提醒**：自动提醒功能
+- **会议纪要**：会议记录和文档管理
+
+### 5. 员工管理系统
+- **员工档案**：完整的员工信息管理
+- **组织架构**：部门和岗位管理
+- **上下级关系**：员工层级关系管理
+- **权限分配**：角色和权限的分配管理
+
+### 6. 财务管理系统
+- **收入管理**：课程收入、咨询收入等
+- **支出管理**：各类费用支出记录
+- **报销流程**：多级审批的报销流程
+- **财务报表**：收支统计和财务分析
+- **预算管理**：预算制定和执行监控
+
+### 7. 系统管理
+- **用户管理**：系统用户的增删改查
+- **角色管理**：角色定义和权限配置
+- **菜单管理**：系统菜单的动态配置
+- **字典管理**：系统字典数据管理
+- **操作日志**：用户操作行为记录
+
+## 🔧 API 设计
+
+### 统一响应格式
+```typescript
+interface ApiResponse<T = any> {
+  code: number;          // 状态码: 0-成功, 其他-失败
+  message: string;       // 响应消息
+  data?: T;             // 响应数据
+  timestamp: number;     // 时间戳
+  path: string;         // 请求路径
+}
+
+// 分页响应格式
+interface PageResponse<T = any> {
+  code: number;
+  message: string;
+  data: {
+    records: T[];        // 数据列表
+    total: number;       // 总记录数
+    current: number;     // 当前页码
+    size: number;        // 每页大小
+    pages: number;       // 总页数
+  };
+  timestamp: number;
+  path: string;
+}
+```
+
+### 主要 API 模块
+
+#### 认证模块 (Auth)
+- `POST /api/v1/auth/login` - 用户登录
+- `POST /api/v1/auth/logout` - 用户登出
+- `POST /api/v1/auth/refresh` - 刷新令牌
+- `GET /api/v1/auth/user-info` - 获取用户信息
+
+#### 客户管理 (Customer)
+- `GET /api/v1/customers` - 获取客户列表
+- `POST /api/v1/customers` - 创建客户
+- `PUT /api/v1/customers/:id` - 更新客户
+- `DELETE /api/v1/customers/:id` - 删除客户
+- `POST /api/v1/customers/:id/assign` - 分配客户
+- `GET /api/v1/customers/:id/follow-records` - 获取跟进记录
+
+#### 课程管理 (Course)
+- `GET /api/v1/courses` - 获取课程列表
+- `POST /api/v1/courses` - 创建课程
+- `PUT /api/v1/courses/:id` - 更新课程
+- `DELETE /api/v1/courses/:id` - 删除课程
+- `POST /api/v1/courses/:id/publish` - 发布课程
+- `GET /api/v1/courses/categories` - 获取课程分类
+
+#### 会议管理 (Meeting)
+- `GET /api/v1/meetings` - 获取会议列表
+- `POST /api/v1/meetings` - 创建会议
+- `PUT /api/v1/meetings/:id` - 更新会议
+- `DELETE /api/v1/meetings/:id` - 删除会议
+- `POST /api/v1/meetings/:id/respond` - 响应会议邀请
+- `GET /api/v1/meeting-rooms` - 获取会议室列表
+
+## 🗄️ 数据库设计
+
+### 核心数据表
+
+#### 用户权限相关
+- `users` - 用户表
+- `roles` - 角色表
+- `permissions` - 权限表
+- `user_roles` - 用户角色关联表
+- `role_permissions` - 角色权限关联表
+
+#### 客户管理相关
+- `customers` - 客户表
+- `customer_assignments` - 客户分配表
+- `customer_follow_records` - 客户跟进记录表
+
+#### 课程管理相关
+- `courses` - 课程表
+- `course_categories` - 课程分类表
+- `course_enrollments` - 课程报名表
+- `course_reviews` - 课程评价表
+
+#### 会议管理相关
+- `meetings` - 会议表
+- `meeting_participants` - 会议参与者表
+- `meeting_rooms` - 会议室表
+- `meeting_attachments` - 会议附件表
+
+#### 财务管理相关
+- `financial_records` - 财务记录表
+- `expense_applications` - 报销申请表
+- `expense_approvals` - 报销审批表
+
+## 🚀 快速开始
+
+### 环境要求
+- Node.js >= 18.0.0
+- npm >= 9.0.0 或 yarn >= 1.22.0
+
+### 安装依赖
+```bash
+npm install
+# 或
+yarn install
+```
+
+### 开发环境启动
+```bash
+npm run dev
+# 或
+yarn dev
+```
+
+### 构建生产版本
+```bash
+npm run build
+# 或
+yarn build
+```
+
+### 代码检查
+```bash
+npm run lint
+# 或
+yarn lint
+```
+
+## 📝 开发规范
+
+### 代码提交规范
+使用 Conventional Commits 规范：
+- `feat`: 新功能
+- `fix`: 修复问题
+- `docs`: 文档更新
+- `style`: 代码格式调整
+- `refactor`: 代码重构
+- `test`: 测试相关
+- `chore`: 构建过程或辅助工具的变动
+
+### 组件开发规范
+1. 使用 TypeScript 进行类型定义
+2. 组件名使用 PascalCase
+3. 文件名使用 kebab-case
+4. 使用 ESLint 和 Prettier 保持代码风格一致
+
+### API 调用规范
+1. 统一使用 service 层进行 API 调用
+2. 错误处理统一在 API 客户端层面处理
+3. 使用 TypeScript 定义 API 请求和响应类型
+
+## 🔒 安全特性
+
+### 认证授权
+- JWT Token 认证机制
+- Token 自动刷新
+- 路由级权限控制
+- 组件级权限控制
+
+### 数据安全
+- 敏感数据脱敏显示
+- 数据权限控制
+- 操作日志记录
+- XSS 防护
+
+## 📊 性能优化
+
+### 前端优化
+- 路由懒加载
+- 组件按需加载
+- 图片懒加载
+- 虚拟滚动（大数据量表格）
+
+### 构建优化
+- Vite 快速构建
+- 代码分割
+- 资源压缩
+- CDN 加速
+
+## 🌐 浏览器支持
+
+- Chrome >= 88
+- Firefox >= 85
+- Safari >= 14
+- Edge >= 88
+
+## 📄 许可证
+
+MIT License
+
+## 🤝 贡献指南
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+## 📞 联系方式
+
+如有问题或建议，请通过以下方式联系：
+
+- 项目地址：[GitHub Repository]
+- 问题反馈：[GitHub Issues]
+- 邮箱：[your-email@example.com]
 
 ---
 
-[![license](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-
-> [!NOTE]
-> 如果您觉得 `React SoybeanAdmin` 对您有所帮助，或者您喜欢我们的项目，请在 GitHub 上给我们一个 ⭐️。您的支持是我们持续改进和增加新功能的动力！感谢您的支持！
-
-## 特别鸣谢
-
-本项目是基于 [Soybean](https://github.com/honghuangdc) 开发的优秀开源项目 [Soybean Admin](https://github.com/soybeanjs/soybean-admin) 的 React 版本实现。在此特别感谢 Soybean 的开源贡献,为中后台开发提供了优秀的解决方案。如果您喜欢本项目,也请给原作者的 [Soybean Admin](https://github.com/soybeanjs/soybean-admin) 点个 star ⭐️。
-
-## 简介
-
-[`React SoybeanAdmin`](https://github.com/soybeanjs/soybean-admin-react) 是一个基于 React19 技术栈的清新优雅中后台模版。项目采用了最新的前端技术栈:
-
-- 🚀 React 19 + ReactRouter V7 + Redux/toolkit
-- 🎨 Ant Design + UnoCSS
-- 📦 Vite 6 + TypeScript
-- 🔐 基于角色的权限管理
-- 📱 移动端适配
-- 🌍 国际化支持
-- 🎯 Mock 数据方案
-- 📚 详尽的文档支持
-
-项目特点:
-
-- 💡 代码规范严谨,架构清晰优雅
-- ⚡️ 开箱即用,无需复杂配置
-- 🛠️ 丰富的组件和主题配置
-- 📋 自动化的文件路由系统
-- 🔧 完善的类型支持
-- 📱 响应式设计,完美适配移动端
-- 🎨 乐观`UI` 项目出现错误自动捕获错误,并显示友好界面,帮助用户快速定位和解决问题,还可以再组件内监控埋点上报。
-- 🚀 丰富的路由功能：基于 React-Router V7 扩展了路由 API，提供类似 Next.js一样的约定式文件路由，也可以自己添加复用路由。
-- ⚡️ 命令行工具：内置高效的命令行工具，git提交、删除文件、发布等。
-
-无论是学习最新前端技术,还是开发企业级中后台项目,React SoybeanAdmin 都是您的不二之选。
-
-## 分支
-
-- `master` 分支: 最新稳定版本,基于 React19 + ReactRouter V7  版本
-- `v18-router6` 分支: 基于 React18 + ReactRouter V6 版本
-
-有问题都是会进行修复,如果需要使用旧版本,请切换到对应分支。 v18-router6 在未来3-5年依然会是市面上较为先进 功能强大的版本
-
-## 版本
-
-### React版本
-
-- **React19 版本:**
-  - [预览地址](https://react.soybeanjs.cn/)
-  - [国内加速访问]( https://react-soybean-admin.pages.dev/)
-  - [Github 仓库](https://github.com/mufeng889/react-soybean-admin)
-  - [Gitee 仓库](https://gitee.com/sjgk_dl/react-admin)
-
-#### 文档
-
-- [地址](https://react-docs.soybeanjs.cn/guide)
-
-### Vue版本
-
-- **NaiveUI 版本:**
-  - [预览地址](https://naive.soybeanjs.cn/) - 基于 Vue3 + NaiveUI 构建的清新优雅后台管理模板
-  - [Github 仓库](https://github.com/soybeanjs/soybean-admin) - 获取最新源码，参与开源贡献
-  - [Gitee 仓库](https://gitee.com/honghuangdc/soybean-admin) - 国内镜像仓库，访问更快捷
-  - 特点:
-    - 完整的 TypeScript 支持
-    - 丰富的主题配置
-    - 优雅的代码风格
-    - 完善的文档说明
-- **AntDesignVue 版本:**
-  - [预览地址](https://antd.soybeanjs.cn/)
-  - [Github 仓库](https://github.com/soybeanjs/soybean-admin-antd)
-  - [Gitee 仓库](https://gitee.com/honghuangdc/soybean-admin-antd)
-
-- **旧版:**
-  - [预览地址](https://legacy.soybeanjs.cn/)
-  - [Github 仓库](https://github.com/soybeanjs/soybean-admin/tree/legacy)
-
-
-## 符合Ant Design风格的保姆级文档
-
-- [地址](https://react-soybean-docs.ohh-889.com/index-cn?theme=dark)
-![](https://ohh-1321526050.cos.ap-nanjing.myqcloud.com/docs-home.jpg)
-
-## 示例图片
-
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-01.png)
-![](https://ohh-1321526050.cos.ap-nanjing.myqcloud.com/mobile.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-02.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-03.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-04.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-05.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-06.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-07.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-08.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-09.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-10.png)
-![](https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/soybean-admin-v1-mobile.png)
-
-## 使用
-
-**环境准备**
-
-确保你的环境满足以下要求：
-
-- **git**: 你需要git来克隆和管理项目版本。
-- **NodeJS**: >=18.12.0，推荐 18.19.0 或更高。
-- **pnpm**: >= 8.7.0，推荐 8.14.0 或更高。
-
-**克隆项目**
-
-```bash
-git clone https://github.com/soybeanjs/soybean-admin.git
-```
-
-**安装依赖**
-
-```bash
-pnpm i
-```
-
-> 由于本项目采用了 pnpm monorepo 的管理方式，因此请不要使用 npm 或 yarn 来安装依赖。
-
-**启动项目**
-
-```bash
-pnpm dev
-```
-
-**构建项目**
-
-```bash
-pnpm build
-```
-
-## 如何贡献
-
-我们热烈欢迎并感谢所有形式的贡献。如果您有任何想法或建议，欢迎通过提交 [pull requests](https://github.com/soybeanjs/soybean-admin-react/pulls) 或创建 GitHub [issue](https://github.com/soybeanjs/soybean-admin-react/issues) 来分享。
-
-## 团队理念
-
-- 欢迎各位小伙伴一起交流、讨论，彼此学习、共同进步。
-- 项目采用 **MIT** 开源协议，永久免费使用，无需担忧版权问题。
-- 任何关于功能扩展、Bug 修复、或文档纠正的贡献都十分欢迎，也鼓励你提交 **PR**，哪怕只是修正一个错别字。
-
-## Git 提交规范
-
-本项目已内置 `commit` 命令，您可以通过执行 `pnpm commit` 来生成符合 [Conventional Commits]([conventionalcommits](https://www.conventionalcommits.org/)) 规范的提交信息。在提交PR时，请务必使用 `commit` 命令来创建提交信息，以确保信息的规范性。
-
-## 浏览器支持
-
-推荐使用最新版的 Chrome 浏览器进行开发，以获得更好的体验。
-
-| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/archive/internet-explorer_9-11/internet-explorer_9-11_48x48.png" alt="IE" width="24px" height="24px"  />](http://godban.github.io/browsers-support-badges/) | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/edge/edge_48x48.png" alt=" Edge" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/) | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png" alt="Firefox" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/) | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/) | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/) |
-| --- | --- | --- | --- | --- |
-| not support | last 2 versions | last 2 versions | last 2 versions | last 2 versions |
-
-## 开源作者
-
-[Ohh-889](https://github.com/mufeng889)
-
-[Soybean](https://github.com/honghuangdc)
-
-## 贡献者
-
-感谢以下贡献者的贡献。如果您想为本项目做出贡献，请参考 [如何贡献](#如何贡献)。
-
-<a href="https://github.com/mufeng889/react-soybean-admin/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=mufeng889/react-soybean-admin" />
-</a>
-
-## 交流
-
-`React Soybean` 是完全开源免费的项目，在帮助开发者更方便地进行中大型管理系统开发，同时也提供微信和 QQ 交流群，使用问题欢迎在群内提问。
-
-  <div>
-   <p>QQ交流群</p>
-    <img src="https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/qq-soybean-admin-4.jpg" style="width:200px" />
-  </div>
-
- <div>
-  <p>添加下面微信邀请进微信群</p>
-  <img src="https://soybeanjs-1300612522.cos.ap-guangzhou.myqcloud.com/uPic/wechat-soybeanjs.jpg" style="width:200px" />
- </div>
-
- <div>
-  <p>添加下面微信邀请进微信群</p>
-  <img src="
-  https://ohh-1321526050.cos.ap-nanjing.myqcloud.com/ohh-889.jpg" style="width:200px" />
- </div>
-
-## 开源协议
-
-项目基于 [MIT © 2021 Soybean](./LICENSE) 协议，仅供学习参考，商业使用请保留作者版权信息，作者不保证也不承担任何软件的使用风险。
-
-## 祝福与展望
-
-非常感谢你选择 **soybean-admin-react**，愿它能在你的工作和学习中带来便利与收获。祝所有使用者在工作和生活中都能顺利进步、健康平安。欢迎大家积极参与、贡献代码，共同将 **soybean-admin-react** 打造得更加完善与强大！
+**React SoybeanAdmin** - 让企业管理更简单、更高效！

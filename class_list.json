@@ -1,0 +1,259 @@
+[
+  {
+    "id": 4,
+    "name": "司库管理体系建设：从现金管理到产业赋能",
+    "categoryId": 2,
+    "categoryName": "管理课程",
+    "teacher": "专业讲师",
+    "startDate": "2024-06-01",
+    "endDate": "2024-06-30",
+    "status": 1,
+    "studentCount": 22,
+    "description": "司库管理体系建设专业培训课程",
+    "createdAt": "2025-05-25 13:35:17",
+    "students": [
+      {
+        "id": 1,
+        "name": "康英",
+        "company": "陕西投资集团财务有限责任公司",
+        "position": "结算业务部经理",
+        "phone": "18629330055",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 2,
+        "name": "周陈静",
+        "company": "陕西投资集团财务有限责任公司",
+        "position": "结算中心副经理",
+        "phone": "15229232511",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 3,
+        "name": "郭盼盼",
+        "company": "陕西投资集团财务有限责任公司",
+        "position": "结算中心",
+        "phone": "18700954866",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 4,
+        "name": "曾安玲",
+        "company": "成都市奥特乐商业管理有限公司",
+        "position": "出纳",
+        "phone": "18200281783",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 5,
+        "name": "刘联普",
+        "company": "中国旅游集团中免股份有限公司",
+        "position": "资金管理总监",
+        "phone": "18900181121",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 6,
+        "name": "余绚",
+        "company": "广东电网有限责任公司",
+        "position": "计划与财务部资金管理科高级经理",
+        "phone": "13826104898",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 7,
+        "name": "郝佳璐",
+        "company": "中核北方核燃料元件有限公司",
+        "position": "财务部",
+        "phone": "17390953118",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 8,
+        "name": "马磬",
+        "company": "人教教材中心有限责任公司",
+        "position": "未知职位",
+        "phone": "13601084077",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 9,
+        "name": "吴震",
+        "company": "人民教育出版社有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 10,
+        "name": "陈志娟",
+        "company": "人民教育出版社有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 11,
+        "name": "吕威",
+        "company": "中国铁道科学研究院",
+        "position": "资金部",
+        "phone": "18601280209",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 12,
+        "name": "蒋博平 ",
+        "company": "中国铁道科学研究院",
+        "position": "资金部",
+        "phone": "13810705487",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 13,
+        "name": "王若涵",
+        "company": "中国铁道科学研究院集团有限公司机车车辆研究所",
+        "position": "财务部会计",
+        "phone": "18510632793",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 14,
+        "name": "董国俊",
+        "company": "贵州茅台股份有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 15,
+        "name": "潘春莉",
+        "company": "贵州茅台股份有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 16,
+        "name": "杨健",
+        "company": "贵州茅台股份有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 17,
+        "name": "杨文强",
+        "company": "贵州茅台股份有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 18,
+        "name": "邓世丽",
+        "company": "贵州茅台股份有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 19,
+        "name": "赵琼莉",
+        "company": "贵州茅台股份有限公司",
+        "position": "未知职位",
+        "phone": "",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 20,
+        "name": "宋春磊",
+        "company": "大华会计师事务所",
+        "position": "业务部合伙人",
+        "phone": "18910771005",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 21,
+        "name": "林小媚",
+        "company": "南宁高新产业建设开发集团有限公司",
+        "position": "未知职位",
+        "phone": "15977745896",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      },
+      {
+        "id": 22,
+        "name": "张玉玲",
+        "company": "南宁高新产业建设开发集团有限公司",
+        "position": "财务部",
+        "phone": "15977745896",
+        "email": "",
+        "joinDate": "2024-06-01",
+        "attendanceRate": 100,
+        "status": 1
+      }
+    ]
+  }
+]

@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: soybean-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: soybean_admin
+      POSTGRES_USER: soybean
+      POSTGRES_PASSWORD: soybean123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - soybean-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: soybean-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redis123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - soybean-network
+
+  # 后端 API 服务
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: soybean-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://soybean:soybean123@postgres:5432/soybean_admin
+      REDIS_URL: redis://:redis123@redis:6379
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - soybean-network
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  soybean-network:
+    driver: bridge

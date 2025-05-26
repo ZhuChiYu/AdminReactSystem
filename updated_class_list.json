@@ -1,0 +1,54 @@
+[
+  {
+    "categoryId": 1,
+    "categoryName": "技术培训",
+    "createdAt": "2024-02-15 14:30:00",
+    "description": "2024年春季常规课程",
+    "endDate": "2024-06-30",
+    "id": 1,
+    "name": "2024春季班",
+    "startDate": "2024-03-01",
+    "status": 1,
+    "studentCount": 30,
+    "teacher": "张老师"
+  },
+  {
+    "categoryId": 2,
+    "categoryName": "管理课程",
+    "createdAt": "2024-03-15 10:20:00",
+    "description": "2024年夏季管理课程",
+    "endDate": "2024-08-31",
+    "id": 2,
+    "name": "2024夏季班",
+    "startDate": "2024-07-01",
+    "status": 0,
+    "studentCount": 25,
+    "teacher": "李老师"
+  },
+  {
+    "categoryId": 3,
+    "categoryName": "营销课程",
+    "createdAt": "2023-08-10 09:15:00",
+    "description": "2023年秋季营销培训",
+    "endDate": "2023-12-31",
+    "id": 3,
+    "name": "2023秋季班",
+    "startDate": "2023-09-01",
+    "status": 2,
+    "studentCount": 28,
+    "teacher": "王老师"
+  },
+  {
+    "id": 4,
+    "name": "司库管理体系建设：从现金管理到产业赋能",
+    "categoryId": 2,
+    "categoryName": "管理课程",
+    "teacher": "专业讲师",
+    "startDate": "2024-06-01",
+    "endDate": "2024-06-30",
+    "status": 1,
+    "studentCount": 22,
+    "description": "司库管理体系建设专业培训课程",
+    "createdAt": "2025-05-25 13:35:17"
+  }
+]

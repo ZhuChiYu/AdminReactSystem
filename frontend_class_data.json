@@ -1,0 +1,15 @@
+[
+  {
+    "id": 4,
+    "name": "司库管理体系建设：从现金管理到产业赋能",
+    "categoryId": 2,
+    "categoryName": "管理课程",
+    "teacher": "专业讲师",
+    "startDate": "2024-06-01",
+    "endDate": "2024-06-30",
+    "status": 1,
+    "studentCount": 22,
+    "description": "司库管理体系建设专业培训课程",
+    "createdAt": "2025-05-25 13:35:17"
+  }
+]
