@@ -297,6 +297,33 @@ export namespace CourseApi {
     coverImage: string;
     createTime: string;
   }
+
+  export interface CreateCourseRequest {
+    title: string;
+    description: string;
+    categoryId: number;
+    duration: number;
+    price: number;
+    instructor: string;
+    level: string;
+    tags: string[];
+  }
+
+  export interface CourseCategory {
+    id: number;
+    name: string;
+    description?: string;
+  }
+
+  export interface CourseReview {
+    id: number;
+    courseId: number;
+    userId: number;
+    userName: string;
+    rating: number;
+    comment: string;
+    createTime: string;
+  }
 }
 
 // 会议相关类型
@@ -343,6 +370,15 @@ export namespace MeetingApi {
     meetingPassword?: string;
     maxParticipants?: number;
     participantIds: number[];
+  }
+
+  export interface MeetingRoom {
+    id: number;
+    name: string;
+    capacity: number;
+    location: string;
+    equipment: string[];
+    status: 'available' | 'occupied' | 'maintenance';
   }
 }
 

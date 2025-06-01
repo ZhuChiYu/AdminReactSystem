@@ -3,178 +3,141 @@ import type { CourseApi, PageResponse } from './types';
 
 /** 课程管理相关API服务 */
 export class CourseService {
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // 模拟课程数据
+  private mockCourses: CourseApi.CourseListItem[] = [
+    {
+      category: { id: 1, name: '财务管理' },
+      courseCode: 'CWGL001',
+      courseName: '企业财务管理基础',
+      courseType: 1,
+      coverImage: 'https://via.placeholder.com/300x200',
+      createTime: '2024-01-15',
+      duration: 120,
+      enrollCount: 890,
+      id: 1,
+      isFeatured: true,
+      maxStudents: 50,
+      price: 2999,
+      rating: 4.8,
+      status: 1,
+      teacher: { id: 1, name: '张教授' },
+      viewCount: 1250
+    },
+    {
+      category: { id: 2, name: '风险管理' },
+      courseCode: 'FXGL002',
+      courseName: '风险管理与内控体系建设',
+      courseType: 1,
+      coverImage: 'https://via.placeholder.com/300x200',
+      createTime: '2024-01-20',
+      duration: 180,
+      enrollCount: 650,
+      id: 2,
+      isFeatured: false,
+      maxStudents: 40,
+      price: 3999,
+      rating: 4.9,
+      status: 1,
+      teacher: { id: 2, name: '李专家' },
+      viewCount: 890
+    },
+    {
+      category: { id: 3, name: '税务管理' },
+      courseCode: 'SWGL003',
+      courseName: '税务筹划与合规管理',
+      courseType: 1,
+      coverImage: 'https://via.placeholder.com/300x200',
+      createTime: '2024-01-25',
+      duration: 150,
+      enrollCount: 420,
+      id: 3,
+      isFeatured: false,
+      maxStudents: 45,
+      price: 3499,
+      rating: 4.7,
+      status: 1,
+      teacher: { id: 3, name: '王顾问' },
+      viewCount: 650
+    }
+  ];
+
   /** 获取课程列表 */
-  async getCourseList(params: CourseApi.CourseQueryParams): Promise<PageResponse<CourseApi.CourseListItem>['data']> {
-    // 目前使用模拟数据，实际项目中替换为真实API调用
-    // return apiClient.get('/courses', { params });
+  async getCourseList(
+    params?: CourseApi.CourseQueryParams
+  ): Promise<{ data: { current: number; records: CourseApi.CourseListItem[]; size: number; total: number } }> {
+    await this.delay(500);
 
-    // 模拟课程数据
-    const mockCourses: CourseApi.CourseListItem[] = [
-      {
-        category: '财务管理',
-        courseCode: 'SZHHCWGL001',
-        courseName: '数智化财务管理',
-        createTime: '2024-03-01 10:00:00',
-        currentStudents: 35,
-        description: '深入学习数字化时代的财务管理理念和实践方法',
-        duration: 3,
-        endDate: '2024-04-17',
-        id: 1,
-        instructor: '张教授',
-        level: 'intermediate',
-        location: '上海培训中心',
-        maxStudents: 50,
-        objectives: ['掌握数字化财务管理理念', '学会使用财务数字化工具', '提升财务分析能力'],
-        originalPrice: 4500,
-        outline: [
-          { chapter: '第一章', duration: 4, title: '数字化财务概述' },
-          { chapter: '第二章', duration: 6, title: '财务数据分析' },
-          { chapter: '第三章', duration: 4, title: '财务决策支持' }
-        ],
-        price: 3800,
-        rating: 4.8,
-        reviewCount: 128,
-        startDate: '2024-04-15',
-        status: 'published',
-        tags: ['财务', '数字化', '管理'],
-        updateTime: '2024-03-20 15:30:00'
-      },
-      {
-        category: '风险管理',
-        courseCode: 'QYNKYFXGL002',
-        courseName: '企业内控与风险管理',
-        createTime: '2024-02-15 14:20:00',
-        currentStudents: 28,
-        description: '全面掌握企业内部控制体系建设和风险管理实务',
-        duration: 2,
-        endDate: '2024-04-21',
-        id: 2,
-        instructor: '李专家',
-        level: 'advanced',
-        location: '北京培训中心',
-        maxStudents: 40,
-        objectives: ['建立内控体系', '识别和评估风险', '制定风险应对策略'],
-        originalPrice: 3200,
-        outline: [
-          { chapter: '第一章', duration: 4, title: '内控体系建设' },
-          { chapter: '第二章', duration: 4, title: '风险识别与评估' }
-        ],
-        price: 2800,
-        rating: 4.6,
-        reviewCount: 89,
-        startDate: '2024-04-20',
-        status: 'published',
-        tags: ['内控', '风险', '管理'],
-        updateTime: '2024-03-18 09:45:00'
-      },
-      {
-        category: '税务管理',
-        courseCode: 'SWCHYHGGL003',
-        courseName: '税务筹划与合规管理',
-        createTime: '2024-02-20 11:15:00',
-        currentStudents: 32,
-        description: '掌握税务筹划技巧和合规管理要点',
-        duration: 2,
-        endDate: '2024-04-26',
-        id: 3,
-        instructor: '王老师',
-        level: 'intermediate',
-        location: '深圳培训中心',
-        maxStudents: 45,
-        objectives: ['掌握税务筹划方法', '了解税务合规要求', '降低税务风险'],
-        originalPrice: 2800,
-        outline: [
-          { chapter: '第一章', duration: 3, title: '税务筹划基础' },
-          { chapter: '第二章', duration: 5, title: '合规管理实务' }
-        ],
-        price: 2500,
-        rating: 4.7,
-        reviewCount: 156,
-        startDate: '2024-04-25',
-        status: 'published',
-        tags: ['税务', '筹划', '合规'],
-        updateTime: '2024-03-22 16:20:00'
-      }
-    ];
+    let filteredCourses = [...this.mockCourses];
 
-    // 根据查询参数过滤数据
-    let filteredCourses = mockCourses;
+    if (params?.categoryId) {
+      filteredCourses = filteredCourses.filter(course => course.category.id === params.categoryId);
+    }
 
-    if (params.courseName) {
+    if (params?.courseName) {
       filteredCourses = filteredCourses.filter(course => course.courseName.includes(params.courseName!));
     }
 
-    if (params.category) {
-      filteredCourses = filteredCourses.filter(course => course.category === params.category);
+    if (params?.courseCode) {
+      filteredCourses = filteredCourses.filter(course => course.courseCode.includes(params.courseCode!));
     }
 
-    if (params.status) {
-      filteredCourses = filteredCourses.filter(course => course.status === params.status);
-    }
+    const current = params?.current || 1;
+    const size = params?.size || 10;
+    const start = (current - 1) * size;
+    const end = start + size;
 
-    if (params.level) {
-      filteredCourses = filteredCourses.filter(course => course.level === params.level);
-    }
-
-    return createMockPageResponse(filteredCourses, params.current || 1, params.size || 10);
+    return {
+      data: {
+        current,
+        records: filteredCourses.slice(start, end),
+        size,
+        total: filteredCourses.length
+      }
+    };
   }
 
   /** 获取课程详情 */
   async getCourseDetail(id: number): Promise<CourseApi.CourseListItem> {
-    // return apiClient.get(`/courses/${id}`);
+    await this.delay(300);
 
-    const mockCourse: CourseApi.CourseListItem = {
-      category: '财务管理',
-      courseCode: 'SZHHCWGL001',
-      courseName: '数智化财务管理',
-      createTime: '2024-03-01 10:00:00',
-      currentStudents: 35,
-      description: '深入学习数字化时代的财务管理理念和实践方法',
-      duration: 3,
-      endDate: '2024-04-17',
+    return {
+      category: { id: 1, name: '财务管理' },
+      courseCode: 'CWGL001',
+      courseName: '企业财务管理基础',
+      courseType: 1,
+      coverImage: 'https://via.placeholder.com/300x200',
+      createTime: '2024-01-15',
+      duration: 120,
+      enrollCount: 890,
       id,
-      instructor: '张教授',
-      level: 'intermediate',
-      location: '上海培训中心',
+      isFeatured: true,
       maxStudents: 50,
-      objectives: ['掌握数字化财务管理理念', '学会使用财务数字化工具', '提升财务分析能力'],
-      originalPrice: 4500,
-      outline: [
-        { chapter: '第一章', duration: 4, title: '数字化财务概述' },
-        { chapter: '第二章', duration: 6, title: '财务数据分析' },
-        { chapter: '第三章', duration: 4, title: '财务决策支持' }
-      ],
-      price: 3800,
+      price: 2999,
       rating: 4.8,
-      reviewCount: 128,
-      startDate: '2024-04-15',
-      status: 'published',
-      tags: ['财务', '数字化', '管理'],
-      updateTime: '2024-03-20 15:30:00'
+      status: 1,
+      teacher: { id: 1, name: '张教授' },
+      viewCount: 1250
     };
-
-    return createMockResponse(mockCourse);
   }
 
   /** 创建课程 */
   async createCourse(params: CourseApi.CreateCourseRequest): Promise<{ id: number }> {
-    // return apiClient.post('/courses', params);
-
-    return createMockResponse({ id: Date.now() });
+    await this.delay(800);
+    return { id: Date.now() };
   }
 
   /** 更新课程 */
   async updateCourse(id: number, params: Partial<CourseApi.CreateCourseRequest>): Promise<void> {
-    // return apiClient.put(`/courses/${id}`, params);
-
-    return createMockResponse(undefined);
+    await this.delay(600);
   }
 
   /** 删除课程 */
   async deleteCourse(id: number): Promise<void> {
-    // return apiClient.delete(`/courses/${id}`);
-
-    return createMockResponse(undefined);
+    await this.delay(400);
   }
 
   /** 发布课程 */
@@ -193,17 +156,20 @@ export class CourseService {
 
   /** 获取课程分类列表 */
   async getCourseCategories(): Promise<CourseApi.CourseCategory[]> {
-    // return apiClient.get('/courses/categories');
+    await this.delay(200);
 
     const mockCategories: CourseApi.CourseCategory[] = [
-      { code: 'finance', description: '财务相关课程', id: 1, name: '财务管理' },
-      { code: 'risk', description: '风险控制相关课程', id: 2, name: '风险管理' },
-      { code: 'tax', description: '税务相关课程', id: 3, name: '税务管理' },
-      { code: 'audit', description: '审计相关课程', id: 4, name: '审计管理' },
-      { code: 'investment', description: '投资相关课程', id: 5, name: '投资管理' }
+      { description: '企业财务管理相关课程', id: 1, name: '财务管理' },
+      { description: '企业风险识别与控制课程', id: 2, name: '风险管理' },
+      { description: '税务筹划与合规管理课程', id: 3, name: '税务管理' },
+      { description: '人力资源管理课程', id: 4, name: '人力资源' },
+      { description: '市场营销策略课程', id: 5, name: '市场营销' },
+      { description: '项目管理方法与实践课程', id: 6, name: '项目管理' },
+      { description: '企业数字化转型课程', id: 7, name: '数字化转型' },
+      { description: '管理者领导力提升课程', id: 8, name: '领导力' }
     ];
 
-    return createMockResponse(mockCategories);
+    return mockCategories;
   }
 
   /** 获取课程统计数据 */
@@ -238,30 +204,41 @@ export class CourseService {
 
   /** 获取课程评价列表 */
   async getCourseReviews(courseId: number): Promise<CourseApi.CourseReview[]> {
-    // return apiClient.get(`/courses/${courseId}/reviews`);
+    await this.delay(300);
 
     const mockReviews: CourseApi.CourseReview[] = [
       {
-        comment: '课程内容很实用，老师讲解清晰',
+        comment: '课程内容非常实用，老师讲解清晰，受益匪浅！',
         courseId,
+        createTime: '2024-01-20 10:30:00',
         id: 1,
         rating: 5,
-        reviewTime: '2024-03-15 14:30:00',
-        studentName: '张三'
+        userId: 1,
+        userName: '张三'
       },
       {
-        comment: '整体不错，希望能增加更多案例',
+        comment: '整体不错，但希望能增加更多实际案例分析。',
         courseId,
+        createTime: '2024-01-18 14:20:00',
         id: 2,
         rating: 4,
-        reviewTime: '2024-03-16 09:20:00',
-        studentName: '李四'
+        userId: 2,
+        userName: '李四'
       }
     ];
 
-    return createMockResponse(mockReviews);
+    return mockReviews;
   }
 }
 
 // 导出课程服务实例
 export const courseService = new CourseService();
+
+// 导出API函数
+export const fetchGetCourseList = courseService.getCourseList.bind(courseService);
+export const fetchGetCourseDetail = courseService.getCourseDetail.bind(courseService);
+export const fetchCreateCourse = courseService.createCourse.bind(courseService);
+export const fetchUpdateCourse = courseService.updateCourse.bind(courseService);
+export const fetchDeleteCourse = courseService.deleteCourse.bind(courseService);
+export const fetchGetCourseCategories = courseService.getCourseCategories.bind(courseService);
+export const fetchGetCourseReviews = courseService.getCourseReviews.bind(courseService);
