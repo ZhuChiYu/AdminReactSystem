@@ -1,7 +1,10 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios';
-import { localStg } from '@/utils/storage';
+
 import { $t } from '@/locales';
-import { ApiResponse, PageResponse, ErrorCode } from './types';
+import { localStg } from '@/utils/storage';
+
+import type { ApiResponse, PageResponse } from './types';
+import { ErrorCode } from './types';
 
 // API客户端类
 class ApiClient {
@@ -9,16 +12,22 @@ class ApiClient {
   private baseURL: string;
 
   constructor() {
-    // 根据环境设置基础URL - 修改为正确的后端地址
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+    // 动态设置基础URL
+    const useRemoteApi = import.meta.env.VITE_USE_REMOTE_API === 'Y';
+    const localApiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+    const remoteApiUrl = import.meta.env.VITE_REMOTE_API_BASE_URL || 'http://111.230.110.95:8080/api';
+
+    this.baseURL = useRemoteApi ? remoteApiUrl : localApiUrl;
+
+    console.log(`🌐 API Base URL: ${this.baseURL} (${useRemoteApi ? '内网穿透模式' : '本地模式'})`);
 
     // 创建axios实例
     this.instance = axios.create({
       baseURL: this.baseURL,
-      timeout: 10000,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
+      timeout: 10000
     });
 
     // 设置请求拦截器
@@ -28,12 +37,10 @@ class ApiClient {
     this.setupResponseInterceptors();
   }
 
-  /**
-   * 设置请求拦截器
-   */
+  /** 设置请求拦截器 */
   private setupRequestInterceptors() {
     this.instance.interceptors.request.use(
-      (config) => {
+      config => {
         // 添加认证token
         const token = localStg.get('token');
         if (token) {
@@ -44,25 +51,23 @@ class ApiClient {
         if (config.method === 'get') {
           config.params = {
             ...config.params,
-            _t: Date.now(),
+            _t: Date.now()
           };
         }
 
         return config;
       },
-      (error) => {
+      error => {
         return Promise.reject(error);
       }
     );
   }
 
-  /**
-   * 设置响应拦截器
-   */
+  /** 设置响应拦截器 */
   private setupResponseInterceptors() {
     this.instance.interceptors.response.use(
       (response: AxiosResponse<ApiResponse>) => {
-        const { code, message, data } = response.data;
+        const { code, data, message } = response.data;
 
         // 成功响应
         if (code === ErrorCode.SUCCESS) {
@@ -74,10 +79,10 @@ class ApiClient {
         (error as any).code = code;
         return Promise.reject(error);
       },
-      (error) => {
+      error => {
         // 网络错误或HTTP状态码错误
         if (error.response) {
-          const { status, data } = error.response;
+          const { data, status } = error.response;
 
           switch (status) {
             case 401:
@@ -110,44 +115,32 @@ class ApiClient {
     );
   }
 
-  /**
-   * GET请求
-   */
+  /** GET请求 */
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
     return this.instance.get(url, config);
   }
 
-  /**
-   * POST请求
-   */
+  /** POST请求 */
   async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
     return this.instance.post(url, data, config);
   }
 
-  /**
-   * PUT请求
-   */
+  /** PUT请求 */
   async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
     return this.instance.put(url, data, config);
   }
 
-  /**
-   * DELETE请求
-   */
+  /** DELETE请求 */
   async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
     return this.instance.delete(url, config);
   }
 
-  /**
-   * PATCH请求
-   */
+  /** PATCH请求 */
   async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
     return this.instance.patch(url, data, config);
   }
 
-  /**
-   * 上传文件
-   */
+  /** 上传文件 */
   async upload<T = any>(url: string, file: File, data?: Record<string, any>): Promise<T> {
     const formData = new FormData();
     formData.append('file', file);
@@ -160,17 +153,15 @@ class ApiClient {
 
     return this.instance.post(url, formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+        'Content-Type': 'multipart/form-data'
+      }
     });
   }
 
-  /**
-   * 下载文件
-   */
+  /** 下载文件 */
   async download(url: string, filename?: string): Promise<void> {
     const response = await this.instance.get(url, {
-      responseType: 'blob',
+      responseType: 'blob'
     });
 
     const blob = new Blob([response.data]);
@@ -190,7 +181,7 @@ export const apiClient = new ApiClient();
 
 // 便捷的模拟数据工具函数
 export const createMockResponse = <T>(data: T, delay = 500): Promise<T> => {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     setTimeout(() => {
       resolve(data);
     }, delay);
@@ -200,22 +191,26 @@ export const createMockResponse = <T>(data: T, delay = 500): Promise<T> => {
 // 创建分页模拟响应
 export const createMockPageResponse = <T>(
   records: T[],
-  current = 1,
-  size = 10,
-  delay = 500
+  options: {
+    current?: number;
+    delay?: number;
+    size?: number;
+  } = {}
 ): Promise<PageResponse<T>['data']> => {
-  return new Promise((resolve) => {
+  const { current = 1, delay = 500, size = 10 } = options;
+
+  return new Promise(resolve => {
     setTimeout(() => {
       const start = (current - 1) * size;
       const end = start + size;
       const pageRecords = records.slice(start, end);
 
       resolve({
-        records: pageRecords,
-        total: records.length,
         current,
-        size,
         pages: Math.ceil(records.length / size),
+        records: pageRecords,
+        size,
+        total: records.length
       });
     }, delay);
   });
