@@ -1,9 +1,13 @@
 import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+
 import { classController } from '@/controllers/classController';
 import { asyncErrorHandler } from '@/middleware/errorHandler';
+import { logger } from '@/utils/logger';
 // import { permissionMiddleware } from '@/middleware/auth';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 /**
  * @swagger
@@ -200,5 +204,105 @@ router.put('/:id', asyncErrorHandler(classController.updateClass));
  *         description: 班级不存在
  */
 router.delete('/:id', asyncErrorHandler(classController.deleteClass));
+
+/**
+ * @swagger
+ * /api/classes/students:
+ *   get:
+ *     summary: 获取班级学生列表
+ *     tags: [班级管理]
+ *     parameters:
+ *       - in: query
+ *         name: classId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 班级ID
+ *       - in: query
+ *         name: current
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: 当前页码
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: 每页大小
+ *     responses:
+ *       200:
+ *         description: 查询成功
+ */
+router.get('/students', async (req, res) => {
+  try {
+    const { classId, current = 1, size = 10 } = req.query;
+
+    if (!classId) {
+      return res.status(400).json({
+        code: 400,
+        message: '缺少班级ID参数',
+        data: null,
+        timestamp: Date.now(),
+        path: req.path
+      });
+    }
+
+    const page = parseInt(current as string);
+    const pageSize = parseInt(size as string);
+    const skip = (page - 1) * pageSize;
+
+    const [students, total] = await Promise.all([
+      prisma.classStudent.findMany({
+        where: { classId: parseInt(classId as string) },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize
+      }),
+      prisma.classStudent.count({ 
+        where: { classId: parseInt(classId as string) } 
+      })
+    ]);
+
+    const result = {
+      records: students.map(student => ({
+        id: student.id,
+        name: student.name,
+        company: student.company,
+        position: student.position,
+        phone: student.phone,
+        email: student.email,
+        joinDate: student.joinDate.toISOString().split('T')[0],
+        attendanceRate: student.attendanceRate,
+        status: student.status,
+        createdAt: student.createdAt.toISOString()
+      })),
+      total,
+      current: page,
+      size: pageSize,
+      pages: Math.ceil(total / pageSize)
+    };
+
+    res.json({
+      code: 0,
+      message: '获取班级学生列表成功',
+      data: result,
+      timestamp: Date.now(),
+      path: req.path
+    });
+  } catch (error) {
+    logger.error('获取班级学生列表失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '获取班级学生列表失败',
+      data: null,
+      timestamp: Date.now(),
+      path: req.path
+    });
+  }
+});
 
 export default router;

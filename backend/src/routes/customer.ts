@@ -1,7 +1,8 @@
 import { Router } from 'express';
+
 import { customerController } from '@/controllers/customerController';
-import { asyncErrorHandler } from '@/middleware/errorHandler';
 import { permissionMiddleware } from '@/middleware/auth';
+import { asyncErrorHandler } from '@/middleware/errorHandler';
 
 const router = Router();
 
@@ -58,7 +59,11 @@ router.get('/', permissionMiddleware('customer:list'), asyncErrorHandler(custome
  *       200:
  *         description: 查询成功
  */
-router.get('/statistics', permissionMiddleware('customer:list'), asyncErrorHandler(customerController.getCustomerStatistics));
+router.get(
+  '/statistics',
+  permissionMiddleware('customer:list'),
+  asyncErrorHandler(customerController.getCustomerStatistics)
+);
 
 /**
  * @swagger

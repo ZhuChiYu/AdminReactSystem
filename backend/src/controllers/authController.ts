@@ -1,26 +1,25 @@
-import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import type { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+
 import { config } from '@/config';
 import { prisma } from '@/config/database';
 import { redisUtils } from '@/config/redis';
-import { logger, loggerUtils } from '@/utils/logger';
-import {
-  createSuccessResponse,
-  createErrorResponse,
-  ValidationError,
-  AuthError,
-  NotFoundError,
-  ErrorCode
-} from '@/utils/errors';
 import { authService } from '@/services/authService';
+import {
+  AuthError,
+  ErrorCode,
+  NotFoundError,
+  ValidationError,
+  createErrorResponse,
+  createSuccessResponse
+} from '@/utils/errors';
+import { logger, loggerUtils } from '@/utils/logger';
 
 class AuthController {
-  /**
-   * 用户登录
-   */
+  /** 用户登录 */
   async login(req: Request, res: Response) {
-    const { userName, password, captcha } = req.body;
+    const { captcha, password, userName } = req.body;
 
     // 参数验证
     if (!userName || !password) {
@@ -29,7 +28,6 @@ class AuthController {
 
     // 查找用户
     const user = await prisma.user.findUnique({
-      where: { userName },
       include: {
         department: true,
         userRoles: {
@@ -38,14 +36,15 @@ class AuthController {
               include: {
                 rolePermissions: {
                   include: {
-                    permission: true,
-                  },
-                },
-              },
-            },
-          },
-        },
+                    permission: true
+                  }
+                }
+              }
+            }
+          }
+        }
       },
+      where: { userName }
     });
 
     if (!user) {
@@ -66,7 +65,7 @@ class AuthController {
     // 生成JWT token
     const tokenPayload = {
       userId: user.id,
-      userName: user.userName,
+      userName: user.userName
     };
 
     const jwtSecret = config.jwt.secret;
@@ -77,11 +76,11 @@ class AuthController {
     }
 
     const token = jwt.sign(tokenPayload, jwtSecret, {
-      expiresIn: config.jwt.expiresIn,
+      expiresIn: config.jwt.expiresIn
     });
 
     const refreshToken = jwt.sign(tokenPayload, jwtRefreshSecret, {
-      expiresIn: config.jwt.refreshExpiresIn,
+      expiresIn: config.jwt.refreshExpiresIn
     });
 
     // 计算过期时间
@@ -90,67 +89,69 @@ class AuthController {
 
     // 提取用户角色和权限
     const roles = user.userRoles.map(ur => ur.role.roleCode);
-    const permissions = user.userRoles.flatMap(ur =>
-      ur.role.rolePermissions.map(rp => rp.permission.code)
-    );
+    const permissions = user.userRoles.flatMap(ur => ur.role.rolePermissions.map(rp => rp.permission.code));
 
     // 构建用户信息
     const userInfo = {
-      userId: user.id.toString(),
-      userName: user.userName,
-      nickName: user.nickName,
-      email: user.email,
-      phone: user.phone,
       avatar: user.avatar,
-      gender: user.gender,
+      buttons: permissions,
       department: user.department?.name || '',
+      email: user.email,
+      gender: user.gender,
+      nickName: user.nickName,
+      permissions,
+      phone: user.phone,
       position: user.position || '',
       roles,
-      permissions,
-      buttons: permissions,
+      userId: user.id.toString(),
+      userName: user.userName
     };
 
     // 缓存用户信息（中间件需要的格式）
     const cacheUserInfo = {
       id: user.id,
-      userName: user.userName,
       nickName: user.nickName,
-      roles,
       permissions,
+      roles,
+      userName: user.userName
     };
     await redisUtils.set(`user:${user.id}`, cacheUserInfo, config.cache.userInfoTtl);
 
     // 更新最后登录信息
     await prisma.user.update({
-      where: { id: user.id },
       data: {
         lastLoginIp: req.ip,
-        lastLoginTime: new Date(),
+        lastLoginTime: new Date()
       },
+      where: { id: user.id }
     });
 
     // 记录登录日志
     loggerUtils.logBusiness(user.id, '用户登录', 'auth', {
       ip: req.ip,
-      userAgent: req.get('User-Agent'),
+      userAgent: req.get('User-Agent')
     });
 
     logger.info(`用户 ${userName} 登录成功`, {
-      userId: user.id,
       ip: req.ip,
+      userId: user.id
     });
 
-    res.json(createSuccessResponse({
-      token,
-      refreshToken,
-      expires,
-      userInfo,
-    }, '登录成功', req.path));
+    res.json(
+      createSuccessResponse(
+        {
+          expires,
+          refreshToken,
+          token,
+          userInfo
+        },
+        '登录成功',
+        req.path
+      )
+    );
   }
 
-  /**
-   * 用户登出
-   */
+  /** 用户登出 */
   async logout(req: Request, res: Response) {
     const authHeader = req.headers.authorization;
     const token = authHeader?.substring(7);
@@ -171,7 +172,7 @@ class AuthController {
 
         // 记录登出日志
         loggerUtils.logBusiness(req.user.id, '用户登出', 'auth', {
-          ip: req.ip,
+          ip: req.ip
         });
       }
     }
@@ -179,9 +180,7 @@ class AuthController {
     res.json(createSuccessResponse(null, '登出成功', req.path));
   }
 
-  /**
-   * 刷新token
-   */
+  /** 刷新token */
   async refreshToken(req: Request, res: Response) {
     const { refreshToken } = req.body;
 
@@ -196,7 +195,7 @@ class AuthController {
 
       // 检查用户是否存在且有效
       const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: userId }
       });
 
       if (!user || user.status !== 1) {
@@ -209,20 +208,21 @@ class AuthController {
         throw new Error('JWT密钥未配置');
       }
 
-      const newToken = jwt.sign(
-        { userId, userName },
-        jwtSecret,
-        { expiresIn: config.jwt.expiresIn }
-      );
+      const newToken = jwt.sign({ userId, userName }, jwtSecret, { expiresIn: config.jwt.expiresIn });
 
       const tokenDecoded = jwt.decode(newToken) as any;
       const expires = tokenDecoded.exp * 1000;
 
-      res.json(createSuccessResponse({
-        token: newToken,
-        expires,
-      }, '刷新成功', req.path));
-
+      res.json(
+        createSuccessResponse(
+          {
+            expires,
+            token: newToken
+          },
+          '刷新成功',
+          req.path
+        )
+      );
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         throw new AuthError('刷新令牌已过期');
@@ -234,9 +234,7 @@ class AuthController {
     }
   }
 
-  /**
-   * 获取当前用户信息
-   */
+  /** 获取当前用户信息 */
   async getCurrentUser(req: Request, res: Response) {
     if (!req.user) {
       throw new AuthError('用户未认证');
@@ -244,7 +242,6 @@ class AuthController {
 
     // 从数据库获取最新的用户信息
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
       include: {
         department: true,
         userRoles: {
@@ -253,14 +250,15 @@ class AuthController {
               include: {
                 rolePermissions: {
                   include: {
-                    permission: true,
-                  },
-                },
-              },
-            },
-          },
-        },
+                    permission: true
+                  }
+                }
+              }
+            }
+          }
+        }
       },
+      where: { id: req.user.id }
     });
 
     if (!user) {
@@ -269,41 +267,37 @@ class AuthController {
 
     // 提取角色和权限
     const roles = user.userRoles.map(ur => ur.role.roleCode);
-    const permissions = user.userRoles.flatMap(ur =>
-      ur.role.rolePermissions.map(rp => rp.permission.code)
-    );
+    const permissions = user.userRoles.flatMap(ur => ur.role.rolePermissions.map(rp => rp.permission.code));
 
     const userInfo = {
-      userId: user.id.toString(),
-      userName: user.userName,
-      nickName: user.nickName,
-      email: user.email,
-      phone: user.phone,
       avatar: user.avatar,
-      gender: user.gender,
+      buttons: permissions,
       department: user.department?.name || '',
+      email: user.email,
+      gender: user.gender,
+      nickName: user.nickName,
+      permissions,
+      phone: user.phone,
       position: user.position || '',
       roles,
-      permissions,
-      buttons: permissions,
+      userId: user.id.toString(),
+      userName: user.userName
     };
 
     // 更新缓存（中间件需要的格式）
     const cacheUserInfo = {
       id: user.id,
-      userName: user.userName,
       nickName: user.nickName,
-      roles,
       permissions,
+      roles,
+      userName: user.userName
     };
     await redisUtils.set(`user:${user.id}`, cacheUserInfo, config.cache.userInfoTtl);
 
     res.json(createSuccessResponse(userInfo, '获取成功', req.path));
   }
 
-  /**
-   * 获取验证码
-   */
+  /** 获取验证码 */
   async getCaptcha(req: Request, res: Response) {
     const captchaData = await authService.generateCaptcha();
 

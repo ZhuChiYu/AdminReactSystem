@@ -1,9 +1,11 @@
+import path from 'node:path';
+
 import { Router } from 'express';
-import { asyncErrorHandler } from '@/middleware/errorHandler';
-import { permissionMiddleware } from '@/middleware/auth';
-import { userController } from '@/controllers/userController';
 import multer from 'multer';
-import path from 'path';
+
+import { userController } from '@/controllers/userController';
+import { permissionMiddleware, authMiddleware } from '@/middleware/auth';
+import { asyncErrorHandler } from '@/middleware/errorHandler';
 
 const router = Router();
 
@@ -57,16 +59,16 @@ const upload = multer({
 router.get('/', permissionMiddleware('system:user:list'), (req, res) => {
   res.json({
     code: 0,
-    message: '用户管理功能开发中...',
     data: {
-      records: [],
-      total: 0,
       current: 1,
-      size: 10,
       pages: 0,
+      records: [],
+      size: 10,
+      total: 0
     },
-    timestamp: Date.now(),
+    message: '用户管理功能开发中...',
     path: req.path,
+    timestamp: Date.now()
   });
 });
 
@@ -108,17 +110,91 @@ router.get('/', permissionMiddleware('system:user:list'), (req, res) => {
  */
 router.get('/employees', permissionMiddleware('system:user:list'), asyncErrorHandler(userController.getEmployees));
 
+/**
+ * @swagger
+ * /api/users/{id}/profile:
+ *   put:
+ *     summary: 更新用户个人资料
+ *     tags: [用户管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 用户ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userName:
+ *                 type: string
+ *                 description: 用户名
+ *               email:
+ *                 type: string
+ *                 description: 邮箱
+ *               phone:
+ *                 type: string
+ *                 description: 手机号
+ *               avatar:
+ *                 type: string
+ *                 description: 头像URL
+ *               department:
+ *                 type: string
+ *                 description: 部门
+ *     responses:
+ *       200:
+ *         description: 更新成功
+ */
+router.put('/:id/profile', authMiddleware, asyncErrorHandler(userController.updateProfile));
+
+/**
+ * @swagger
+ * /api/users/{id}/password:
+ *   put:
+ *     summary: 修改用户密码
+ *     tags: [用户管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 用户ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 description: 旧密码
+ *               newPassword:
+ *                 type: string
+ *                 description: 新密码
+ *     responses:
+ *       200:
+ *         description: 修改成功
+ */
+router.put('/:id/password', authMiddleware, asyncErrorHandler(userController.changePassword));
+
 // 导入员工数据
-router.post('/import',
+router.post(
+  '/import',
   permissionMiddleware('system:user:import'),
   upload.single('file'),
   asyncErrorHandler(userController.importEmployees)
 );
 
 // 下载导入模板
-router.get('/template',
-  permissionMiddleware('system:user:import'),
-  asyncErrorHandler(userController.downloadTemplate)
-);
+router.get('/template', permissionMiddleware('system:user:import'), asyncErrorHandler(userController.downloadTemplate));
 
 export default router;

@@ -1,28 +1,13 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
+
 import { prisma } from '@/config/database';
+import { ErrorCode, NotFoundError, ValidationError, createErrorResponse, createSuccessResponse } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import {
-  createSuccessResponse,
-  createErrorResponse,
-  ValidationError,
-  NotFoundError,
-  ErrorCode
-} from '@/utils/errors';
 
 class CustomerController {
-  /**
-   * 获取客户列表
-   */
+  /** 获取客户列表 */
   async getCustomers(req: Request, res: Response) {
-    const {
-      current = 1,
-      size = 10,
-      customerName,
-      company,
-      followStatus,
-      industry,
-      source
-    } = req.query;
+    const { company, current = 1, customerName, followStatus, industry, size = 10, source } = req.query;
 
     const page = Number(current);
     const pageSize = Number(size);
@@ -63,97 +48,103 @@ class CustomerController {
 
       // 获取客户列表
       const customers = await prisma.customer.findMany({
-        where,
-        skip,
-        take: pageSize,
         include: {
           assignedTo: {
             select: {
               id: true,
-              userName: true,
-              nickName: true
+              nickName: true,
+              userName: true
             }
           },
           createdBy: {
             select: {
               id: true,
-              userName: true,
-              nickName: true
+              nickName: true,
+              userName: true
             }
           }
         },
         orderBy: {
           createdAt: 'desc'
-        }
+        },
+        skip,
+        take: pageSize,
+        where
       });
 
       // 格式化返回数据
       const records = customers.map(customer => ({
-        id: customer.id,
-        customerName: customer.customerName,
-        company: customer.company,
-        position: customer.position,
-        phone: customer.phone,
-        mobile: customer.mobile,
-        email: customer.email,
-        wechat: customer.wechat,
-        industry: customer.industry,
-        source: customer.source,
-        level: customer.level,
-        followStatus: customer.followStatus,
-        nextFollowTime: customer.nextFollowTime,
-        assignedTo: customer.assignedTo ? {
-          id: customer.assignedTo.id,
-          name: customer.assignedTo.nickName
-        } : null,
         assignedTime: customer.assignedTime,
-        createdBy: customer.createdBy ? {
-          id: customer.createdBy.id,
-          name: customer.createdBy.nickName
-        } : null,
-        remark: customer.remark,
+        assignedTo: customer.assignedTo
+          ? {
+              id: customer.assignedTo.id,
+              name: customer.assignedTo.nickName
+            }
+          : null,
+        company: customer.company,
         createdAt: customer.createdAt,
-        updatedAt: customer.updatedAt
+        createdBy: customer.createdBy
+          ? {
+              id: customer.createdBy.id,
+              name: customer.createdBy.nickName
+            }
+          : null,
+        customerName: customer.customerName,
+        email: customer.email,
+        followStatus: customer.followStatus,
+        id: customer.id,
+        industry: customer.industry,
+        level: customer.level,
+        mobile: customer.mobile,
+        nextFollowTime: customer.nextFollowTime,
+        phone: customer.phone,
+        position: customer.position,
+        remark: customer.remark,
+        source: customer.source,
+        updatedAt: customer.updatedAt,
+        wechat: customer.wechat
       }));
 
       const pages = Math.ceil(total / pageSize);
 
-      res.json(createSuccessResponse({
-        records,
-        total,
-        current: page,
-        size: pageSize,
-        pages
-      }, '查询成功', req.path));
-
+      res.json(
+        createSuccessResponse(
+          {
+            current: page,
+            pages,
+            records,
+            size: pageSize,
+            total
+          },
+          '查询成功',
+          req.path
+        )
+      );
     } catch (error) {
       logger.error('获取客户列表失败:', error);
       res.status(500).json(createErrorResponse(500, '获取客户列表失败', null, req.path));
     }
   }
 
-  /**
-   * 获取客户详情
-   */
+  /** 获取客户详情 */
   async getCustomerById(req: Request, res: Response) {
     const { id } = req.params;
 
     try {
       const customer = await prisma.customer.findUnique({
-        where: { id: Number(id) },
         include: {
           assignedTo: {
             select: {
               id: true,
-              userName: true,
-              nickName: true
+              nickName: true,
+              userName: true
             }
           },
           createdBy: {
             select: {
               id: true,
-              userName: true,
-              nickName: true
+              nickName: true,
+              userName: true
             }
           },
           followRecords: {
@@ -161,8 +152,8 @@ class CustomerController {
               followUser: {
                 select: {
                   id: true,
-                  userName: true,
-                  nickName: true
+                  nickName: true,
+                  userName: true
                 }
               }
             },
@@ -170,7 +161,8 @@ class CustomerController {
               createdAt: 'desc'
             }
           }
-        }
+        },
+        where: { id: Number(id) }
       });
 
       if (!customer) {
@@ -178,48 +170,51 @@ class CustomerController {
       }
 
       const result = {
-        id: customer.id,
-        customerName: customer.customerName,
-        company: customer.company,
-        position: customer.position,
-        phone: customer.phone,
-        mobile: customer.mobile,
-        email: customer.email,
-        wechat: customer.wechat,
-        industry: customer.industry,
-        source: customer.source,
-        level: customer.level,
-        followStatus: customer.followStatus,
-        nextFollowTime: customer.nextFollowTime,
-        assignedTo: customer.assignedTo ? {
-          id: customer.assignedTo.id,
-          name: customer.assignedTo.nickName
-        } : null,
         assignedTime: customer.assignedTime,
-        createdBy: customer.createdBy ? {
-          id: customer.createdBy.id,
-          name: customer.createdBy.nickName
-        } : null,
-        remark: customer.remark,
+        assignedTo: customer.assignedTo
+          ? {
+              id: customer.assignedTo.id,
+              name: customer.assignedTo.nickName
+            }
+          : null,
+        company: customer.company,
         createdAt: customer.createdAt,
-        updatedAt: customer.updatedAt,
+        createdBy: customer.createdBy
+          ? {
+              id: customer.createdBy.id,
+              name: customer.createdBy.nickName
+            }
+          : null,
+        customerName: customer.customerName,
+        email: customer.email,
         followRecords: customer.followRecords.map(record => ({
-          id: record.id,
-          followType: record.followType,
+          attachments: record.attachments,
+          createdAt: record.createdAt,
           followContent: record.followContent,
           followResult: record.followResult,
-          nextFollowTime: record.nextFollowTime,
+          followType: record.followType,
           followUser: {
             id: record.followUser.id,
             name: record.followUser.nickName
           },
-          attachments: record.attachments,
-          createdAt: record.createdAt
-        }))
+          id: record.id,
+          nextFollowTime: record.nextFollowTime
+        })),
+        followStatus: customer.followStatus,
+        id: customer.id,
+        industry: customer.industry,
+        level: customer.level,
+        mobile: customer.mobile,
+        nextFollowTime: customer.nextFollowTime,
+        phone: customer.phone,
+        position: customer.position,
+        remark: customer.remark,
+        source: customer.source,
+        updatedAt: customer.updatedAt,
+        wechat: customer.wechat
       };
 
       res.json(createSuccessResponse(result, '查询成功', req.path));
-
     } catch (error) {
       if (error instanceof NotFoundError) {
         res.status(404).json(createErrorResponse(404, error.message, null, req.path));
@@ -230,23 +225,21 @@ class CustomerController {
     }
   }
 
-  /**
-   * 创建客户
-   */
+  /** 创建客户 */
   async createCustomer(req: Request, res: Response) {
     const {
-      customerName,
       company,
-      position,
-      phone,
-      mobile,
+      customerName,
       email,
-      wechat,
-      industry,
-      source,
-      level = 1,
       followStatus = 'consult',
-      remark
+      industry,
+      level = 1,
+      mobile,
+      phone,
+      position,
+      remark,
+      source,
+      wechat
     } = req.body;
 
     // 参数验证
@@ -261,82 +254,87 @@ class CustomerController {
     try {
       const customer = await prisma.customer.create({
         data: {
-          customerName,
           company,
-          position,
-          phone,
-          mobile,
-          email,
-          wechat,
-          industry,
-          source,
-          level: Number(level),
-          followStatus,
           createdById: req.user.id,
-          remark
+          customerName,
+          email,
+          followStatus,
+          industry,
+          level: Number(level),
+          mobile,
+          phone,
+          position,
+          remark,
+          source,
+          wechat
         },
         include: {
           createdBy: {
             select: {
               id: true,
-              userName: true,
-              nickName: true
+              nickName: true,
+              userName: true
             }
           }
         }
       });
 
       logger.info(`用户 ${req.user.userName} 创建客户: ${customerName}`, {
-        userId: req.user.id,
-        customerId: customer.id
+        customerId: customer.id,
+        userId: req.user.id
       });
 
-      res.json(createSuccessResponse({
-        id: customer.id,
-        customerName: customer.customerName,
-        company: customer.company,
-        position: customer.position,
-        phone: customer.phone,
-        mobile: customer.mobile,
-        email: customer.email,
-        wechat: customer.wechat,
-        industry: customer.industry,
-        source: customer.source,
-        level: customer.level,
-        followStatus: customer.followStatus,
-        createdBy: customer.createdBy ? {
-          id: customer.createdBy.id,
-          name: customer.createdBy.nickName
-        } : null,
-        remark: customer.remark,
-        createdAt: customer.createdAt,
-        updatedAt: customer.updatedAt
-      }, '创建成功', req.path));
-
+      res.json(
+        createSuccessResponse(
+          {
+            company: customer.company,
+            createdAt: customer.createdAt,
+            createdBy: customer.createdBy
+              ? {
+                  id: customer.createdBy.id,
+                  name: customer.createdBy.nickName
+                }
+              : null,
+            customerName: customer.customerName,
+            email: customer.email,
+            followStatus: customer.followStatus,
+            id: customer.id,
+            industry: customer.industry,
+            level: customer.level,
+            mobile: customer.mobile,
+            phone: customer.phone,
+            position: customer.position,
+            remark: customer.remark,
+            source: customer.source,
+            updatedAt: customer.updatedAt,
+            wechat: customer.wechat
+          },
+          '创建成功',
+          req.path
+        )
+      );
     } catch (error) {
       logger.error('创建客户失败:', error);
       res.status(500).json(createErrorResponse(500, '创建客户失败', null, req.path));
     }
   }
 
-  /**
-   * 更新客户
-   */
+  /** 更新客户 */
   async updateCustomer(req: Request, res: Response) {
     const { id } = req.params;
     const {
-      customerName,
       company,
-      position,
-      phone,
-      mobile,
+      customerName,
       email,
-      wechat,
-      industry,
-      source,
-      level,
       followStatus,
-      remark
+      industry,
+      level,
+      mobile,
+      phone,
+      position,
+      remark,
+      source,
+      wechat
     } = req.body;
 
     if (!req.user) {
@@ -354,70 +352,79 @@ class CustomerController {
       }
 
       const customer = await prisma.customer.update({
-        where: { id: Number(id) },
         data: {
-          customerName,
           company,
-          position,
-          phone,
-          mobile,
+          customerName,
           email,
-          wechat,
-          industry,
-          source,
-          level: level ? Number(level) : undefined,
           followStatus,
-          remark
+          industry,
+          level: level ? Number(level) : undefined,
+          mobile,
+          phone,
+          position,
+          remark,
+          source,
+          wechat
         },
         include: {
           assignedTo: {
             select: {
               id: true,
-              userName: true,
-              nickName: true
+              nickName: true,
+              userName: true
             }
           },
           createdBy: {
             select: {
               id: true,
-              userName: true,
-              nickName: true
+              nickName: true,
+              userName: true
             }
           }
-        }
+        },
+        where: { id: Number(id) }
       });
 
       logger.info(`用户 ${req.user.userName} 更新客户: ${customer.customerName}`, {
-        userId: req.user.id,
-        customerId: customer.id
+        customerId: customer.id,
+        userId: req.user.id
       });
 
-      res.json(createSuccessResponse({
-        id: customer.id,
-        customerName: customer.customerName,
-        company: customer.company,
-        position: customer.position,
-        phone: customer.phone,
-        mobile: customer.mobile,
-        email: customer.email,
-        wechat: customer.wechat,
-        industry: customer.industry,
-        source: customer.source,
-        level: customer.level,
-        followStatus: customer.followStatus,
-        assignedTo: customer.assignedTo ? {
-          id: customer.assignedTo.id,
-          name: customer.assignedTo.nickName
-        } : null,
-        createdBy: customer.createdBy ? {
-          id: customer.createdBy.id,
-          name: customer.createdBy.nickName
-        } : null,
-        remark: customer.remark,
-        createdAt: customer.createdAt,
-        updatedAt: customer.updatedAt
-      }, '更新成功', req.path));
-
+      res.json(
+        createSuccessResponse(
+          {
+            assignedTo: customer.assignedTo
+              ? {
+                  id: customer.assignedTo.id,
+                  name: customer.assignedTo.nickName
+                }
+              : null,
+            company: customer.company,
+            createdAt: customer.createdAt,
+            createdBy: customer.createdBy
+              ? {
+                  id: customer.createdBy.id,
+                  name: customer.createdBy.nickName
+                }
+              : null,
+            customerName: customer.customerName,
+            email: customer.email,
+            followStatus: customer.followStatus,
+            id: customer.id,
+            industry: customer.industry,
+            level: customer.level,
+            mobile: customer.mobile,
+            phone: customer.phone,
+            position: customer.position,
+            remark: customer.remark,
+            source: customer.source,
+            updatedAt: customer.updatedAt,
+            wechat: customer.wechat
+          },
+          '更新成功',
+          req.path
+        )
+      );
     } catch (error) {
       if (error instanceof NotFoundError) {
         res.status(404).json(createErrorResponse(404, error.message, null, req.path));
@@ -428,9 +435,7 @@ class CustomerController {
     }
   }
 
-  /**
-   * 删除客户
-   */
+  /** 删除客户 */
   async deleteCustomer(req: Request, res: Response) {
     const { id } = req.params;
 
@@ -453,12 +458,11 @@ class CustomerController {
       });
 
       logger.info(`用户 ${req.user.userName} 删除客户: ${existingCustomer.customerName}`, {
-        userId: req.user.id,
-        customerId: existingCustomer.id
+        customerId: existingCustomer.id,
+        userId: req.user.id
       });
 
       res.json(createSuccessResponse(null, '删除成功', req.path));
-
     } catch (error) {
       if (error instanceof NotFoundError) {
         res.status(404).json(createErrorResponse(404, error.message, null, req.path));
@@ -469,17 +473,15 @@ class CustomerController {
     }
   }
 
-  /**
-   * 获取客户统计数据
-   */
+  /** 获取客户统计数据 */
   async getCustomerStatistics(req: Request, res: Response) {
     try {
       // 获取各个状态的客户数量
       const statistics = await prisma.customer.groupBy({
-        by: ['followStatus'],
         _count: {
           followStatus: true
-        }
+        },
+        by: ['followStatus']
       });
 
       // 获取总客户数
@@ -488,16 +490,16 @@ class CustomerController {
       // 格式化统计数据
       const result: Record<string, number> = {
         all: totalCount,
-        consult: 0,
-        wechat_added: 0,
-        registered: 0,
         arrived: 0,
-        new_develop: 0,
+        consult: 0,
         early_25: 0,
         effective_visit: 0,
+        new_develop: 0,
         not_arrived: 0,
+        registered: 0,
         rejected: 0,
-        vip: 0
+        vip: 0,
+        wechat_added: 0
       };
 
       // 填充实际统计数据
@@ -508,7 +510,6 @@ class CustomerController {
       });
 
       res.json(createSuccessResponse(result, '查询成功', req.path));
-
     } catch (error) {
       logger.error('获取客户统计失败:', error);
       res.status(500).json(createErrorResponse(500, '获取客户统计失败', null, req.path));

@@ -1,23 +1,16 @@
-import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { createSuccessResponse, createErrorResponse } from '@/utils/response';
+import type { Request, Response } from 'express';
+
 import { logger } from '@/utils/logger';
+import { createErrorResponse, createSuccessResponse } from '@/utils/response';
 
 const prisma = new PrismaClient();
 
 class ClassController {
-  /**
-   * 获取班级列表
-   */
+  /** 获取班级列表 */
   async getClasses(req: Request, res: Response) {
     try {
-      const {
-        current = 1,
-        size = 10,
-        name,
-        categoryId,
-        status
-      } = req.query;
+      const { categoryId, current = 1, name, size = 10, status } = req.query;
 
       const page = Number(current);
       const pageSize = Number(size);
@@ -44,51 +37,51 @@ class ClassController {
       // 查询班级列表
       const [classes, total] = await Promise.all([
         prisma.class.findMany({
-          where,
-          skip,
-          take: pageSize,
-          orderBy: {
-            createdAt: 'desc'
-          },
           include: {
             students: {
               select: {
+                company: true,
+                email: true,
                 id: true,
                 name: true,
-                company: true,
-                position: true,
                 phone: true,
-                email: true,
+                position: true,
                 status: true
               }
             }
-          }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          skip,
+          take: pageSize,
+          where
         }),
         prisma.class.count({ where })
       ]);
 
       // 格式化返回数据
       const formattedClasses = classes.map(classItem => ({
-        id: classItem.id,
-        name: classItem.name,
         categoryId: classItem.categoryId,
         categoryName: classItem.categoryName,
-        teacher: classItem.teacher,
+        createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
         description: classItem.description,
-        startDate: classItem.startDate.toISOString().split('T')[0],
         endDate: classItem.endDate.toISOString().split('T')[0],
+        id: classItem.id,
+        name: classItem.name,
+        startDate: classItem.startDate.toISOString().split('T')[0],
         status: classItem.status,
         studentCount: classItem.students.length,
-        createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
+        teacher: classItem.teacher,
         updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       }));
 
       const result = {
-        records: formattedClasses,
         current: page,
+        pages: Math.ceil(total / pageSize),
+        records: formattedClasses,
         size: pageSize,
-        total,
-        pages: Math.ceil(total / pageSize)
+        total
       };
 
       res.json(createSuccessResponse(result, '获取班级列表成功', req.path));
@@ -98,22 +91,20 @@ class ClassController {
     }
   }
 
-  /**
-   * 获取班级详情
-   */
+  /** 获取班级详情 */
   async getClassById(req: Request, res: Response) {
     try {
       const { id } = req.params;
 
       const classItem = await prisma.class.findUnique({
-        where: { id: Number(id) },
         include: {
           students: {
             orderBy: {
               createdAt: 'asc'
             }
           }
-        }
+        },
+        where: { id: Number(id) }
       });
 
       if (!classItem) {
@@ -122,30 +113,30 @@ class ClassController {
 
       // 格式化返回数据
       const formattedClass = {
-        id: classItem.id,
-        name: classItem.name,
         categoryId: classItem.categoryId,
         categoryName: classItem.categoryName,
-        teacher: classItem.teacher,
+        createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
         description: classItem.description,
-        startDate: classItem.startDate.toISOString().split('T')[0],
         endDate: classItem.endDate.toISOString().split('T')[0],
+        id: classItem.id,
+        name: classItem.name,
+        startDate: classItem.startDate.toISOString().split('T')[0],
         status: classItem.status,
         studentCount: classItem.students.length,
-        createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
-        updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19),
         students: classItem.students.map(student => ({
-          id: student.id,
-          name: student.name,
-          company: student.company,
-          position: student.position,
-          phone: student.phone,
-          email: student.email,
-          joinDate: student.joinDate.toISOString().split('T')[0],
           attendanceRate: student.attendanceRate,
-          status: student.status,
-          createdAt: student.createdAt.toISOString().replace('T', ' ').substring(0, 19)
-        }))
+          company: student.company,
+          createdAt: student.createdAt.toISOString().replace('T', ' ').substring(0, 19),
+          email: student.email,
+          id: student.id,
+          joinDate: student.joinDate.toISOString().split('T')[0],
+          name: student.name,
+          phone: student.phone,
+          position: student.position,
+          status: student.status
+        })),
+        teacher: classItem.teacher,
+        updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       };
 
       res.json(createSuccessResponse(formattedClass, '获取班级详情成功', req.path));
@@ -155,21 +146,10 @@ class ClassController {
     }
   }
 
-  /**
-   * 创建班级
-   */
+  /** 创建班级 */
   async createClass(req: Request, res: Response) {
     try {
-      const {
-        name,
-        categoryId,
-        categoryName,
-        teacher,
-        description,
-        startDate,
-        endDate,
-        students = []
-      } = req.body;
+      const { categoryId, categoryName, description, endDate, name, startDate, students = [], teacher } = req.body;
 
       // 验证必填字段
       if (!name || !categoryId || !categoryName || !teacher || !startDate || !endDate) {
@@ -190,27 +170,27 @@ class ClassController {
       // 创建班级
       const newClass = await prisma.class.create({
         data: {
-          name,
           categoryId: Number(categoryId),
           categoryName,
-          teacher,
           description,
-          startDate: new Date(startDate),
           endDate: new Date(endDate),
+          name,
+          startDate: new Date(startDate),
           status,
           studentCount: students.length,
           students: {
             create: students.map((student: any) => ({
-              name: student.name,
+              attendanceRate: student.attendanceRate || 100,
               company: student.company || '',
-              position: student.position || '',
-              phone: student.phone || '',
               email: student.email || '',
               joinDate: new Date(student.joinDate || startDate),
-              attendanceRate: student.attendanceRate || 100,
+              name: student.name,
+              phone: student.phone || '',
+              position: student.position || '',
               status: student.status || 1
             }))
-          }
+          },
+          teacher
         },
         include: {
           students: true
@@ -224,21 +204,11 @@ class ClassController {
     }
   }
 
-  /**
-   * 更新班级
-   */
+  /** 更新班级 */
   async updateClass(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const {
-        name,
-        categoryId,
-        categoryName,
-        teacher,
-        description,
-        startDate,
-        endDate
-      } = req.body;
+      const { categoryId, categoryName, description, endDate, name, startDate, teacher } = req.body;
 
       // 检查班级是否存在
       const existingClass = await prisma.class.findUnique({
@@ -262,20 +232,20 @@ class ClassController {
 
       // 更新班级
       const updatedClass = await prisma.class.update({
-        where: { id: Number(id) },
         data: {
-          name,
           categoryId: Number(categoryId),
           categoryName,
-          teacher,
           description,
-          startDate: new Date(startDate),
           endDate: new Date(endDate),
-          status
+          name,
+          startDate: new Date(startDate),
+          status,
+          teacher
         },
         include: {
           students: true
-        }
+        },
+        where: { id: Number(id) }
       });
 
       res.json(createSuccessResponse(updatedClass, '更新班级成功', req.path));
@@ -285,9 +255,7 @@ class ClassController {
     }
   }
 
-  /**
-   * 删除班级
-   */
+  /** 删除班级 */
   async deleteClass(req: Request, res: Response) {
     try {
       const { id } = req.params;
