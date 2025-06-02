@@ -122,6 +122,12 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 ]
               },
               {
+                matchedFiles: [null, '/src/pages/(base)/course-manage/detail/index.tsx', null, null],
+                name: '(base)_course-manage_detail',
+                path: '/course-manage/detail',
+                handle: { i18nKey: 'route.(base)_course-manage_detail', title: '(base)_course-manage_detail' }
+              },
+              {
                 matchedFiles: [null, '/src/pages/(base)/course-manage/list/index.tsx', null, null],
                 name: '(base)_course-manage_list',
                 path: '/course-manage/list',

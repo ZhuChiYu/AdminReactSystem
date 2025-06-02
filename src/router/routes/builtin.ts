@@ -34,6 +34,17 @@ export const BaseChildrenRoutes = [
     children: [
       {
         handle: {
+          i18nKey: 'route.(base)_course-manage_list',
+          icon: 'mdi:format-list-bulleted',
+          order: 1,
+          title: 'course_list'
+        },
+        id: 'course_list',
+        lazy: () => import('@/pages/(base)/course-manage/list').then(convert),
+        path: '/course-manage/list'
+      },
+      {
+        handle: {
           i18nKey: 'route.(base)_course-manage_category',
           icon: 'mdi:folder-multiple-outline',
           order: 2,
@@ -42,6 +53,17 @@ export const BaseChildrenRoutes = [
         id: 'course_category',
         lazy: () => import('@/pages/(base)/course-manage/category').then(convert),
         path: '/course-manage/category'
+      },
+      {
+        handle: {
+          hideInMenu: true,
+          i18nKey: 'route.(base)_course-manage_detail',
+          icon: 'mdi:card-account-details-outline',
+          title: 'course_detail'
+        },
+        id: 'course_detail',
+        lazy: () => import('@/pages/(base)/course-manage/detail').then(convert),
+        path: '/course-manage/detail/:courseId'
       },
       {
         handle: {

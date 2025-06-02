@@ -28,6 +28,7 @@ export const pages: Record<string, () => Promise<any>> = {
 "(base)_course-manage_category": () => import("@/pages/(base)/course-manage/category/index.tsx"),
 "(base)_course-manage_class_detail": () => import("@/pages/(base)/course-manage/class/detail/index.tsx"),
 "(base)_course-manage_class": () => import("@/pages/(base)/course-manage/class/index.tsx"),
+"(base)_course-manage_detail": () => import("@/pages/(base)/course-manage/detail/index.tsx"),
 "(base)_course-manage": () => import("@/pages/(base)/course-manage/index.tsx"),
 "(base)_course-manage_list": () => import("@/pages/(base)/course-manage/list/index.tsx"),
 "(base)_customer-manage_assign": () => import("@/pages/(base)/customer-manage/assign/index.tsx"),

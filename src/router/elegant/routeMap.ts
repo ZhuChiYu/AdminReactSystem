@@ -36,6 +36,7 @@ export const routeMap: RouteMap = {
  "(base)_course-manage_category": "/course-manage/category",
  "(base)_course-manage_class": "/course-manage/class",
  "(base)_course-manage_class_detail": "/course-manage/class/detail",
+ "(base)_course-manage_detail": "/course-manage/detail",
  "(base)_course-manage_list": "/course-manage/list",
  "(base)_customer-manage": "/customer-manage",
  "(base)_customer-manage_assign": "/customer-manage/assign",

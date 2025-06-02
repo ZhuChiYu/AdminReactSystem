@@ -21,6 +21,7 @@ function initRoutes() {
     // 要移除的菜单项ID列表
     const removeMenuIds = [
       'class-manage', // 避免班级管理重复
+      'course-manage', // 避免课程管理重复 - 使用手动配置的路由
       'multi-menu', // 多级菜单
       'function', // 系统功能
       'projects', // 多级动态路由
