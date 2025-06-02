@@ -1,10 +1,11 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+
 import { config } from '@/config';
-import { logger } from '@/utils/logger';
-import { redisUtils } from '@/config/redis';
 import { prisma } from '@/config/database';
+import { redisUtils } from '@/config/redis';
 import { AuthError, createErrorResponse } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 
 // 扩展Request类型
 declare global {
@@ -12,10 +13,10 @@ declare global {
     interface Request {
       user?: {
         id: number;
-        userName: string;
         nickName: string;
-        roles: string[];
         permissions: string[];
+        roles: string[];
+        userName: string;
       };
     }
   }
@@ -43,18 +44,17 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const { userId, userName } = decoded;
 
     // 从缓存获取用户信息
-    let userInfo = await redisUtils.get(`user:${userId}`) as {
+    let userInfo = (await redisUtils.get(`user:${userId}`)) as {
       id: number;
-      userName: string;
       nickName: string;
-      roles: string[];
       permissions: string[];
+      roles: string[];
+      userName: string;
     } | null;
 
     if (!userInfo) {
       // 缓存中没有，从数据库获取
       const user = await prisma.user.findUnique({
-        where: { id: userId },
         include: {
           userRoles: {
             include: {
@@ -62,14 +62,15 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
                 include: {
                   rolePermissions: {
                     include: {
-                      permission: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
+                      permission: true
+                    }
+                  }
+                }
+              }
+            }
+          }
         },
+        where: { id: userId }
       });
 
       if (!user || user.status !== 1) {
@@ -78,16 +79,14 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
       // 提取角色和权限
       const roles = user.userRoles.map(ur => ur.role.roleCode);
-      const permissions = user.userRoles.flatMap(ur =>
-        ur.role.rolePermissions.map(rp => rp.permission.code)
-      );
+      const permissions = user.userRoles.flatMap(ur => ur.role.rolePermissions.map(rp => rp.permission.code));
 
       userInfo = {
         id: user.id,
-        userName: user.userName,
         nickName: user.nickName,
-        roles,
         permissions,
+        roles,
+        userName: user.userName
       };
 
       // 缓存用户信息
@@ -180,7 +179,7 @@ export const optionalAuthMiddleware = async (req: Request, res: Response, next: 
       }
 
       // 获取用户信息
-      let userInfo = await redisUtils.get<any>(`user:${userId}`);
+      const userInfo = await redisUtils.get<any>(`user:${userId}`);
       if (userInfo) {
         req.user = userInfo;
       }

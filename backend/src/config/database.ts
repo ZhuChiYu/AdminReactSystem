@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+
 import { logger } from '@/utils/logger';
 
 // 创建Prisma客户端实例
@@ -6,39 +7,39 @@ export const prisma = new PrismaClient({
   log: [
     {
       emit: 'event',
-      level: 'query',
+      level: 'query'
     },
     {
       emit: 'event',
-      level: 'error',
+      level: 'error'
     },
     {
       emit: 'event',
-      level: 'info',
+      level: 'info'
     },
     {
       emit: 'event',
-      level: 'warn',
-    },
-  ],
+      level: 'warn'
+    }
+  ]
 });
 
 // 监听Prisma事件
-prisma.$on('query', (e) => {
+prisma.$on('query', e => {
   logger.debug(`Query: ${e.query}`);
   logger.debug(`Params: ${e.params}`);
   logger.debug(`Duration: ${e.duration}ms`);
 });
 
-prisma.$on('error', (e) => {
+prisma.$on('error', e => {
   logger.error('Prisma Error:', e);
 });
 
-prisma.$on('info', (e) => {
+prisma.$on('info', e => {
   logger.info('Prisma Info:', e.message);
 });
 
-prisma.$on('warn', (e) => {
+prisma.$on('warn', e => {
   logger.warn('Prisma Warning:', e.message);
 });
 

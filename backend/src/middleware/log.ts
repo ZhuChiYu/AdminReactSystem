@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
+
 import { logger, loggerUtils } from '@/utils/logger';
 
 // 请求日志中间件
@@ -9,7 +10,7 @@ export const logMiddleware = (req: Request, res: Response, next: NextFunction) =
   logger.info(`🔵 ${req.method} ${req.originalUrl} - 开始处理`, {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    userId: req.user?.id,
+    userId: req.user?.id
   });
 
   // 监听响应结束事件

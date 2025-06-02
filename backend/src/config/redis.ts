@@ -1,19 +1,20 @@
 import { createClient } from 'redis';
+
 import { config } from '@/config';
 import { logger } from '@/utils/logger';
 
 // 创建Redis客户端
 export const redis = createClient({
-  url: config.redisUrl,
   socket: {
-    reconnectStrategy: (retries) => {
+    reconnectStrategy: retries => {
       if (retries > 10) {
         logger.error('Redis重连次数超过限制，停止重连');
         return false;
       }
       return Math.min(retries * 100, 3000);
-    },
+    }
   },
+  url: config.redisUrl
 });
 
 // Redis事件监听
@@ -25,7 +26,7 @@ redis.on('ready', () => {
   logger.info('✅ Redis准备就绪');
 });
 
-redis.on('error', (error) => {
+redis.on('error', error => {
   logger.error('❌ Redis连接错误:', error);
 });
 
@@ -74,31 +75,6 @@ export const checkRedisHealth = async () => {
 
 // Redis工具函数
 export const redisUtils = {
-  // 设置缓存
-  async set(key: string, value: any, ttl?: number): Promise<void> {
-    try {
-      const serializedValue = JSON.stringify(value);
-      if (ttl) {
-        await redis.setEx(key, ttl, serializedValue);
-      } else {
-        await redis.set(key, serializedValue);
-      }
-    } catch (error) {
-      logger.error(`Redis设置缓存失败 [${key}]:`, error);
-    }
-  },
-
-  // 获取缓存
-  async get<T>(key: string): Promise<T | null> {
-    try {
-      const value = await redis.get(key);
-      return value ? JSON.parse(value) : null;
-    } catch (error) {
-      logger.error(`Redis获取缓存失败 [${key}]:`, error);
-      return null;
-    }
-  },
-
   // 删除缓存
   async del(key: string): Promise<void> {
     try {
@@ -140,6 +116,31 @@ export const redisUtils = {
     }
   },
 
+  // 获取缓存
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const value = await redis.get(key);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      logger.error(`Redis获取缓存失败 [${key}]:`, error);
+      return null;
+    }
+  },
+
+  // 设置缓存
+  async set(key: string, value: any, ttl?: number): Promise<void> {
+    try {
+      const serializedValue = JSON.stringify(value);
+      if (ttl) {
+        await redis.setEx(key, ttl, serializedValue);
+      } else {
+        await redis.set(key, serializedValue);
+      }
+    } catch (error) {
+      logger.error(`Redis设置缓存失败 [${key}]:`, error);
+    }
+  },
+
   // 获取剩余过期时间
   async ttl(key: string): Promise<number> {
     try {
@@ -148,7 +149,7 @@ export const redisUtils = {
       logger.error(`Redis获取过期时间失败 [${key}]:`, error);
       return -1;
     }
-  },
+  }
 };
 
 export default redis;

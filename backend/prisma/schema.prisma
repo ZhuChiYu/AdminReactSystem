@@ -48,6 +48,8 @@ model User {
   meetingParticipants MeetingParticipant[]
   financialRecords FinancialRecord[]
   operationLogs OperationLog[]
+  assignedTasks Task[] @relation("TaskAssignee")
+  uploadedAttachments Attachment[] @relation("AttachmentUploader")
 
   @@map("users")
 }
@@ -228,15 +230,13 @@ model Course {
   location        String   @db.VarChar(200)
   tags            Json?    // 标签 JSON 数组
   status          Int      @default(0) // 0-草稿, 1-已发布, 2-已下架
-  rating          Decimal? @default(0) @db.Decimal(3, 2)
-  reviewCount     Int      @default(0) @map("review_count")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   // 关联关系
   category    CourseCategory @relation(fields: [categoryId], references: [id])
   enrollments CourseEnrollment[]
-  reviews     CourseReview[]
+  attachments Attachment[]
 
   @@map("courses")
 }
@@ -257,21 +257,6 @@ model CourseEnrollment {
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@map("course_enrollments")
-}
-
-// 课程评价表
-model CourseReview {
-  id         Int      @id @default(autoincrement())
-  courseId   Int      @map("course_id")
-  studentName String  @map("student_name") @db.VarChar(100)
-  rating     Int      // 1-5星评分
-  comment    String?  @db.Text
-  reviewTime DateTime @default(now()) @map("review_time")
-
-  // 关联关系
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  @@map("course_reviews")
 }
 
 // 会议室表
@@ -401,6 +386,26 @@ model OperationLog {
   @@map("operation_logs")
 }
 
+// 附件表
+model Attachment {
+  id           Int      @id @default(autoincrement())
+  courseId     Int      @map("course_id")
+  fileName     String   @map("file_name") @db.VarChar(255)
+  originalName String?  @map("original_name") @db.VarChar(255)
+  fileType     String   @map("file_type") @db.VarChar(50)
+  fileSize     Int      @map("file_size")
+  uploaderId   Int      @map("uploader_id")
+  uploadTime   DateTime @default(now()) @map("upload_time")
+  downloadCount Int     @default(0) @map("download_count")
+  status       Int      @default(1) // 1-正常, 2-删除
+
+  // 关联关系
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  uploader User   @relation("AttachmentUploader", fields: [uploaderId], references: [id])
+
+  @@map("attachments")
+}
+
 // 班级表
 model Class {
   id          Int      @id @default(autoincrement())
@@ -441,4 +446,43 @@ model ClassStudent {
   class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@map("class_students")
+}
+
+// 通知表
+model Notification {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(200)
+  content     String   @db.Text
+  type        String   @db.VarChar(50) // info, warning, error, success, meeting, class_announcement
+  userId      Int      @map("user_id") // 0表示系统通知
+  readStatus  Int      @default(0) @map("read_status") // 0-未读, 1-已读
+  readTime    String?  @map("read_time")
+  relatedId   Int?     @map("related_id") // 关联业务ID
+  relatedType String?  @map("related_type") @db.VarChar(50) // 关联类型
+  createTime  String   @map("create_time")
+
+  @@map("notifications")
+}
+
+// 任务表
+model Task {
+  id          Int      @id @default(autoincrement())
+  taskName    String   @map("task_name") @db.VarChar(200)
+  taskDesc    String?  @map("task_desc") @db.Text
+  projectName String   @map("project_name") @db.VarChar(200)
+  dueDate     DateTime @map("due_date")
+  targetCount Int      @default(0) @map("target_count") // 目标数量
+  actualCount Int      @default(0) @map("actual_count") // 实际完成数量
+  assigneeId  Int      @map("assignee_id")
+  taskType    String   @default("normal") @map("task_type") @db.VarChar(50) // normal, weekly, monthly
+  priority    Int      @default(1) // 1-低, 2-中, 3-高
+  taskStatus  Int      @default(0) @map("task_status") // 0-未开始, 1-进行中, 2-已完成, 3-已暂停
+  remark      String?  @db.Text
+  createTime  String   @map("create_time")
+  updateTime  String?  @map("update_time")
+
+  // 关联关系
+  assignee User @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  @@map("tasks")
 }

@@ -1,20 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
+
+import { ApiError, ErrorCode, ValidationError, createErrorResponse, errorUtils } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import {
-  ApiError,
-  ValidationError,
-  errorUtils,
-  createErrorResponse,
-  ErrorCode
-} from '@/utils/errors';
 
 // 全局错误处理中间件
-export const errorHandler = (
-  error: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction) => {
   let statusCode = 500;
   let errorCode = ErrorCode.SYSTEM_ERROR;
   let message = '服务器内部错误';
@@ -76,44 +66,39 @@ export const errorHandler = (
     // 服务器错误，记录详细信息
     logger.error('服务器错误:', {
       error: {
-        name: error.name,
         message: error.message,
-        stack: error.stack,
+        name: error.name,
+        stack: error.stack
       },
       request: {
-        method: req.method,
-        url: req.originalUrl,
-        ip: req.ip,
-        userAgent: req.get('User-Agent'),
         body: req.body,
+        ip: req.ip,
+        method: req.method,
         params: req.params,
         query: req.query,
+        url: req.originalUrl,
+        userAgent: req.get('User-Agent')
       },
-      user: req.user,
+      user: req.user
     });
   } else if (statusCode >= 400) {
     // 客户端错误，记录基本信息
     logger.warn('客户端错误:', {
       error: {
-        name: error.name,
         message: error.message,
+        name: error.name
       },
       request: {
-        method: req.method,
-        url: req.originalUrl,
         ip: req.ip,
+        method: req.method,
+        url: req.originalUrl
       },
-      user: req.user,
+      user: req.user
     });
   }
 
   // 构建错误响应
-  const errorResponse = createErrorResponse(
-    errorCode,
-    message,
-    details,
-    req.originalUrl
-  );
+  const errorResponse = createErrorResponse(errorCode, message, details, req.originalUrl);
 
   // 在开发环境下，添加错误堆栈信息
   if (process.env.NODE_ENV === 'development' && statusCode >= 500) {
@@ -132,18 +117,13 @@ export const asyncErrorHandler = (fn: Function) => {
 
 // 404错误处理
 export const notFoundHandler = (req: Request, res: Response) => {
-  const errorResponse = createErrorResponse(
-    ErrorCode.NOT_FOUND,
-    '接口不存在',
-    null,
-    req.originalUrl
-  );
+  const errorResponse = createErrorResponse(ErrorCode.NOT_FOUND, '接口不存在', null, req.originalUrl);
 
   logger.warn('404错误:', {
+    ip: req.ip,
     method: req.method,
     url: req.originalUrl,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
+    userAgent: req.get('User-Agent')
   });
 
   res.status(404).json(errorResponse);
