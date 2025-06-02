@@ -1,14 +1,14 @@
-import http from 'http';
+import http from 'node:http';
 
 const options = {
   hostname: 'localhost',
-  port: process.env.PORT || 3000,
-  path: '/health',
   method: 'GET',
-  timeout: 2000,
+  path: '/health',
+  port: process.env.PORT || 3000,
+  timeout: 2000
 };
 
-const req = http.request(options, (res) => {
+const req = http.request(options, res => {
   if (res.statusCode === 200) {
     process.exit(0);
   } else {
@@ -17,7 +17,7 @@ const req = http.request(options, (res) => {
   }
 });
 
-req.on('error', (error) => {
+req.on('error', error => {
   console.error('健康检查失败:', error.message);
   process.exit(1);
 });

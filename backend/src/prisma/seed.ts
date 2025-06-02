@@ -107,7 +107,8 @@ async function main() {
         code: 'system:user:delete',
         name: '删除用户',
         type: 'button',
-        parentCode: 'system:user'
+        sort: 4,
+        status: 1
       },
       update: {},
       where: { code: 'system:user:delete' }
@@ -117,7 +118,8 @@ async function main() {
         code: 'system:user:import',
         name: '导入用户',
         type: 'button',
-        parentCode: 'system:user'
+        sort: 5,
+        status: 1
       },
       update: {},
       where: { code: 'system:user:import' }
@@ -213,46 +215,28 @@ async function main() {
       update: {},
       where: { code: 'meeting:create' }
     }),
-    // 用户管理权限
+    // 系统管理权限
     prisma.permission.upsert({
       create: {
-        code: 'system:user:list',
-        name: '查看用户列表',
-        type: 'button',
-        parentCode: 'system:user'
+        code: 'system:config',
+        name: '系统配置',
+        sort: 40,
+        status: 1,
+        type: 'api'
       },
       update: {},
-      where: { code: 'system:user:list' }
+      where: { code: 'system:config' }
     }),
     prisma.permission.upsert({
       create: {
-        code: 'system:user:add',
-        name: '添加用户',
-        type: 'button',
-        parentCode: 'system:user'
+        code: 'system:dict',
+        name: '数据字典',
+        sort: 41,
+        status: 1,
+        type: 'api'
       },
       update: {},
-      where: { code: 'system:user:add' }
-    }),
-    prisma.permission.upsert({
-      create: {
-        code: 'system:user:edit',
-        name: '编辑用户',
-        type: 'button',
-        parentCode: 'system:user'
-      },
-      update: {},
-      where: { code: 'system:user:edit' }
-    }),
-    prisma.permission.upsert({
-      create: {
-        code: 'system:user:delete',
-        name: '删除用户',
-        type: 'button',
-        parentCode: 'system:user'
-      },
-      update: {},
-      where: { code: 'system:user:delete' }
+      where: { code: 'system:dict' }
     })
   ]);
 
@@ -568,76 +552,43 @@ async function main() {
   const superAdminRole = roles[0]; // super_admin
   for (const permission of permissions) {
     await prisma.rolePermission.upsert({
-      create: {
-        roleId: superAdminRole.id,
-        permissionId: permission.id
-      },
-      update: {},
       where: {
         roleId_permissionId: {
           roleId: superAdminRole.id,
-          permissionId: permission.id
+          permissionId: permission.id,
         }
-      }
+      },
+      create: {
+        roleId: superAdminRole.id,
+        permissionId: permission.id,
+      },
+      update: {},
     });
   }
 
-  // 为管理员角色分配部分权限
+  // 为管理员角色分配基本权限
   const adminRole = roles[1]; // admin
-  const adminPermissions = [
-    'system:user:list',
-    'customer:list',
-    'customer:create',
-    'customer:update',
-    'meeting:list',
-    'meeting:create',
-    'course:list'
-  ];
+  const adminPermissions = permissions.filter(p =>
+    p.code.includes('customer:') ||
+    p.code.includes('course:') ||
+    p.code.includes('meeting:') ||
+    p.code.includes('system:user:')
+  );
 
-  for (const permissionCode of adminPermissions) {
-    const permission = permissions.find(p => p.code === permissionCode);
-    if (permission) {
-      await prisma.rolePermission.upsert({
-        create: {
+  for (const permission of adminPermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
           roleId: adminRole.id,
-          permissionId: permission.id
-        },
-        update: {},
-        where: {
-          roleId_permissionId: {
-            roleId: adminRole.id,
-            permissionId: permission.id
-          }
+          permissionId: permission.id,
         }
-      });
-    }
-  }
-
-  // 为顾问角色分配基础权限
-  const consultantRole = roles[2]; // consultant
-  const consultantPermissions = [
-    'customer:list',
-    'meeting:list',
-    'course:list'
-  ];
-
-  for (const permissionCode of consultantPermissions) {
-    const permission = permissions.find(p => p.code === permissionCode);
-    if (permission) {
-      await prisma.rolePermission.upsert({
-        create: {
-          roleId: consultantRole.id,
-          permissionId: permission.id
-        },
-        update: {},
-        where: {
-          roleId_permissionId: {
-            roleId: consultantRole.id,
-            permissionId: permission.id
-          }
-        }
-      });
-    }
+      },
+      create: {
+        roleId: adminRole.id,
+        permissionId: permission.id,
+      },
+      update: {},
+    });
   }
 
   logger.info('角色权限分配完成');

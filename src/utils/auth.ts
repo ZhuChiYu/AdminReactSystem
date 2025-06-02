@@ -3,21 +3,28 @@ import { localStg } from '@/utils/storage';
 /** 用户角色类型 */
 export enum UserRole {
   // 超级管理员
-  SUPER_ADMIN = 'super_admin',
   // 管理员
   ADMIN = 'admin',
+  // 管理员
   // 顾问
   CONSULTANT = 'consultant',
-  // 市场部经理
-  MARKETING_MANAGER = 'marketing_manager',
-  // 人力专员
-  HR_SPECIALIST = 'hr_specialist',
+  // 顾问
   // 人力BP
   HR_BP = 'hr_bp',
+  // 市场部经理
+  // 人力专员
+  HR_SPECIALIST = 'hr_specialist',
+  // 人力专员
+  // 市场部经理
+  MARKETING_MANAGER = 'marketing_manager',
+  // 人力BP
+  // 销售总监
+  SALES_DIRECTOR = 'sales_director',
   // 销售经理
   SALES_MANAGER = 'sales_manager',
   // 销售总监
-  SALES_DIRECTOR = 'sales_director'
+  // 超级管理员
+  SUPER_ADMIN = 'super_admin'
 }
 
 /**

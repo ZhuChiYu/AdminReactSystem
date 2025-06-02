@@ -6,13 +6,20 @@ export enum PermissionType {
   // 编辑班级信息权限
   ASSIGN_CUSTOMER = 'assign_customer', // 查看客户姓名权限
   // 编辑客户信息权限
-  EDIT_CLASS = 'edit_class', // 查看客户电话权限
+  // 编辑通知公告权限
+  EDIT_ANNOUNCE = 'edit_announce', // 查看客户电话权限
   // 查看客户信息权限
-  EDIT_CUSTOMER = 'edit_customer', // 查看客户手机权限
+  // 查看客户姓名权限
+  // 编辑客户信息权限
+  EDIT_CLASS = 'edit_class', // 查看客户手机权限
+  // 编辑学员信息权限
+  // 查看客户电话权限
+  // 查看客户信息权限
+  EDIT_CUSTOMER = 'edit_customer',
+  // 编辑通知公告权限
+  // 查看客户手机权限
   // 编辑学员信息权限
   EDIT_STUDENT = 'edit_student',
-  // 编辑通知公告权限
-  EDIT_ANNOUNCE = 'edit_announce',
   VIEW_CUSTOMER = 'view_customer', // 查看客户信息权限
   // 查看客户电话权限
   VIEW_CUSTOMER_MOBILE = 'view_customer_mobile', // 编辑客户信息权限

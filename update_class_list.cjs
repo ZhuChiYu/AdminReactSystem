@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('node:fs');
 
 // 读取生成的前端班级数据
 const frontendData = JSON.parse(fs.readFileSync('./frontend_class_data.json', 'utf8'));

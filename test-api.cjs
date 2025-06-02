@@ -5,8 +5,8 @@ async function testAPI() {
     // 1. 登录获取token
     console.log('1. 测试登录...');
     const loginResponse = await axios.post('http://localhost:3001/api/auth/login', {
-      userName: 'admin',
-      password: '123456'
+      password: '123456',
+      userName: 'admin'
     });
 
     const token = loginResponse.data.data.token;
@@ -16,7 +16,7 @@ async function testAPI() {
     console.log('2. 测试员工列表API...');
     const employeeResponse = await axios.get('http://localhost:3001/api/users/employees?current=1&size=10', {
       headers: {
-        'Authorization': `Bearer ${token}`
+        Authorization: `Bearer ${token}`
       }
     });
 
@@ -27,7 +27,7 @@ async function testAPI() {
     console.log('3. 测试客户列表API...');
     const customerResponse = await axios.get('http://localhost:3001/api/customers?current=1&size=10', {
       headers: {
-        'Authorization': `Bearer ${token}`
+        Authorization: `Bearer ${token}`
       }
     });
 
@@ -35,7 +35,6 @@ async function testAPI() {
     console.log(`   获取到 ${customerResponse.data.data.records.length} 个客户记录`);
 
     console.log('\n🎉 所有API测试通过！');
-
   } catch (error) {
     console.error('❌ API测试失败:', error.response?.data || error.message);
   }

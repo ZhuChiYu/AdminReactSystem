@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router-dom';
+
 import { isSuperAdmin } from '@/utils/auth';
 
 export function filterCacheRoutes(routes: RouteObject[]) {

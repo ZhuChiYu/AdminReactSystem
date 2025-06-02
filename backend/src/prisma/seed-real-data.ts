@@ -1,6 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
-import fs from 'fs';
-import path from 'path';
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -221,8 +221,8 @@ async function main() {
   for (const permission of permissions) {
     await prisma.rolePermission.create({
       data: {
-        roleId: superAdminRole.id,
-        permissionId: permission.id
+        permissionId: permission.id,
+        roleId: superAdminRole.id
       }
     });
   }
@@ -233,24 +233,24 @@ async function main() {
   logger.info('👤 创建超级管理员...');
   const superAdmin = await prisma.user.create({
     data: {
-      userName: 'admin',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '超级管理员',
-      email: 'admin@soybean.com',
-      phone: '13800000001',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_1.webp',
-      gender: 1,
-      status: 1,
       departmentId: departments[0].id,
-      position: '超级管理员'
+      email: 'admin@soybean.com',
+      gender: 1,
+      nickName: '超级管理员',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000001',
+      position: '超级管理员',
+      status: 1,
+      userName: 'admin'
     }
   });
 
   // 分配超级管理员角色
   await prisma.userRole.create({
     data: {
-      userId: superAdmin.id,
-      roleId: roles[0].id // super_admin
+      roleId: roles[0].id,
+      userId: superAdmin.id // super_admin
     }
   });
 
@@ -264,16 +264,16 @@ async function main() {
 
     const user = await prisma.user.create({
       data: {
-        userName: employeeData.userName,
-        password: employeeData.password,
-        nickName: employeeData.nickName,
-        email: employeeData.email,
-        phone: employeeData.phone,
         avatar: employeeData.avatar,
-        gender: employeeData.gender,
-        status: employeeData.status,
         departmentId: department.id,
-        position: employeeData.position
+        email: employeeData.email,
+        gender: employeeData.gender,
+        nickName: employeeData.nickName,
+        password: employeeData.password,
+        phone: employeeData.phone,
+        position: employeeData.position,
+        status: employeeData.status,
+        userName: employeeData.userName
       }
     });
 
@@ -283,8 +283,8 @@ async function main() {
     const role = roles.find(r => r.roleCode === employeeData.roleCode) || roles[2]; // 默认consultant
     await prisma.userRole.create({
       data: {
-        userId: user.id,
-        roleId: role.id
+        roleId: role.id,
+        userId: user.id
       }
     });
   }
@@ -298,18 +298,19 @@ async function main() {
   for (const customerData of excelData.customers) {
     const customer = await prisma.customer.create({
       data: {
-        customerName: customerData.name,
         company: customerData.company,
-        position: customerData.position,
-        phone: customerData.phone,
-        mobile: customerData.mobile,
+        // 默认普通客户
+        createdById: superAdmin.id,
+        customerName: customerData.name,
         email: customerData.email,
-        industry: customerData.industry,
-        source: customerData.source,
         followStatus: customerData.followStatus,
-        level: 1, // 默认普通客户
-        createdById: superAdmin.id, // 由超级管理员创建
-        remark: customerData.followNotes
+        industry: customerData.industry,
+        level: 1,
+        mobile: customerData.mobile,
+        phone: customerData.phone,
+        position: customerData.position, // 由超级管理员创建
+        remark: customerData.followNotes,
+        source: customerData.source
       }
     });
 

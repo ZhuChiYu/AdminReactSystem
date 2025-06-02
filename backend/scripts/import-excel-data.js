@@ -1,26 +1,49 @@
-const XLSX = require('xlsx');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
+
 const bcrypt = require('bcryptjs');
+const XLSX = require('xlsx');
 
 // Excel文件路径
-const customerExcelPath = '/Users/zhuchiyu/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/2.0b4.0.9/4db5b98d5a1913e089d853e4285cc840/Message/MessageTemp/578c4368f87cdaade6e0491319c5bab5/File/客户列表.xlsx';
-const employeeExcelPath = '/Users/zhuchiyu/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/2.0b4.0.9/4db5b98d5a1913e089d853e4285cc840/Message/MessageTemp/578c4368f87cdaade6e0491319c5bab5/File/员工列表.xlsx';
+const customerExcelPath =
+  '/Users/zhuchiyu/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/2.0b4.0.9/4db5b98d5a1913e089d853e4285cc840/Message/MessageTemp/578c4368f87cdaade6e0491319c5bab5/File/客户列表.xlsx';
+const employeeExcelPath =
+  '/Users/zhuchiyu/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/2.0b4.0.9/4db5b98d5a1913e089d853e4285cc840/Message/MessageTemp/578c4368f87cdaade6e0491319c5bab5/File/员工列表.xlsx';
 
 // 生成用户名的函数
 function generateUsername(name, index) {
   // 使用姓名的拼音首字母 + 数字
   const pinyinMap = {
-    '罗': 'luo', '静': 'jing', '雯': 'wen',
-    '袁': 'yuan', '琴': 'qin',
-    '龙': 'long', '建': 'jian', '珍': 'zhen',
-    '李': 'li', '王': 'wang', '张': 'zhang', '刘': 'liu', '陈': 'chen', '杨': 'yang',
-    '黄': 'huang', '赵': 'zhao', '周': 'zhou', '吴': 'wu', '徐': 'xu', '孙': 'sun',
-    '马': 'ma', '朱': 'zhu', '胡': 'hu', '郭': 'guo', '何': 'he', '林': 'lin'
+    何: 'he',
+    刘: 'liu',
+    吴: 'wu',
+    周: 'zhou',
+    孙: 'sun',
+    建: 'jian',
+    张: 'zhang',
+    徐: 'xu',
+    朱: 'zhu',
+    李: 'li',
+    杨: 'yang',
+    林: 'lin',
+    王: 'wang',
+    珍: 'zhen',
+    琴: 'qin',
+    罗: 'luo',
+    胡: 'hu',
+    袁: 'yuan',
+    赵: 'zhao',
+    郭: 'guo',
+    陈: 'chen',
+    雯: 'wen',
+    静: 'jing',
+    马: 'ma',
+    黄: 'huang',
+    龙: 'long'
   };
 
   let username = '';
-  for (let char of name) {
+  for (const char of name) {
     if (pinyinMap[char]) {
       username += pinyinMap[char];
     } else {
@@ -38,34 +61,34 @@ function generatePassword() {
 
 // 跟进状态映射
 const followStatusMap = {
-  '咨询': 'consult',
-  '已加微信': 'wechat_added',
-  '已报名': 'registered',
-  '已到访': 'arrived',
-  '新开发': 'new_develop',
+  VIP: 'vip',
+  咨询: 'consult',
+  已到访: 'arrived',
+  已加微信: 'wechat_added',
+  已报名: 'registered',
+  已拒绝: 'rejected',
+  新开发: 'new_develop',
   '早期25%': 'early_25',
-  '有效到访': 'effective_visit',
-  '未到访': 'not_arrived',
-  '已拒绝': 'rejected',
-  'VIP': 'vip'
+  有效到访: 'effective_visit',
+  未到访: 'not_arrived'
 };
 
 // 部门映射
 const departmentMap = {
-  '管理员': 'admin',
-  '普通用户': 'employee',
-  'sales': 'sales',
-  'marketing': 'marketing',
-  'hr': 'hr'
+  hr: 'hr',
+  marketing: 'marketing',
+  sales: 'sales',
+  普通用户: 'employee',
+  管理员: 'admin'
 };
 
 // 角色映射
 const roleMap = {
-  '管理员': 'admin',
-  '普通用户': 'consultant',
-  '销售经理': 'sales_manager',
-  '市场经理': 'marketing_manager',
-  '人力专员': 'hr_specialist'
+  人力专员: 'hr_specialist',
+  市场经理: 'marketing_manager',
+  普通用户: 'consultant',
+  管理员: 'admin',
+  销售经理: 'sales_manager'
 };
 
 async function processData() {
@@ -79,23 +102,26 @@ async function processData() {
     const customerData = XLSX.utils.sheet_to_json(customerWorksheet);
 
     customers = customerData.map((row, index) => {
-      const followStatus = followStatusMap[row['__EMPTY']] || 'consult';
+      const followStatus = followStatusMap[row.__EMPTY] || 'consult';
       return {
-        id: index + 1,
-        name: row['姓名'] || `客户${index + 1}`,
-        company: row['单位'] || '未知公司',
-        position: row['职务'] || '员工',
-        phone: `138${String(Math.floor(Math.random() * 90000000) + 10000000)}`, // 生成随机手机号
-        mobile: `159${String(Math.floor(Math.random() * 90000000) + 10000000)}`, // 生成随机座机号
-        email: `customer${index + 1}@${(row['单位'] || 'example').toLowerCase().replace(/\s+/g, '')}.com`,
         address: '地址信息暂无',
-        source: 'exhibition', // 默认来源：展会
-        followStatus: followStatus,
-        followNotes: row['跟进状态'] || '',
-        industry: 'education', // 默认行业：教育
-        level: 'potential', // 默认级别：潜在客户
+        // 默认级别：潜在客户
         assignedTo: null,
+        company: row['单位'] || '未知公司',
         createTime: new Date().toISOString(),
+        // 生成随机座机号
+        email: `customer${index + 1}@${(row['单位'] || 'example').toLowerCase().replace(/\s+/g, '')}.com`,
+        followNotes: row['跟进状态'] || '', // 默认来源：展会
+        followStatus,
+        id: index + 1,
+        industry: 'education', // 默认行业：教育
+        level: 'potential',
+        // 生成随机手机号
+        mobile: `159${String(Math.floor(Math.random() * 90000000) + 10000000)}`,
+        name: row['姓名'] || `客户${index + 1}`,
+        phone: `138${String(Math.floor(Math.random() * 90000000) + 10000000)}`,
+        position: row['职务'] || '员工',
+        source: 'exhibition',
         updateTime: new Date().toISOString()
       };
     });
@@ -106,8 +132,8 @@ async function processData() {
   }
 
   // 读取员工数据
-  let employees = [];
-  let userCredentials = [];
+  const employees = [];
+  const userCredentials = [];
   try {
     const employeeWorkbook = XLSX.readFile(employeeExcelPath);
     const employeeWorksheet = employeeWorkbook.Sheets[employeeWorkbook.SheetNames[0]];
@@ -123,35 +149,35 @@ async function processData() {
       const departmentCode = row['序号'] === '管理员' ? 'admin' : 'sales';
 
       const employee = {
-        id: i + 1,
-        userName: username,
-        password: hashedPassword,
-        nickName: row['姓名'] || `员工${i + 1}`,
-        email: row['邮箱'] || `${username}@company.com`,
-        phone: String(row['手机号'] || `138${String(Math.floor(Math.random() * 90000000) + 10000000)}`),
-        avatar: `https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_${(i % 7) + 1}.webp`,
-        gender: row['性别'] === '女' ? 2 : 1,
-        status: 1,
-        position: row['职务'] || (roleType === 'admin' ? '管理员' : '员工'),
         address: row['家庭住址'] || '地址信息暂无',
-        idCard: row['身份证号'] || null,
+        avatar: `https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_${(i % 7) + 1}.webp`,
         bankCard: String(row['银行卡号'] || ''),
-        wechatId: row['工作微信号'] || null,
+        departmentCode,
+        email: row['邮箱'] || `${username}@company.com`,
+        gender: row['性别'] === '女' ? 2 : 1,
+        id: i + 1,
+        idCard: row['身份证号'] || null,
+        nickName: row['姓名'] || `员工${i + 1}`,
+        password: hashedPassword,
+        phone: String(row['手机号'] || `138${String(Math.floor(Math.random() * 90000000) + 10000000)}`),
+        position: row['职务'] || (roleType === 'admin' ? '管理员' : '员工'),
+        roleCode: roleType,
+        status: 1,
         timId: String(row['TIM号'] || ''),
-        departmentCode: departmentCode,
-        roleCode: roleType
+        userName: username,
+        wechatId: row['工作微信号'] || null
       };
 
       employees.push(employee);
 
       // 保存用户名密码信息
       userCredentials.push({
-        username: username,
-        password: password,
-        name: row['姓名'] || `员工${i + 1}`,
-        role: roleType === 'admin' ? '管理员' : '员工',
         email: employee.email,
-        phone: employee.phone
+        name: row['姓名'] || `员工${i + 1}`,
+        password,
+        phone: employee.phone,
+        role: roleType === 'admin' ? '管理员' : '员工',
+        username
       });
     }
 
@@ -168,11 +194,7 @@ async function processData() {
   };
 
   // 保存到JSON文件
-  fs.writeFileSync(
-    path.join(__dirname, '../data/excel-import-data.json'),
-    JSON.stringify(seedData, null, 2),
-    'utf8'
-  );
+  fs.writeFileSync(path.join(__dirname, '../data/excel-import-data.json'), JSON.stringify(seedData, null, 2), 'utf8');
 
   // 生成用户凭据文档
   let credentialsDoc = '# 员工登录信息\n\n';
@@ -183,11 +205,7 @@ async function processData() {
     credentialsDoc += `| ${cred.name} | ${cred.username} | ${cred.password} | ${cred.role} | ${cred.email} | ${cred.phone} |\n`;
   });
 
-  fs.writeFileSync(
-    path.join(__dirname, '../data/员工登录信息.md'),
-    credentialsDoc,
-    'utf8'
-  );
+  fs.writeFileSync(path.join(__dirname, '../data/员工登录信息.md'), credentialsDoc, 'utf8');
 
   console.log('\n📋 员工登录信息:');
   console.table(userCredentials);

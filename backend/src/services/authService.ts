@@ -1,10 +1,9 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
+
 import { redisUtils } from '@/config/redis';
 
 class AuthService {
-  /**
-   * 生成验证码
-   */
+  /** 生成验证码 */
   async generateCaptcha() {
     // 生成4位随机验证码
     const code = Math.random().toString().slice(2, 6);
@@ -20,13 +19,11 @@ class AuthService {
 
     return {
       captchaId,
-      captchaImage,
+      captchaImage
     };
   }
 
-  /**
-   * 验证验证码
-   */
+  /** 验证验证码 */
   async verifyCaptcha(captchaId: string, code: string): Promise<boolean> {
     if (!captchaId || !code) {
       return false;
@@ -44,9 +41,7 @@ class AuthService {
     return storedCode.toLowerCase() === code.toLowerCase();
   }
 
-  /**
-   * 生成简单的验证码图片（SVG转Base64）
-   */
+  /** 生成简单的验证码图片（SVG转Base64） */
   private generateCaptchaImage(code: string): string {
     // 创建SVG验证码图片
     const width = 120;

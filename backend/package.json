@@ -2,25 +2,8 @@
   "name": "soybean-admin-backend",
   "version": "1.0.0",
   "description": "React SoybeanAdmin Backend API",
-  "main": "dist/server.js",
-  "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio",
-    "db:seed": "tsx src/prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
-    "format": "prettier --write 'src/**/*.ts'",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down"
-  },
+  "author": "React SoybeanAdmin Team",
+  "license": "MIT",
   "keywords": [
     "nodejs",
     "express",
@@ -29,8 +12,29 @@
     "postgresql",
     "api"
   ],
-  "author": "React SoybeanAdmin Team",
-  "license": "MIT",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset --force",
+    "db:seed": "tsx src/prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "dev": "tsx watch src/server.ts",
+    "docker:down": "docker-compose down",
+    "docker:up": "docker-compose up -d",
+    "format": "prettier --write 'src/**/*.ts'",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "start": "node dist/server.js",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
   "dependencies": {
     "@prisma/client": "^5.15.0",
     "bcryptjs": "^2.4.3",
@@ -78,10 +82,6 @@
     "ts-jest": "^29.1.5",
     "tsx": "^4.15.7",
     "typescript": "^5.5.2"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
   },
   "prisma": {
     "seed": "tsx src/prisma/seed.ts"

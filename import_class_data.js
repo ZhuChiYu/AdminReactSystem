@@ -1,5 +1,6 @@
+const fs = require('node:fs');
+
 const XLSX = require('xlsx');
-const fs = require('fs');
 
 // 读取Excel文件
 const workbook = XLSX.readFile('./class_data.xls');
@@ -14,28 +15,30 @@ console.log(JSON.stringify(data, null, 2));
 
 // 生成班级数据
 const classData = {
+  categoryId: 2,
+  // 管理课程
+  categoryName: '管理课程',
+  createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+  description: '司库管理体系建设专业培训课程',
+  endDate: '2024-06-30',
   id: 4,
   name: '司库管理体系建设：从现金管理到产业赋能',
-  categoryId: 2, // 管理课程
-  categoryName: '管理课程',
-  teacher: '专业讲师',
   startDate: '2024-06-01',
-  endDate: '2024-06-30',
-  status: 1, // 进行中
+  status: 1,
+  // 进行中
   studentCount: data.length,
-  description: '司库管理体系建设专业培训课程',
-  createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
   students: data.map((row, index) => ({
-    id: index + 1,
-    name: row['姓名'] || row['学员姓名'] || row['Name'] || `学员${index + 1}`,
-    company: row['单位'] || row['公司'] || row['Company'] || '未知单位',
-    position: row['职务'] || row['职位'] || row['Position'] || '未知职位',
-    phone: row['电话'] || row['手机'] || row['Phone'] || '',
-    email: row['邮箱'] || row['Email'] || '',
-    joinDate: '2024-06-01',
     attendanceRate: 100,
+    company: row['单位'] || row['公司'] || row.Company || '未知单位',
+    email: row['邮箱'] || row.Email || '',
+    id: index + 1,
+    joinDate: '2024-06-01',
+    name: row['姓名'] || row['学员姓名'] || row.Name || `学员${index + 1}`,
+    phone: row['电话'] || row['手机'] || row.Phone || '',
+    position: row['职务'] || row['职位'] || row.Position || '未知职位',
     status: 1
-  }))
+  })),
+  teacher: '专业讲师'
 };
 
 console.log('\n生成的班级数据：');
@@ -66,17 +69,17 @@ console.log('班级数据已保存到 class_list.json');
 
 // 生成用于前端的数据格式
 const frontendData = classList.map(classItem => ({
-  id: classItem.id,
-  name: classItem.name,
   categoryId: classItem.categoryId,
   categoryName: classItem.categoryName,
-  teacher: classItem.teacher,
-  startDate: classItem.startDate,
+  createdAt: classItem.createdAt,
+  description: classItem.description,
   endDate: classItem.endDate,
+  id: classItem.id,
+  name: classItem.name,
+  startDate: classItem.startDate,
   status: classItem.status,
   studentCount: classItem.studentCount,
-  description: classItem.description,
-  createdAt: classItem.createdAt
+  teacher: classItem.teacher
 }));
 
 fs.writeFileSync('./frontend_class_data.json', JSON.stringify(frontendData, null, 2));

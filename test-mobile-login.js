@@ -1,1 +1,1 @@
-console.log("测试开始");
+console.log('测试开始');
