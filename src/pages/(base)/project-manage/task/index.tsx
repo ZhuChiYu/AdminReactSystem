@@ -16,6 +16,10 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+
+import { projectService } from '@/service/api';
+import type { TaskApi } from '@/service/api/types';
 
 const { Paragraph } = Typography;
 
@@ -45,17 +49,21 @@ const followUpStatusColors = {
 };
 
 interface TaskRecord {
-  company: string;
-  createdAt: string;
+  id: number;
+  name: string;
+  projectName: string;
+  description: string;
+  count: number;
+  target: number;
   employeeId: string;
   employeeName: string;
   eventTime: string;
   followUpContent: string;
-  followUpStatus: FollowUpStatus;
+  followUpStatus: number;
   followUpTime: string;
-  id: number;
+  createdAt: string;
+  company: string;
   mobile: string;
-  name: string;
   position: string;
   telephone: string;
 }
@@ -85,99 +93,74 @@ const ItemList = () => {
     status: ''
   });
 
-  // 模拟获取事项列表
-  const fetchTasks = () => {
+  // 获取任务列表
+  const fetchTasks = async () => {
     setLoading(true);
+    try {
+      const response = await projectService.getTaskList({
+        current: 1,
+        size: 1000
+      });
 
-    // 模拟API请求
-    setTimeout(() => {
-      const mockData: TaskRecord[] = [
-        {
-          company: '上海民用航空电源系统有限公司',
-          createdAt: '2024-03-20 10:30:00',
-          employeeId: 'emp001',
-          employeeName: '张三',
-          eventTime: '2024-04-15 14:00:00',
-          followUpContent:
-            '发计划教智化简章微信（15802910xxx）发计划教智化简章微信（15802910xxx）发计划教智化简章微信（15802910xxx）发计划教智化简章微信（15802910xxx）发计划教智化简章微信（15802910xxx）发计划教智化简章微信（15802910xxx）',
-          followUpStatus: FollowUpStatus.ADDED_WECHAT,
-          followUpTime: '2024-03-20 10:30:00',
-          id: 1,
-          mobile: '15802910000',
-          name: '马芳',
-          position: '财务负责培训',
-          telephone: '029-81112543'
-        }
-      ];
+      // 将API返回的数据转换为组件需要的格式
+      const formattedTasks: TaskRecord[] = response.records.map((task: TaskApi.TaskListItem) => ({
+        id: task.id,
+        name: task.taskName || '',
+        projectName: task.projectName || '',
+        description: task.taskDesc || '',
+        count: task.actualCount || 0,
+        target: task.targetCount || 0,
+        employeeId: task.assignee?.id?.toString() || '',
+        employeeName: task.assignee?.name || '',
+        eventTime: task.dueDate || '',
+        followUpContent: task.taskDesc || '',
+        followUpStatus: task.taskStatus,
+        followUpTime: task.updateTime || '',
+        createdAt: task.createTime || '',
+        company: '', // 这些字段在任务表中可能不存在，需要根据实际业务调整
+        mobile: '',
+        position: '',
+        telephone: ''
+      }));
 
-      // 生成更多示例数据
-      for (let i = 2; i <= 20; i += 1) {
-        const date = dayjs().subtract(Math.floor(Math.random() * 30), 'day');
-        const getFollowUpStatus = (index: number) => {
-          if (index % 4 === 0) return FollowUpStatus.ADDED_WECHAT;
-          if (index % 4 === 1) return FollowUpStatus.CONTACTED;
-          if (index % 4 === 2) return FollowUpStatus.NOT_STARTED;
-          return FollowUpStatus.PENDING;
-        };
-        // 随机分配员工ID，确保部分任务属于当前登录员工
-        const employeeId = i % 3 === 0 ? 'emp001' : `emp00${(i % 3) + 2}`;
-        const employeeName = employeeId === 'emp001' ? '张三' : `员工${(i % 3) + 2}`;
-        mockData.push({
-          company: `公司${i}`,
-          createdAt: date.format('YYYY-MM-DD HH:mm:ss'),
-          employeeId,
-          employeeName,
-          eventTime: date.add(30, 'day').format('YYYY-MM-DD HH:mm:ss'),
-          followUpContent: `跟进内容${i}`.repeat(10), // 生成长内容以测试展开功能
-          followUpStatus: getFollowUpStatus(i),
-          followUpTime: date.format('YYYY-MM-DD HH:mm:ss'),
-          id: i,
-          mobile: `1380000${String(i).padStart(4, '0')}`,
-          name: `客户${i}`,
-          position: `职位${i}`,
-          telephone: `029-8111${String(i).padStart(4, '0')}`
-        });
-      }
-
-      // 只显示当前登录员工的任务，除非是管理员
-      const filteredMockData = currentUser.isAdmin
-        ? mockData
-        : mockData.filter(task => task.employeeId === currentUser.id);
-
-      setTasks(filteredMockData);
-      setFilteredTasks(filteredMockData);
+      setTasks(formattedTasks);
+      setFilteredTasks(formattedTasks);
+    } catch (error) {
+      message.error('获取任务列表失败');
+      console.error('获取任务列表失败:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   useEffect(() => {
     fetchTasks();
   }, []);
 
-  // 处理搜索
+  // 搜索处理
   const handleSearch = () => {
-    const { keyword } = searchParams;
     let filtered = [...tasks];
 
-    if (keyword) {
+    if (searchParams.keyword) {
       filtered = filtered.filter(
         task =>
-          task.company.includes(keyword) ||
-          task.name.includes(keyword) ||
-          task.position.includes(keyword) ||
-          task.followUpContent.includes(keyword)
+          task.name.includes(searchParams.keyword) ||
+          task.projectName.includes(searchParams.keyword) ||
+          task.employeeName.includes(searchParams.keyword) ||
+          task.description.includes(searchParams.keyword)
       );
+    }
+
+    if (searchParams.status) {
+      filtered = filtered.filter(task => task.followUpStatus.toString() === searchParams.status);
     }
 
     setFilteredTasks(filtered);
   };
 
-  // 重置搜索条件
+  // 重置搜索
   const resetSearch = () => {
-    setSearchParams({
-      keyword: '',
-      status: ''
-    });
+    setSearchParams({ keyword: '', status: '' });
     setFilteredTasks(tasks);
   };
 
@@ -257,121 +240,97 @@ const ItemList = () => {
     setIsContentModalVisible(true);
   };
 
+  // 状态映射
+  const getStatusTag = (status: number) => {
+    const statusMap = {
+      [FollowUpStatus.NOT_STARTED]: { color: 'default', text: '未开始' },
+      [FollowUpStatus.CONTACTED]: { color: 'processing', text: '已联系' },
+      [FollowUpStatus.ADDED_WECHAT]: { color: 'success', text: '已加微信' },
+      [FollowUpStatus.PENDING]: { color: 'warning', text: '待处理' }
+    };
+
+    const config = statusMap[status] || { color: 'default', text: '未知' };
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
   // 表格列定义
   const columns = [
     {
-      dataIndex: 'company',
-      key: 'company',
-      title: '单位',
-      width: 200
+      title: '序号',
+      dataIndex: 'id',
+      key: 'id',
+      ...getCenterColumnConfig(),
+      width: 60
     },
     {
+      title: '任务名称',
       dataIndex: 'name',
       key: 'name',
-      title: '姓名',
-      width: 100
-    },
-    {
-      dataIndex: 'position',
-      key: 'position',
-      title: '职位',
+      ...getCenterColumnConfig(),
       width: 150
     },
     {
-      dataIndex: 'telephone',
-      key: 'telephone',
-      title: '电话',
-      width: 150
-    },
-    {
-      dataIndex: 'mobile',
-      key: 'mobile',
-      title: '手机',
-      width: 150
-    },
-    {
-      dataIndex: 'followUpContent',
-      ellipsis: true,
-      key: 'followUpContent',
-      render: (content: string) => (
-        <Space>
-          <Paragraph
-            ellipsis={{ rows: 2, tooltip: false }}
-            style={{ marginBottom: 0, width: 180 }}
-          >
-            {content}
-          </Paragraph>
-          <Tooltip title="查看完整内容">
-            <Button
-              icon={<EyeOutlined />}
-              size="small"
-              type="link"
-              onClick={() => showFullContent(content)}
-            />
-          </Tooltip>
-        </Space>
-      ),
-      title: '跟进内容',
-      width: 250
-    },
-    {
-      dataIndex: 'followUpStatus',
-      key: 'followUpStatus',
-      render: (status: FollowUpStatus) => <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>,
-      title: '跟进状态',
-      width: 120
-    },
-    {
-      dataIndex: 'followUpTime',
-      key: 'followUpTime',
-      title: '跟进时间',
+      title: '项目名称',
+      dataIndex: 'projectName',
+      key: 'projectName',
+      ...getCenterColumnConfig(),
       width: 180
     },
     {
-      dataIndex: 'eventTime',
-      key: 'eventTime',
-      title: '举办时间',
-      width: 180
-    },
-    {
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      title: '创建时间',
-      width: 180
-    },
-    {
+      title: '负责人',
       dataIndex: 'employeeName',
       key: 'employeeName',
-      render: (text: string, record: TaskRecord) =>
-        record.employeeId === currentUser.id ? <Tag color="blue">{text}</Tag> : text,
-      title: '负责人',
+      ...getCenterColumnConfig(),
       width: 100
     },
     {
+      title: '状态',
+      dataIndex: 'followUpStatus',
+      key: 'followUpStatus',
+      ...getCenterColumnConfig(),
+      width: 100,
+      render: (status: number) => getStatusTag(status)
+    },
+    {
+      title: '完成数量',
+      dataIndex: 'count',
+      key: 'count',
+      ...getCenterColumnConfig(),
+      width: 80
+    },
+    {
+      title: '目标数量',
+      dataIndex: 'target',
+      key: 'target',
+      ...getCenterColumnConfig(),
+      width: 80
+    },
+    {
+      title: '截止时间',
+      dataIndex: 'eventTime',
+      key: 'eventTime',
+      ...getCenterColumnConfig(),
+      width: 150
+    },
+    {
+      title: '操作',
       key: 'action',
-      render: (_: unknown, record: TaskRecord) =>
-        // 只能编辑自己的任务，管理员可以编辑所有任务
-        record.employeeId === currentUser.id || currentUser.isAdmin ? (
-          <Space size="small">
-            <Button
-              size="small"
-              type="link"
-              onClick={() => openModal(record)}
-            >
+      ...getActionColumnConfig(200),
+      render: (_: any, record: TaskRecord) => (
+        <Space>
+          <Button type="link" size="small">
+            查看详情
+          </Button>
+          <Button type="link" size="small">
               编辑
             </Button>
-            <Button
-              danger
-              size="small"
-              type="link"
-              onClick={() => handleDelete(record.id)}
-            >
+          {currentUser.isAdmin && (
+            <Button type="link" size="small" danger>
               删除
             </Button>
+          )}
           </Space>
-        ) : null,
-      title: '操作',
-      width: 150
+      )
     }
   ];
 
@@ -382,7 +341,7 @@ const ItemList = () => {
         className="h-full"
         title={
           <Space>
-            <span>事项列表</span>
+            <span>任务列表</span>
             {currentUser.isAdmin && <Tag color="gold">管理员</Tag>}
           </Space>
         }
@@ -395,6 +354,18 @@ const ItemList = () => {
             value={searchParams.keyword}
             onChange={e => setSearchParams({ ...searchParams, keyword: e.target.value })}
           />
+          <Select
+            allowClear
+            placeholder="请选择状态"
+            style={{ width: 120 }}
+            value={searchParams.status}
+            onChange={value => setSearchParams({ ...searchParams, status: value || '' })}
+          >
+            <Select.Option value="0">未开始</Select.Option>
+            <Select.Option value="1">已联系</Select.Option>
+            <Select.Option value="2">已加微信</Select.Option>
+            <Select.Option value="3">待处理</Select.Option>
+          </Select>
           <Button
             icon={<SearchOutlined />}
             type="primary"
@@ -403,13 +374,6 @@ const ItemList = () => {
             搜索
           </Button>
           <Button onClick={resetSearch}>重置</Button>
-          <Button
-            icon={<PlusOutlined />}
-            type="primary"
-            onClick={() => openModal()}
-          >
-            新增事项
-          </Button>
         </div>
 
         <Table
@@ -417,7 +381,7 @@ const ItemList = () => {
           dataSource={filteredTasks}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1800, y: 'calc(100vh - 300px)' }}
+          {...getFullTableConfig(10)}
         />
 
         <Modal

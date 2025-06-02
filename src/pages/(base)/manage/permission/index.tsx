@@ -7,6 +7,7 @@ import { type EmployeeApi, employeeService } from '@/service/api';
 import useCustomerStore from '@/store/customerStore';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { UserRole, getCurrentUserId, isSuperAdmin } from '@/utils/auth';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 权限类型中文名称映射
 const permissionTypeNames = {
@@ -407,19 +408,22 @@ const PermissionManagement = () => {
     {
       dataIndex: 'id',
       key: 'id',
+      ...getCenterColumnConfig(),
       title: 'ID',
       width: 100
     },
     {
       dataIndex: 'nickName',
       key: 'nickName',
+      ...getCenterColumnConfig(),
       title: '姓名',
       width: 150
     },
     {
       dataIndex: 'roles',
       key: 'roles',
-      render: (roles: Array<{code: string; name: string}>) => {
+      ...getCenterColumnConfig(),
+      render: (roles: Array<{ code: string; name: string }>) => {
         const roleCode = roles?.[0]?.code || '';
         let color = 'green';
         if (roleCode === 'super_admin') {
@@ -434,6 +438,7 @@ const PermissionManagement = () => {
     },
     {
       key: 'action',
+      ...getActionColumnConfig(100),
       render: (_: unknown, record: EmployeeApi.EmployeeListItem) => (
         <Button
           type="link"
@@ -448,8 +453,7 @@ const PermissionManagement = () => {
           选择
         </Button>
       ),
-      title: '操作',
-      width: 100
+      title: '操作'
     }
   ];
 
@@ -458,29 +462,34 @@ const PermissionManagement = () => {
     {
       dataIndex: 'permissionName',
       key: 'permissionName',
+      ...getCenterColumnConfig(),
       title: '权限类型',
       width: 150
     },
     {
       dataIndex: 'scope',
       key: 'scope',
+      ...getCenterColumnConfig(),
       title: '权限范围',
       width: 200
     },
     {
       dataIndex: 'grantTime',
       key: 'grantTime',
+      ...getCenterColumnConfig(),
       title: '授予时间',
       width: 150
     },
     {
       dataIndex: 'grantedBy',
       key: 'grantedBy',
+      ...getCenterColumnConfig(),
       title: '授予人',
       width: 120
     },
     {
       key: 'action',
+      ...getActionColumnConfig(100),
       render: (_: any, record: any) => (
         <Button
           danger
@@ -490,8 +499,7 @@ const PermissionManagement = () => {
           撤销
         </Button>
       ),
-      title: '操作',
-      width: 100
+      title: '操作'
     }
   ];
 
@@ -519,10 +527,10 @@ const PermissionManagement = () => {
               <Table
                 columns={userColumns}
                 dataSource={filteredUsers}
-                pagination={{ pageSize: 5 }}
                 rowClassName={record => (String(record.id) === selectedUser?.id ? 'ant-table-row-selected' : '')}
                 rowKey="id"
                 size="small"
+                {...getFullTableConfig(5)}
               />
             </Card>
           </Col>
@@ -566,8 +574,8 @@ const PermissionManagement = () => {
                 <Table
                   columns={permissionColumns}
                   dataSource={userPermissions}
-                  pagination={{ pageSize: 8 }}
                   rowKey="key"
+                  {...getFullTableConfig(8)}
                 />
               ) : (
                 <div className="h-64 flex items-center justify-center">

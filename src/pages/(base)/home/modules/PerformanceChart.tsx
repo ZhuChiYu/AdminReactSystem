@@ -1,42 +1,23 @@
 import { Card, Tabs } from 'antd';
 import type { TabsProps } from 'antd';
+import { useEffect, useState } from 'react';
+
 import { useEcharts } from '@/hooks/common/echarts';
-import { useState, useEffect } from 'react';
 
 const PerformanceChart = () => {
   const [activeTab, setActiveTab] = useState<string>('month');
 
   // 客户统计图
   const { domRef: clientSourceRef, updateOptions: updateClientSourceChart } = useEcharts(() => ({
-    tooltip: {
-      trigger: 'item',
-      formatter: '{b}: {c} ({d}%)'
-    },
     legend: {
+      data: ['已实到', '咨询', '早25客户', '有效回访', '新开发', '未实到', '已报名', '未通过', '大客户', '已加微信'],
       orient: 'vertical',
       right: 10,
-      top: 'center',
-      data: ['已实到', '咨询', '早25客户', '有效回访', '新开发', '未实到', '已报名', '未通过', '大客户', '已加微信']
+      top: 'center'
     },
     series: [
       {
-        name: '客户统计',
-        type: 'pie',
-        radius: ['50%', '70%'],
         avoidLabelOverlap: false,
-        label: {
-          show: false
-        },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: '14',
-            fontWeight: 'bold'
-          }
-        },
-        labelLine: {
-          show: false
-        },
         data: [
           { name: '已实到', value: 20 },
           { name: '咨询', value: 49 },
@@ -48,9 +29,29 @@ const PerformanceChart = () => {
           { name: '未通过', value: 28 },
           { name: '大客户', value: 29 },
           { name: '已加微信', value: 46 }
-        ]
+        ],
+        emphasis: {
+          label: {
+            fontSize: '14',
+            fontWeight: 'bold',
+            show: true
+          }
+        },
+        label: {
+          show: false
+        },
+        labelLine: {
+          show: false
+        },
+        name: '客户统计',
+        radius: ['50%', '70%'],
+        type: 'pie'
       }
-    ]
+    ],
+    tooltip: {
+      formatter: '{b}: {c} ({d}%)',
+      trigger: 'item'
+    }
   }));
 
   // 业绩趋势图 - 月度

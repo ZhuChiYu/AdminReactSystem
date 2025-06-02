@@ -31,6 +31,8 @@ import {
   taskTypeColors,
   taskTypeNames
 } from '../types';
+import { projectService } from '@/service/api';
+import type { TaskApi } from '@/service/api/types';
 
 /** 月度任务组件 */
 const MonthlyTasks = () => {
@@ -40,6 +42,7 @@ const MonthlyTasks = () => {
   const [isTargetModalVisible, setIsTargetModalVisible] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<StatisticsPeriod>(StatisticsPeriod.MONTH);
   const [targetForm] = Form.useForm();
+  const [modalVisible, setModalVisible] = useState(false);
 
   // 模拟当前用户信息
   const currentUser = {
@@ -83,79 +86,42 @@ const MonthlyTasks = () => {
     };
   };
 
-  // 模拟获取事项列表
-  const fetchTasks = () => {
+  // 获取月任务列表
+  const fetchTasks = async () => {
     setLoading(true);
+    try {
+      const response = await projectService.getTaskList({
+        current: 1,
+        size: 1000,
+        // 可以添加月过滤条件
+        monthFilter: true
+      });
 
-    // 模拟API请求
-    setTimeout(() => {
-      const mockData: ProjectItem[] = [
-        {
-          count: 15,
-          createdAt: '2024-03-01 14:30:00',
-          description: '接待新客户咨询课程情况',
-          employeeId: 1,
-          employeeName: '张三',
-          eventTime: '2024-03-20 14:30:00',
-          followUpStatus: FollowUpStatus.COMPLETED,
-          id: 1,
-          name: '新客户咨询',
-          projectName: '企业定制培训项目A',
-          remark: '本月表现优秀，奖励',
-          target: 100,
-          type: TaskType.CONSULT
-        },
-        {
-          count: 12,
-          createdAt: '2024-03-05 15:45:00',
-          description: '处理新学员报名事宜',
-          employeeId: 1,
-          employeeName: '张三',
-          eventTime: '2024-03-20 15:45:00',
-          followUpStatus: FollowUpStatus.IN_PROGRESS,
-          id: 2,
-          name: '课程报名',
-          projectName: '北京大学专项培训',
-          target: 80,
-          type: TaskType.REGISTER
-        },
-        {
-          count: 8,
-          createdAt: '2024-03-10 09:30:00',
-          description: '开发新课程计划',
-          employeeId: 1,
-          employeeName: '张三',
-          eventTime: '2024-03-21 09:30:00',
-          followUpStatus: FollowUpStatus.COMPLETED,
-          id: 3,
-          name: '新课程开发',
-          projectName: '企业培训项目B',
-          target: 10,
-          type: TaskType.DEVELOP
-        },
-        {
-          count: 20,
-          createdAt: '2024-03-15 11:00:00',
-          description: '回访客户了解需求',
-          employeeId: 1,
-          employeeName: '张三',
-          eventTime: '2024-03-22 11:00:00',
-          followUpStatus: FollowUpStatus.COMPLETED,
-          id: 4,
-          name: '客户回访',
-          projectName: '上海企业培训项目',
-          target: 40,
-          type: TaskType.FOLLOW_UP
-        }
-      ];
+      // 转换API数据格式
+      const formattedTasks: ProjectItem[] = response.records.map((task: TaskApi.TaskListItem) => ({
+        id: task.id,
+        name: task.taskName || '',
+        projectName: task.projectName || '',
+        description: task.taskDesc || '',
+        employeeId: task.assignee?.id || 0,
+        employeeName: task.assignee?.name || '',
+        eventTime: task.dueDate || '',
+        followUpStatus: task.taskStatus,
+        createdAt: task.createTime || '',
+        count: task.actualCount || 0,
+        target: task.targetCount || 0,
+        type: TaskType.CONSULT, // 需要根据实际情况映射
+        remark: task.remark || ''
+      }));
 
-      // 只显示当前用户的事项
-      const filteredData = mockData.filter(task => task.employeeId === currentUser.id);
-
-      setTasks(filteredData);
-      setFilteredTasks(filteredData);
+      setTasks(formattedTasks);
+      setFilteredTasks(formattedTasks);
+    } catch (error) {
+      message.error('获取月任务列表失败');
+      console.error('获取月任务列表失败:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   useEffect(() => {
@@ -226,40 +192,54 @@ const MonthlyTasks = () => {
     });
   };
 
-  // 更新任务状态
-  const handleStatusChange = (taskId: number, followUpStatus: FollowUpStatus) => {
-    const updatedTasks = tasks.map(task => {
-      if (task.id === taskId) {
-        return { ...task, followUpStatus };
-      }
-      return task;
-    });
+  // 创建任务
+  const handleCreateTask = async () => {
+    try {
+      const values = await targetForm.validateFields();
+      
+      const taskData = {
+        taskName: values.name,
+        taskDesc: values.description,
+        projectName: values.projectName,
+        dueDate: values.eventTime.format('YYYY-MM-DD HH:mm:ss'),
+        targetCount: values.target,
+        assigneeId: 1, // 需要根据实际用户获取
+        taskType: 'monthly'
+      };
 
-    setTasks(updatedTasks);
-    setFilteredTasks(updatedTasks);
-    message.success('状态更新成功');
+      await projectService.createTask(taskData);
+      message.success('任务创建成功');
+      setIsTargetModalVisible(false);
+      targetForm.resetFields();
+      fetchTasks(); // 重新获取列表
+    } catch (error) {
+      message.error('创建任务失败');
+      console.error('创建任务失败:', error);
+    }
   };
 
-  // 周/月统计摘要
-  const getSummary = () => {
-    const types = Object.values(TaskType);
-    const summary = types.map(type => getStatistics(tasks, type));
+  // 更新任务状态
+  const handleUpdateTask = async (taskId: number, status: number) => {
+    try {
+      await projectService.updateTask(taskId, { taskStatus: status });
+      message.success('任务状态更新成功');
+      fetchTasks(); // 重新获取列表
+    } catch (error) {
+      message.error('更新任务状态失败');
+      console.error('更新任务状态失败:', error);
+    }
+  };
 
-    // 计算总计
-    const totalCount = summary.reduce((sum, data) => sum + data.count, 0);
-    const totalCompleted = summary.reduce((sum, data) => sum + data.completedCount, 0);
-    const totalTarget = summary.reduce((sum, data) => sum + data.target, 0);
-    const totalProgress = totalTarget ? Math.min(100, (totalCompleted / totalTarget) * 100) : 0;
-
-    return {
-      summary,
-      total: {
-        completedCount: totalCompleted,
-        count: totalCount,
-        progress: totalProgress,
-        target: totalTarget
-      }
-    };
+  // 删除任务
+  const handleDeleteTask = async (taskId: number) => {
+    try {
+      await projectService.deleteTask(taskId);
+      message.success('任务删除成功');
+      fetchTasks(); // 重新获取列表
+    } catch (error) {
+      message.error('删除任务失败');
+      console.error('删除任务失败:', error);
+    }
   };
 
   // 表格列定义
@@ -348,7 +328,7 @@ const MonthlyTasks = () => {
             <Button
               size="small"
               type="link"
-              onClick={() => handleStatusChange(record.id, FollowUpStatus.COMPLETED)}
+              onClick={() => handleUpdateTask(record.id, FollowUpStatus.COMPLETED)}
             >
               完成
             </Button>
@@ -357,11 +337,19 @@ const MonthlyTasks = () => {
             <Button
               size="small"
               type="link"
-              onClick={() => handleStatusChange(record.id, FollowUpStatus.IN_PROGRESS)}
+              onClick={() => handleUpdateTask(record.id, FollowUpStatus.IN_PROGRESS)}
             >
               进行中
             </Button>
           )}
+          <Button
+            danger
+            size="small"
+            type="link"
+            onClick={() => handleDeleteTask(record.id)}
+          >
+            删除
+          </Button>
         </Space>
       ),
       title: '操作',
@@ -447,6 +435,28 @@ const MonthlyTasks = () => {
     );
   };
 
+  // 周/月统计摘要
+  const getSummary = () => {
+    const types = Object.values(TaskType);
+    const summary = types.map(type => getStatistics(tasks, type));
+
+    // 计算总计
+    const totalCount = summary.reduce((sum, data) => sum + data.count, 0);
+    const totalCompleted = summary.reduce((sum, data) => sum + data.completedCount, 0);
+    const totalTarget = summary.reduce((sum, data) => sum + data.target, 0);
+    const totalProgress = totalTarget ? Math.min(100, (totalCompleted / totalTarget) * 100) : 0;
+
+    return {
+      summary,
+      total: {
+        completedCount: totalCompleted,
+        count: totalCount,
+        progress: totalProgress,
+        target: totalTarget
+      }
+    };
+  };
+
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
@@ -457,9 +467,9 @@ const MonthlyTasks = () => {
           <Button
             icon={<SettingOutlined />}
             type="primary"
-            onClick={openTargetModal}
+            onClick={() => setModalVisible(true)}
           >
-            申请设置目标
+            新增任务
           </Button>
         }
       >
@@ -530,49 +540,52 @@ const MonthlyTasks = () => {
         />
 
         <Modal
-          open={isTargetModalVisible}
-          title="申请设置目标"
-          onCancel={handleTargetCancel}
-          onOk={handleTargetSubmit}
+          open={modalVisible}
+          title="新增月任务"
+          onCancel={() => setModalVisible(false)}
+          onOk={handleCreateTask}
         >
           <Form
             form={targetForm}
-            labelCol={{ span: 6 }}
-            wrapperCol={{ span: 16 }}
+            layout="vertical"
           >
             <Form.Item
-              label="事项类型"
-              name="type"
-              rules={[{ message: '请选择事项类型', required: true }]}
+              label="任务名称"
+              name="name"
+              rules={[{ required: true, message: '请输入任务名称' }]}
             >
-              <Select
-                placeholder="请选择事项类型"
-                options={Object.values(TaskType).map(type => ({
-                  label: taskTypeNames[type],
-                  value: type
-                }))}
-              />
+              <Input placeholder="请输入任务名称" />
             </Form.Item>
+
+            <Form.Item
+              label="项目名称"
+              name="projectName"
+              rules={[{ required: true, message: '请输入项目名称' }]}
+            >
+              <Input placeholder="请输入项目名称" />
+            </Form.Item>
+
+            <Form.Item
+              label="任务描述"
+              name="description"
+            >
+              <Input.TextArea placeholder="请输入任务描述" rows={3} />
+            </Form.Item>
+
             <Form.Item
               label="目标数量"
               name="target"
-              rules={[{ message: '请输入目标数量', required: true }]}
+              rules={[{ required: true, message: '请输入目标数量' }]}
             >
-              <Input
-                min={1}
-                placeholder="请输入目标数量"
-                type="number"
-              />
+              <Input type="number" placeholder="请输入目标数量" />
             </Form.Item>
+
             <Form.Item
-              label="申请理由"
-              name="reason"
-              rules={[{ message: '请输入申请理由', required: true }]}
+              label="截止时间"
+              name="eventTime"
+              rules={[{ required: true, message: '请选择截止时间' }]}
             >
-              <Input.TextArea
-                placeholder="请输入申请理由"
-                rows={3}
-              />
+              <DatePicker showTime style={{ width: '100%' }} />
             </Form.Item>
           </Form>
         </Modal>
@@ -582,3 +595,4 @@ const MonthlyTasks = () => {
 };
 
 export default MonthlyTasks;
+

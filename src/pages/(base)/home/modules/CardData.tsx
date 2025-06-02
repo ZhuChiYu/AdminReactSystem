@@ -97,17 +97,7 @@ const CardItem = (data: CardDataProps) => {
 };
 
 const CardData = () => {
-  const data = useGetCardData();
-
-  return (
-    <ACard
-      className="card-wrapper"
-      size="small"
-      variant="borderless"
-    >
-      <ARow gutter={[16, 16]}>{data.map(CardItem)}</ARow>
-    </ACard>
-  );
+  return null;
 };
 
 export default CardData;

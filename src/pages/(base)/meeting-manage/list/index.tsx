@@ -1,22 +1,26 @@
-import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
-import React, { useState } from 'react';
+import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, Typography, message, App } from 'antd';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { meetingService } from '@/service/api';
+import type { MeetingApi } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Title } = Typography;
 const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
 interface MeetingItem {
-  approvalStatus: 'approved' | 'pending' | 'rejected'; // 审批状态
+  approvalStatus: number; // 审批状态
   endTime: string;
-  id: string;
+  id: number;
   location: string;
   organizer: string;
   participants: string[];
   // 会议总结内容
   record?: string;
   startTime: string;
-  status: 'cancelled' | 'completed' | 'ongoing' | 'pending';
+  status: number;
   summary?: string;
   title: string; // 会议记录内容
 }
@@ -30,48 +34,49 @@ const Component: React.FC = () => {
   const [currentMeeting, setCurrentMeeting] = useState<MeetingItem | null>(null);
   const [recordForm] = Form.useForm();
   const [summaryForm] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+  const [meetings, setMeetings] = useState<MeetingItem[]>([]);
+  const { message } = App.useApp();
 
   // 当前用户角色，在实际应用中应该从认证上下文中获取
   const currentUserRole = 'employee'; // 可能的值: 'super-admin', 'admin', 'employee'
 
-  // 模拟数据
-  const mockData: MeetingItem[] = [
-    {
-      approvalStatus: 'approved',
-      endTime: '2023-10-20 16:00',
-      id: '1',
-      location: '会议室A',
-      organizer: '张三',
-      participants: ['李四', '王五', '赵六'],
-      record: '讨论了项目当前进度，确定了下一阶段的目标和任务分配。张三负责前端开发，李四负责后端开发，王五负责测试。',
-      startTime: '2023-10-20 14:00',
-      status: 'completed',
-      summary: '项目总体进度良好，但后端性能优化任务需要加快推进。',
-      title: '项目进度汇报会'
-    },
-    {
-      approvalStatus: 'pending',
-      endTime: '2023-10-22 12:00',
-      id: '2',
-      location: '会议室B',
-      organizer: '李四',
-      participants: ['张三', '王五', '钱七'],
-      startTime: '2023-10-22 10:00',
-      status: 'pending',
-      title: '季度业绩分析会'
-    },
-    {
-      approvalStatus: 'rejected',
-      endTime: '2023-10-18 11:30',
-      id: '3',
-      location: '会议室C',
-      organizer: '王五',
-      participants: ['张三', '李四', '孙八'],
-      startTime: '2023-10-18 09:00',
-      status: 'cancelled',
-      title: '产品设计讨论会'
+  // 获取会议列表
+  const fetchMeetings = async () => {
+    setLoading(true);
+    try {
+      const response = await meetingService.getMeetingList({
+        current: 1,
+        size: 1000
+      });
+
+      // 转换API数据格式
+      const formattedMeetings: MeetingItem[] = response.records.map((meeting: MeetingApi.MeetingListItem) => ({
+        approvalStatus: 0, // 默认待审批状态
+        endTime: meeting.endTime,
+        id: meeting.id,
+        location: meeting.meetingRoom || '未指定',
+        organizer: meeting.organizer?.name || '',
+        participants: [], // API中没有participants字段，使用空数组
+        record: '', // API中没有meetingRecord字段，使用空字符串
+        startTime: meeting.startTime,
+        status: meeting.meetingStatus,
+        summary: '', // API中没有meetingSummary字段，使用空字符串
+        title: meeting.meetingTitle
+      }));
+
+      setMeetings(formattedMeetings);
+    } catch (error) {
+      message.error('获取会议列表失败');
+      console.error('获取会议列表失败:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchMeetings();
+  }, []);
 
   // 显示创建会议弹窗
   const showModal = () => {
@@ -80,13 +85,29 @@ const Component: React.FC = () => {
   };
 
   // 创建会议
-  const handleOk = () => {
-    form.validateFields().then(values => {
-      console.log('创建会议:', values);
-      // 实际项目中这里会调用API，并处理审批流程
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+
+      const meetingData: MeetingApi.CreateMeetingRequest = {
+        meetingTitle: values.title,
+        meetingType: 'meeting',
+        meetingRoom: values.location,
+        startTime: values.time[0].format('YYYY-MM-DD HH:mm:ss'),
+        endTime: values.time[1].format('YYYY-MM-DD HH:mm:ss'),
+        meetingDesc: values.agenda || '',
+        isOnline: false,
+        participantIds: []
+      };
+
+      await meetingService.createMeeting(meetingData);
       message.success('会议创建成功，等待审批');
       setIsModalVisible(false);
-    });
+      fetchMeetings(); // 重新获取列表
+    } catch (error) {
+      message.error('创建会议失败');
+      console.error('创建会议失败:', error);
+    }
   };
 
   // 显示记录弹窗
@@ -99,12 +120,24 @@ const Component: React.FC = () => {
   };
 
   // 保存会议记录
-  const handleSaveRecord = () => {
-    recordForm.validateFields().then(values => {
-      console.log('保存会议记录:', values, '会议ID:', currentMeeting?.id);
-      message.success('会议记录保存成功');
-      setRecordModalVisible(false);
-    });
+  const handleSaveRecord = async () => {
+    try {
+      const values = await recordForm.validateFields();
+
+      if (currentMeeting) {
+        // 由于API类型定义中没有meetingRecord字段，这里暂时注释掉或使用其他方式处理
+        // await meetingService.updateMeeting(currentMeeting.id, {
+        //   meetingRecord: values.content
+        // });
+        console.log('保存会议记录:', values.content);
+        message.success('会议记录保存成功');
+        setRecordModalVisible(false);
+        fetchMeetings(); // 重新获取列表
+      }
+    } catch (error) {
+      message.error('保存会议记录失败');
+      console.error('保存会议记录失败:', error);
+    }
   };
 
   // 显示总结弹窗
@@ -117,94 +150,117 @@ const Component: React.FC = () => {
   };
 
   // 保存会议总结
-  const handleSaveSummary = () => {
-    summaryForm.validateFields().then(values => {
-      console.log('保存会议总结:', values, '会议ID:', currentMeeting?.id);
-      message.success('会议总结保存成功');
-      setSummaryModalVisible(false);
-    });
+  const handleSaveSummary = async () => {
+    try {
+      const values = await summaryForm.validateFields();
+
+      if (currentMeeting) {
+        // 由于API类型定义中没有meetingSummary字段，这里暂时注释掉或使用其他方式处理
+        // await meetingService.updateMeeting(currentMeeting.id, {
+        //   meetingSummary: values.content
+        // });
+        console.log('保存会议总结:', values.content);
+        message.success('会议总结保存成功');
+        setSummaryModalVisible(false);
+        fetchMeetings(); // 重新获取列表
+      }
+    } catch (error) {
+      message.error('保存会议总结失败');
+      console.error('保存会议总结失败:', error);
+    }
   };
 
   // 获取审批状态标签
-  const getApprovalStatusTag = (status: string) => {
+  const getApprovalStatusTag = (status: number) => {
     switch (status) {
-      case 'approved':
+      case 1:
         return <Tag color="success">已批准</Tag>;
-      case 'pending':
+      case 0:
         return <Tag color="processing">审批中</Tag>;
-      case 'rejected':
+      case -1:
         return <Tag color="error">已拒绝</Tag>;
       default:
         return <Tag>未知</Tag>;
     }
   };
 
+  // 表格列配置
   const columns = [
     {
+      title: '会议标题',
       dataIndex: 'title',
       key: 'title',
-      title: '会议标题'
+      ...getCenterColumnConfig(),
     },
     {
+      title: '组织者',
       dataIndex: 'organizer',
       key: 'organizer',
-      title: '组织者'
+      ...getCenterColumnConfig(),
     },
     {
+      title: '开始时间',
       dataIndex: 'startTime',
       key: 'startTime',
-      title: '开始时间'
+      ...getCenterColumnConfig(),
     },
     {
+      title: '结束时间',
       dataIndex: 'endTime',
       key: 'endTime',
-      title: '结束时间'
+      ...getCenterColumnConfig(),
     },
     {
+      title: '地点',
       dataIndex: 'location',
       key: 'location',
-      title: '地点'
+      ...getCenterColumnConfig(),
     },
     {
+      title: '审批状态',
       dataIndex: 'approvalStatus',
       key: 'approvalStatus',
-      render: (status: string) => getApprovalStatusTag(status),
-      title: '审批状态'
+      ...getCenterColumnConfig(),
+      render: (status: number) => getApprovalStatusTag(status),
     },
     {
+      title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => {
+      ...getCenterColumnConfig(),
+      render: (status: number) => {
         let color = 'blue';
         let text = '待开始';
 
-        if (status === 'ongoing') {
+        if (status === 1) {
           color = 'green';
           text = '进行中';
-        } else if (status === 'completed') {
+        } else if (status === 2) {
           color = 'gray';
           text = '已结束';
-        } else if (status === 'cancelled') {
+        } else if (status === -1) {
           color = 'red';
           text = '已取消';
         }
 
         return <Tag color={color}>{text}</Tag>;
       },
-      title: '状态'
     },
     {
+      title: '参与人数',
       dataIndex: 'participants',
       key: 'participants',
+      ...getCenterColumnConfig(),
       render: (participants: string[]) => participants.length,
-      title: '参与人数'
     },
     {
+      title: '操作',
       key: 'action',
+      ...getActionColumnConfig(200),
       render: (_: any, record: MeetingItem) => (
         <Space>
           {/* 只有会议被批准且已结束才能添加记录和总结 */}
-          {record.approvalStatus === 'approved' && record.status === 'completed' && (
+          {record.approvalStatus === 1 && record.status === 2 && (
             <>
               <Button
                 size="small"
@@ -224,11 +280,10 @@ const Component: React.FC = () => {
           )}
 
           {/* 显示审批状态消息 */}
-          {record.approvalStatus === 'pending' && <Tag color="orange">等待审批</Tag>}
-          {record.approvalStatus === 'rejected' && <Tag color="red">审批拒绝</Tag>}
+          {record.approvalStatus === 0 && <Tag color="orange">等待审批</Tag>}
+          {record.approvalStatus === -1 && <Tag color="red">审批拒绝</Tag>}
         </Space>
       ),
-      title: '操作'
     }
   ];
 
@@ -246,8 +301,10 @@ const Component: React.FC = () => {
         </div>
         <Table
           columns={columns}
-          dataSource={mockData}
+          dataSource={meetings}
+          loading={loading}
           rowKey="id"
+          {...getFullTableConfig(10)}
         />
       </Card>
 

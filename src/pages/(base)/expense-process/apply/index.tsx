@@ -29,6 +29,7 @@ import type dayjs from 'dayjs';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { expenseService, notificationService } from '@/service/api';
 import { isSuperAdmin } from '@/utils/auth';
 
 const { Text, Title } = Typography;
@@ -152,7 +153,7 @@ const Component: React.FC = () => {
   };
 
   // 提交申请
-  const handleSubmit = (values: any) => {
+  const handleSubmit = async (values: any) => {
     if (expenseItems.length === 0) {
       message.error('请至少添加一个报销项目');
       return;
@@ -160,53 +161,47 @@ const Component: React.FC = () => {
 
     setSubmitting(true);
 
-    // 准备报销数据
-    const newExpenseApplication = {
-      amount: expenseItems.reduce((sum, item) => sum + item.amount, 0),
-      applicant: values.applicant || '匿名用户',
-      date: new Date().toLocaleDateString(),
-      department: values.department
-        ? departments.find(d => d.value === values.department)?.label || values.department
-        : '未指定部门',
-      id: Date.now().toString(),
-      items: expenseItems,
-      status: 'pending',
-      title: values.title,
-      type:
-        expenseItems.length > 0 ? expenseTypes.find(t => t.value === expenseItems[0].itemType)?.label || '其他' : '其他'
-    };
-
-    // 模拟提交
-    setTimeout(() => {
-      // 保存到本地存储
-      const existingExpenses = JSON.parse(localStorage.getItem('expenseApplications') || '[]');
-      localStorage.setItem('expenseApplications', JSON.stringify([newExpenseApplication, ...existingExpenses]));
-
-      // 发送通知给超级管理员
-      const notification = {
-        content: `${values.applicant || '员工'}提交了新的报销申请: ${values.title}，请尽快审核`,
-        createdAt: new Date().toISOString(),
-        id: Date.now().toString(),
-        read: false,
-        title: '新报销申请待审核',
-        type: 'expense'
+    try {
+      // 构造API请求数据
+      const expenseData = {
+        expenseType: expenseItems.length > 0 ? expenseItems[0].itemType : '其他',
+        applicationReason: values.title,
+        expensePeriodStart: values.dateRange?.[0]?.format('YYYY-MM-DD'),
+        expensePeriodEnd: values.dateRange?.[1]?.format('YYYY-MM-DD'),
+        remark: values.description,
+        items: expenseItems.map(item => ({
+          itemName: item.itemName,
+          itemType: item.itemType,
+          expenseDate: item.date.format('YYYY-MM-DD'),
+          amount: item.amount,
+          description: item.description
+        }))
       };
 
-      // 存储通知到本地存储
-      const existingNotifications = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
-      localStorage.setItem('adminNotifications', JSON.stringify([notification, ...existingNotifications]));
+      // 调用API提交费用申请
+      const response = await expenseService.createExpense(expenseData);
 
-      console.log('已发送通知给超级管理员', notification);
-      console.log('已保存报销申请', newExpenseApplication);
+      // 发送通知给管理员
+      await notificationService.createNotification({
+        title: '新报销申请待审核',
+        content: `${values.applicant || '员工'}提交了新的报销申请: ${values.title}，请尽快审核`,
+        type: 'expense',
+        relatedId: response.id,
+        relatedType: 'expense_application'
+      });
 
-      setSubmitting(false);
       message.success('报销申请提交成功');
 
       // 提交成功后清空表单
       form.resetFields();
       setExpenseItems([]);
       setFileList([]);
-    }, 1500);
+    } catch (error) {
+      message.error('提交报销申请失败');
+      console.error('提交报销申请失败:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // 表格列定义

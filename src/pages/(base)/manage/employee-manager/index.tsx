@@ -3,19 +3,20 @@ import { Button as AButton, Card, Form, Modal, Select, Space, Table, Tag, messag
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { employeeService, type EmployeeApi } from '@/service/api';
+import { type EmployeeApi, employeeService } from '@/service/api';
 import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 角色中文名称映射
 const roleNames = {
-  super_admin: '超级管理员',
   admin: '管理员',
   consultant: '顾问',
-  marketing_manager: '市场部经理',
-  hr_specialist: '人力专员',
   hr_bp: '人力BP',
+  hr_specialist: '人力专员',
+  marketing_manager: '市场部经理',
+  sales_director: '销售总监',
   sales_manager: '销售经理',
-  sales_director: '销售总监'
+  super_admin: '超级管理员'
 };
 
 interface EmployeeManagerRelation {
@@ -85,10 +86,11 @@ const EmployeeManagerManagement = () => {
   // 获取未分配的员工
   const getUnassignedEmployees = () => {
     const assignedEmployeeIds = relations.map(r => r.employeeId);
-    return employees.filter(emp =>
-      !assignedEmployeeIds.includes(emp.id) &&
-      !emp.roles?.some(role => role.code === 'admin') &&
-      !emp.roles?.some(role => role.code === 'super_admin')
+    return employees.filter(
+      emp =>
+        !assignedEmployeeIds.includes(emp.id) &&
+        !emp.roles?.some(role => role.code === 'admin') &&
+        !emp.roles?.some(role => role.code === 'super_admin')
     );
   };
 
@@ -164,6 +166,7 @@ const EmployeeManagerManagement = () => {
     {
       dataIndex: 'employeeName',
       key: 'employeeName',
+      ...getCenterColumnConfig(),
       render: (text: string) => (
         <Space>
           <UserOutlined />
@@ -175,22 +178,26 @@ const EmployeeManagerManagement = () => {
     {
       dataIndex: 'managerName',
       key: 'managerName',
+      ...getCenterColumnConfig(),
       render: (text: string) => <Tag color="blue">{text}</Tag>,
       title: '管理员'
     },
     {
       dataIndex: 'assignedByName',
       key: 'assignedByName',
+      ...getCenterColumnConfig(),
       render: (text: string) => <Tag color="green">{text}</Tag>,
       title: '分配人'
     },
     {
       dataIndex: 'assignedTime',
       key: 'assignedTime',
+      ...getCenterColumnConfig(),
       title: '分配时间'
     },
     {
       key: 'action',
+      ...getActionColumnConfig(120),
       render: (_: any, record: EmployeeManagerRelation) => (
         <Space>
           <AButton
@@ -231,11 +238,7 @@ const EmployeeManagerManagement = () => {
           dataSource={relations}
           loading={loading}
           rowKey="id"
-          pagination={{
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: total => `共 ${total} 条记录`
-          }}
+          {...getFullTableConfig(10)}
         />
       </Card>
 
@@ -275,9 +278,7 @@ const EmployeeManagerManagement = () => {
                 const userName = manager.userName?.toLowerCase() || '';
                 const roleName = getEmployeeRoleName(manager).toLowerCase();
 
-                return nickName.includes(searchText) ||
-                       userName.includes(searchText) ||
-                       roleName.includes(searchText);
+                return nickName.includes(searchText) || userName.includes(searchText) || roleName.includes(searchText);
               }}
               onChange={setSelectedManager}
             >
@@ -311,9 +312,7 @@ const EmployeeManagerManagement = () => {
                 const userName = employee.userName?.toLowerCase() || '';
                 const roleName = getEmployeeRoleName(employee).toLowerCase();
 
-                return nickName.includes(searchText) ||
-                       userName.includes(searchText) ||
-                       roleName.includes(searchText);
+                return nickName.includes(searchText) || userName.includes(searchText) || roleName.includes(searchText);
               }}
               onChange={setSelectedEmployees}
             >

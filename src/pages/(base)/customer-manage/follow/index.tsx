@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 import type { CustomerApi } from '@/service/api';
 import { customerService } from '@/service/api';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 /** 跟进状态枚举 */
 export enum FollowUpStatus {
@@ -192,6 +193,7 @@ const CustomerFollow = () => {
     {
       dataIndex: 'customerName',
       key: 'customerName',
+      ...getCenterColumnConfig(),
       render: text => <span>{text}</span>,
       title: '客户姓名',
       width: 100
@@ -200,18 +202,21 @@ const CustomerFollow = () => {
       dataIndex: 'company',
       ellipsis: true,
       key: 'company',
+      ...getCenterColumnConfig(),
       title: '公司',
       width: 200
     },
     {
       dataIndex: 'position',
       key: 'position',
+      ...getCenterColumnConfig(),
       title: '职位',
       width: 120
     },
     {
       dataIndex: 'phone',
       key: 'phone',
+      ...getCenterColumnConfig(),
       render: text => <span>{text || '-'}</span>,
       title: '电话',
       width: 120
@@ -219,6 +224,7 @@ const CustomerFollow = () => {
     {
       dataIndex: 'mobile',
       key: 'mobile',
+      ...getCenterColumnConfig(),
       render: text => <span>{text || '-'}</span>,
       title: '手机',
       width: 120
@@ -226,6 +232,7 @@ const CustomerFollow = () => {
     {
       dataIndex: 'followStatus',
       key: 'followStatus',
+      ...getCenterColumnConfig(),
       render: (status: string) => <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>,
       title: '跟进状态',
       width: 100
@@ -234,6 +241,7 @@ const CustomerFollow = () => {
       dataIndex: 'remark',
       ellipsis: true,
       key: 'followContent',
+      ...getCenterColumnConfig(),
       render: (text: string) => (
         <span title={text}>{text?.length > 30 ? `${text.slice(0, 30)}...` : text || '暂无跟进内容'}</span>
       ),
@@ -242,6 +250,7 @@ const CustomerFollow = () => {
     {
       dataIndex: ['assignedTo', 'name'],
       key: 'employeeName',
+      ...getCenterColumnConfig(),
       render: text => text || '未分配',
       title: '负责人',
       width: 100
@@ -249,6 +258,7 @@ const CustomerFollow = () => {
     {
       dataIndex: 'createdAt',
       key: 'createTime',
+      ...getCenterColumnConfig(),
       render: (text: string) => {
         if (!text) return '-';
         const date = new Date(text);
@@ -269,6 +279,7 @@ const CustomerFollow = () => {
     },
     {
       key: 'action',
+      ...getActionColumnConfig(120),
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -292,8 +303,7 @@ const CustomerFollow = () => {
           )}
         </Space>
       ),
-      title: '操作',
-      width: 120
+      title: '操作'
     }
   ];
 
@@ -387,12 +397,7 @@ const CustomerFollow = () => {
         dataSource={filteredRecords}
         loading={loading}
         rowKey="id"
-        scroll={{ x: 1200 }}
-        pagination={{
-          showQuickJumper: true,
-          showSizeChanger: true,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
-        }}
+        {...getFullTableConfig(10)}
       />
 
       {/* 添加跟进记录模态框 */}

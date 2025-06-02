@@ -50,6 +50,7 @@ const Role = () => {
         title: t('page.manage.role.roleCode')
       },
       {
+        align: 'center',
         dataIndex: 'roleDesc',
         key: 'roleDesc',
         minWidth: 120,
@@ -71,6 +72,7 @@ const Role = () => {
       },
       {
         align: 'center',
+        fixed: 'right' as const,
         key: 'operate',
         render: (_, record) => (
           <div className="flex-center gap-8px">
@@ -146,9 +148,9 @@ const Role = () => {
   return (
     <div className="h-full min-h-500px flex-col-stretch gap-16px overflow-hidden lt-sm:overflow-auto">
       <ACollapse
-        variant="borderless"
         className="card-wrapper"
         defaultActiveKey={isMobile ? undefined : '1'}
+        variant="borderless"
         items={[
           {
             children: <RoleSearch {...searchProps} />,

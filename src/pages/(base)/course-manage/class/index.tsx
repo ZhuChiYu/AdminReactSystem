@@ -1,456 +1,371 @@
-import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
-import type { Dayjs } from 'dayjs';
-import dayjs from 'dayjs';
+import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { classService } from '@/service/api';
+import type { ClassApi } from '@/service/api/types';
+
+interface ClassItem {
+  id: number;
+  name: string;
+  categoryId: number;
+  categoryName: string;
+  teacher: string;
+  studentCount: number;
+  startDate: string;
+  endDate: string;
+  status: number;
+  description: string;
+  createdAt: string;
+}
 
 /** 班级状态枚举 */
 enum ClassStatus {
   NOT_STARTED = 0,
   IN_PROGRESS = 1,
-  COMPLETED = 2
+  COMPLETED = 2,
+  SUSPENDED = 3
 }
 
 /** 班级类型枚举 */
 enum ClassCategory {
   TECHNICAL = 1,
   MANAGEMENT = 2,
-  TRAINING = 3,
-  OTHER = 4
+  TRAINING = 3
 }
 
 /** 班级列表组件 */
 const ClassList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [classList, setClassList] = useState<any[]>([]);
-  const [filteredList, setFilteredList] = useState<any[]>([]);
-
-  // 筛选条件
-  const [searchName, setSearchName] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<number | ''>('');
-  const [selectedStatus, setSelectedStatus] = useState<number | ''>('');
-  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
-
-  // 添加班级相关状态
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [classList, setClassList] = useState<ClassItem[]>([]);
+  const [filteredList, setFilteredList] = useState<ClassItem[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
-  const [submitting, setSubmitting] = useState(false);
 
-  // 模拟数据加载
-  useEffect(() => {
+  // 获取班级列表
+  const fetchClasses = async () => {
     setLoading(true);
+    try {
+      const response = await classService.getClassList({
+        current: 1,
+        size: 1000
+      });
 
-    // 检查是否有缓存的班级列表数据
-    const storedClasses = localStorage.getItem('classList');
-    if (storedClasses) {
-      try {
-        const classes = JSON.parse(storedClasses);
-        setClassList(classes);
-        setFilteredList(classes);
-        setLoading(false);
-        return;
+      // 转换API数据格式
+      const formattedClasses: ClassItem[] = response.records.map((classItem: ClassApi.ClassListItem) => ({
+        id: classItem.id,
+        name: classItem.className,
+        categoryId: classItem.categoryId || 0,
+        categoryName: classItem.category?.name || '',
+        teacher: classItem.teacher || '',
+        studentCount: classItem.studentCount || 0,
+        startDate: classItem.startDate || '',
+        endDate: classItem.endDate || '',
+        status: classItem.status || 0,
+        description: classItem.description || '',
+        createdAt: classItem.createTime || ''
+      }));
+
+      setClassList(formattedClasses);
+      setFilteredList(formattedClasses);
       } catch (error) {
-        console.error('解析班级列表数据失败', error);
-      }
-    }
-
-    // 如果没有缓存数据，则加载模拟数据
-    // 模拟API请求
-    setTimeout(() => {
-      const mockData = [
-        {
-          categoryId: ClassCategory.TECHNICAL,
-          categoryName: '技术培训',
-          createdAt: '2024-02-15 14:30:00',
-          description: '2024年春季常规课程',
-          endDate: '2024-06-30',
-          id: 1,
-          name: '2024春季班',
-          startDate: '2024-03-01',
-          status: ClassStatus.IN_PROGRESS,
-          studentCount: 30,
-          teacher: '张老师'
-        },
-        {
-          categoryId: ClassCategory.MANAGEMENT,
-          categoryName: '管理课程',
-          createdAt: '2024-03-15 10:20:00',
-          description: '2024年夏季管理课程',
-          endDate: '2024-08-31',
-          id: 2,
-          name: '2024夏季班',
-          startDate: '2024-07-01',
-          status: ClassStatus.NOT_STARTED,
-          studentCount: 25,
-          teacher: '李老师'
-        },
-        {
-          categoryId: ClassCategory.TRAINING,
-          categoryName: '营销课程',
-          createdAt: '2023-08-10 09:15:00',
-          description: '2023年秋季营销培训',
-          endDate: '2023-12-31',
-          id: 3,
-          name: '2023秋季班',
-          startDate: '2023-09-01',
-          status: ClassStatus.COMPLETED,
-          studentCount: 28,
-          teacher: '王老师'
-        }
-      ];
-      setClassList(mockData);
-      setFilteredList(mockData);
-
-      // 保存到localStorage
-      localStorage.setItem('classList', JSON.stringify(mockData));
-
+      message.error('获取班级列表失败');
+      console.error('获取班级列表失败:', error);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  };
+
+  useEffect(() => {
+    fetchClasses();
   }, []);
 
-  // 应用筛选
-  const applyFilters = () => {
-    let result = [...classList];
-
-    // 按班级名称筛选
-    if (searchName) {
-      result = result.filter(classItem => classItem.name.toLowerCase().includes(searchName.toLowerCase()));
-    }
-
-    // 按分类筛选
-    if (selectedCategory !== '') {
-      result = result.filter(classItem => classItem.categoryId === selectedCategory);
-    }
-
-    // 按状态筛选
-    if (selectedStatus !== '') {
-      result = result.filter(classItem => classItem.status === selectedStatus);
-    }
-
-    // 按日期范围筛选
-    if (dateRange && dateRange[0] && dateRange[1]) {
-      const startDate = dateRange[0].format('YYYY-MM-DD');
-      const endDate = dateRange[1].format('YYYY-MM-DD');
-
-      result = result.filter(classItem => {
-        return classItem.startDate >= startDate && classItem.startDate <= endDate;
-      });
-    }
-
-    setFilteredList(result);
-  };
-
-  // 监听筛选条件变化时应用筛选
-  useEffect(() => {
-    applyFilters();
-  }, [searchName, selectedCategory, selectedStatus, dateRange]);
-
-  // 重置筛选
-  const resetFilters = () => {
-    setSearchName('');
-    setSelectedCategory('');
-    setSelectedStatus('');
-    setDateRange(null);
+  // 搜索处理
+  const handleSearch = (value: string) => {
+    if (!value) {
     setFilteredList(classList);
+    } else {
+      const filtered = classList.filter(item =>
+        item.name.toLowerCase().includes(value.toLowerCase()) ||
+        item.teacher.toLowerCase().includes(value.toLowerCase()) ||
+        item.categoryName.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredList(filtered);
+    }
   };
 
-  // 获取状态标签颜色
-  const getStatusColor = (status: ClassStatus) => {
-    if (status === ClassStatus.IN_PROGRESS) return 'processing';
-    if (status === ClassStatus.NOT_STARTED) return 'default';
-    return 'success';
+  // 打开新增弹窗
+  const showModal = () => {
+    setIsModalVisible(true);
   };
 
-  // 获取状态文本
-  const getStatusText = (status: ClassStatus) => {
-    if (status === ClassStatus.IN_PROGRESS) return '进行中';
-    if (status === ClassStatus.NOT_STARTED) return '未开始';
-    return '已结束';
-  };
-
-  // 分类选项
-  const categoryOptions = [
-    { label: '全部类型', value: '' },
-    { label: '技术培训', value: ClassCategory.TECHNICAL },
-    { label: '管理课程', value: ClassCategory.MANAGEMENT },
-    { label: '营销课程', value: ClassCategory.TRAINING },
-    { label: '其他课程', value: ClassCategory.OTHER }
-  ];
-
-  // 状态选项
-  const statusOptions = [
-    { label: '全部状态', value: '' },
-    { label: '未开始', value: ClassStatus.NOT_STARTED },
-    { label: '进行中', value: ClassStatus.IN_PROGRESS },
-    { label: '已结束', value: ClassStatus.COMPLETED }
-  ];
-
-  // 打开添加班级模态框
-  const showAddModal = () => {
-    form.resetFields();
-    setIsModalOpen(true);
-  };
-
-  // 关闭添加班级模态框
+  // 关闭弹窗
   const handleCancel = () => {
-    setIsModalOpen(false);
+    setIsModalVisible(false);
+    form.resetFields();
+  };
+
+  // 提交新增表单
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+
+      const classData = {
+        className: values.name,
+        categoryId: values.categoryId,
+        teacher: values.teacher,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        description: values.description,
+        status: ClassStatus.NOT_STARTED
+      };
+
+      await classService.createClass(classData);
+      message.success('班级创建成功');
+      setIsModalVisible(false);
+    form.resetFields();
+      fetchClasses(); // 重新获取列表
+    } catch (error) {
+      message.error('创建班级失败');
+      console.error('创建班级失败:', error);
+    }
+  };
+
+  // 删除班级
+  const handleDelete = async (id: number) => {
+    try {
+      await classService.deleteClass(id);
+      message.success('删除成功');
+      fetchClasses(); // 重新获取列表
+    } catch (error) {
+      message.error('删除失败');
+      console.error('删除班级失败:', error);
+    }
   };
 
   // 查看班级详情
   const handleViewDetail = (classId: number) => {
-    navigate(`/course-manage/class/${classId}`);
+    navigate(`/class-manage/detail/${classId}`);
   };
 
-  // 提交添加班级表单
-  const handleAddClass = async () => {
-    try {
-      const values = await form.validateFields();
-      setSubmitting(true);
+  // 编辑班级
+  const handleEdit = (classId: number) => {
+    navigate(`/class-manage/edit/${classId}`);
+  };
 
-      // 模拟API请求延迟
-      setTimeout(() => {
-        // 生成新班级对象
-        const newClass = {
-          categoryId: values.categoryId,
-          categoryName: categoryOptions.find(item => item.value === values.categoryId)?.label || '未知类型',
-          createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          description: values.description || '',
-          endDate: values.endDate.format('YYYY-MM-DD'),
-          id: classList.length + 1,
-          name: values.name,
-          startDate: values.startDate.format('YYYY-MM-DD'),
-          status:
-            new Date(values.startDate.format('YYYY-MM-DD')).getTime() > new Date().getTime()
-              ? ClassStatus.NOT_STARTED
-              : ClassStatus.IN_PROGRESS,
-          studentCount: 0,
-          teacher: values.teacher
-        };
-
-        // 更新班级列表
-        const updatedClassList = [...classList, newClass];
-        setClassList(updatedClassList);
-        setFilteredList(updatedClassList);
-
-        // 更新本地存储
-        localStorage.setItem('classList', JSON.stringify(updatedClassList));
-
-        // 关闭模态框并重置状态
-        setIsModalOpen(false);
-        setSubmitting(false);
-        form.resetFields();
-
-        // 显示成功消息
-        Modal.success({
-          content: `班级"${values.name}"已成功创建`,
-          title: '创建成功'
-        });
-      }, 1000);
-    } catch (error) {
-      console.error('表单验证失败:', error);
-      setSubmitting(false);
+  // 获取状态标签
+  const getStatusTag = (status: number) => {
+    switch (status) {
+      case ClassStatus.NOT_STARTED:
+        return <Tag color="default">未开始</Tag>;
+      case ClassStatus.IN_PROGRESS:
+        return <Tag color="processing">进行中</Tag>;
+      case ClassStatus.COMPLETED:
+        return <Tag color="success">已完成</Tag>;
+      case ClassStatus.SUSPENDED:
+        return <Tag color="warning">已暂停</Tag>;
+      default:
+        return <Tag color="default">未知</Tag>;
     }
   };
 
-  // 表格列定义
   const columns = [
     {
+      title: '班级ID',
       dataIndex: 'id',
       key: 'id',
-      title: 'ID',
-      width: 80
+      width: 100
     },
     {
+      title: '班级名称',
       dataIndex: 'name',
       key: 'name',
-      title: '班级名称',
       width: 200
     },
     {
+      title: '分类',
       dataIndex: 'categoryName',
       key: 'categoryName',
-      title: '班级类型',
-      width: 150
+      width: 120
     },
     {
+      title: '授课老师',
       dataIndex: 'teacher',
       key: 'teacher',
-      title: '班主任',
       width: 120
     },
     {
+      title: '学员数量',
       dataIndex: 'studentCount',
       key: 'studentCount',
-      title: '学员人数',
       width: 100
     },
     {
+      title: '开始日期',
       dataIndex: 'startDate',
       key: 'startDate',
-      title: '开始日期',
       width: 120
     },
     {
+      title: '结束日期',
       dataIndex: 'endDate',
       key: 'endDate',
-      title: '结束日期',
       width: 120
     },
     {
+      title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: ClassStatus) => <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>,
-      title: '状态',
-      width: 100
+      width: 100,
+      render: (status: number) => getStatusTag(status)
     },
     {
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      title: '创建时间',
-      width: 180
-    },
-    {
+      title: '操作',
       key: 'action',
-      render: (_: unknown, record: any) => (
-        <Space size="middle">
+      width: 200,
+      render: (_: any, record: ClassItem) => (
+        <Space>
           <Button
+            icon={<EyeOutlined />}
+            size="small"
             type="link"
             onClick={() => handleViewDetail(record.id)}
           >
-            查看
+            详情
           </Button>
-          <Button type="link">编辑</Button>
           <Button
-            danger
+            icon={<EditOutlined />}
+            size="small"
             type="link"
+            onClick={() => handleEdit(record.id)}
           >
-            删除
+            编辑
           </Button>
+          <Popconfirm
+            title="确定要删除这个班级吗？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              type="link"
+            >
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
-      ),
-      title: '操作',
-      width: 200
+      )
     }
   ];
 
   return (
-    <div className="h-full bg-white dark:bg-[#141414]">
-      <Card
-        variant="borderless"
-        className="h-full"
-        title="班级列表"
-      >
-        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Input
+    <div className="p-4">
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">班级管理</h2>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Input.Search
+              placeholder="搜索班级名称、老师或分类"
             allowClear
-            placeholder="班级名称"
-            style={{ width: 200 }}
-            value={searchName}
-            onChange={e => setSearchName(e.target.value)}
-          />
-          <Select
-            allowClear
-            options={categoryOptions}
-            placeholder="班级类型"
-            style={{ width: 200 }}
-            value={selectedCategory}
-            onChange={value => setSelectedCategory(value)}
-          />
-          <Select
-            allowClear
-            options={statusOptions}
-            placeholder="班级状态"
-            style={{ width: 200 }}
-            value={selectedStatus}
-            onChange={value => setSelectedStatus(value)}
-          />
-          <DatePicker.RangePicker
-            placeholder={['开始日期', '结束日期']}
             style={{ width: 300 }}
-            value={dateRange}
-            onChange={dates => setDateRange(dates)}
+              onSearch={handleSearch}
+              onChange={(e) => !e.target.value && handleSearch('')}
           />
-          <Button onClick={resetFilters}>重置</Button>
           <Button
             type="primary"
-            onClick={showAddModal}
+              icon={<PlusOutlined />}
+              onClick={showModal}
           >
             新增班级
           </Button>
+          </div>
         </div>
 
         <Table
           columns={columns}
           dataSource={filteredList}
-          loading={loading}
           rowKey="id"
-          scroll={{ y: 'calc(100vh - 300px)' }}
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`
+          }}
         />
+      </Card>
 
+      {/* 新增班级弹窗 */}
         <Modal
-          confirmLoading={submitting}
-          open={isModalOpen}
           title="新增班级"
+        open={isModalVisible}
+        onOk={handleOk}
           onCancel={handleCancel}
-          onOk={handleAddClass}
+        width={600}
         >
           <Form
             form={form}
-            labelCol={{ span: 6 }}
-            style={{ marginTop: 20 }}
-            wrapperCol={{ span: 16 }}
+          layout="vertical"
           >
             <Form.Item
               label="班级名称"
               name="name"
-              rules={[{ message: '请输入班级名称', required: true }]}
+            rules={[{ required: true, message: '请输入班级名称' }]}
             >
               <Input placeholder="请输入班级名称" />
             </Form.Item>
+
             <Form.Item
-              label="班级类型"
+            label="分类"
               name="categoryId"
-              rules={[{ message: '请选择班级类型', required: true }]}
+            rules={[{ required: true, message: '请选择分类' }]}
             >
-              <Select
-                options={categoryOptions.filter(item => item.value !== '')}
-                placeholder="请选择班级类型"
-              />
+            <Select placeholder="请选择分类">
+              <Select.Option value={ClassCategory.TECHNICAL}>技术培训</Select.Option>
+              <Select.Option value={ClassCategory.MANAGEMENT}>管理课程</Select.Option>
+              <Select.Option value={ClassCategory.TRAINING}>营销课程</Select.Option>
+            </Select>
             </Form.Item>
+
             <Form.Item
-              label="班主任"
+            label="授课老师"
               name="teacher"
-              rules={[{ message: '请输入班主任姓名', required: true }]}
+            rules={[{ required: true, message: '请输入授课老师' }]}
             >
-              <Input placeholder="请输入班主任姓名" />
+            <Input placeholder="请输入授课老师" />
             </Form.Item>
+
             <Form.Item
               label="开始日期"
               name="startDate"
-              rules={[{ message: '请选择开始日期', required: true }]}
+            rules={[{ required: true, message: '请选择开始日期' }]}
             >
-              <DatePicker className="w-full" />
+            <Input type="date" />
             </Form.Item>
+
             <Form.Item
               label="结束日期"
               name="endDate"
-              rules={[{ message: '请选择结束日期', required: true }]}
+            rules={[{ required: true, message: '请选择结束日期' }]}
             >
-              <DatePicker className="w-full" />
+            <Input type="date" />
             </Form.Item>
+
             <Form.Item
               label="班级描述"
               name="description"
             >
-              <Input.TextArea
-                placeholder="请输入班级描述"
-                rows={4}
-              />
+            <Input.TextArea placeholder="请输入班级描述" rows={4} />
             </Form.Item>
           </Form>
         </Modal>
-      </Card>
     </div>
   );
 };

@@ -1,222 +1,229 @@
-import { CalendarOutlined, ClockCircleOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
-import { Button, Card, Empty, List, Space, Tabs, Tag } from 'antd';
-import type { TabsProps } from 'antd';
+import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Card, List, Tag } from 'antd';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 
-interface Meeting {
-  endTime: string;
-  id: string;
-  location: string;
-  organizer: string;
-  participants: string[];
-  startTime: string;
-  status: 'cancelled' | 'completed' | 'ongoing' | 'pending';
-  title: string;
-}
+import { meetingService } from '@/service/api';
+import { projectService } from '@/service/api/project';
+import type { MeetingApi, TaskApi } from '@/service/api/types';
 
-interface Task {
-  deadline: string;
-  id: string;
-  priority: 'high' | 'low' | 'medium';
-  status: 'completed' | 'in_progress' | 'not_started';
+interface MeetingItem {
+  id: number;
+  location?: string;
+  status: number;
+  time: string;
   title: string;
   type: string;
 }
 
+interface TaskItem {
+  dueDate: string;
+  id: number;
+  priority: number;
+  project: string;
+  status: number;
+  title: string;
+}
+
 const TodayMeetingsAndTasks = () => {
-  const navigate = useNavigate();
+  const [meetings, setMeetings] = useState<MeetingItem[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // 模拟今日会议数据
-  const todayMeetings: Meeting[] = [
-    {
-      endTime: dayjs().hour(11).minute(30).format('HH:mm'),
-      id: '1',
-      location: '会议室A',
-      organizer: '张经理',
-      participants: ['李四', '王五', '赵六'],
-      startTime: dayjs().hour(10).minute(0).format('HH:mm'),
-      status: 'pending',
-      title: '项目周例会'
-    },
-    {
-      endTime: dayjs().hour(15).minute(0).format('HH:mm'),
-      id: '2',
-      location: '线上会议',
-      organizer: '市场部',
-      participants: ['客户代表', '产品经理', '销售经理'],
-      startTime: dayjs().hour(14).minute(0).format('HH:mm'),
-      status: 'pending',
-      title: '客户需求沟通会'
-    }
-  ];
+  // 获取今日会议
+  const fetchTodayMeetings = async () => {
+    try {
+      const today = dayjs().format('YYYY-MM-DD');
+      const response = await meetingService.getMeetingList({
+        current: 1,
+        size: 10,
+        startTimeBegin: `${today} 00:00:00`,
+        startTimeEnd: `${today} 23:59:59`
+      });
 
-  // 模拟即将到期的任务
-  const upcomingTasks: Task[] = [
-    {
-      deadline: dayjs().add(1, 'day').format('YYYY-MM-DD'),
-      id: '1',
-      priority: 'high',
-      status: 'in_progress',
-      title: '完成月度销售报表',
-      type: '报表'
-    },
-    {
-      deadline: dayjs().add(2, 'day').format('YYYY-MM-DD'),
-      id: '2',
-      priority: 'medium',
-      status: 'not_started',
-      title: '客户资料更新',
-      type: '客户管理'
-    },
-    {
-      deadline: dayjs().format('YYYY-MM-DD'),
-      id: '3',
-      priority: 'high',
-      status: 'in_progress',
-      title: '项目进度汇报准备',
-      type: '项目管理'
-    }
-  ];
+      const todayMeetings: MeetingItem[] = response.records.map((meeting: MeetingApi.MeetingListItem) => ({
+        id: meeting.id,
+        location: meeting.meetingRoom || meeting.meetingUrl,
+        status: meeting.meetingStatus,
+        time: meeting.startTime,
+        title: meeting.meetingTitle,
+        type: meeting.meetingType
+      }));
 
-  const getPriorityTag = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return <Tag color="error">紧急</Tag>;
-      case 'medium':
-        return <Tag color="warning">中等</Tag>;
-      case 'low':
-        return <Tag color="success">普通</Tag>;
-      default:
-        return null;
+      setMeetings(todayMeetings);
+    } catch (error) {
+      console.error('获取今日会议失败:', error);
+      setMeetings([]);
     }
   };
 
-  const getStatusTag = (status: string) => {
+  // 获取即将到期的任务
+  const fetchUpcomingTasks = async () => {
+    try {
+      const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD');
+      const response = await projectService.getTaskList({
+        current: 1,
+        dueDateEnd: `${tomorrow} 23:59:59`,
+        size: 10
+      });
+
+      const upcomingTasks: TaskItem[] = response.records
+        .filter((task: TaskApi.TaskListItem) => task.dueDate && dayjs(task.dueDate).isAfter(dayjs()))
+        .map((task: TaskApi.TaskListItem) => ({
+          dueDate: task.dueDate || '',
+          id: task.id,
+          priority: task.priority || 0,
+          project: task.projectName || '',
+          status: task.taskStatus,
+          title: task.taskName
+        }));
+
+      setTasks(upcomingTasks);
+    } catch (error) {
+      console.error('获取即将到期任务失败:', error);
+      setTasks([]);
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchTodayMeetings(), fetchUpcomingTasks()]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // 获取会议状态标签
+  const getMeetingStatusTag = (status: number) => {
     switch (status) {
-      case 'not_started':
-        return <Tag>未开始</Tag>;
-      case 'in_progress':
+      case 0:
+        return <Tag color="default">待开始</Tag>;
+      case 1:
         return <Tag color="processing">进行中</Tag>;
-      case 'completed':
+      case 2:
         return <Tag color="success">已完成</Tag>;
       default:
-        return null;
+        return <Tag color="default">未知</Tag>;
     }
   };
 
-  const items: TabsProps['items'] = [
-    {
-      children: (
-        <List
-          dataSource={todayMeetings}
-          size="small"
-          locale={{
-            emptyText: <Empty description="今日暂无会议安排" />
-          }}
-          renderItem={meeting => (
-            <List.Item
-              actions={[
-                <Button
-                  key="view"
-                  type="link"
-                  onClick={() => navigate('/meeting-manage/list')}
-                >
-                  查看详情
-                </Button>
-              ]}
-            >
-              <List.Item.Meta
-                description={
-                  <Space
-                    direction="vertical"
-                    size={2}
-                  >
-                    <Space>
-                      <ClockCircleOutlined /> {meeting.startTime} - {meeting.endTime}
-                    </Space>
-                    <Space>
-                      <EnvironmentOutlined /> {meeting.location}
-                    </Space>
-                    <Space>
-                      <TeamOutlined /> 参会人: {meeting.participants.join(', ')}
-                    </Space>
-                  </Space>
-                }
-                title={
-                  <Space>
-                    {meeting.title}
-                    {meeting.status === 'ongoing' && <Tag color="green">进行中</Tag>}
-                  </Space>
-                }
-              />
-            </List.Item>
-          )}
-        />
-      ),
-      key: 'meetings',
-      label: '今日会议'
-    },
-    {
-      children: (
-        <List
-          dataSource={upcomingTasks}
-          size="small"
-          locale={{
-            emptyText: <Empty description="暂无待办任务" />
-          }}
-          renderItem={task => (
-            <List.Item
-              actions={[
-                <Button
-                  key="view"
-                  type="link"
-                  onClick={() => navigate('/project-manage/task')}
-                >
-                  查看详情
-                </Button>
-              ]}
-            >
-              <List.Item.Meta
-                description={
-                  <Space
-                    direction="vertical"
-                    size={2}
-                  >
-                    <div>
-                      <CalendarOutlined /> 截止日期: {task.deadline}
-                    </div>
-                    <div>类型: {task.type}</div>
-                  </Space>
-                }
-                title={
-                  <Space>
-                    {task.title}
-                    {getPriorityTag(task.priority)}
-                    {getStatusTag(task.status)}
-                  </Space>
-                }
-              />
-            </List.Item>
-          )}
-        />
-      ),
-      key: 'tasks',
-      label: '待办任务'
+  // 获取任务优先级标签
+  const getPriorityTag = (priority: number) => {
+    switch (priority) {
+      case 1:
+        return <Tag color="red">高</Tag>;
+      case 2:
+        return <Tag color="orange">中</Tag>;
+      case 3:
+        return <Tag color="blue">低</Tag>;
+      default:
+        return <Tag color="default">普通</Tag>;
     }
-  ];
+  };
+
+  // 获取任务状态标签
+  const getTaskStatusTag = (status: number) => {
+    switch (status) {
+      case 0:
+        return <Tag color="default">未开始</Tag>;
+      case 1:
+        return <Tag color="processing">进行中</Tag>;
+      case 2:
+        return <Tag color="success">已完成</Tag>;
+      default:
+        return <Tag color="default">未知</Tag>;
+    }
+  };
 
   return (
-    <Card
-      className="card-wrapper"
-      title="日程与待办"
-      variant="borderless"
-    >
-      <Tabs
-        defaultActiveKey="meetings"
-        items={items}
-      />
-    </Card>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* 今日会议 */}
+      <Card
+        loading={loading}
+        size="small"
+        title={
+          <div className="flex items-center gap-2">
+            <CalendarOutlined />
+            <span>今日会议</span>
+          </div>
+        }
+      >
+        {meetings.length > 0 ? (
+          <List
+            dataSource={meetings}
+            size="small"
+            renderItem={meeting => (
+              <List.Item>
+                <div className="w-full flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-medium">{meeting.title}</div>
+                    <div className="text-sm text-gray-500">
+                      <ClockCircleOutlined className="mr-1" />
+                      {dayjs(meeting.time).format('HH:mm')}
+                      {meeting.location && ` | ${meeting.location}`}
+                    </div>
+                    <div className="text-xs text-gray-400">{meeting.type}</div>
+                  </div>
+                  <div className="ml-2">{getMeetingStatusTag(meeting.status)}</div>
+                </div>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <div className="py-8 text-center text-gray-500">
+            <CalendarOutlined className="text-2xl" />
+            <div className="mt-2">今日暂无会议</div>
+          </div>
+        )}
+      </Card>
+
+      {/* 即将到期的任务 */}
+      <Card
+        loading={loading}
+        size="small"
+        title={
+          <div className="flex items-center gap-2">
+            <CheckCircleOutlined />
+            <span>即将到期任务</span>
+          </div>
+        }
+      >
+        {tasks.length > 0 ? (
+          <List
+            dataSource={tasks}
+            size="small"
+            renderItem={task => (
+              <List.Item>
+                <div className="w-full flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-medium">{task.title}</div>
+                    <div className="text-sm text-gray-500">项目: {task.project}</div>
+                    <div className="text-xs text-gray-400">
+                      <ClockCircleOutlined className="mr-1" />
+                      截止: {dayjs(task.dueDate).format('MM-DD HH:mm')}
+                    </div>
+                  </div>
+                  <div className="ml-2 space-x-1">
+                    {getPriorityTag(task.priority)}
+                    {getTaskStatusTag(task.status)}
+                  </div>
+                </div>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <div className="py-8 text-center text-gray-500">
+            <CheckCircleOutlined className="text-2xl" />
+            <div className="mt-2">暂无即将到期任务</div>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 };
 

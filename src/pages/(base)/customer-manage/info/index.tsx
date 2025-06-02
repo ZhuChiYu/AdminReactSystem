@@ -1,10 +1,27 @@
 import { UserAddOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message, App } from 'antd';
 import { useEffect, useState } from 'react';
 
-import useCustomerStore, { type CustomerInfo, FollowUpStatus } from '@/store/customerStore';
+import { customerService } from '@/service/api';
+import type { CustomerApi } from '@/service/api/types';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, getCurrentUserName, isAdmin, isSuperAdmin } from '@/utils/auth';
+import { localStg } from '@/utils/storage';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+
+// 定义本地的跟进状态枚举和映射
+export enum FollowUpStatus {
+  ARRIVED = 'arrived', // 已实到
+  CONSULT = 'consult', // 咨询
+  EARLY_25 = 'early_25', // 早25客户
+  EFFECTIVE_VISIT = 'effective_visit', // 有效回访
+  NEW_DEVELOP = 'new_develop', // 新开发
+  NOT_ARRIVED = 'not_arrived', // 未实到
+  REGISTERED = 'registered', // 已报名
+  REJECTED = 'rejected', // 未通过
+  VIP = 'vip', // 大客户
+  WECHAT_ADDED = 'wechat_added' // 已加微信
+}
 
 /** 跟进状态名称 */
 const followUpStatusNames = {
@@ -17,7 +34,9 @@ const followUpStatusNames = {
   [FollowUpStatus.REGISTERED]: '已报名',
   [FollowUpStatus.ARRIVED]: '已实到',
   [FollowUpStatus.NOT_ARRIVED]: '未实到',
-  [FollowUpStatus.NEW_DEVELOP]: '新开发'
+  [FollowUpStatus.NEW_DEVELOP]: '新开发',
+  'already_signed': '已报名',
+  'already_paid': '已实到'
 };
 
 /** 跟进状态颜色 */
@@ -31,19 +50,28 @@ const followUpStatusColors = {
   [FollowUpStatus.REGISTERED]: 'success',
   [FollowUpStatus.ARRIVED]: 'green',
   [FollowUpStatus.NOT_ARRIVED]: 'orange',
-  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
+  [FollowUpStatus.NEW_DEVELOP]: 'geekblue',
+  'already_signed': 'success',
+  'already_paid': 'green'
 };
 
 /** 客户信息管理组件 */
 const CustomerManagement = () => {
+  const { message } = App.useApp();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [currentCustomer, setCurrentCustomer] = useState<CustomerInfo | null>(null);
+  const [currentCustomer, setCurrentCustomer] = useState<CustomerApi.CustomerListItem | null>(null);
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
-
-  // 从状态管理器中获取客户数据和添加/更新方法
-  const { addCustomer, calculateTaskCounts, customers, updateCustomer } = useCustomerStore();
+  
+  // 数据状态
+  const [customers, setCustomers] = useState<CustomerApi.CustomerListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
 
   // 从权限管理器中获取权限相关方法
   const { hasPermission } = usePermissionStore();
@@ -56,8 +84,48 @@ const CustomerManagement = () => {
   const isUserSuperAdmin = isSuperAdmin();
   const isUserAdmin = isAdmin();
 
+  // 搜索条件
+  const [searchParams, setSearchParams] = useState({
+    company: '',
+    followStatus: '',
+    customerName: '',
+    phone: ''
+  });
+
+  // 获取客户数据
+  const fetchCustomers = async () => {
+    setLoading(true);
+    try {
+      const params: CustomerApi.CustomerQueryParams = {
+        current: pagination.current,
+        size: pagination.pageSize,
+        customerName: searchParams.customerName || undefined,
+        company: searchParams.company || undefined,
+        followStatus: searchParams.followStatus || undefined
+      };
+
+      const response = await customerService.getCustomerList(params);
+      setCustomers(response.records);
+      setPagination({
+        current: response.current,
+        pageSize: response.size,
+        total: response.total
+      });
+    } catch (error) {
+      message.error('获取客户数据失败');
+      console.error('获取客户数据失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 初始化加载数据
+  useEffect(() => {
+    fetchCustomers();
+  }, [pagination.current, pagination.pageSize]);
+
   // 检查用户是否有权限修改客户信息
-  const canEditCustomer = (customer: CustomerInfo) => {
+  const canEditCustomer = (customer: CustomerApi.CustomerListItem) => {
     // 超级管理员可以修改所有客户信息
     if (isUserSuperAdmin) return true;
 
@@ -68,13 +136,13 @@ const CustomerManagement = () => {
     const hasGlobalEditPermission = hasPermission(currentUserId, PermissionType.EDIT_CUSTOMER);
 
     // 管理员是否可以修改自己分配的客户
-    const isAssignedByCurrentAdmin = isUserAdmin && customer.assignedBy === currentUserId;
+    const isAssignedByCurrentAdmin = isUserAdmin && customer.assignedToId === currentUserId;
 
     return hasCustomerEditPermission || hasGlobalEditPermission || isAssignedByCurrentAdmin;
   };
 
   // 检查是否有权限查看客户手机号
-  const canViewMobile = (customer: CustomerInfo) => {
+  const canViewMobile = (customer: CustomerApi.CustomerListItem) => {
     // 超级管理员可以查看所有客户信息
     if (isUserSuperAdmin) return true;
 
@@ -85,13 +153,13 @@ const CustomerManagement = () => {
     const hasGlobalMobilePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_MOBILE);
 
     // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.employeeId === currentUserId;
+    const isOwnCustomer = customer.assignedToId === currentUserId;
 
     return hasCustomerMobilePermission || hasGlobalMobilePermission || isOwnCustomer;
   };
 
   // 检查是否有权限查看客户电话
-  const canViewPhone = (customer: CustomerInfo) => {
+  const canViewPhone = (customer: CustomerApi.CustomerListItem) => {
     // 超级管理员可以查看所有客户信息
     if (isUserSuperAdmin) return true;
 
@@ -102,13 +170,13 @@ const CustomerManagement = () => {
     const hasGlobalPhonePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_PHONE);
 
     // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.employeeId === currentUserId;
+    const isOwnCustomer = customer.assignedToId === currentUserId;
 
     return hasCustomerPhonePermission || hasGlobalPhonePermission || isOwnCustomer;
   };
 
   // 检查是否有权限查看客户姓名
-  const canViewName = (customer: CustomerInfo) => {
+  const canViewName = (customer: CustomerApi.CustomerListItem) => {
     // 超级管理员可以查看所有客户信息
     if (isUserSuperAdmin) return true;
 
@@ -119,88 +187,36 @@ const CustomerManagement = () => {
     const hasGlobalNamePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_NAME);
 
     // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.employeeId === currentUserId;
+    const isOwnCustomer = customer.assignedToId === currentUserId;
 
     return hasCustomerNamePermission || hasGlobalNamePermission || isOwnCustomer;
   };
 
-  // 根据用户角色过滤客户列表
-  const filteredCustomersByRole =
-    isUserAdmin || isUserSuperAdmin
-      ? customers
-      : customers.filter((customer: CustomerInfo) => customer.employeeId === currentUserId);
-
-  const [filteredList, setFilteredList] = useState(filteredCustomersByRole);
-
-  // 搜索条件
-  const [searchParams, setSearchParams] = useState({
-    company: '',
-    followStatus: '',
-    name: '',
-    phone: ''
-  });
-
   // 处理搜索
   const handleSearch = () => {
-    const { company, followStatus, name, phone } = searchParams;
-
-    let filtered = [...filteredCustomersByRole];
-
-    if (name) {
-      filtered = filtered.filter(item => item.name.includes(name));
-    }
-
-    if (phone) {
-      filtered = filtered.filter(item => item.phone?.includes(phone) || item.mobile?.includes(phone));
-    }
-
-    if (company) {
-      filtered = filtered.filter(item => item.company.includes(company));
-    }
-
-    if (followStatus) {
-      filtered = filtered.filter(item => item.followStatus === followStatus);
-    }
-
-    setFilteredList(filtered);
+    setPagination({ ...pagination, current: 1 }); // 重置到第一页
+    fetchCustomers();
   };
-
-  // 监听客户数据变化
-  useEffect(() => {
-    // 根据用户角色重新过滤数据
-    const roleFilteredCustomers =
-      isUserAdmin || isUserSuperAdmin
-        ? customers
-        : customers.filter((customer: CustomerInfo) => customer.employeeId === currentUserId);
-
-    setFilteredList(roleFilteredCustomers);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers, isUserAdmin, isUserSuperAdmin, currentUserId]);
-
-  // 当搜索参数变化时
-  useEffect(() => {
-    handleSearch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
 
   // 重置搜索条件
   const resetSearch = () => {
     setSearchParams({
       company: '',
       followStatus: '',
-      name: '',
+      customerName: '',
       phone: ''
     });
-    // 重置为根据角色过滤的列表
-    const roleFilteredCustomers =
-      isUserAdmin || isUserSuperAdmin
-        ? customers
-        : customers.filter((customer: CustomerInfo) => customer.employeeId === currentUserId);
-    setFilteredList(roleFilteredCustomers);
+    setPagination({ ...pagination, current: 1 });
+    // 重新获取数据会在useEffect中触发
   };
 
+  // 当搜索参数或分页变化时重新获取数据
+  useEffect(() => {
+    fetchCustomers();
+  }, [searchParams]);
+
   // 打开修改跟进状态弹窗
-  const openFollowStatusModal = (record: CustomerInfo) => {
+  const openFollowStatusModal = (record: CustomerApi.CustomerListItem) => {
     // 检查修改权限
     if (!canEditCustomer(record)) {
       message.error('您没有权限修改此客户的信息');
@@ -238,18 +254,21 @@ const CustomerManagement = () => {
 
       // 更新客户跟进状态
       if (currentCustomer) {
-        const updatedCustomer = {
-          ...currentCustomer,
+        const updateData = {
           followStatus
         };
 
-        updateCustomer(updatedCustomer);
-        calculateTaskCounts(); // 重新计算任务数据
-        message.success('更新成功');
+        customerService.updateCustomer(currentCustomer.id, updateData)
+          .then(() => {
+            message.success('更新成功');
+            setIsModalVisible(false);
+            setCurrentCustomer(null);
+            fetchCustomers(); // 重新获取数据
+          })
+          .catch(() => {
+            message.error('更新失败');
+          });
       }
-
-      setIsModalVisible(false);
-      setCurrentCustomer(null);
     });
   };
 
@@ -257,124 +276,148 @@ const CustomerManagement = () => {
   const handleAddSubmit = () => {
     addForm.validateFields().then(values => {
       // 添加新客户
-      const newCustomer: CustomerInfo = {
+      const newCustomer: CustomerApi.CreateCustomerRequest = {
+        customerName: values.customerName,
         company: values.company,
-        createTime: new Date().toLocaleString(),
-        employeeId: currentUserId,
-        employeeName: currentUserName,
-        followContent: values.followContent || '',
-        followStatus: values.followStatus,
-        id: customers.length > 0 ? Math.max(...customers.map(c => c.id)) + 1 : 1,
-        mobile: values.mobile || '',
-        name: values.name,
-        phone: values.phone || '',
         position: values.position || '',
-        source: values.source || '手动添加'
+        phone: values.phone || '',
+        mobile: values.mobile || '',
+        email: values.email || '',
+        industry: values.industry || '',
+        source: values.source || '手动添加',
+        followStatus: values.followStatus,
+        remark: values.remark || ''
       };
 
-      addCustomer(newCustomer);
-      calculateTaskCounts(); // 重新计算任务数据
-      message.success('添加成功');
-      setIsAddModalVisible(false);
+      customerService.createCustomer(newCustomer)
+        .then(() => {
+          message.success('添加成功');
+          setIsAddModalVisible(false);
+          fetchCustomers(); // 重新获取数据
+        })
+        .catch(() => {
+          message.error('添加失败');
+        });
     });
   };
 
-  // 表格列定义
+  // 表格分页处理
+  const handleTableChange = (page: number, pageSize?: number) => {
+    setPagination({
+      current: page,
+      pageSize: pageSize || pagination.pageSize,
+      total: pagination.total
+    });
+  };
+
+  // 表格列配置
   const columns = [
     {
-      dataIndex: 'id',
-      key: 'id',
-      title: 'ID',
-      width: 80
+      title: '客户姓名',
+      dataIndex: 'customerName',
+      key: 'customerName',
+      ...getCenterColumnConfig(),
+      render: (text: string, record: CustomerApi.CustomerListItem) => 
+        canViewName(record) ? text : '***',
+      width: 120,
     },
     {
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string, record: CustomerInfo) => {
-        return canViewName(record) ? text : '*** (无权限查看)';
-      },
-      title: '姓名',
-      width: 120
-    },
-    {
+      title: '单位名称',
       dataIndex: 'company',
       key: 'company',
-      title: '单位',
-      width: 200
+      ...getCenterColumnConfig(),
+      width: 200,
     },
     {
+      title: '职位',
       dataIndex: 'position',
       key: 'position',
-      title: '职位',
-      width: 120
+      ...getCenterColumnConfig(),
+      width: 120,
     },
     {
+      title: '电话',
       dataIndex: 'phone',
       key: 'phone',
-      render: (text: string, record: CustomerInfo) => {
-        return canViewPhone(record) ? text : '*** (无权限查看)';
-      },
-      title: '电话',
-      width: 150
+      ...getCenterColumnConfig(),
+      render: (text: string, record: CustomerApi.CustomerListItem) => 
+        canViewPhone(record) ? text || '-' : '***',
+      width: 120,
     },
     {
+      title: '手机',
       dataIndex: 'mobile',
       key: 'mobile',
-      render: (text: string, record: CustomerInfo) => {
-        return canViewMobile(record) ? text : '*** (无权限查看)';
-      },
-      title: '手机',
-      width: 150
+      ...getCenterColumnConfig(),
+      render: (text: string, record: CustomerApi.CustomerListItem) => 
+        canViewMobile(record) ? text || '-' : '***',
+      width: 120,
     },
     {
+      title: '跟进状态',
       dataIndex: 'followStatus',
       key: 'followStatus',
-      render: (status: FollowUpStatus) => <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>,
-      title: '跟进状态',
-      width: 120
+      ...getCenterColumnConfig(),
+      render: (status: string) => {
+        const statusName = followUpStatusNames[status] || status;
+        const colorMap: Record<string, string> = {
+          [FollowUpStatus.VIP]: 'red',
+          [FollowUpStatus.REGISTERED]: 'green',
+          [FollowUpStatus.EFFECTIVE_VISIT]: 'blue',
+          [FollowUpStatus.WECHAT_ADDED]: 'cyan',
+          [FollowUpStatus.NEW_DEVELOP]: 'orange',
+        };
+        return (
+          <Tag color={colorMap[status] || 'default'}>
+            {statusName}
+          </Tag>
+        );
+      },
+      width: 120,
     },
     {
-      dataIndex: 'employeeName',
-      key: 'employeeName',
+      title: '跟进次数',
+      dataIndex: 'followCount',
+      key: 'followCount',
+      ...getCenterColumnConfig(),
+      render: (count: number) => count || 0,
+      width: 100,
+    },
+    {
       title: '负责人',
-      width: 120
+      dataIndex: 'assignedTo',
+      key: 'assignedTo',
+      ...getCenterColumnConfig(),
+      render: (assignedTo: any) => assignedTo?.name || '-',
+      width: 120,
     },
     {
-      dataIndex: 'source',
-      key: 'source',
-      title: '来源',
-      width: 120
-    },
-    {
-      dataIndex: 'createTime',
-      key: 'createTime',
-      title: '创建时间',
-      width: 180
-    },
-    {
+      title: '操作',
       key: 'action',
-      render: (_: any, record: CustomerInfo) => (
-        <Space size="small">
+      ...getActionColumnConfig(120),
+      render: (_: any, record: CustomerApi.CustomerListItem) => (
+        <Space>
           <Button
-            disabled={!canEditCustomer(record)}
+            size="small"
             type="link"
             onClick={() => openFollowStatusModal(record)}
+            disabled={!canEditCustomer(record)}
           >
             修改状态
           </Button>
         </Space>
       ),
-      title: '操作',
-      width: 120
     }
   ];
 
   // 如果是超级管理员或管理员，显示"分配者"列
   if (isUserAdmin || isUserSuperAdmin) {
     columns.splice(7, 0, {
-      dataIndex: 'assignedBy',
-      key: 'assignedBy',
       title: '分配者',
+      dataIndex: 'createdBy',
+      key: 'createdBy',
+      ...getCenterColumnConfig(),
+      render: (createdBy: any) => createdBy?.userName || '-',
       width: 120
     });
   }
@@ -401,8 +444,8 @@ const CustomerManagement = () => {
             allowClear
             placeholder="客户姓名"
             style={{ width: 150 }}
-            value={searchParams.name}
-            onChange={e => setSearchParams({ ...searchParams, name: e.target.value })}
+            value={searchParams.customerName}
+            onChange={e => setSearchParams({ ...searchParams, customerName: e.target.value })}
           />
           <Input
             allowClear
@@ -444,10 +487,17 @@ const CustomerManagement = () => {
 
         <Table
           columns={columns}
-          dataSource={filteredList}
-          pagination={{ pageSize: 10 }}
+          dataSource={customers}
+          loading={loading}
           rowKey="id"
-          scroll={{ x: 1600 }}
+          {...getFullTableConfig(10)}
+          pagination={{
+            ...getFullTableConfig(10).pagination,
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: handleTableChange
+          }}
         />
       </Card>
 
@@ -501,7 +551,7 @@ const CustomerManagement = () => {
         >
           <Form.Item
             label="姓名"
-            name="name"
+            name="customerName"
             rules={[{ message: '请输入客户姓名', required: true }]}
           >
             <Input placeholder="请输入客户姓名" />
@@ -548,19 +598,31 @@ const CustomerManagement = () => {
             </Select>
           </Form.Item>
           <Form.Item
-            label="跟进内容"
-            name="followContent"
+            label="邮箱"
+            name="email"
           >
-            <Input.TextArea
-              placeholder="请输入跟进内容"
-              rows={3}
-            />
+            <Input placeholder="请输入邮箱" />
+          </Form.Item>
+          <Form.Item
+            label="行业"
+            name="industry"
+          >
+            <Input placeholder="请输入行业" />
           </Form.Item>
           <Form.Item
             label="来源"
             name="source"
           >
             <Input placeholder="请输入来源" />
+          </Form.Item>
+          <Form.Item
+            label="备注"
+            name="remark"
+          >
+            <Input.TextArea
+              placeholder="请输入备注"
+              rows={3}
+            />
           </Form.Item>
         </Form>
       </Modal>

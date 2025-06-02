@@ -3,19 +3,20 @@ import { Button as AButton, Card, Form, Input, Modal, Select, Space, Table, Tag,
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { customerService, employeeService, type CustomerApi, type EmployeeApi } from '@/service/api';
+import { type CustomerApi, type EmployeeApi, customerService, employeeService } from '@/service/api';
 import { getCurrentUserId, isAdminOrSuperAdmin } from '@/utils/auth';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 角色中文名称映射
 const roleNames = {
-  super_admin: '超级管理员',
   admin: '管理员',
   consultant: '顾问',
-  marketing_manager: '市场部经理',
-  hr_specialist: '人力专员',
   hr_bp: '人力BP',
+  hr_specialist: '人力专员',
+  marketing_manager: '市场部经理',
+  sales_director: '销售总监',
   sales_manager: '销售经理',
-  sales_director: '销售总监'
+  super_admin: '超级管理员'
 };
 
 interface CustomerAssignment {
@@ -182,6 +183,7 @@ const CustomerAssignManagement = () => {
     {
       dataIndex: 'customerName',
       key: 'customerName',
+      ...getCenterColumnConfig(),
       render: (text: string) => (
         <Space>
           <CustomerServiceOutlined />
@@ -193,28 +195,33 @@ const CustomerAssignManagement = () => {
     {
       dataIndex: 'assignedToName',
       key: 'assignedToName',
+      ...getCenterColumnConfig(),
       render: (text: string) => <Tag color="green">{text}</Tag>,
       title: '分配给员工'
     },
     {
       dataIndex: 'assignedByName',
       key: 'assignedByName',
+      ...getCenterColumnConfig(),
       render: (text: string) => <Tag color="blue">{text}</Tag>,
       title: '分配人'
     },
     {
       dataIndex: 'assignedTime',
       key: 'assignedTime',
+      ...getCenterColumnConfig(),
       title: '分配时间'
     },
     {
       dataIndex: 'remark',
       key: 'remark',
+      ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
       title: '备注'
     },
     {
       key: 'action',
+      ...getActionColumnConfig(120),
       render: (_: any, record: CustomerAssignment) => (
         <Space>
           {(record.assignedById === Number(currentUserId) || Number(currentUserId) === 1) && (
@@ -257,11 +264,7 @@ const CustomerAssignManagement = () => {
           dataSource={getFilteredAssignments()}
           loading={loading}
           rowKey="id"
-          pagination={{
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: total => `共 ${total} 条记录`
-          }}
+          {...getFullTableConfig(10)}
         />
       </Card>
 
@@ -302,9 +305,7 @@ const CustomerAssignManagement = () => {
                 const userName = employee.userName?.toLowerCase() || '';
                 const roleName = getEmployeeRoleName(employee).toLowerCase();
 
-                return nickName.includes(searchText) ||
-                       userName.includes(searchText) ||
-                       roleName.includes(searchText);
+                return nickName.includes(searchText) || userName.includes(searchText) || roleName.includes(searchText);
               }}
               onChange={setSelectedEmployee}
             >
@@ -339,10 +340,12 @@ const CustomerAssignManagement = () => {
                 const phone = customer.phone?.toLowerCase() || '';
                 const mobile = customer.mobile?.toLowerCase() || '';
 
-                return customerName.includes(searchText) ||
-                       company.includes(searchText) ||
-                       phone.includes(searchText) ||
-                       mobile.includes(searchText);
+                return (
+                  customerName.includes(searchText) ||
+                  company.includes(searchText) ||
+                  phone.includes(searchText) ||
+                  mobile.includes(searchText)
+                );
               }}
               onChange={setSelectedCustomers}
             >

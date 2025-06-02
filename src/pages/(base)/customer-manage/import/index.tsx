@@ -1,7 +1,29 @@
 import { InboxOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Divider, Form, Input, Row, Select, Space, Table, Tabs, Tag, Upload, message } from 'antd';
-import type { UploadFile, UploadProps } from 'antd';
-import { useState } from 'react';
+import {
+  Button,
+  Card,
+  Col,
+  Divider,
+  Form,
+  Input,
+  Modal,
+  Row,
+  Select,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  Upload,
+  message
+} from 'antd';
+import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import React, { useEffect, useState } from 'react';
+
+import { customerService } from '@/service/api';
+import type { CustomerApi } from '@/service/api/types';
+
+const { Dragger } = Upload;
+const { TextArea } = Input;
 
 /** 客户跟进状态枚举 */
 enum FollowUpStatus {
@@ -45,37 +67,39 @@ const followUpStatusColors: Record<FollowUpStatus, string> = {
   [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
 };
 
+interface CustomerImportItem {
+  company: string;
+  createTime: string;
+  followStatus: number;
+  followUp: string;
+  id: number;
+  mobile: string;
+  name: string;
+  phone: string;
+  position: string;
+}
+
 /** 客户导入组件 */
 const CustomerImport = () => {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [previewData, setPreviewData] = useState<CustomerImportItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('excel');
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus | ''>('');
   const [manualForm] = Form.useForm();
   const [manualEntryList, setManualEntryList] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [isImportModalVisible, setIsImportModalVisible] = useState(false);
 
   /** 文件上传属性配置 */
   const uploadProps: UploadProps = {
-    beforeUpload: file => {
-      const isExcel =
-        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.type === 'application/vnd.ms-excel';
-
-      if (!isExcel) {
-        message.error('只支持上传Excel文件!');
-        return Upload.LIST_IGNORE;
-      }
-
-      setFileList([file]);
-      return false;
-    },
+    accept: '.xlsx,.xls',
+    beforeUpload: () => false, // 阻止自动上传
     fileList,
-    listType: 'text',
     maxCount: 1,
+    onChange: ({ fileList: newFileList }) => setFileList(newFileList),
     onRemove: () => {
-      setFileList([]);
       setPreviewData([]);
     }
   };
@@ -90,10 +114,16 @@ const CustomerImport = () => {
     setUploading(true);
 
     try {
-      // 模拟解析Excel数据预览
+      // 这里应该调用文件解析API
+      const formData = new FormData();
+      formData.append('file', fileList[0].originFileObj as File);
+
+      // 模拟API调用 - 实际应该调用后端解析Excel的接口
+      // const response = await customerService.previewImportFile(formData);
+
+      // 临时使用模拟数据展示功能
       setTimeout(() => {
-        // 使用表格中的真实数据结构
-        const mockData = [
+        const mockData: CustomerImportItem[] = [
           {
             company: '上海民用航空电源系统有限公司',
             createTime: new Date().toLocaleString(),
@@ -115,50 +145,6 @@ const CustomerImport = () => {
             name: '万娜',
             phone: '027-65263855',
             position: '财务负责培训'
-          },
-          {
-            company: '太原钢铁（集团）有限公司',
-            createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.WECHAT_ADDED,
-            followUp: '负责培训推荐微信',
-            id: 3,
-            mobile: '',
-            name: '陈建英',
-            phone: '微信',
-            position: '财务负责培训'
-          },
-          {
-            company: '中国电力工程顾问集团中南电力设计院有限公司',
-            createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.EFFECTIVE_VISIT,
-            followUp: '数智财务发课程微信18717397529/3.4天接3.5天接2.24天接',
-            id: 4,
-            mobile: '',
-            name: '刘老师',
-            phone: '027-65263854',
-            position: '财务'
-          },
-          {
-            company: '中国能源建设集团江苏省电力设计院有限公司',
-            createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.REGISTERED,
-            followUp: '数智化还有年计划发一下微信13813844478',
-            id: 5,
-            mobile: '',
-            name: '陶主任',
-            phone: '025-85081060',
-            position: '财务主任'
-          },
-          {
-            company: '中国能源建设集团天津电力设计院有限公司',
-            createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.REGISTERED,
-            followUp: '其他单位能学应该是有发文，看一下，课程和计划发过来微信13821110961',
-            id: 6,
-            mobile: '',
-            name: '迟主任',
-            phone: '022-58339303',
-            position: '财务主任'
           }
         ];
 
@@ -166,7 +152,7 @@ const CustomerImport = () => {
         setUploading(false);
         message.success('数据预览成功');
       }, 1500);
-    } catch {
+    } catch (error) {
       message.error('预览失败');
       setUploading(false);
     }
@@ -182,12 +168,19 @@ const CustomerImport = () => {
     setUploading(true);
 
     try {
-      // 模拟导入过程
-      setTimeout(() => {
-        setUploading(false);
-        message.success('导入成功');
-      }, 2000);
-    } catch {
+      const formData = new FormData();
+      formData.append('file', fileList[0].originFileObj as File);
+
+      // 调用实际的导入API
+      await customerService.importCustomers(formData);
+
+      setUploading(false);
+      message.success('导入成功');
+
+      // 清空文件列表和预览数据
+      setFileList([]);
+      setPreviewData([]);
+    } catch (error) {
       message.error('导入失败');
       setUploading(false);
     }
@@ -351,12 +344,68 @@ const CustomerImport = () => {
     }, 1500);
   };
 
+  /** 打开单个录入弹窗 */
+  const openImportModal = () => {
+    manualForm.resetFields();
+    setIsImportModalVisible(true);
+  };
+
+  /** 单个客户录入 */
+  const handleSingleImport = async () => {
+    try {
+      const values = await manualForm.validateFields();
+
+      const customerData = {
+        address: values.address || '',
+        company: values.company,
+        email: values.email || '',
+        followNotes: values.followUp || '',
+        followStatus: values.followStatus,
+        industry: 'other',
+        level: 'potential',
+        mobile: values.mobile || '',
+        name: values.name,
+        phone: values.phone,
+        position: values.position,
+        source: 'manual'
+      };
+
+      await customerService.createCustomer(customerData);
+
+      message.success('客户录入成功');
+      setIsImportModalVisible(false);
+      manualForm.resetFields();
+    } catch (error) {
+      message.error('客户录入失败');
+      console.error('录入失败:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'preview') {
+      // 获取真实的导入预览数据
+      fetchImportPreview();
+    }
+  }, [activeTab]);
+
+  // 获取导入预览数据
+  const fetchImportPreview = async () => {
+    try {
+      // 这里可以调用API获取预览数据，或者基于上传的文件生成预览
+      // 如果是Excel导入，可能需要解析Excel文件内容
+      setPreviewData([]); // 暂时设为空，等待实际实现
+    } catch (error) {
+      console.error('获取导入预览数据失败:', error);
+      setPreviewData([]);
+    }
+  };
+
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        variant="borderless"
         className="h-full"
         title="客户导入"
+        variant="borderless"
       >
         <Tabs
           activeKey={activeTab}
@@ -369,13 +418,13 @@ const CustomerImport = () => {
                       <Card variant="borderless">
                         <Row justify="center">
                           <Col span={12}>
-                            <Upload.Dragger {...uploadProps}>
+                            <Dragger {...uploadProps}>
                               <p className="ant-upload-drag-icon">
                                 <InboxOutlined />
                               </p>
                               <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-                              <p className="ant-upload-hint">支持单个Excel文件上传，请使用标准模板导入数据</p>
-                            </Upload.Dragger>
+                              <p className="ant-upload-hint">支持.xlsx, .xls格式的Excel文件</p>
+                            </Dragger>
                           </Col>
                         </Row>
                         <Row
@@ -397,7 +446,7 @@ const CustomerImport = () => {
                             type="primary"
                             onClick={handleImport}
                           >
-                            一键导入
+                            确认导入
                           </Button>
                         </Row>
                       </Card>
@@ -431,8 +480,8 @@ const CustomerImport = () => {
                   <Row gutter={[16, 16]}>
                     <Col span={12}>
                       <Card
-                        variant="borderless"
                         title="客户信息录入"
+                        variant="borderless"
                       >
                         <Form
                           form={manualForm}
@@ -555,6 +604,113 @@ const CustomerImport = () => {
           onChange={key => setActiveTab(key)}
         />
       </Card>
+
+      {/* 预览数据弹窗 */}
+      <Modal
+        footer={null}
+        open={isPreviewVisible}
+        title="预览导入数据"
+        width={1200}
+        onCancel={() => setIsPreviewVisible(false)}
+      >
+        <Table
+          columns={columns}
+          dataSource={previewData}
+          pagination={{ pageSize: 10 }}
+          rowKey="id"
+          scroll={{ x: 1000 }}
+          size="small"
+        />
+      </Modal>
+
+      {/* 单个录入弹窗 */}
+      <Modal
+        open={isImportModalVisible}
+        title="录入客户信息"
+        width={600}
+        onCancel={() => setIsImportModalVisible(false)}
+        onOk={handleSingleImport}
+      >
+        <Form
+          form={manualForm}
+          layout="vertical"
+        >
+          <Form.Item
+            label="客户姓名"
+            name="name"
+            rules={[{ message: '请输入客户姓名', required: true }]}
+          >
+            <Input placeholder="请输入客户姓名" />
+          </Form.Item>
+
+          <Form.Item
+            label="公司名称"
+            name="company"
+            rules={[{ message: '请输入公司名称', required: true }]}
+          >
+            <Input placeholder="请输入公司名称" />
+          </Form.Item>
+
+          <Form.Item
+            label="职位"
+            name="position"
+            rules={[{ message: '请输入职位', required: true }]}
+          >
+            <Input placeholder="请输入职位" />
+          </Form.Item>
+
+          <Form.Item
+            label="电话"
+            name="phone"
+          >
+            <Input placeholder="请输入电话" />
+          </Form.Item>
+
+          <Form.Item
+            label="手机"
+            name="mobile"
+          >
+            <Input placeholder="请输入手机号" />
+          </Form.Item>
+
+          <Form.Item
+            label="邮箱"
+            name="email"
+          >
+            <Input placeholder="请输入邮箱" />
+          </Form.Item>
+
+          <Form.Item
+            label="地址"
+            name="address"
+          >
+            <Input placeholder="请输入地址" />
+          </Form.Item>
+
+          <Form.Item
+            label="跟进状态"
+            name="followStatus"
+            rules={[{ message: '请选择跟进状态', required: true }]}
+          >
+            <Select placeholder="请选择跟进状态">
+              <Select.Option value={FollowUpStatus.EARLY_25}>早25</Select.Option>
+              <Select.Option value={FollowUpStatus.WECHAT_ADDED}>加微信</Select.Option>
+              <Select.Option value={FollowUpStatus.EFFECTIVE_VISIT}>有效拜访</Select.Option>
+              <Select.Option value={FollowUpStatus.REGISTERED}>已注册</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="跟进内容"
+            name="followUp"
+          >
+            <TextArea
+              placeholder="请输入跟进内容"
+              rows={3}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

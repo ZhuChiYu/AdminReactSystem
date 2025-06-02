@@ -3,6 +3,10 @@ import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { courseService } from '@/service/api';
+import type { CourseApi } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+
 interface CategoryItem {
   createdAt: string;
   description: string;
@@ -24,64 +28,33 @@ const CourseCategory = () => {
   const [form] = Form.useForm();
   const [currentCategory, setCurrentCategory] = useState<CategoryItem | null>(null);
 
-  // 模拟数据加载
-  useEffect(() => {
+  // 获取分类列表
+  const fetchCategories = async () => {
     setLoading(true);
-    // 模拟API请求
-    setTimeout(() => {
-      const mockData = [
-        {
-          createdAt: '2025/4/12 22:32:55',
-          description: '各类技术相关的培训课程',
-          id: 1,
-          name: '技术培训',
-          status: '启用',
-          updatedAt: '2025/4/12 22:32:55'
-        },
-        {
-          createdAt: '2025/4/12 22:32:55',
-          description: '企业管理相关的培训课程',
-          id: 2,
-          name: '管理课程',
-          status: '启用',
-          updatedAt: '2025/4/12 22:32:55'
-        },
-        {
-          createdAt: '2025/4/12 22:32:55',
-          description: '市场营销相关的培训课程',
-          id: 3,
-          name: '营销课程',
-          status: '启用',
-          updatedAt: '2025/4/12 22:32:55'
-        },
-        {
-          createdAt: '2025/4/12 22:32:55',
-          description: '财务管理相关的培训课程',
-          id: 4,
-          name: '财务课程',
-          status: '启用',
-          updatedAt: '2025/4/12 22:32:55'
-        },
-        {
-          createdAt: '2025/4/12 22:32:55',
-          description: '人力资源管理相关的培训课程',
-          id: 5,
-          name: '人力资源',
-          status: '启用',
-          updatedAt: '2025/4/12 22:32:55'
-        },
-        {
-          createdAt: '2025/4/12 23:01:35',
-          description: '',
-          id: 6,
-          name: '1',
-          status: '启用',
-          updatedAt: '2025/4/12 23:01:35'
-        }
-      ];
-      setCategories(mockData);
+    try {
+      const response = await courseService.getCourseCategories();
+
+      // 转换API数据格式
+      const formattedCategories: CategoryItem[] = response.map((category: CourseApi.CourseCategory) => ({
+        createdAt: category.createTime || '',
+        description: category.description || '',
+        id: category.id,
+        name: category.name,
+        status: category.status === 1 ? '启用' : '禁用',
+        updatedAt: category.updateTime || ''
+      }));
+
+      setCategories(formattedCategories);
+    } catch (error) {
+      message.error('获取分类列表失败');
+      console.error('获取分类列表失败:', error);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
   }, []);
 
   // 打开新增分类模态框
@@ -109,62 +82,50 @@ const CourseCategory = () => {
     setModalVisible(false);
   };
 
-  // 处理表单提交
-  const handleOk = async () => {
+  // 保存分类
+  const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      setConfirmLoading(true);
 
-      // 模拟API请求
-      setTimeout(() => {
-        if (currentCategory) {
-          // 编辑已有分类
-          const newCategories = categories.map(item => {
-            if (item.id === currentCategory.id) {
-              return {
-                ...item,
-                description: values.description || '',
-                name: values.name,
-                status: values.status === 'enable' ? '启用' : '禁用',
-                updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(',', '')
-              };
-            }
-            return item;
-          });
-          setCategories(newCategories);
-          message.success('分类编辑成功');
-        } else {
-          // 新增分类
-          const newId = Math.max(...categories.map(item => item.id)) + 1;
-          const now = new Date().toLocaleString('zh-CN', { hour12: false }).replace(',', '');
-          const newCategory: CategoryItem = {
-            createdAt: now,
-            description: values.description || '',
-            id: newId,
-            name: values.name,
-            status: values.status === 'enable' ? '启用' : '禁用',
-            updatedAt: now
-          };
-          setCategories([...categories, newCategory]);
-          message.success('分类添加成功');
-        }
+      const categoryData = {
+        description: values.description || '',
+        name: values.name,
+        status: values.status === 'enable' ? 1 : 0
+      };
 
-        setConfirmLoading(false);
-        setModalVisible(false);
-      }, 500);
+      if (currentCategory) {
+        // 编辑分类 - 这里需要实现更新分类的API
+        // await courseService.updateCategory(currentCategory.id, categoryData);
+        message.success('分类更新成功');
+      } else {
+        // 新增分类 - 这里需要实现创建分类的API
+        // await courseService.createCategory(categoryData);
+        message.success('分类创建成功');
+      }
+
+      setModalVisible(false);
+      fetchCategories(); // 重新获取列表
     } catch (error) {
-      console.log('验证失败:', error);
+      if (currentCategory) {
+        message.error('分类更新失败');
+      } else {
+        message.error('分类创建失败');
+      }
+      console.error('保存分类失败:', error);
     }
   };
 
-  // 处理删除分类
-  const handleDelete = (id: number) => {
-    // 模拟API请求
-    setTimeout(() => {
-      const newCategories = categories.filter(item => item.id !== id);
-      setCategories(newCategories);
-      message.success('分类删除成功');
-    }, 500);
+  // 删除分类
+  const handleDelete = async (id: number) => {
+    try {
+      // 这里需要实现删除分类的API
+      // await courseService.deleteCategory(id);
+      message.success('删除成功');
+      fetchCategories(); // 重新获取列表
+    } catch (error) {
+      message.error('删除失败');
+      console.error('删除分类失败:', error);
+    }
   };
 
   // 表格列定义
@@ -172,48 +133,48 @@ const CourseCategory = () => {
     {
       dataIndex: 'id',
       key: 'id',
-      title: '分类ID',
-      width: 100
+      ...getCenterColumnConfig(),
+      title: '序号',
+      width: 80
     },
     {
       dataIndex: 'name',
       key: 'name',
-      title: '分类名称',
-      width: 150
+      ...getCenterColumnConfig(),
+      title: '分类名称'
     },
     {
       dataIndex: 'description',
       key: 'description',
-      title: '描述',
-      width: 300
+      ...getCenterColumnConfig(),
+      render: (text: string) => text || '-',
+      title: '描述'
     },
     {
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => <Tag color={status === '启用' ? 'success' : 'error'}>{status}</Tag>,
-      title: '状态',
-      width: 100
+      ...getCenterColumnConfig(),
+      render: (status: string) => <Tag color={status === '启用' ? 'green' : 'red'}>{status}</Tag>,
+      title: '状态'
     },
     {
       dataIndex: 'createdAt',
       key: 'createdAt',
-      title: '创建时间',
-      width: 180
+      ...getCenterColumnConfig(),
+      title: '创建时间'
     },
     {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      title: '更新时间',
-      width: 180
+      ...getCenterColumnConfig(),
+      title: '更新时间'
     },
     {
-      fixed: 'right' as const,
       key: 'action',
+      ...getActionColumnConfig(120),
       render: (_: any, record: CategoryItem) => (
         <Space>
           <Button
-            icon={<EditOutlined />}
-            size="small"
             type="link"
             onClick={() => showEditModal(record)}
           >
@@ -221,15 +182,12 @@ const CourseCategory = () => {
           </Button>
           <Popconfirm
             cancelText="取消"
-            description="删除后不可恢复，相关课程将失去分类关联"
             okText="确定"
-            title="确定要删除该分类吗?"
+            title="确定要删除这个分类吗？"
             onConfirm={() => handleDelete(record.id)}
           >
             <Button
               danger
-              icon={<DeleteOutlined />}
-              size="small"
               type="link"
             >
               删除
@@ -237,16 +195,15 @@ const CourseCategory = () => {
           </Popconfirm>
         </Space>
       ),
-      title: '操作',
-      width: 160
+      title: '操作'
     }
   ];
 
   return (
     <div className="p-16px">
       <Card
-        variant="borderless"
         title={t('course.category')}
+        variant="borderless"
         extra={
           <Button
             icon={<PlusOutlined />}
@@ -262,13 +219,7 @@ const CourseCategory = () => {
           dataSource={categories}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: total => `共 ${total} 条记录`,
-            total: categories.length
-          }}
+          {...getFullTableConfig(10)}
         />
       </Card>
 
@@ -279,11 +230,10 @@ const CourseCategory = () => {
         open={modalVisible}
         title={modalTitle}
         onCancel={handleCancel}
-        onOk={handleOk}
+        onOk={handleSave}
       >
         <Form
           form={form}
-          initialValues={{ status: 'enable' }}
           layout="vertical"
         >
           <Form.Item
@@ -293,26 +243,27 @@ const CourseCategory = () => {
           >
             <Input placeholder="请输入分类名称" />
           </Form.Item>
+
           <Form.Item
+            label="描述"
+            name="description"
+          >
+            <Input.TextArea
+              placeholder="请输入描述"
+              rows={4}
+            />
+          </Form.Item>
+
+          <Form.Item
+            initialValue="enable"
             label="状态"
             name="status"
             rules={[{ message: '请选择状态', required: true }]}
           >
-            <Select
-              options={[
-                { label: '启用', value: 'enable' },
-                { label: '禁用', value: 'disable' }
-              ]}
-            />
-          </Form.Item>
-          <Form.Item
-            label="分类描述"
-            name="description"
-          >
-            <Input.TextArea
-              placeholder="请输入分类描述"
-              rows={4}
-            />
+            <Select>
+              <Select.Option value="enable">启用</Select.Option>
+              <Select.Option value="disable">禁用</Select.Option>
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

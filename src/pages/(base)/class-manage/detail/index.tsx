@@ -9,7 +9,6 @@ import {
   UploadOutlined
 } from '@ant-design/icons';
 import {
-  Avatar,
   Button,
   Card,
   DatePicker,
@@ -33,6 +32,9 @@ import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import UserAvatar from '@/components/UserAvatar';
+import { attachmentService, classService, courseService, notificationService } from '@/service/api';
+import type { AttachmentApi, NotificationApi } from '@/service/api/types';
 import type { UserPermission } from '@/store/permissionStore';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
@@ -96,185 +98,132 @@ const ClassDetail = () => {
   const currentUserId = getCurrentUserId();
   const isUserSuperAdmin = isSuperAdmin();
 
-  useEffect(() => {
-    // 模拟加载班级数据
+  // 获取班级数据
+  const fetchClassData = async () => {
+    if (!classId) return;
+
     setLoading(true);
-    console.log('班级ID:', classId);
+    try {
+      // 获取班级基本信息
+      const classResponse = await classService.getClassDetail(Number.parseInt(classId, 10));
+      setClassInfo({
+        category: classResponse.category?.name || '未分类',
+        className: classResponse.className,
+        currentStudents: classResponse.currentStudents || 0,
+        description: classResponse.description || '',
+        endDate: classResponse.endDate || '',
+        id: classResponse.id,
+        location: classResponse.location || '',
+        maxStudents: classResponse.maxStudents || 0,
+        scheduleInfo: classResponse.scheduleInfo || '',
+        startDate: classResponse.startDate || '',
+        status: classResponse.status,
+        teacher: classResponse.teacher || '未分配'
+      });
 
-    // 尝试从localStorage获取班级列表数据
-    const storedClasses = localStorage.getItem('classList');
-    console.log('从 localStorage 获取的班级列表数据：', storedClasses);
+      // 获取学生列表
+      const studentsResponse = await classService.getClassStudentList({
+        classId: Number.parseInt(classId, 10),
+        current: 1,
+        size: 1000
+      });
 
-    if (storedClasses) {
-      try {
-        const classes = JSON.parse(storedClasses);
-        console.log('解析后的班级列表数据：', classes);
+      const formattedStudents = studentsResponse.records.map((student: any) => ({
+        attendance: student.attendanceRate || 0,
+        avatar:
+          student.avatar ||
+          `https://xsgames.co/randomusers/avatar.php?g=${student.gender === '女' ? 'female' : 'male'}&id=${student.id}`,
+        company: student.company || '',
+        email: student.email || '',
+        gender: student.gender || '',
+        id: student.id,
+        joinDate: student.enrollmentDate || '',
+        landline: student.landline || '',
+        name: student.name,
+        phone: student.phone || '',
+        position: student.position || '',
+        studentId: student.studentId || ''
+      }));
 
-        // 尝试不同的方式匹配ID
-        let currentClass = classes.find((c: any) => c.id === Number(classId));
+      setStudentList(formattedStudents);
 
-        if (!currentClass) {
-          // 如果找不到，尝试直接比较字符串
-          currentClass = classes.find((c: any) => String(c.id) === classId);
-          console.log('使用字符串比较找到的班级：', currentClass);
-        }
+      // 获取课程列表
+      const coursesResponse = await courseService.getClassCourseList({
+        classId: Number.parseInt(classId, 10),
+        current: 1,
+        size: 1000
+      });
 
-        if (currentClass) {
-          setClassInfo(currentClass);
-        } else {
-          console.error('未找到匹配ID的班级信息，classId:', classId, '数据类型:', typeof classId);
-          // 记录所有班级ID用于调试
-          console.log(
-            '所有班级ID:',
-            classes.map((c: any) => ({ id: c.id, type: typeof c.id }))
-          );
-        }
-      } catch (error) {
-        console.error('解析班级数据失败', error);
-      }
-    } else {
-      console.error('未找到班级列表数据');
+      const formattedCourses = coursesResponse.records.map((course: any) => ({
+        classroom: course.classroom || '',
+        endDate: course.endDate || '',
+        id: course.id,
+        name: course.courseName,
+        schedule: course.schedule || '',
+        startDate: course.startDate || '',
+        status: course.status || 1,
+        teacher: course.instructor || ''
+      }));
+
+      setCourseList(formattedCourses);
+
+      // 获取公告列表
+      const announcementsResponse = await notificationService.getNotificationList({
+        current: 1,
+        relatedId: Number.parseInt(classId, 10),
+        size: 1000,
+        type: 'class_announcement'
+      });
+
+      const formattedAnnouncements = announcementsResponse.records.map(
+        (announcement: NotificationApi.NotificationListItem) => ({
+          content: announcement.content,
+          id: announcement.id,
+          importance: 1,
+          publishDate: announcement.createTime,
+          status: 1,
+          title: announcement.title
+        })
+      );
+
+      setAnnounceList(formattedAnnouncements);
+
+      // 获取教职工列表
+      const staffResponse = await classService.getClassStaffList({
+        classId: Number.parseInt(classId, 10)
+      });
+
+      setStaffList(staffResponse || []);
+
+      // 获取课程附件
+      const courseAttachmentsResponse = await attachmentService.getAttachmentList({
+        courseId: Number.parseInt(classId, 10),
+        current: 1,
+        size: 1000
+      });
+
+      const formattedCourseAttachments = courseAttachmentsResponse.records.map(
+        (attachment: AttachmentApi.AttachmentListItem) => ({
+          fileName: attachment.fileName,
+          fileSize: attachment.fileSize,
+          fileType: attachment.fileType,
+          id: attachment.id,
+          uploader: attachment.uploader?.name || '未知',
+          uploadTime: attachment.uploadTime
+        })
+      );
+
+      setCourseAttachments(formattedCourseAttachments);
+    } catch (error) {
+      message.error('获取班级数据失败');
+      console.error('获取班级数据失败:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // 加载模拟学员数据
-    const mockStudents = [
-      {
-        attendance: 95.5,
-        avatar: 'https://xsgames.co/randomusers/avatar.php?g=female&id=1',
-        company: '阿里巴巴',
-        email: 'zhangting@company.cn',
-        gender: '女',
-        id: 1,
-        joinDate: '2024-03-01',
-        landline: '0571-88886666',
-        name: '张婷',
-        phone: '010-50778734',
-        position: '测试工程师',
-        studentId: '11490102359'
-      },
-      {
-        attendance: 92.0,
-        avatar: 'https://xsgames.co/randomusers/avatar.php?g=male&id=2',
-        company: '理想科技',
-        email: '曾建华@example.com',
-        gender: '男',
-        id: 2,
-        joinDate: '2024-03-02',
-        landline: '010-66667777',
-        name: '曾建华',
-        phone: '010-12609203',
-        position: '后端开发',
-        studentId: '15486679562'
-      },
-      {
-        attendance: 88.5,
-        avatar: 'https://xsgames.co/randomusers/avatar.php?g=male&id=3',
-        company: '南京科技',
-        email: '董军@company.cn',
-        gender: '男',
-        id: 3,
-        joinDate: '2024-03-01',
-        landline: '025-88889999',
-        name: '董军',
-        phone: '010-37843376',
-        position: '前端开发',
-        studentId: '14219252022'
-      },
-      {
-        attendance: 96.0,
-        avatar: 'https://xsgames.co/randomusers/avatar.php?g=female&id=4',
-        company: '腾讯科技',
-        email: 'yang格@example.com',
-        gender: '女',
-        id: 4,
-        joinDate: '2024-03-05',
-        landline: '0755-66668888',
-        name: '杨格',
-        phone: '010-44109487',
-        position: '技术主管',
-        studentId: '18769613825'
-      }
-    ];
-    setStudentList(mockStudents);
-
-    // 加载模拟课程数据
-    const mockCourses = [
-      {
-        classroom: '教室101',
-        endDate: '2024-04-30',
-        id: 1,
-        name: '高等数学',
-        schedule: '周一、周三 9:00-10:30',
-        startDate: '2024-03-05',
-        status: 1,
-        teacher: '王老师'
-      },
-      {
-        classroom: '教室102',
-        endDate: '2024-04-30',
-        id: 2,
-        name: '大学物理',
-        schedule: '周二、周四 14:00-15:30',
-        startDate: '2024-03-05',
-        status: 1,
-        teacher: '李老师'
-      }
-    ];
-    setCourseList(mockCourses);
-
-    // 加载模拟通知公告数据
-    const mockAnnouncements = [
-      {
-        content: '请同学们于3月1日上午9点到校报到',
-        id: 1,
-        importance: 2,
-        publishDate: '2024-02-25 14:30:00',
-        status: 1,
-        title: '开学通知'
-      },
-      {
-        content: '因教师请假，本周周三的高等数学课程调整到周五同一时间上课',
-        id: 2,
-        importance: 1,
-        publishDate: '2024-03-10 09:15:00',
-        status: 1,
-        title: '课程调整通知'
-      },
-      {
-        content: '期中考试将于4月20日上午9点开始，请各位同学提前做好准备',
-        id: 3,
-        importance: 2,
-        publishDate: '2024-03-25 16:30:00',
-        status: 1,
-        title: '期中考试安排'
-      }
-    ];
-    setAnnounceList(mockAnnouncements);
-
-    // 加载员工列表
-    const mockStaff = [
-      {
-        department: '人事部',
-        id: '1',
-        name: '张三',
-        role: '员工'
-      },
-      {
-        department: '技术部',
-        id: '2',
-        name: '李四',
-        role: '主管'
-      },
-      {
-        department: '营销部',
-        id: '3',
-        name: '王五',
-        role: '经理'
-      }
-    ];
-    setStaffList(mockStaff);
-
-    setLoading(false);
+  useEffect(() => {
+    fetchClassData();
   }, [classId]);
 
   // 获取状态标签颜色
@@ -395,7 +344,12 @@ const ClassDetail = () => {
       key: 'name',
       render: (text: string, record: any) => (
         <Space>
-          <Avatar src={record.avatar} />
+          <UserAvatar
+            avatar={record.avatar}
+            gender={record.gender}
+            size={40}
+            userId={record.id}
+          />
           {text}
         </Space>
       ),
@@ -1053,8 +1007,8 @@ const ClassDetail = () => {
 
     return (
       <Card
-        variant="borderless"
         className="mb-4"
+        variant="borderless"
       >
         <Descriptions
           column={{ lg: 3, md: 2, sm: 1, xl: 4, xs: 1, xxl: 4 }}
@@ -1096,8 +1050,8 @@ const ClassDetail = () => {
   const renderStudentList = () => {
     return (
       <Card
-        variant="borderless"
         title="班级学员"
+        variant="borderless"
         extra={
           <Space>
             <Button
@@ -1356,8 +1310,8 @@ const ClassDetail = () => {
       isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, classInfo?.id);
     return (
       <Card
-        variant="borderless"
         title="班级课程"
+        variant="borderless"
         extra={
           canEdit && (
             <Button
@@ -1824,8 +1778,8 @@ const ClassDetail = () => {
 
     return (
       <Card
-        variant="borderless"
         title="通知公告"
+        variant="borderless"
         extra={
           canEditAnnounce && (
             <Button
@@ -2315,8 +2269,8 @@ const ClassDetail = () => {
 
     return (
       <Card
-        variant="borderless"
         title="权限管理"
+        variant="borderless"
       >
         <Typography.Paragraph className="mb-4">在此管理员工和管理员对当前班级的特殊权限。</Typography.Paragraph>
 

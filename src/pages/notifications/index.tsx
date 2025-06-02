@@ -5,9 +5,12 @@ import {
   InfoCircleOutlined,
   WarningOutlined
 } from '@ant-design/icons';
-import { Avatar, Button, Card, Empty, List, Radio, Space, Tabs, Tag, Typography } from 'antd';
+import { Avatar, Button, Card, Empty, List, Radio, Space, Tabs, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { notificationService } from '@/service/api';
+import type { NotificationApi } from '@/service/api/types';
 
 const { Text, Title } = Typography;
 
@@ -25,63 +28,39 @@ const NotificationsPage: React.FC = () => {
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  // 模拟获取通知数据
+  // 获取通知数据
+  const fetchNotifications = async () => {
+    setLoading(true);
+    try {
+      const response = await notificationService.getNotificationList({
+        current: 1,
+        size: 100
+      });
+
+      // 转换API数据格式
+      const formattedNotifications: Notification[] = response.records.map((notification: NotificationApi.NotificationListItem) => ({
+        id: notification.id.toString(),
+        title: notification.title,
+        content: notification.content,
+        type: notification.type as 'info' | 'meeting' | 'success' | 'warning',
+        datetime: notification.createTime,
+        read: notification.readStatus === 1
+      }));
+
+      setNotifications(formattedNotifications);
+      filterNotifications(formattedNotifications, activeTab);
+    } catch (error) {
+      message.error('获取通知列表失败');
+      console.error('获取通知列表失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // 在实际应用中，这里应该从API获取数据
-    const mockNotifications: Notification[] = [
-      {
-        content: '您有一个新的会议需要审批，请尽快处理',
-        datetime: '2023-11-10 10:30',
-        id: '1',
-        read: false,
-        title: '会议审批',
-        type: 'meeting'
-      },
-      {
-        content: '您的会议"项目评审会议"已审批通过',
-        datetime: '2023-11-09 15:20',
-        id: '2',
-        read: false,
-        title: '会议已批准',
-        type: 'success'
-      },
-      {
-        content: '您被邀请参加"季度总结会议"',
-        datetime: '2023-11-08 09:15',
-        id: '3',
-        read: true,
-        title: '会议邀请',
-        type: 'info'
-      },
-      {
-        content: '您的会议"产品设计讨论"被拒绝，原因：时间冲突',
-        datetime: '2023-11-07 16:45',
-        id: '4',
-        read: true,
-        title: '会议被拒绝',
-        type: 'warning'
-      },
-      {
-        content: '明天下午2点将召开"技术架构讨论"会议，请准时参加',
-        datetime: '2023-11-06 11:20',
-        id: '5',
-        read: true,
-        title: '会议提醒',
-        type: 'info'
-      },
-      {
-        content: '您负责的"市场营销策略"会议已成功创建',
-        datetime: '2023-11-05 14:10',
-        id: '6',
-        read: true,
-        title: '会议创建成功',
-        type: 'success'
-      }
-    ];
-
-    setNotifications(mockNotifications);
-    filterNotifications(mockNotifications, activeTab);
+    fetchNotifications();
   }, []);
 
   // 根据Tab过滤通知
@@ -96,19 +75,35 @@ const NotificationsPage: React.FC = () => {
   };
 
   // 标记通知为已读
-  const markAsRead = (id: string) => {
-    const updatedNotifications = notifications.map(notification =>
-      notification.id === id ? { ...notification, read: true } : notification
-    );
-    setNotifications(updatedNotifications);
-    filterNotifications(updatedNotifications, activeTab);
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationService.markAsRead(parseInt(id));
+      
+      const updatedNotifications = notifications.map(notification =>
+        notification.id === id ? { ...notification, read: true } : notification
+      );
+      setNotifications(updatedNotifications);
+      filterNotifications(updatedNotifications, activeTab);
+      message.success('已标记为已读');
+    } catch (error) {
+      message.error('标记失败');
+      console.error('标记通知失败:', error);
+    }
   };
 
   // 标记所有通知为已读
-  const markAllAsRead = () => {
-    const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
-    setNotifications(updatedNotifications);
-    filterNotifications(updatedNotifications, activeTab);
+  const markAllAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      
+      const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
+      setNotifications(updatedNotifications);
+      filterNotifications(updatedNotifications, activeTab);
+      message.success('所有通知已标记为已读');
+    } catch (error) {
+      message.error('标记失败');
+      console.error('标记所有通知失败:', error);
+    }
   };
 
   // 查看通知详情

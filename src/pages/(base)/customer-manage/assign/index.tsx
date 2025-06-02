@@ -3,21 +3,21 @@ import { Button, Card, Form, Modal, Select, Space, Table, Tag, message } from 'a
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { employeeService, type EmployeeApi } from '@/service/api';
+import { type EmployeeApi, employeeService } from '@/service/api';
 import useCustomerStore, { type CustomerInfo } from '@/store/customerStore';
 import usePermissionStore from '@/store/permissionStore';
 import { getCurrentUserId, isAdminOrSuperAdmin, isSuperAdmin } from '@/utils/auth';
 
 // 角色名称显示映射
 const roleNames = {
-  super_admin: '超级管理员',
   admin: '管理员',
   consultant: '顾问',
-  marketing_manager: '市场部经理',
-  hr_specialist: '人力专员',
   hr_bp: '人力BP',
+  hr_specialist: '人力专员',
+  marketing_manager: '市场部经理',
+  sales_director: '销售总监',
   sales_manager: '销售经理',
-  sales_director: '销售总监'
+  super_admin: '超级管理员'
 };
 
 /** 客户分配组件 */
@@ -238,10 +238,14 @@ const CustomerAssignment = () => {
   const getAvailableEmployees = () => {
     if (isUserSuperAdmin) {
       // 超级管理员可以分配给任何人
-      return employees.filter(employee => employee.roles?.[0]?.code === 'consultant' || employee.roles?.[0]?.code === 'admin');
+      return employees.filter(
+        employee => employee.roles?.[0]?.code === 'consultant' || employee.roles?.[0]?.code === 'admin'
+      );
     }
     // 管理员不能分配给自己
-    return employees.filter(employee => employee.roles?.[0]?.code === 'consultant' && employee.id !== Number(currentUserId));
+    return employees.filter(
+      employee => employee.roles?.[0]?.code === 'consultant' && employee.id !== Number(currentUserId)
+    );
   };
 
   return (
@@ -304,9 +308,7 @@ const CustomerAssignment = () => {
                 const userName = employee.userName?.toLowerCase() || '';
                 const roleName = getEmployeeRoleName(employee).toLowerCase();
 
-                return nickName.includes(searchText) ||
-                       userName.includes(searchText) ||
-                       roleName.includes(searchText);
+                return nickName.includes(searchText) || userName.includes(searchText) || roleName.includes(searchText);
               }}
             >
               {getAvailableEmployees().map(employee => (
@@ -350,9 +352,7 @@ const CustomerAssignment = () => {
                 const userName = employee.userName?.toLowerCase() || '';
                 const roleName = getEmployeeRoleName(employee).toLowerCase();
 
-                return nickName.includes(searchText) ||
-                       userName.includes(searchText) ||
-                       roleName.includes(searchText);
+                return nickName.includes(searchText) || userName.includes(searchText) || roleName.includes(searchText);
               }}
             >
               {getAvailableEmployees().map(employee => (

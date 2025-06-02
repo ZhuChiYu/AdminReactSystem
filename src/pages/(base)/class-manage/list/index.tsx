@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 import { classService, type ClassApi } from '@/service/api';
+import { courseService } from '@/service/api';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -51,18 +53,25 @@ const ClassList = () => {
   const currentUserId = getCurrentUserId();
   const isUserSuperAdmin = isSuperAdmin();
 
+  // 获取可选课程列表
+  const [availableCourses, setAvailableCourses] = useState<any[]>([]);
+
   // 获取课程列表数据
   useEffect(() => {
-    const storedCourses = localStorage.getItem('courseList');
-    if (storedCourses) {
+    const fetchCourses = async () => {
       try {
-        const courses = JSON.parse(storedCourses);
-        setCourseList(courses);
+        const response = await courseService.getCourseList({
+          current: 1,
+          size: 1000 // 获取所有课程用于选择
+        });
+        setAvailableCourses(response.records || []);
       } catch (error) {
-        console.error('解析课程列表数据失败', error);
-        setCourseList([]);
+        console.error('获取课程列表失败:', error);
+        setAvailableCourses([]);
       }
-    }
+    };
+
+    fetchCourses();
   }, []);
 
   // 根据类别获取对应课程的价格
@@ -304,23 +313,27 @@ const ClassList = () => {
     {
       dataIndex: 'id',
       key: 'id',
+      ...getCenterColumnConfig(),
       title: 'ID',
       width: 50
     },
     {
       dataIndex: 'name',
       key: 'name',
+      ...getCenterColumnConfig(),
       title: '班级名称',
       width: 180
     },
     {
       dataIndex: 'categoryName',
       key: 'categoryName',
+      ...getCenterColumnConfig(),
       title: '班级类型',
       width: 150
     },
     {
       key: 'trainingFee',
+      ...getCenterColumnConfig(),
       render: (_: unknown, record: any) => {
         const fee = calculateTrainingFee(record.categoryName, record.studentCount);
         return `¥${fee.toFixed(2)}`;
@@ -331,24 +344,28 @@ const ClassList = () => {
     {
       dataIndex: 'studentCount',
       key: 'studentCount',
+      ...getCenterColumnConfig(),
       title: '学员人数',
       width: 100
     },
     {
       dataIndex: 'startDate',
       key: 'startDate',
+      ...getCenterColumnConfig(),
       title: '开始日期',
       width: 120
     },
     {
       dataIndex: 'endDate',
       key: 'endDate',
+      ...getCenterColumnConfig(),
       title: '结束日期',
       width: 120
     },
     {
       dataIndex: 'status',
       key: 'status',
+      ...getCenterColumnConfig(),
       render: (status: ClassStatus) => <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>,
       title: '状态',
       width: 100
@@ -356,12 +373,13 @@ const ClassList = () => {
     {
       dataIndex: 'createdAt',
       key: 'createdAt',
+      ...getCenterColumnConfig(),
       title: '创建时间',
       width: 180
     },
     {
-      fixed: 'right' as const,
       key: 'action',
+      ...getActionColumnConfig(200),
       render: (_: unknown, record: any) => {
         // 权限判断：超级管理员或有EDIT_CLASS权限才显示编辑按钮
         const canEdit = isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, record.id);
@@ -396,8 +414,7 @@ const ClassList = () => {
           </Space>
         );
       },
-      title: '操作',
-      width: 200
+      title: '操作'
     }
   ];
 
@@ -452,16 +469,7 @@ const ClassList = () => {
           dataSource={filteredList}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 'max-content', y: 'calc(100vh - 300px)' }}
-          pagination={{
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: total => `共 ${total} 条记录`,
-            total: filteredList.length,
-            current: pagination.current,
-            pageSize: pagination.size,
-            onChange: handleTableChange
-          }}
+          {...getFullTableConfig(10)}
         />
 
         <Modal

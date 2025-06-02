@@ -1,66 +1,94 @@
 import { BellOutlined } from '@ant-design/icons';
-import { Badge, Button, Dropdown, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { Badge, Button, Dropdown, Empty, List, Spin, Typography, App } from 'antd';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { notificationService } from '@/service/api';
 
 const { Text } = Typography;
 
 interface Notification {
   content: string;
-  datetime: string;
   id: string;
   read: boolean;
+  time: string;
   title: string;
-  type: 'info' | 'meeting' | 'success' | 'warning';
+  type: 'error' | 'info' | 'success' | 'warning' | 'meeting';
 }
 
 const NotificationDropdown: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { message } = App.useApp();
 
-  // 模拟获取通知数据
-  useEffect(() => {
-    // 在实际应用中，这里应该从API获取数据
-    const mockNotifications: Notification[] = [
-      {
-        content: '您有一个新的会议需要审批',
-        datetime: '2023-11-10 10:30',
-        id: '1',
-        read: false,
-        title: '会议审批',
-        type: 'meeting'
-      },
-      {
-        content: '您的会议"项目评审会议"已审批通过',
-        datetime: '2023-11-09 15:20',
-        id: '2',
-        read: false,
-        title: '会议已批准',
-        type: 'success'
-      },
-      {
-        content: '您被邀请参加"季度总结会议"',
-        datetime: '2023-11-08 09:15',
-        id: '3',
-        read: true,
-        title: '会议邀请',
-        type: 'info'
+  // 获取通知数据
+  const fetchNotifications = async () => {
+    setLoading(true);
+    try {
+      const response = await notificationService.getNotificationList({
+        current: 1,
+        size: 10
+      });
+
+      // 检查响应数据格式
+      if (response && response.records && Array.isArray(response.records)) {
+        // 转换API数据格式
+        const formattedNotifications: Notification[] = response.records.map(notification => ({
+          content: notification.content,
+          id: notification.id.toString(),
+          read: notification.readStatus === 1,
+          time: new Date(notification.createTime).toLocaleString(),
+          title: notification.title,
+          type: notification.type as 'error' | 'info' | 'success' | 'warning' | 'meeting'
+        }));
+
+        setNotifications(formattedNotifications);
+        setUnreadCount(formattedNotifications.filter(n => !n.read).length);
+      } else {
+        console.warn('通知API返回数据格式异常:', response);
+        setNotifications([]);
+        setUnreadCount(0);
       }
-    ];
+    } catch (error) {
+      console.error('获取通知失败:', error);
+      setNotifications([]);
+      setUnreadCount(0);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    setNotifications(mockNotifications);
-    // 计算未读通知数量
-    setUnreadCount(mockNotifications.filter(n => !n.read).length);
+  useEffect(() => {
+    fetchNotifications();
   }, []);
 
-  // 标记通知为已读
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notification => (notification.id === id ? { ...notification, read: true } : notification))
-    );
-    // 更新未读数量
-    setUnreadCount(prev => Math.max(0, prev - 1));
+  // 标记为已读
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationService.markAsRead(Number.parseInt(id, 10));
+
+      setNotifications(notifications.map(n => (n.id === id ? { ...n, read: true } : n)));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('标记已读失败:', error);
+      message.error('标记已读失败');
+    }
+  };
+
+  // 标记所有为已读
+  const markAllAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+
+      setNotifications(notifications.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+      message.success('全部已标记为已读');
+    } catch (error) {
+      console.error('标记全部已读失败:', error);
+      message.error('标记全部已读失败');
+    }
   };
 
   // 查看所有通知
@@ -84,99 +112,108 @@ const NotificationDropdown: React.FC = () => {
     }
   };
 
-  const notificationItems = (
-    <div
-      className="notification-dropdown"
-      style={{
-        background: '#fff',
-        borderRadius: '8px',
-        boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
-        width: '320px'
-      }}
-    >
-      <div
-        className="notification-header"
-        style={{
-          alignItems: 'center',
-          borderBottom: '1px solid #f0f0f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          padding: '12px 16px'
-        }}
-      >
-        <Text
-          strong
-          style={{ fontSize: '16px' }}
-        >
-          通知
-        </Text>
-        <Button
-          size="small"
-          style={{ height: 'auto', padding: '0' }}
-          type="link"
-          onClick={() => {
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-            setUnreadCount(0);
-          }}
-        >
-          全部标为已读
-        </Button>
-      </div>
+  const renderNotificationList = () => {
+    if (loading) {
+      return (
+        <div className="p-4 text-center">
+          <Spin />
+        </div>
+      );
+    }
 
-      <div
-        className="notification-content"
-        style={{ maxHeight: '400px', overflow: 'auto' }}
-      >
-        {notifications.length === 0 ? (
-          <div style={{ padding: '24px 0', textAlign: 'center' }}>
-            <Text type="secondary">暂无通知</Text>
-          </div>
-        ) : (
-          <div>
-            {notifications.map(notification => (
-              <div
-                className={`notification-item ${notification.read ? 'read' : 'unread'}`}
-                key={notification.id}
-                style={{
-                  backgroundColor: notification.read ? '#fff' : '#f0f7ff',
-                  borderBottom: '1px solid #f0f0f0',
-                  cursor: 'pointer',
-                  padding: '12px 16px'
-                }}
-                onClick={() => viewNotification(notification)}
-              >
-                <div style={{ marginBottom: '4px' }}>
-                  <Text strong>{notification.title}</Text>
-                </div>
-                <div style={{ marginBottom: '4px' }}>
-                  <Text style={{ fontSize: '14px' }}>{notification.content}</Text>
-                </div>
-                <div>
+    if (notifications.length === 0) {
+      return (
+        <div className="p-4">
+          <Empty
+            description="暂无通知"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+        <List
+          dataSource={notifications}
+          size="small"
+          split={false}
+          renderItem={item => (
+            <List.Item
+              className={`cursor-pointer hover:bg-gray-50 transition-colors ${!item.read ? 'bg-blue-50' : ''}`}
+              style={{ 
+                padding: '12px 16px',
+                borderBottom: '1px solid #f0f0f0'
+              }}
+              onClick={() => viewNotification(item)}
+            >
+              <div className="w-full">
+                <div className="mb-1 flex items-center justify-between">
                   <Text
-                    style={{ fontSize: '12px' }}
+                    strong={!item.read}
+                    style={{ 
+                      fontSize: '14px',
+                      maxWidth: '220px'
+                    }}
+                    ellipsis={{ tooltip: item.title }}
+                  >
+                    {item.title}
+                  </Text>
+                  {!item.read && <div className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />}
+                </div>
+                <Text
+                  style={{ 
+                    fontSize: '12px', 
+                    lineHeight: '16px',
+                    display: 'block',
+                    maxWidth: '260px'
+                  }}
+                  type="secondary"
+                  ellipsis={{ tooltip: item.content }}
+                >
+                  {item.content}
+                </Text>
+                <div className="mt-1">
+                  <Text
+                    style={{ fontSize: '11px' }}
                     type="secondary"
                   >
-                    {notification.datetime}
+                    {item.time}
                   </Text>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </List.Item>
+          )}
+        />
+      </div>
+    );
+  };
+
+  const notificationItems = (
+    <div style={{ width: 320, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)', border: '1px solid #f0f0f0' }}>
+      <div className="flex items-center justify-between border-b p-3" style={{ backgroundColor: '#fafafa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
+        <Text strong>通知</Text>
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <Button
+              size="small"
+              type="link"
+              onClick={markAllAsRead}
+            >
+              全部已读
+            </Button>
+          )}
+          <Button
+            size="small"
+            type="link"
+            onClick={viewAllNotifications}
+          >
+            查看全部
+          </Button>
+        </div>
       </div>
 
-      <div
-        className="notification-footer"
-        style={{ borderTop: '1px solid #f0f0f0', padding: '8px 16px', textAlign: 'center' }}
-      >
-        <Button
-          block
-          type="link"
-          onClick={viewAllNotifications}
-        >
-          查看全部通知
-        </Button>
-      </div>
+      {renderNotificationList()}
     </div>
   );
 
@@ -186,17 +223,17 @@ const NotificationDropdown: React.FC = () => {
       placement="bottomRight"
       trigger={['click']}
     >
-      <div
-        className="notification-icon"
-        style={{ cursor: 'pointer', padding: '0 8px' }}
+      <Badge
+        count={unreadCount}
+        size="small"
       >
-        <Badge
-          count={unreadCount}
-          overflowCount={99}
-        >
-          <BellOutlined style={{ fontSize: '18px' }} />
-        </Badge>
-      </div>
+        <Button
+          icon={<BellOutlined />}
+          shape="circle"
+          size="large"
+          type="text"
+        />
+      </Badge>
     </Dropdown>
   );
 };

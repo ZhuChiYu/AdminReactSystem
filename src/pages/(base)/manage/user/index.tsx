@@ -1,5 +1,5 @@
-import { Suspense, lazy, useState } from 'react';
 import { DownloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { Suspense, lazy, useState } from 'react';
 
 import { enableStatusRecord, userGenderRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
@@ -59,17 +59,18 @@ const UserManage = () => {
       const result = await employeeService.importEmployees(file);
 
       // 显示导入结果
-      const { total, success, failed, errorList } = result;
+      const { errorList, failed, success, total } = result;
 
       if (failed === 0) {
         window.$message?.success(`导入成功！共导入 ${success} 条记录`);
       } else {
-        const errorMsg = errorList.slice(0, 3).map(item =>
-          `第${item.row}行: ${item.error}`
-        ).join('\n');
+        const errorMsg = errorList
+          .slice(0, 3)
+          .map(item => `第${item.row}行: ${item.error}`)
+          .join('\n');
 
         window.$message?.warning(
-          `导入完成！成功 ${success} 条，失败 ${failed} 条。${failed > 0 ? '\n失败原因:\n' + errorMsg : ''}`
+          `导入完成！成功 ${success} 条，失败 ${failed} 条。${failed > 0 ? `\n失败原因:\n${errorMsg}` : ''}`
         );
       }
 
@@ -88,32 +89,37 @@ const UserManage = () => {
     try {
       const response = await employeeService.getEmployeeList({
         current: params.current || 1,
-        size: params.size || 10,
-        userName: params.userName || undefined,
-        nickName: params.nickName || undefined,
         department: params.department || undefined,
-        status: params.status || undefined
+        nickName: params.nickName || undefined,
+        size: params.size || 10,
+        status: params.status || undefined,
+        userName: params.userName || undefined
       });
 
       return {
         data: {
+          current: response.current,
           records: response.records.map((record, index) => ({
             ...record,
-            index: (response.current - 1) * response.size + index + 1,
-            userGender: record.gender === 'male' ? 1 : record.gender === 'female' ? 2 : null,
-            userPhone: record.phone,
-            userEmail: record.email,
-            password: '123456', // 默认密码显示
+            // 默认密码显示
             // 添加TableData必需的字段
             createBy: 'system',
             createTime: record.createdAt,
+            index: (response.current - 1) * response.size + index + 1,
+            password: '123456',
+            status: (record.status === 'active'
+              ? '1'
+              : record.status === 'inactive'
+                ? '2'
+                : null) as Api.Common.EnableStatus | null,
             updateBy: 'system',
             updateTime: record.updatedAt,
-            status: (record.status === 'active' ? '1' : record.status === 'inactive' ? '2' : null) as Api.Common.EnableStatus | null
+            userEmail: record.email,
+            userGender: record.gender === 'male' ? 1 : record.gender === 'female' ? 2 : null,
+            userPhone: record.phone
           })),
-          total: response.total,
-          current: response.current,
-          size: response.size
+          size: response.size,
+          total: response.total
         },
         error: null,
         response: {} as any
@@ -132,11 +138,11 @@ const UserManage = () => {
       apiFn: fetchEmployeeListAdapter,
       apiParams: {
         current: 1,
+        department: null,
         nickName: null,
         size: 10,
         status: null,
-        userName: null,
-        department: null
+        userName: null
       } as any,
       columns: () => [
         {
@@ -380,8 +386,8 @@ const UserManage = () => {
         extra={
           <div className="flex gap-8px">
             <AButton
-              type="default"
               icon={<DownloadOutlined />}
+              type="default"
               onClick={handleDownloadTemplate}
             >
               下载模板
@@ -389,15 +395,15 @@ const UserManage = () => {
             <AUpload
               accept=".xlsx,.xls"
               showUploadList={false}
-              beforeUpload={(file) => {
+              beforeUpload={file => {
                 handleImport(file);
                 return false; // 阻止自动上传
               }}
             >
               <AButton
-                type="primary"
                 icon={<UploadOutlined />}
                 loading={importLoading}
+                type="primary"
               >
                 导入员工
               </AButton>
@@ -414,7 +420,7 @@ const UserManage = () => {
           </div>
         }
         styles={{
-          body: { padding: '0', height: '100%', display: 'flex', flexDirection: 'column' }
+          body: { display: 'flex', flexDirection: 'column', height: '100%', padding: '0' }
         }}
       >
         <div style={{ flex: 1, overflow: 'auto' }}>
@@ -425,8 +431,8 @@ const UserManage = () => {
             {...tableProps}
             pagination={{
               ...tableProps.pagination,
-              showSizeChanger: true,
               showQuickJumper: true,
+              showSizeChanger: true,
               showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`
             }}
           />

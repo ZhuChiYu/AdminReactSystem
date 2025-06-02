@@ -1,106 +1,91 @@
-import { useLang } from '@/features/lang';
+import { useEcharts } from '@/packages/hooks';
+import { statisticsService } from '@/service/api';
 
-const PieChart = () => {
-  const { t } = useTranslation();
+interface Props {
+  className?: string;
+}
 
-  const { locale } = useLang();
+const PieChart = (props: Props) => {
+  const { className } = props;
 
-  const { domRef, updateOptions } = useEcharts(() => ({
-    legend: {
-      bottom: '1%',
-      itemStyle: {
-        borderWidth: 0
-      },
-      left: 'center'
-    },
-    series: [
-      {
-        avoidLabelOverlap: false,
-        color: ['#5da8ff', '#8e9dff', '#fedc69', '#26deca'],
-        data: [] as { name: string; value: number }[],
-        emphasis: {
-          label: {
-            fontSize: '12',
-            show: true
-          }
-        },
-        itemStyle: {
-          borderColor: '#fff',
-          borderRadius: 10,
-          borderWidth: 1
-        },
-        label: {
-          position: 'center',
-          show: false
-        },
-        labelLine: {
-          show: false
-        },
-        name: t('page.home.schedule'),
-        radius: ['45%', '75%'],
-        type: 'pie'
-      }
-    ],
-    tooltip: {
-      trigger: 'item'
-    }
-  }));
-
-  async function mockData() {
-    await new Promise(resolve => {
-      setTimeout(resolve, 1000);
-    });
-
-    updateOptions(opts => {
-      opts.series[0].data = [
-        { name: t('page.home.study'), value: 20 },
-        { name: t('page.home.entertainment'), value: 10 },
-        { name: t('page.home.work'), value: 40 },
-        { name: t('page.home.rest'), value: 30 }
-      ];
-
-      return opts;
-    });
-  }
-
-  function updateLocale() {
-    updateOptions((opts, factory) => {
-      const originOpts = factory();
-
-      opts.series[0].name = originOpts.series[0].name;
-
-      opts.series[0].data = [
-        { name: t('page.home.study'), value: 20 },
-        { name: t('page.home.entertainment'), value: 10 },
-        { name: t('page.home.work'), value: 40 },
-        { name: t('page.home.rest'), value: 30 }
-      ];
-
-      return opts;
-    });
-  }
-
-  async function init() {
-    mockData();
-  }
-
-  useMount(() => {
-    init();
+  const { domRef } = useEcharts(() => getOption(), {
+    refreshDeps: []
   });
 
-  useUpdateEffect(() => {
-    updateLocale();
-  }, [locale]);
+  async function fetchData() {
+    try {
+      const response = await statisticsService.getPieChartData({
+        type: 'user_source',
+        period: 'month'
+      });
+      
+      return response.map(item => ({
+        name: item.name,
+        value: item.value
+      }));
+    } catch (error) {
+      console.error('获取饼图数据失败:', error);
+      // 返回默认数据
+      return [
+        { name: '工作', value: 40 },
+        { name: '学习', value: 20 },
+        { name: '休息', value: 30 },
+        { name: '娱乐', value: 10 }
+      ];
+    }
+  }
+
+  async function getOption() {
+    const data = await fetchData();
+    
+    const option: echarts.EChartsOption = {
+      tooltip: {
+        trigger: 'item'
+      },
+      legend: {
+        bottom: '1%',
+        left: 'center',
+        itemStyle: {
+          borderWidth: 0
+        }
+      },
+      series: [
+        {
+          name: '时间安排',
+          type: 'pie',
+          radius: ['45%', '75%'],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 10,
+            borderColor: '#fff',
+            borderWidth: 1
+          },
+          label: {
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: '12'
+            }
+          },
+          labelLine: {
+            show: false
+          },
+          data: data,
+          color: ['#5da8ff', '#8e9dff', '#fedc69', '#26deca']
+        }
+      ]
+    };
+    return option;
+  }
+
   return (
-    <ACard
-      className="card-wrapper"
-      variant="borderless"
-    >
-      <div
-        className="h-360px overflow-hidden"
-        ref={domRef}
-      />
-    </ACard>
+    <div
+      ref={domRef}
+      className={className}
+    />
   );
 };
 

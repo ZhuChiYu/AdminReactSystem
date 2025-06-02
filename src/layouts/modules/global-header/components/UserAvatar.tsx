@@ -1,5 +1,6 @@
 import type { MenuProps } from 'antd';
 
+import UserAvatarComponent from '@/components/UserAvatar';
 import { selectToken, selectUserInfo } from '@/features/auth/authStore';
 import { useRouter } from '@/features/router';
 
@@ -72,14 +73,13 @@ const UserAvatar = memo(() => {
       placement="bottomRight"
       trigger={['click']}
     >
-      <div>
-        <ButtonIcon className="px-12px">
-          <SvgIcon
-            className="text-icon-large"
-            icon="ph:user-circle"
-          />
-          <span className="text-16px font-medium">{userInfo.userName}</span>
-        </ButtonIcon>
+      <div className="flex items-center px-12px cursor-pointer">
+        <UserAvatarComponent
+          userId={userInfo.userId}
+          avatar={userInfo.avatar}
+          size={32}
+        />
+        <span className="ml-8px text-16px font-medium">{userInfo.userName}</span>
       </div>
     </ADropdown>
   ) : (

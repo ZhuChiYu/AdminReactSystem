@@ -1,148 +1,98 @@
-import { useLang } from '@/features/lang';
+import { useEcharts } from '@/packages/hooks';
+import { statisticsService } from '@/service/api';
 
-const LineChart = () => {
-  const { t } = useTranslation();
+interface Props {
+  className?: string;
+}
 
-  const { locale } = useLang();
+const LineChart = (props: Props) => {
+  const { className } = props;
 
-  const { domRef, updateOptions } = useEcharts(() => ({
-    grid: {
-      bottom: '3%',
-      containLabel: true,
-      left: '3%',
-      right: '4%'
-    },
-    legend: {
-      data: [t('page.home.downloadCount'), t('page.home.registerCount')]
-    },
-    series: [
-      {
-        areaStyle: {
-          color: {
-            colorStops: [
-              {
-                color: '#8e9dff',
-                offset: 0.25
-              },
-              {
-                color: '#fff',
-                offset: 1
-              }
-            ],
-            type: 'linear',
-            x: 0,
-            x2: 0,
-            y: 0,
-            y2: 1
-          }
-        },
-        color: '#8e9dff',
-        data: [] as number[],
-        emphasis: {
-          focus: 'series'
-        },
-        name: t('page.home.downloadCount'),
-        smooth: true,
-        stack: 'Total',
-        type: 'line'
-      },
-      {
-        areaStyle: {
-          color: {
-            colorStops: [
-              {
-                color: '#26deca',
-                offset: 0.25
-              },
-              {
-                color: '#fff',
-                offset: 1
-              }
-            ],
-            type: 'linear',
-            x: 0,
-            x2: 0,
-            y: 0,
-            y2: 1
-          }
-        },
-        color: '#26deca',
-        data: [],
-        emphasis: {
-          focus: 'series'
-        },
-        name: t('page.home.registerCount'),
-        smooth: true,
-        stack: 'Total',
-        type: 'line'
-      }
-    ],
-    tooltip: {
-      axisPointer: {
-        label: {
-          backgroundColor: '#6a7985'
-        },
-        type: 'cross'
-      },
-      trigger: 'axis'
-    },
-    xAxis: {
-      boundaryGap: false,
-      data: [] as string[],
-      type: 'category'
-    },
-    yAxis: {
-      type: 'value'
-    }
-  }));
-
-  async function mockData() {
-    await new Promise(resolve => {
-      setTimeout(resolve, 1000);
-    });
-
-    updateOptions(opts => {
-      opts.xAxis.data = ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00', '24:00'];
-      opts.series[0].data = [4623, 6145, 6268, 6411, 1890, 4251, 2978, 3880, 3606, 4311];
-      opts.series[1].data = [2208, 2016, 2916, 4512, 8281, 2008, 1963, 2367, 2956, 678];
-
-      return opts;
-    });
-  }
-
-  function init() {
-    mockData();
-  }
-
-  function updateLocale() {
-    updateOptions((opts, factory) => {
-      const originOpts = factory();
-      opts.legend.data = originOpts.legend.data;
-      opts.series[0].name = originOpts.series[0].name;
-      opts.series[1].name = originOpts.series[1].name;
-
-      return opts;
-    });
-  }
-  // init
-
-  useMount(() => {
-    init();
+  const { domRef } = useEcharts(() => getOption(), {
+    refreshDeps: []
   });
 
-  useUpdateEffect(() => {
-    updateLocale();
-  }, [locale]);
+  async function fetchData() {
+    try {
+      const response = await statisticsService.getLineChartData({
+        period: 'month',
+        type: 'revenue'
+      });
+      
+      return {
+        xAxisData: response.xAxisData || [],
+        seriesData: response.seriesData || []
+      };
+    } catch (error) {
+      console.error('获取图表数据失败:', error);
+      // 返回默认数据
+      return {
+        xAxisData: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+        seriesData: [120, 200, 150, 80, 70, 110, 130, 180, 160, 140, 190, 210]
+      };
+    }
+  }
+
+  async function getOption() {
+    const data = await fetchData();
+    
+    const option: echarts.EChartsOption = {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross',
+          label: {
+            backgroundColor: '#6a7985'
+          }
+        }
+      },
+      legend: {
+        data: ['营收趋势']
+      },
+      toolbox: {
+        feature: {
+          saveAsImage: {}
+        }
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
+      },
+      xAxis: [
+        {
+          type: 'category',
+          boundaryGap: false,
+          data: data.xAxisData
+        }
+      ],
+      yAxis: [
+        {
+          type: 'value'
+        }
+      ],
+      series: [
+        {
+          name: '营收趋势',
+          type: 'line',
+          stack: 'Total',
+          areaStyle: {},
+          emphasis: {
+            focus: 'series'
+          },
+          data: data.seriesData
+        }
+      ]
+    };
+    return option;
+  }
+
   return (
-    <ACard
-      className="card-wrapper"
-      variant="borderless"
-    >
-      <div
-        className="h-360px overflow-hidden"
-        ref={domRef}
-      />
-    </ACard>
+    <div
+      ref={domRef}
+      className={className}
+    />
   );
 };
 

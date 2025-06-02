@@ -2,7 +2,9 @@ import { Button, Card, Form, Input, Popconfirm, Select, Space, Table, Typography
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { employeeService, type EmployeeApi } from '@/service/api';
+import { type EmployeeApi, employeeService } from '@/service/api';
+import type { EmployeeApi as EmployeeApiType } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -108,118 +110,134 @@ const Component: React.FC = () => {
     return gender === 'male' ? '男' : gender === 'female' ? '女' : '-';
   };
 
+  // 表格列配置
   const columns = [
     {
+      title: '序号',
       dataIndex: 'id',
       key: 'id',
-      title: 'ID',
+      ...getCenterColumnConfig(),
       width: 80
     },
     {
-      dataIndex: 'userName',
-      key: 'userName',
-      title: '用户名',
-      width: 120
-    },
-    {
+      title: '员工姓名',
       dataIndex: 'nickName',
       key: 'nickName',
-      title: '姓名',
-      width: 120
+      ...getCenterColumnConfig(),
+      render: (text: string) => text || '-'
     },
     {
+      title: '用户名',
+      dataIndex: 'userName',
+      key: 'userName',
+      ...getCenterColumnConfig(),
+    },
+    {
+      title: '性别',
       dataIndex: 'gender',
       key: 'gender',
+      ...getCenterColumnConfig(),
       render: (gender: string) => getGenderText(gender),
-      title: '性别',
       width: 80
     },
     {
+      title: '角色',
       dataIndex: 'roleNames',
       key: 'roleNames',
+      ...getCenterColumnConfig(),
       render: (roleNames: string[]) => roleNames?.join(', ') || '-',
-      title: '角色',
       width: 150
     },
     {
+      title: '职位',
       dataIndex: 'position',
       key: 'position',
+      ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
-      title: '职位',
       width: 120
     },
     {
+      title: '部门',
       dataIndex: ['department', 'name'],
       key: 'department',
+      ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
-      title: '部门',
       width: 120
     },
     {
+      title: '合同年限',
       dataIndex: 'contractYears',
       key: 'contractYears',
-      render: (years: number) => years ? `${years}年` : '-',
-      title: '合同年限',
+      ...getCenterColumnConfig(),
+      render: (years: number) => (years ? `${years}年` : '-'),
       width: 100
     },
     {
+      title: '合同开始',
       dataIndex: 'contractStartDate',
       key: 'contractStartDate',
+      ...getCenterColumnConfig(),
       render: (date: string) => {
         if (!date) return '-';
         return new Date(date).toLocaleDateString('zh-CN');
       },
-      title: '合同开始',
       width: 120
     },
     {
+      title: '合同结束',
       dataIndex: 'contractEndDate',
       key: 'contractEndDate',
+      ...getCenterColumnConfig(),
       render: (date: string) => {
         if (!date) return '-';
         return new Date(date).toLocaleDateString('zh-CN');
       },
-      title: '合同结束',
       width: 120
     },
     {
+      title: '电话',
       dataIndex: 'phone',
       key: 'phone',
+      ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
-      title: '电话',
       width: 120
     },
     {
+      title: '邮箱',
       dataIndex: 'email',
       key: 'email',
+      ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
-      title: '邮箱',
       width: 200
     },
     {
+      title: '状态',
       dataIndex: 'status',
       key: 'status',
+      ...getCenterColumnConfig(),
       render: (status: string) => {
         const { color, text } = getStatusTag(status);
         return <span style={{ color }}>{text}</span>;
       },
-      title: '状态',
       width: 100
     },
     {
+      title: '入职日期',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      ...getCenterColumnConfig(),
       render: (text: string) => {
         if (!text) return '-';
         const date = new Date(text);
         return date.toLocaleDateString('zh-CN');
       },
-      title: '入职日期',
       width: 120
     },
     {
+      title: '操作',
       key: 'action',
-      render: (_: any, record: EmployeeApi.EmployeeListItem) => (
+      ...getActionColumnConfig(320),
+      render: (_: any, record: EmployeeApiType.EmployeeListItem) => (
         <Space size="small">
           <Button
             type="link"
@@ -260,7 +278,6 @@ const Component: React.FC = () => {
           </Popconfirm>
         </Space>
       ),
-      title: '操作'
     }
   ];
 
@@ -286,7 +303,10 @@ const Component: React.FC = () => {
             <Input placeholder="请输入部门" />
           </Form.Item>
           <Form.Item name="status">
-            <Select placeholder="请选择状态" style={{ width: 120 }}>
+            <Select
+              placeholder="请选择状态"
+              style={{ width: 120 }}
+            >
               <Option value="">全部</Option>
               <Option value="active">在职</Option>
               <Option value="inactive">离职</Option>
@@ -295,12 +315,13 @@ const Component: React.FC = () => {
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
+              <Button
+                htmlType="submit"
+                type="primary"
+              >
                 搜索
               </Button>
-              <Button onClick={resetSearch}>
-                重置
-              </Button>
+              <Button onClick={resetSearch}>重置</Button>
             </Space>
           </Form.Item>
         </Form>
@@ -310,15 +331,14 @@ const Component: React.FC = () => {
           dataSource={employees}
           loading={loading}
           rowKey="id"
+          {...getFullTableConfig(10)}
           pagination={{
+            ...getFullTableConfig(10).pagination,
             current: pagination.current,
-            pageSize: pagination.size,
-            total: pagination.total,
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: total => `共 ${total} 条记录`,
             onChange: handlePaginationChange,
-            onShowSizeChange: handlePaginationChange
+            onShowSizeChange: handlePaginationChange,
+            pageSize: pagination.size,
+            total: pagination.total
           }}
         />
       </Card>

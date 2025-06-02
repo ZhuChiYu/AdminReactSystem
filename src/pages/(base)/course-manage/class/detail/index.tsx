@@ -2,6 +2,11 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Avatar, Button, Card, Descriptions, List, Space, Table, Tabs, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { classService, courseService, notificationService } from '@/service/api';
+import type { ClassApi, NotificationApi } from '@/service/api/types';
+import { message } from 'antd';
+
+import UserAvatar from '@/components/UserAvatar';
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -20,132 +25,95 @@ const ClassDetail = () => {
   const [courseList, setCourseList] = useState<any[]>([]);
   const [announceList, setAnnounceList] = useState<any[]>([]);
 
-  useEffect(() => {
-    // 模拟加载班级数据
+  // 获取班级详情数据
+  const fetchClassData = async () => {
+    if (!classId) return;
+    
     setLoading(true);
+    try {
+      // 获取班级基本信息
+      const classResponse = await classService.getClassDetail(parseInt(classId, 10));
+      setClassInfo({
+        id: classResponse.id,
+        className: classResponse.className,
+        teacher: classResponse.teacher || '未分配',
+        category: classResponse.category?.name || '未分类',
+        startDate: classResponse.startDate || '',
+        endDate: classResponse.endDate || '',
+        maxStudents: classResponse.maxStudents || 0,
+        currentStudents: classResponse.currentStudents || 0,
+        scheduleInfo: classResponse.scheduleInfo || '',
+        status: classResponse.status
+      });
 
-    // 尝试从localStorage获取班级列表数据
-    const storedClasses = localStorage.getItem('classList');
-    if (storedClasses) {
-      try {
-        const classes = JSON.parse(storedClasses);
-        const currentClass = classes.find((c: any) => c.id === Number(classId));
-        if (currentClass) {
-          setClassInfo(currentClass);
-        }
-      } catch (error) {
-        console.error('解析班级数据失败', error);
-      }
+      // 获取学生列表
+      const studentsResponse = await classService.getClassStudentList({
+        classId: parseInt(classId, 10),
+        current: 1,
+        size: 1000
+      });
+
+      const formattedStudents = studentsResponse.records.map((student: any) => ({
+        id: student.id.toString(),
+        name: student.name,
+        phone: student.phone || '',
+        email: student.email || '',
+        enrollmentDate: student.enrollmentDate || '',
+        progress: student.progress || 0,
+        status: student.status || 'active',
+        attendanceRate: student.attendanceRate || 0
+      }));
+
+      setStudentList(formattedStudents);
+
+      // 获取课程列表
+      const coursesResponse = await courseService.getClassCourseList({
+        classId: parseInt(classId, 10),
+        current: 1,
+        size: 1000
+      });
+
+      const formattedCourses = coursesResponse.records.map((course: any) => ({
+        id: course.id.toString(),
+        courseName: course.courseName,
+        instructor: course.instructor || '',
+        duration: course.duration || 0,
+        schedule: course.schedule || '',
+        status: course.status || 'active',
+        progress: course.progress || 0
+      }));
+
+      setCourseList(formattedCourses);
+
+      // 获取公告列表
+      const announcementsResponse = await notificationService.getNotificationList({
+        current: 1,
+        size: 1000,
+        type: 'class_announcement',
+        relatedId: parseInt(classId, 10)
+      });
+
+      const formattedAnnouncements = announcementsResponse.records.map((announcement: NotificationApi.NotificationListItem) => ({
+        id: announcement.id.toString(),
+        title: announcement.title,
+        content: announcement.content,
+        publishDate: announcement.createTime,
+        author: '管理员',
+        important: false
+      }));
+
+      setAnnounceList(formattedAnnouncements);
+
+    } catch (error) {
+      message.error('获取班级数据失败');
+      console.error('获取班级数据失败:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // 加载模拟学员数据
-    const mockStudents = [
-      {
-        attendance: 95.5,
-        company: '阿里巴巴',
-        email: 'zhangting@company.cn',
-        gender: '女',
-        id: 1,
-        joinDate: '2024-03-01',
-        name: '张婷',
-        phone: '010-50778734',
-        position: '测试工程师',
-        studentId: '11490102359'
-      },
-      {
-        attendance: 92.0,
-        company: '理想科技',
-        email: '曾建华@example.com',
-        gender: '男',
-        id: 2,
-        joinDate: '2024-03-02',
-        name: '曾建华',
-        phone: '010-12609203',
-        position: '后端开发',
-        studentId: '15486679562'
-      },
-      {
-        attendance: 88.5,
-        company: '南京科技',
-        email: '董军@company.cn',
-        gender: '男',
-        id: 3,
-        joinDate: '2024-03-01',
-        name: '董军',
-        phone: '010-37843376',
-        position: '前端开发',
-        studentId: '14219252022'
-      },
-      {
-        attendance: 96.0,
-        company: '腾讯科技',
-        email: 'yang格@example.com',
-        gender: '女',
-        id: 4,
-        joinDate: '2024-03-05',
-        name: '杨格',
-        phone: '010-44109487',
-        position: '技术主管',
-        studentId: '18769613825'
-      }
-    ];
-    setStudentList(mockStudents);
-
-    // 加载模拟课程数据
-    const mockCourses = [
-      {
-        classroom: '教室101',
-        endDate: '2024-04-30',
-        id: 1,
-        name: '高等数学',
-        schedule: '周一、周三 9:00-10:30',
-        startDate: '2024-03-05',
-        status: 1,
-        teacher: '王老师'
-      },
-      {
-        classroom: '教室102',
-        endDate: '2024-04-30',
-        id: 2,
-        name: '大学物理',
-        schedule: '周二、周四 14:00-15:30',
-        startDate: '2024-03-05',
-        status: 1,
-        teacher: '李老师'
-      }
-    ];
-    setCourseList(mockCourses);
-
-    // 加载模拟通知公告数据
-    const mockAnnouncements = [
-      {
-        content: '请同学们于3月1日上午9点到校报到',
-        id: 1,
-        importance: 2,
-        publishDate: '2024-02-25 14:30:00',
-        status: 1,
-        title: '开学通知'
-      },
-      {
-        content: '因教师请假，本周周三的高等数学课程调整到周五同一时间上课',
-        id: 2,
-        importance: 1,
-        publishDate: '2024-03-10 09:15:00',
-        status: 1,
-        title: '课程调整通知'
-      },
-      {
-        content: '期中考试将于4月20日上午9点开始，请各位同学提前做好准备',
-        id: 3,
-        importance: 2,
-        publishDate: '2024-03-25 16:30:00',
-        status: 1,
-        title: '期中考试安排'
-      }
-    ];
-    setAnnounceList(mockAnnouncements);
-
-    setLoading(false);
+  useEffect(() => {
+    fetchClassData();
   }, [classId]);
 
   // 获取状态标签颜色
@@ -194,7 +162,7 @@ const ClassDetail = () => {
       key: 'name',
       render: (text: string) => (
         <Space>
-          <Avatar src={`https://xsgames.co/randomusers/avatar.php?g=${Math.random()}`} />
+          <UserAvatar userId={text} size={40} />
           {text}
         </Space>
       ),
@@ -455,6 +423,7 @@ const ClassDetail = () => {
               ]}
             >
               <List.Item.Meta
+                avatar={<UserAvatar userId={item.id} size={40} />}
                 description={
                   <div>
                     <div>{item.content}</div>

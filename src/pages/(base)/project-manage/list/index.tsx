@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 import type { CustomerInfo, TaskRecord } from '@/store/customerStore';
 import useCustomerStore, { FollowUpStatus, TaskFollowUpStatus, TaskType } from '@/store/customerStore';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 // 暂时注释掉未使用的导入
 // import { getCurrentUserId, getCurrentUserName, isAdmin } from '@/utils/auth';
 
@@ -412,12 +413,14 @@ const TaskManagement = () => {
     {
       dataIndex: 'id',
       key: 'id',
+      ...getCenterColumnConfig(),
       title: '序号',
       width: 60
     },
     {
       dataIndex: 'type',
       key: 'type',
+      ...getCenterColumnConfig(),
       render: (type: TaskType) => <Tag color={taskTypeColors[type]}>{taskTypeNames[type]}</Tag>,
       title: '类型',
       width: 100
@@ -425,12 +428,14 @@ const TaskManagement = () => {
     {
       dataIndex: 'projectName',
       key: 'projectName',
+      ...getCenterColumnConfig(),
       title: '培训项目',
       width: 180
     },
     {
       dataIndex: 'name',
       key: 'name',
+      ...getCenterColumnConfig(),
       title: '任务名称',
       width: 150
     },
@@ -438,12 +443,14 @@ const TaskManagement = () => {
       dataIndex: 'description',
       ellipsis: true,
       key: 'description',
+      ...getCenterColumnConfig(),
       title: '描述',
       width: 200
     },
     {
       dataIndex: 'count',
       key: 'count',
+      ...getCenterColumnConfig(),
       render: (count: number, record: TaskRecord) => (
         <Button
           type="link"
@@ -458,11 +465,13 @@ const TaskManagement = () => {
     {
       dataIndex: 'target',
       key: 'target',
+      ...getCenterColumnConfig(),
       title: '目标',
       width: 80
     },
     {
       key: 'progress',
+      ...getCenterColumnConfig(),
       render: (_: any, record: TaskRecord) => {
         const { count, target } = record;
         const progress = target ? Math.min(100, (count / target) * 100) : 0;
@@ -482,6 +491,7 @@ const TaskManagement = () => {
     {
       dataIndex: 'followUpStatus',
       key: 'followUpStatus',
+      ...getCenterColumnConfig(),
       render: (status: TaskFollowUpStatus) => (
         <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>
       ),
@@ -491,6 +501,7 @@ const TaskManagement = () => {
     {
       dataIndex: 'eventTime',
       key: 'eventTime',
+      ...getCenterColumnConfig(),
       title: '事件时间',
       width: 180
     },
@@ -498,6 +509,7 @@ const TaskManagement = () => {
       dataIndex: 'remark',
       ellipsis: true,
       key: 'remark',
+      ...getCenterColumnConfig(),
       render: (text: string, record: TaskRecord) => (
         <div className="flex items-center">
           <span
@@ -522,6 +534,7 @@ const TaskManagement = () => {
     },
     {
       key: 'action',
+      ...getActionColumnConfig(150),
       render: (_: unknown, record: TaskRecord) => (
         <Space size="small">
           {record.followUpStatus !== TaskFollowUpStatus.COMPLETED && (
@@ -557,8 +570,7 @@ const TaskManagement = () => {
           </Button>
         </Space>
       ),
-      title: '操作',
-      width: 150
+      title: '操作'
     }
   ];
 
@@ -567,54 +579,63 @@ const TaskManagement = () => {
     {
       dataIndex: 'id',
       key: 'id',
+      ...getCenterColumnConfig(),
       title: '序号',
       width: 60
     },
     {
       dataIndex: 'company',
       key: 'company',
+      ...getCenterColumnConfig(),
       title: '单位',
       width: 200
     },
     {
       dataIndex: 'name',
       key: 'name',
+      ...getCenterColumnConfig(),
       title: '姓名',
       width: 100
     },
     {
       dataIndex: 'position',
       key: 'position',
+      ...getCenterColumnConfig(),
       title: '职位',
       width: 150
     },
     {
       dataIndex: 'phone',
       key: 'phone',
+      ...getCenterColumnConfig(),
       title: '电话',
       width: 150
     },
     {
       dataIndex: 'mobile',
       key: 'mobile',
+      ...getCenterColumnConfig(),
       title: '手机',
       width: 150
     },
     {
       dataIndex: 'source',
       key: 'source',
+      ...getCenterColumnConfig(),
       title: '来源',
       width: 100
     },
     {
       dataIndex: 'followContent',
       key: 'followContent',
+      ...getCenterColumnConfig(),
       title: '跟进内容',
       width: 200
     },
     {
       dataIndex: 'followStatus',
       key: 'followStatus',
+      ...getCenterColumnConfig(),
       render: (status: string) => {
         let color = 'default';
         if (status === '已加微信') {
@@ -634,11 +655,13 @@ const TaskManagement = () => {
     {
       dataIndex: 'createTime',
       key: 'createTime',
+      ...getCenterColumnConfig(),
       title: '创建时间',
       width: 180
     },
     {
       key: 'action',
+      ...getActionColumnConfig(120),
       render: () => (
         <Button
           size="small"
@@ -647,8 +670,7 @@ const TaskManagement = () => {
           修改跟进状态
         </Button>
       ),
-      title: '操作',
-      width: 120
+      title: '操作'
     }
   ];
 
@@ -710,8 +732,8 @@ const TaskManagement = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        variant="borderless"
         className="h-full"
+        variant="borderless"
         extra={
           <Space>
             <Select
@@ -801,7 +823,7 @@ const TaskManagement = () => {
           columns={columns}
           dataSource={filteredTasks}
           rowKey="id"
-          scroll={{ x: 1800, y: 'calc(100vh - 450px)' }}
+          {...getFullTableConfig(10)}
         />
 
         <Modal
@@ -961,9 +983,8 @@ const TaskManagement = () => {
           <Table
             columns={customerColumns}
             dataSource={selectedTaskCustomers}
-            pagination={{ pageSize: 10 }}
             rowKey="id"
-            scroll={{ x: 1800, y: 500 }}
+            {...getFullTableConfig(10)}
           />
         </Modal>
       </Card>

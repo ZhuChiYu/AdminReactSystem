@@ -1,4 +1,3 @@
-import CardData from './modules/CardData';
 import HeaderBanner from './modules/HeaderBanner';
 import PerformanceChart from './modules/PerformanceChart';
 import TodayMeetingsAndTasks from './modules/TodayMeetingsAndTasks';
@@ -11,8 +10,6 @@ const Home = () => {
       size={[16, 16]}
     >
       <HeaderBanner />
-
-      <CardData />
 
       <ARow gutter={[16, 16]}>
         <ACol
