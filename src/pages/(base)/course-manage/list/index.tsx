@@ -1,129 +1,135 @@
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag } from 'antd';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { courseService } from '@/service/api';
+import type { CourseApi } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { attachmentService } from '@/service/api';
+
+const { RangePicker } = DatePicker;
+
+interface CourseItem {
+  id: number;
+  name: string;
+  price: number;
+  category: string;
+  date: string;
+  createdAt: string;
+  status: string;
+  attachment: string;
+  attachmentCount: number;
+}
+
 const CourseList = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [courseList, setCourseList] = useState<any[]>([]);
-  const [filteredList, setFilteredList] = useState<any[]>([]);
-
-  // 筛选条件
+  const [courseList, setCourseList] = useState<CourseItem[]>([]);
+  const [filteredList, setFilteredList] = useState<CourseItem[]>([]);
   const [searchName, setSearchName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [categories, setCategories] = useState<CourseApi.CourseCategory[]>([]);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<CourseItem | null>(null);
 
   // 添加课程相关状态
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   // 添加编辑课程相关状态
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
-  const [currentCourse, setCurrentCourse] = useState<any>(null);
+  const [currentCourse, setCurrentCourse] = useState<CourseItem | null>(null);
 
-  // 模拟数据加载
-  useEffect(() => {
+  // 获取课程列表
+  const fetchCourseList = async () => {
     setLoading(true);
+    try {
+      const response = await courseService.getCourseList({
+        current: 1,
+        size: 1000
+      });
 
-    // 检查是否有缓存的课程列表数据
-    const storedCourses = localStorage.getItem('courseList');
-    if (storedCourses) {
-      try {
-        const courses = JSON.parse(storedCourses);
-        setCourseList(courses);
-        setFilteredList(courses);
-        setLoading(false);
-        return;
-      } catch (error) {
-        console.error('解析课程列表数据失败', error);
+      // 先转换基本的课程数据
+      const basicCourses: CourseItem[] = response.records.map((course: CourseApi.CourseListItem) => ({
+        id: course.id,
+        name: course.courseName,
+        price: typeof course.price === 'string' ? parseFloat(course.price) : course.price,
+        category: course.category.name,
+        date: course.createTime || course.createdAt || new Date().toISOString(),
+        createdAt: course.createTime || course.createdAt || new Date().toISOString(),
+        status: course.status === 1 ? '已上线' : '未上线',
+        attachment: '获取中...',
+        attachmentCount: 0
+      }));
+
+      // 先设置基本数据，让用户看到列表
+      setCourseList(basicCourses);
+      setFilteredList(basicCourses);
+
+      // 批量获取附件数量（并发限制为5个）
+      const batchSize = 5;
+      const updatedCourses = [...basicCourses];
+      
+      for (let i = 0; i < basicCourses.length; i += batchSize) {
+        const batch = basicCourses.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (course, index) => {
+          try {
+            const stats = await attachmentService.getCourseAttachmentStats(course.id);
+            const actualIndex = i + index;
+            updatedCourses[actualIndex] = {
+              ...course,
+              attachmentCount: stats.data?.totalCount || 0,
+              attachment: (stats.data?.totalCount || 0) > 0 ? '有附件' : '无附件'
+            };
+          } catch (error) {
+            console.warn(`获取课程 ${course.id} 附件统计失败:`, error);
+            const actualIndex = i + index;
+            updatedCourses[actualIndex] = {
+              ...course,
+              attachmentCount: 0,
+              attachment: '获取失败'
+            };
+          }
+        });
+
+        await Promise.all(batchPromises);
+        
+        // 每完成一批就更新界面
+        setCourseList([...updatedCourses]);
+        setFilteredList([...updatedCourses]);
       }
-    }
 
-    // 如果没有缓存数据，则加载模拟数据
-    // 模拟API请求
-    setTimeout(() => {
-      const mockData = [
-        {
-          attachment: '无附件',
-          attachmentCount: 0,
-          category: '技术培训',
-          createdAt: '2025-04-13 08:50:17',
-          date: '2025-05-13',
-          id: 1,
-          name: '企业人才培训管理',
-          price: 19999.0,
-          status: '已上线'
-        },
-        {
-          attachment: '无附件',
-          attachmentCount: 0,
-          category: '技术培训',
-          createdAt: '2025-04-12 22:32:55',
-          date: '2024-06-10',
-          id: 2,
-          name: 'Python数据分析',
-          price: 3999.0,
-          status: '已上线'
-        },
-        {
-          attachment: '无附件',
-          attachmentCount: 0,
-          category: '管理课程',
-          createdAt: '2025-04-12 22:32:55',
-          date: '2024-05-20',
-          id: 3,
-          name: '高级项目管理',
-          price: 5999.0,
-          status: '已上线'
-        },
-        {
-          attachment: '无附件',
-          attachmentCount: 0,
-          category: '营销课程',
-          createdAt: '2025-04-12 22:32:55',
-          date: '2024-07-15',
-          id: 4,
-          name: '数字营销策略',
-          price: 4999.0,
-          status: '已上线'
-        },
-        {
-          attachment: '无附件',
-          attachmentCount: 0,
-          category: '财务课程',
-          createdAt: '2025-04-12 22:32:55',
-          date: '2024-08-10',
-          id: 5,
-          name: '财务分析与决策',
-          price: 6999.0,
-          status: '已上线'
-        },
-        {
-          attachment: '无附件',
-          attachmentCount: 0,
-          category: '人力资源',
-          createdAt: '2025-04-12 22:32:55',
-          date: '2024-09-05',
-          id: 6,
-          name: '人才招聘与培养',
-          price: 5499.0,
-          status: '已上线'
-        }
-      ];
-      setCourseList(mockData);
-      setFilteredList(mockData);
-
-      // 保存到localStorage
-      localStorage.setItem('courseList', JSON.stringify(mockData));
-
+    } catch (error) {
+      message.error('获取课程列表失败');
+      console.error('获取课程列表失败:', error);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  };
+
+  // 获取课程分类
+  const fetchCategories = async () => {
+    try {
+      const categoriesData = await courseService.getCourseCategories();
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error('获取课程分类失败:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCourseList();
+    fetchCategories();
   }, []);
 
   // 应用筛选
@@ -183,9 +189,9 @@ const CourseList = () => {
   ];
 
   // 分类选项（不包含"全部分类"项）
-  const categoryOptionsForForm = Array.from(new Set(courseList.map(course => course.category))).map(category => ({
-    label: category,
-    value: category
+  const categoryOptionsForForm = categories.map(category => ({
+    label: category.name,
+    value: category.name
   }));
 
   // 打开添加课程模态框
@@ -205,7 +211,7 @@ const CourseList = () => {
   };
 
   // 打开编辑课程模态框
-  const showEditModal = (course: any) => {
+  const showEditModal = (course: CourseItem) => {
     setCurrentCourse(course);
     editForm.setFieldsValue({
       category: course.category,
@@ -227,42 +233,34 @@ const CourseList = () => {
       const values = await form.validateFields();
       setSubmitting(true);
 
-      // 模拟API请求延迟
-      setTimeout(() => {
-        // 生成新课程对象
-        const newCourse = {
-          attachment: '无附件',
-          attachmentCount: 0,
-          category: values.category,
-          createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          date: values.date.format('YYYY-MM-DD'),
-          id: courseList.length + 1,
-          name: values.name,
-          price: values.price,
-          status: '已上线'
-        };
+      // 准备API请求数据
+      const courseData = {
+        courseName: values.name,
+        courseCode: `COURSE_${Date.now()}`, // 生成唯一课程编码
+        categoryId: categories.find(cat => cat.name === values.category)?.id || 1,
+        instructor: '系统管理员', // 默认讲师
+        description: `${values.name}课程`,
+        duration: 30, // 默认30天
+        price: values.price,
+        originalPrice: values.price,
+        maxStudents: 50, // 默认最大学员数
+        startDate: values.date.format('YYYY-MM-DD'),
+        endDate: values.date.add(30, 'day').format('YYYY-MM-DD'), // 默认30天后结束
+        location: '线上课程',
+        tags: []
+      };
 
-        // 更新课程列表
-        const updatedCourseList = [...courseList, newCourse];
-        setCourseList(updatedCourseList);
-        setFilteredList(updatedCourseList);
-
-        // 更新本地存储
-        localStorage.setItem('courseList', JSON.stringify(updatedCourseList));
-
-        // 关闭模态框并重置状态
-        setIsModalOpen(false);
-        setSubmitting(false);
-        form.resetFields();
-
-        // 显示成功消息
-        Modal.success({
-          content: `课程"${values.name}"已成功添加`,
-          title: '添加成功'
-        });
-      }, 1000);
+      // 调用真实的API
+      await courseService.createCourse(courseData);
+      
+      message.success(`课程"${values.name}"已成功添加`);
+      setIsModalOpen(false);
+      form.resetFields();
+      fetchCourseList(); // 重新获取列表
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('创建课程失败:', error);
+      message.error('创建课程失败，请重试');
+    } finally {
       setSubmitting(false);
     }
   };
@@ -273,217 +271,231 @@ const CourseList = () => {
       const values = await editForm.validateFields();
       setSubmitting(true);
 
-      // 模拟API请求延迟
-      setTimeout(() => {
-        // 更新课程对象
-        const updatedCourse = {
-          ...currentCourse,
-          category: values.category,
-          date: values.date.format('YYYY-MM-DD'),
-          name: values.name,
-          price: values.price
-        };
+      if (!currentCourse) {
+        message.error('未找到要编辑的课程');
+        setSubmitting(false);
+        return;
+      }
 
-        // 更新课程列表
-        const updatedCourseList = courseList.map(course => (course.id === currentCourse.id ? updatedCourse : course));
-        setCourseList(updatedCourseList);
-        setFilteredList(updatedCourseList);
+      // 准备API请求数据
+      const courseData = {
+        courseName: values.name,
+        categoryId: categories.find(cat => cat.name === values.category)?.id || 1,
+        price: values.price.toString(),
+        courseStartDate: values.date.format('YYYY-MM-DD'),
+        status: 1 // 默认状态为已上线
+      };
 
-        // 更新本地存储
-        localStorage.setItem('courseList', JSON.stringify(updatedCourseList));
-
+      try {
+        await courseService.updateCourse(currentCourse.id, courseData);
+        
+        message.success(`课程"${values.name}"已成功更新`);
+        
         // 关闭模态框并重置状态
         setEditModalOpen(false);
-        setSubmitting(false);
         setCurrentCourse(null);
-
-        // 显示成功消息
-        Modal.success({
-          content: `课程"${values.name}"已成功更新`,
-          title: '更新成功'
-        });
-      }, 1000);
+        
+        // 重新获取课程列表
+        fetchCourseList();
+      } catch (error) {
+        console.error('更新课程失败:', error);
+        message.error('更新课程失败，请重试');
+      } finally {
+        setSubmitting(false);
+      }
     } catch (error) {
       console.error('表单验证失败:', error);
       setSubmitting(false);
     }
   };
 
-  // 处理删除课程
-  const handleDeleteCourse = (courseId: number) => {
-    // 模拟API删除请求
-    setLoading(true);
-
-    setTimeout(() => {
-      // 从列表中移除课程
-      const updatedCourseList = courseList.filter(course => course.id !== courseId);
-      setCourseList(updatedCourseList);
-      setFilteredList(updatedCourseList);
-
-      // 更新本地存储
-      localStorage.setItem('courseList', JSON.stringify(updatedCourseList));
-
-      setLoading(false);
-
-      // 显示成功消息
-      Modal.success({
-        content: '课程已成功删除',
-        title: '删除成功'
-      });
-    }, 500);
+  // 删除课程
+  const handleDelete = async (record: any) => {
+    try {
+      await courseService.deleteCourse(record.id);
+      message.success('删除成功');
+      fetchCourseList(); // 重新获取数据
+    } catch (error) {
+      console.error('删除课程失败:', error);
+      message.error('删除失败');
+    }
   };
 
-  // 表格列定义
+  // 显示删除确认
+  const showDeleteConfirm = (course: CourseItem) => {
+    setCourseToDelete(course);
+    setDeleteModalVisible(true);
+  };
+
+  // 导航到课程详情页
+  const goToDetail = (courseId: number) => {
+    navigate(`/course-manage/detail/${courseId}`);
+  };
+
+  // 导航到课程附件页
+  const goToAttachments = (courseId: number) => {
+    navigate(`/course-manage/attachments/${courseId}`);
+  };
+
+  // 表格列配置
   const columns = [
     {
-      dataIndex: 'id',
-      key: 'id',
-      title: '课程ID',
-      width: 80
-    },
-    {
+      title: '课程名称',
       dataIndex: 'name',
       key: 'name',
-      title: '课程名称',
-      width: 200
+      ...getCenterColumnConfig(),
     },
     {
+      title: '分类',
       dataIndex: 'category',
       key: 'category',
-      title: '分类',
-      width: 120
+      ...getCenterColumnConfig(),
+      render: (category: string) => <Tag color="blue">{category}</Tag>
     },
     {
+      title: '价格',
       dataIndex: 'price',
       key: 'price',
-      render: (price: number) => `¥${price.toFixed(2)}`,
-      title: '价格',
-      width: 120
+      ...getCenterColumnConfig(),
+      render: (price: number) => `¥${price}`
     },
     {
-      dataIndex: 'date',
-      key: 'date',
-      title: '日期',
-      width: 120
-    },
-    {
-      dataIndex: 'attachment',
-      key: 'attachment',
-      render: (_text: string, record: any) =>
-        record.attachmentCount > 0 ? (
-          <Tag color="blue">{`${record.attachmentCount}个附件`}</Tag>
-        ) : (
-          <Tag color="default">无附件</Tag>
-        ),
-      title: '附件',
-      width: 100
-    },
-    {
+      title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => <Tag color={getStatusColor(status)}>{status}</Tag>,
-      title: '状态',
-      width: 100
+      ...getCenterColumnConfig(),
+      render: (status: string) => (
+        <Tag color={getStatusColor(status)}>
+          {status}
+        </Tag>
+      )
     },
     {
+      title: '附件数量',
+      dataIndex: 'attachmentCount',
+      key: 'attachmentCount',
+      ...getCenterColumnConfig(),
+      render: (count: number) => (
+        <Tag color={count > 0 ? 'green' : 'gray'}>
+          {count || 0} 个
+        </Tag>
+      )
+    },
+    {
+      title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      title: '创建时间',
-      width: 180
+      ...getCenterColumnConfig(),
+      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss')
     },
     {
-      fixed: 'right' as const,
+      title: '操作',
       key: 'action',
-      render: (_: any, record: any) => (
+      ...getActionColumnConfig(300),
+      render: (_: any, record: CourseItem) => (
         <Space>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => showEditModal(record)}
-          >
+          <Button size="small" onClick={() => goToDetail(record.id)}>
+            查看详情
+          </Button>
+          <Button size="small" onClick={() => goToAttachments(record.id)}>
+            附件管理
+          </Button>
+          <Button size="small" type="primary" onClick={() => showEditModal(record)}>
             编辑
           </Button>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => handleAttachment(record.id)}
-          >
-            附件
+          <Button size="small" danger onClick={() => showDeleteConfirm(record)}>
+            删除
           </Button>
-          <Popconfirm
-            cancelText="取消"
-            description="确定要删除这个课程吗？此操作不可撤销。"
-            okText="确定"
-            title="删除课程"
-            onConfirm={() => handleDeleteCourse(record.id)}
-          >
-            <Button
-              danger
-              size="small"
-              type="link"
-            >
-              删除
-            </Button>
-          </Popconfirm>
         </Space>
-      ),
-      title: '操作',
-      width: 200
+      )
     }
   ];
 
+  // 批量删除
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请选择要删除的课程');
+      return;
+    }
+
+    try {
+      await courseService.batchDeleteCourses(selectedRowKeys as number[]);
+      message.success('批量删除成功');
+      setSelectedRowKeys([]);
+      fetchCourseList(); // 重新获取数据
+    } catch (error) {
+      console.error('批量删除失败:', error);
+      message.error('批量删除失败');
+    }
+  };
+
   return (
-    <div className="p-16px">
-      <Card
-        variant="borderless"
-        title={t('course.list')}
-      >
-        <div className="mb-16px flex flex-wrap gap-16px">
-          <Input.Search
-            placeholder="请输入课程名称"
-            style={{ width: 200 }}
+    <div className="p-4">
+      <Card title="课程管理">
+        {/* 搜索筛选区域 */}
+        <div className="mb-4 space-y-4">
+          <div className="flex flex-wrap gap-4">
+            <Input
+              placeholder="搜索课程名称"
             value={searchName}
             onChange={e => setSearchName(e.target.value)}
-            onSearch={value => setSearchName(value)}
+              style={{ width: 200 }}
+              allowClear
           />
-
           <Select
-            options={categoryOptions}
             placeholder="选择分类"
+              value={selectedCategory}
+              onChange={setSelectedCategory}
             style={{ width: 150 }}
-            value={selectedCategory}
-            onChange={value => setSelectedCategory(value)}
-          />
-
-          <DatePicker.RangePicker
+              allowClear
+            >
+              {categories.map(category => (
+                <Select.Option key={category.id} value={category.name}>
+                  {category.name}
+                </Select.Option>
+              ))}
+            </Select>
+            <RangePicker
+              value={dateRange}
+              onChange={setDateRange}
             placeholder={['开始日期', '结束日期']}
-            value={dateRange}
-            onChange={value => setDateRange(value)}
-          />
-
-          <Button
-            className="ml-auto"
-            type="primary"
-            onClick={showAddModal}
-          >
-            添加课程
-          </Button>
-          <Button onClick={resetFilters}>重置筛选</Button>
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button icon={<SearchOutlined />} type="primary" onClick={applyFilters}>
+              搜索
+            </Button>
+            <Button onClick={resetFilters}>重置</Button>
+            <Button icon={<PlusOutlined />} type="primary" onClick={showAddModal}>
+              新增课程
+            </Button>
+          </div>
         </div>
 
+        {/* 表格 */}
         <Table
           columns={columns}
           dataSource={filteredList}
-          loading={loading}
           rowKey="id"
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: total => `共 ${total} 条记录`,
-            total: filteredList.length
+          loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
           }}
+          {...getFullTableConfig(10)}
         />
+
+        {/* 删除确认对话框 */}
+        <Modal
+          title="确认删除"
+          open={deleteModalVisible}
+          onOk={() => courseToDelete && handleDelete(courseToDelete)}
+          onCancel={() => setDeleteModalVisible(false)}
+          okText="确认"
+          cancelText="取消"
+        >
+          <p>确定要删除课程 "{courseToDelete?.name}" 吗？此操作不可撤销。</p>
+        </Modal>
       </Card>
 
       {/* 添加课程模态框 */}
