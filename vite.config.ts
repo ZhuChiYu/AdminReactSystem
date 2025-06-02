@@ -94,7 +94,6 @@ export default defineConfig(configEnv => {
       }
     },
     server: {
-      allowedHosts: ['.ngrok-free.app'],
       host: '0.0.0.0',
       open: true,
       port: 9527,

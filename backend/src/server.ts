@@ -65,18 +65,6 @@ app.use(cors({
       allowedOrigins.push('https://your-domain.com');
     }
 
-    // 允许ngrok域名
-    if (origin.includes('.ngrok-free.app') || origin.includes('.ngrok.io')) {
-      return callback(null, true);
-    }
-
-    // 允许frp相关域名和端口
-    if (origin.includes("englishpartner.cn") ||
-        origin.includes("111.230.110.95") ||
-        origin.match(/http:\/\/111\.230\.110\.95:\d+/)) {
-      return callback(null, true);
-    }
-
     // 检查是否在允许列表中
     if (allowedOrigins.indexOf(origin) !== -1) {
       return callback(null, true);
@@ -91,7 +79,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'ngrok-skip-browser-warning'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 app.use(compression());
