@@ -12,14 +12,10 @@ class ApiClient {
   private baseURL: string;
 
   constructor() {
-    // 动态设置基础URL
-    const useRemoteApi = import.meta.env.VITE_USE_REMOTE_API === 'Y';
-    const localApiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
-    const remoteApiUrl = import.meta.env.VITE_REMOTE_API_BASE_URL || 'http://111.230.110.95:8080/api';
+    // 使用本地API地址
+    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
-    this.baseURL = useRemoteApi ? remoteApiUrl : localApiUrl;
-
-    console.log(`🌐 API Base URL: ${this.baseURL} (${useRemoteApi ? '内网穿透模式' : '本地模式'})`);
+    console.log(`🌐 API Base URL: ${this.baseURL}`);
 
     // 创建axios实例
     this.instance = axios.create({

@@ -47,10 +47,7 @@
     "preview": "vite preview",
     "release": "sa release",
     "typecheck": "tsc --noEmit --skipLibCheck",
-    "update-pkg": "sa update-pkg",
-    "api:local": "node scripts/switch-api.js local",
-    "api:remote": "node scripts/switch-api.js remote",
-    "api:switch": "node scripts/switch-api.js"
+    "update-pkg": "sa update-pkg"
   },
   "dependencies": {
     "@ant-design/v5-patch-for-react-19": "1.0.3",
