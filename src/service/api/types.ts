@@ -281,32 +281,43 @@ export namespace CourseApi {
       id: number;
       name: string;
     };
-    courseType: number;
-    price: number;
+    courseType?: number;
+    price: number | string;
     duration: number;
     maxStudents: number;
-    teacher: {
+    teacher?: {
       id: number;
       name: string;
     };
+    instructor?: string;
     status: number;
-    isFeatured: boolean;
-    viewCount: number;
-    enrollCount: number;
-    rating: number;
-    coverImage: string;
-    createTime: string;
+    isFeatured?: boolean;
+    viewCount?: number;
+    enrollCount?: number;
+    enrollmentCount?: number;
+    rating: number | string;
+    coverImage?: string;
+    createTime?: string;
+    createdAt?: string;
+    updatedAt?: string;
   }
 
   export interface CreateCourseRequest {
-    title: string;
-    description: string;
+    courseName: string;
+    courseCode: string;
     categoryId: number;
+    instructor: string;
+    description?: string;
+    objectives?: any;
+    outline?: any;
     duration: number;
     price: number;
-    instructor: string;
-    level: string;
-    tags: string[];
+    originalPrice: number;
+    maxStudents: number;
+    startDate: string;
+    endDate: string;
+    location: string;
+    tags?: any;
   }
 
   export interface CourseCategory {
@@ -488,6 +499,49 @@ export namespace ExpenseApi {
     receiptNo?: string;
     vendor?: string;
   }
+
+  export interface ExpenseQueryParams extends PageParams {
+    applicantId?: number;
+    status?: number;
+    expenseType?: string;
+    applicationTimeStart?: string;
+    applicationTimeEnd?: string;
+    amount?: number;
+  }
+
+  export interface ExpenseListItem {
+    id: number;
+    applicant: {
+      id: number;
+      name: string;
+    };
+    expenseType: string;
+    amount: number;
+    description?: string;
+    applicationTime: string;
+    status: number;
+    approver?: {
+      id: number;
+      name: string;
+    };
+    approvalTime?: string;
+    remark?: string;
+    attachments?: FileInfo[];
+  }
+
+  export interface CreateExpenseRequest {
+    expenseType: string;
+    amount: number;
+    description?: string;
+    expenseDate?: string;
+    remark?: string;
+    attachments?: string[];
+  }
+
+  export interface ApproveExpenseRequest {
+    status: number;
+    remark?: string;
+  }
 }
 
 // 统计相关类型
@@ -615,5 +669,130 @@ export namespace EmployeeApi {
     roles?: string[];
     departmentId?: number;
     status?: string;
+  }
+}
+
+// 通知相关类型
+export namespace NotificationApi {
+  export interface NotificationQueryParams extends PageParams {
+    type?: string;
+    readStatus?: number;
+    title?: string;
+    relatedId?: number;
+    relatedType?: string;
+  }
+
+  export interface NotificationListItem {
+    id: number;
+    title: string;
+    content: string;
+    type: string;
+    readStatus: number;
+    createTime: string;
+    readTime?: string;
+    userId: number;
+    relatedId?: number;
+    relatedType?: string;
+  }
+
+  export interface CreateNotificationRequest {
+    title: string;
+    content: string;
+    type: string;
+    targetUserIds?: number[];
+    relatedId?: number;
+    relatedType?: string;
+  }
+
+  export interface MarkReadRequest {
+    notificationIds: number[];
+  }
+}
+
+// 班级相关类型
+export namespace ClassApi {
+  export interface ClassQueryParams extends PageParams {
+    className?: string;
+    categoryId?: number;
+    teacherId?: number;
+    status?: number;
+    startDateBegin?: string;
+    startDateEnd?: string;
+  }
+
+  export interface ClassListItem {
+    id: number;
+    className: string;
+    classCode?: string;
+    categoryId?: number;
+    category?: {
+      id: number;
+      name: string;
+    };
+    teacher?: string;
+    teacherId?: number;
+    maxStudents?: number;
+    currentStudents?: number;
+    studentCount?: number;
+    startDate?: string;
+    endDate?: string;
+    scheduleInfo?: string;
+    status: number;
+    description?: string;
+    price?: number;
+    location?: string;
+    createTime: string;
+    updateTime?: string;
+  }
+
+  export interface CreateClassRequest {
+    className: string;
+    categoryId?: number;
+    teacher?: string;
+    teacherId?: number;
+    maxStudents?: number;
+    startDate?: string;
+    endDate?: string;
+    scheduleInfo?: string;
+    description?: string;
+    price?: number;
+    location?: string;
+    status?: number;
+  }
+}
+
+// 课程附件相关类型
+export namespace AttachmentApi {
+  export interface AttachmentQueryParams extends PageParams {
+    courseId?: number;
+    fileName?: string;
+    fileType?: string;
+  }
+
+  export interface AttachmentListItem {
+    id: number;
+    courseId: number;
+    fileName: string;
+    originalName?: string;
+    fileType: string;
+    fileSize: number;
+    downloadUrl: string;
+    uploadTime: string;
+    uploader?: {
+      id: number;
+      name: string;
+    };
+  }
+
+  export interface UploadAttachmentRequest {
+    courseId: number;
+    file: File;
+    description?: string;
+  }
+
+  export interface AttachmentStats {
+    totalCount: number;
+    totalSize: number;
+    fileTypes: { type: string; count: number }[];
   }
 }

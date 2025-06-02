@@ -89,9 +89,39 @@ class ClassService {
   /**
    * 获取班级详情
    */
-  async getClassDetail(id: number): Promise<ClassApi.ClassDetail> {
-    const response = await apiClient.get<ClassApi.ClassDetail>(`/classes/${id}`);
-    return response;
+  async getClassDetail(classId: number) {
+    try {
+      const response = await apiClient.get(`/classes/${classId}`);
+      return response;
+    } catch (error) {
+      console.error('获取班级详情失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取班级学生列表
+   */
+  async getClassStudentList(params: {
+    classId: number;
+    current?: number;
+    size?: number;
+  }) {
+    try {
+      const response = await apiClient.get('/classes/students', {
+        params
+      });
+      return response;
+    } catch (error) {
+      console.error('获取班级学生列表失败:', error);
+      return {
+        current: params?.current || 1,
+        records: [],
+        size: params?.size || 10,
+        total: 0,
+        pages: 0
+      };
+    }
   }
 
   /**
@@ -115,6 +145,23 @@ class ClassService {
    */
   async deleteClass(id: number): Promise<void> {
     await apiClient.delete(`/classes/${id}`);
+  }
+
+  /**
+   * 获取班级教职工列表
+   */
+  async getClassStaffList(params: {
+    classId: number;
+  }) {
+    try {
+      const response = await apiClient.get('/classes/staff', {
+        params
+      });
+      return response;
+    } catch (error) {
+      console.error('获取班级教职工列表失败:', error);
+      return [];
+    }
   }
 }
 

@@ -1,42 +1,30 @@
 import { apiClient, createMockResponse } from './client';
-import { UserApi } from './types';
+import type { UserApi } from './types';
 
-/**
- * 认证相关API服务
- */
+/** 认证相关API服务 */
 export class AuthService {
-  /**
-   * 用户登录
-   */
+  /** 用户登录 */
   async login(params: UserApi.LoginRequest): Promise<UserApi.LoginResponse> {
     // 使用真实API调用
     return apiClient.post('/auth/login', params);
   }
 
-  /**
-   * 用户登出
-   */
+  /** 用户登出 */
   async logout(): Promise<void> {
     return apiClient.post('/auth/logout');
   }
 
-  /**
-   * 刷新Token
-   */
-  async refreshToken(refreshToken: string): Promise<{ token: string; refreshToken: string }> {
+  /** 刷新Token */
+  async refreshToken(refreshToken: string): Promise<{ refreshToken: string; token: string }> {
     return apiClient.post('/auth/refresh', { refreshToken });
-}
+  }
 
-  /**
-   * 获取用户信息
-   */
+  /** 获取用户信息 */
   async getUserInfo(): Promise<UserApi.UserInfo> {
     return apiClient.get('/auth/me');
-}
+  }
 
-/**
-   * 获取路由菜单
-   */
+  /** 获取路由菜单 */
   async getRoutes(): Promise<UserApi.MenuRoute[]> {
     return apiClient.get('/auth/routes');
   }

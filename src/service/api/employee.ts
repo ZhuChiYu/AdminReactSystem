@@ -4,7 +4,9 @@ import type { EmployeeApi, PageResponse } from './types';
 /** 员工管理相关API服务 */
 export class EmployeeService {
   /** 获取员工列表 */
-  async getEmployeeList(params: EmployeeApi.EmployeeQueryParams): Promise<PageResponse<EmployeeApi.EmployeeListItem>['data']> {
+  async getEmployeeList(
+    params: EmployeeApi.EmployeeQueryParams
+  ): Promise<PageResponse<EmployeeApi.EmployeeListItem>['data']> {
     try {
       // 调用真实的后端API
       const response = await apiClient.get('/users/employees', { params });
@@ -14,11 +16,11 @@ export class EmployeeService {
 
       // 如果API调用失败，返回空数据
       return {
-        records: [],
-        total: 0,
         current: params.current || 1,
+        pages: 0,
+        records: [],
         size: params.size || 10,
-        pages: 0
+        total: 0
       };
     }
   }
@@ -62,11 +64,12 @@ export class EmployeeService {
   async getRegularEmployeeList(): Promise<EmployeeApi.EmployeeListItem[]> {
     try {
       const response = await this.getAllEmployees();
-      return response.filter(emp =>
-        emp.roles?.includes('employee') ||
-        emp.roles?.includes('consultant') ||
-        emp.roles?.includes('sales_manager') ||
-        emp.roles?.includes('hr_specialist')
+      return response.filter(
+        emp =>
+          emp.roles?.includes('employee') ||
+          emp.roles?.includes('consultant') ||
+          emp.roles?.includes('sales_manager') ||
+          emp.roles?.includes('hr_specialist')
       );
     } catch (error) {
       console.error('获取普通员工列表失败:', error);
@@ -74,9 +77,7 @@ export class EmployeeService {
     }
   }
 
-  /**
-   * 导入员工数据
-   */
+  /** 导入员工数据 */
   async importEmployees(file: File): Promise<EmployeeApi.ImportResult> {
     const formData = new FormData();
     formData.append('file', file);
@@ -89,9 +90,7 @@ export class EmployeeService {
     return response;
   }
 
-  /**
-   * 下载导入模板
-   */
+  /** 下载导入模板 */
   async downloadTemplate(): Promise<Blob> {
     const response = await apiClient.get('/users/template', {
       responseType: 'blob'
