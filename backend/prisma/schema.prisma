@@ -50,6 +50,8 @@ model User {
   operationLogs OperationLog[]
   assignedTasks Task[] @relation("TaskAssignee")
   uploadedAttachments Attachment[] @relation("AttachmentUploader")
+  expenseApplications ExpenseApplication[] @relation("ExpenseApplicant")
+  approvedExpenses ExpenseApplication[] @relation("ExpenseApprover")
 
   @@map("users")
 }
@@ -485,4 +487,50 @@ model Task {
   assignee User @relation("TaskAssignee", fields: [assigneeId], references: [id])
 
   @@map("tasks")
+}
+
+// 费用申请表
+model ExpenseApplication {
+  id               Int      @id @default(autoincrement())
+  applicationNo    String   @unique @map("application_no") @db.VarChar(50) // 申请编号
+  applicantId      Int      @map("applicant_id") // 申请人ID
+  expenseType      String   @map("expense_type") @db.VarChar(100) // 费用类型
+  totalAmount      Decimal  @default(0) @map("total_amount") @db.Decimal(12, 2) // 总金额
+  applicationReason String? @map("application_reason") @db.Text // 申请原因
+  expensePeriodStart DateTime? @map("expense_period_start") // 费用期间开始
+  expensePeriodEnd DateTime? @map("expense_period_end") // 费用期间结束
+  remark           String?  @db.Text // 备注
+  applicationStatus Int     @default(0) @map("application_status") // 0-待审批, 1-已通过, 2-已拒绝, 3-已撤回
+  currentApproverId Int?    @map("current_approver_id") // 当前审批人ID
+  approvalTime     DateTime? @map("approval_time") // 审批时间
+  approvalComment  String?  @map("approval_comment") @db.Text // 审批意见
+  attachments      Json?    // 附件信息 JSON 格式
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  applicant User @relation("ExpenseApplicant", fields: [applicantId], references: [id])
+  approver  User? @relation("ExpenseApprover", fields: [currentApproverId], references: [id])
+  items     ExpenseItem[]
+
+  @@map("expense_applications")
+}
+
+// 费用项目表
+model ExpenseItem {
+  id               Int      @id @default(autoincrement())
+  applicationId    Int      @map("application_id") // 申请ID
+  itemName         String   @map("item_name") @db.VarChar(200) // 项目名称
+  itemType         String   @map("item_type") @db.VarChar(100) // 项目类型
+  expenseDate      DateTime @map("expense_date") // 费用发生日期
+  amount           Decimal  @map("amount") @db.Decimal(12, 2) // 金额
+  description      String?  @db.Text // 描述
+  receiptNo        String?  @map("receipt_no") @db.VarChar(100) // 发票/收据编号
+  vendor           String?  @db.VarChar(200) // 供应商/商家
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // 关联关系
+  application ExpenseApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("expense_items")
 }

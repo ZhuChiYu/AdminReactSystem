@@ -21,6 +21,7 @@ import avatarRoutes from '@/routes/avatar';
 import classRoutes from '@/routes/class';
 import courseRoutes from '@/routes/course';
 import customerRoutes from '@/routes/customer';
+import expenseRoutes from '@/routes/expense';
 import meetingRoutes from '@/routes/meeting';
 import notificationRoutes from '@/routes/notification';
 import systemRoutes from '@/routes/system';
@@ -148,6 +149,7 @@ app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/api/tasks', authMiddleware, taskRoutes);
 app.use('/api/system', authMiddleware, systemRoutes);
 app.use('/api/attachments', authMiddleware, attachmentRoutes);
+app.use('/api/expense', authMiddleware, expenseRoutes);
 
 // API文档
 if (process.env.API_DOC_ENABLED === 'true') {
