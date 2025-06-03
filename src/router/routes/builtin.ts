@@ -112,6 +112,17 @@ export const BaseChildrenRoutes = [
       },
       {
         handle: {
+          i18nKey: 'route.(base)_class-manage_category',
+          icon: 'mdi:folder-multiple-outline',
+          order: 2,
+          title: 'class_category'
+        },
+        id: 'class_category',
+        lazy: () => import('@/pages/(base)/class-manage/category').then(convert),
+        path: '/class-manage/category'
+      },
+      {
+        handle: {
           hideInMenu: true,
           i18nKey: 'route.(base)_class-manage_detail',
           icon: 'mdi:card-account-details-outline',
@@ -186,40 +197,6 @@ export const BaseChildrenRoutes = [
     id: 'finance_dashboard',
     lazy: () => import('@/pages/(base)/finance-dashboard').then(convert),
     path: '/finance-dashboard'
-  },
-  {
-    children: [
-      {
-        handle: {
-          i18nKey: 'route.(base)_project-manage_list',
-          icon: 'mdi:clipboard-list-outline',
-          order: 1,
-          title: '事项列表'
-        },
-        id: 'project_list',
-        lazy: () => import('@/pages/(base)/project-manage/list').then(convert),
-        path: '/project-manage/list'
-      },
-      {
-        handle: {
-          i18nKey: 'route.(base)_project-manage_task',
-          icon: 'mdi:clipboard-check-outline',
-          order: 2,
-          title: '任务管理'
-        },
-        id: 'project_task',
-        lazy: () => import('@/pages/(base)/project-manage/task').then(convert),
-        path: '/project-manage/task'
-      }
-    ],
-    handle: {
-      i18nKey: 'route.(base)_project-manage',
-      icon: 'mdi:clipboard-text-outline',
-      order: 6,
-      title: '事项管理'
-    },
-    id: 'project_manage',
-    path: '/project-manage'
   },
   {
     children: [

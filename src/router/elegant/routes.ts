@@ -41,6 +41,12 @@ export const generatedRoutes: ElegantConstRoute[] = [
             },
             children: [
               {
+                matchedFiles: [null, '/src/pages/(base)/class-manage/category/index.tsx', null, null],
+                name: '(base)_class-manage_category',
+                path: '/class-manage/category',
+                handle: { i18nKey: 'route.(base)_class-manage_category', title: '(base)_class-manage_category' }
+              },
+              {
                 matchedFiles: [null, '/src/pages/(base)/class-manage/detail/index.tsx', null, null],
                 name: '(base)_class-manage_detail',
                 path: '/class-manage/detail',
