@@ -1,43 +1,53 @@
-const axios = require('axios');
+const http = require('node:http');
 
-async function testAPI() {
-  try {
-    // 1. 登录获取token
-    console.log('1. 测试登录...');
-    const loginResponse = await axios.post('http://localhost:3001/api/auth/login', {
-      password: '123456',
-      userName: 'admin'
-    });
-
-    const token = loginResponse.data.data.token;
-    console.log('✅ 登录成功，token已获取');
-
-    // 2. 测试员工列表API
-    console.log('2. 测试员工列表API...');
-    const employeeResponse = await axios.get('http://localhost:3001/api/users/employees?current=1&size=10', {
-      headers: {
-        Authorization: `Bearer ${token}`
+const loginData = JSON.stringify({ password: '123456', userName: 'admin' });
+const loginReq = http.request(
+  {
+    headers: { 'Content-Type': 'application/json' },
+    hostname: 'localhost',
+    method: 'POST',
+    path: '/api/auth/login',
+    port: 3001
+  },
+  res => {
+    let data = '';
+    res.on('data', chunk => (data += chunk));
+    res.on('end', () => {
+      try {
+        const loginResponse = JSON.parse(data);
+        if (loginResponse.code === 0) {
+          const token = loginResponse.data.token;
+          console.log('✅ 登录成功，token:', `${token.substring(0, 20)}...`);
+          const expenseReq = http.request(
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              hostname: 'localhost',
+              method: 'GET',
+              path: '/api/expense/list?current=1&size=10&status=0',
+              port: 3001
+            },
+            res => {
+              let expenseData = '';
+              res.on('data', chunk => (expenseData += chunk));
+              res.on('end', () => {
+                try {
+                  const expenseResponse = JSON.parse(expenseData);
+                  console.log('✅ 费用申请接口响应:', JSON.stringify(expenseResponse, null, 2));
+                } catch (err) {
+                  console.error('❌ 解析费用申请响应失败:', err);
+                }
+              });
+            }
+          );
+          expenseReq.on('error', err => console.error('❌ 费用申请请求失败:', err));
+          expenseReq.end();
+        }
+      } catch (err) {
+        console.error('❌ 解析登录响应失败:', err);
       }
     });
-
-    console.log('✅ 员工列表API成功');
-    console.log(`   获取到 ${employeeResponse.data.data.records.length} 个员工记录`);
-
-    // 3. 测试客户列表API
-    console.log('3. 测试客户列表API...');
-    const customerResponse = await axios.get('http://localhost:3001/api/customers?current=1&size=10', {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-    console.log('✅ 客户列表API成功');
-    console.log(`   获取到 ${customerResponse.data.data.records.length} 个客户记录`);
-
-    console.log('\n🎉 所有API测试通过！');
-  } catch (error) {
-    console.error('❌ API测试失败:', error.response?.data || error.message);
   }
-}
-
-testAPI();
+);
+loginReq.on('error', err => console.error('❌ 登录请求失败:', err));
+loginReq.write(loginData);
+loginReq.end();

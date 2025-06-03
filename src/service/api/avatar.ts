@@ -1,23 +1,21 @@
 import { apiClient } from './client';
 
 export interface AvatarUploadResponse {
-  url: string;
   filename: string;
   size: number;
+  url: string;
 }
 
 export interface UserAvatarInfo {
-  id: number;
-  userId: number;
   avatarUrl: string;
+  id: number;
   isCustom: boolean;
   uploadTime: string;
+  userId: number;
 }
 
 class AvatarService {
-  /**
-   * 上传用户头像
-   */
+  /** 上传用户头像 */
   async uploadAvatar(file: File, userId?: number) {
     try {
       const formData = new FormData();
@@ -38,9 +36,7 @@ class AvatarService {
     }
   }
 
-  /**
-   * 获取用户头像信息
-   */
+  /** 获取用户头像信息 */
   async getUserAvatar(userId: number) {
     try {
       const response = await apiClient.get<UserAvatarInfo>(`/avatar/user/${userId}`);
@@ -52,9 +48,7 @@ class AvatarService {
     }
   }
 
-  /**
-   * 删除用户头像（恢复为默认头像）
-   */
+  /** 删除用户头像（恢复为默认头像） */
   async deleteUserAvatar(userId: number) {
     try {
       const response = await apiClient.delete(`/avatar/user/${userId}`);
@@ -65,9 +59,7 @@ class AvatarService {
     }
   }
 
-  /**
-   * 批量获取用户头像
-   */
+  /** 批量获取用户头像 */
   async getBatchUserAvatars(userIds: number[]) {
     try {
       const response = await apiClient.post<UserAvatarInfo[]>('/avatar/batch', {
@@ -80,10 +72,8 @@ class AvatarService {
     }
   }
 
-  /**
-   * 获取默认头像URL
-   */
-  getDefaultAvatar(gender?: 'male' | 'female', size: number = 64) {
+  /** 获取默认头像URL */
+  getDefaultAvatar(gender?: 'female' | 'male', size: number = 64) {
     // 使用本地默认头像资源
     if (gender === 'female') {
       return `/assets/avatars/default-female.png`;
@@ -93,14 +83,8 @@ class AvatarService {
     return `/assets/avatars/default-unknown.png`;
   }
 
-  /**
-   * 生成头像显示URL
-   */
-  getAvatarUrl(user: {
-    id?: number;
-    avatar?: string;
-    gender?: 'male' | 'female' | '男' | '女';
-  }) {
+  /** 生成头像显示URL */
+  getAvatarUrl(user: { avatar?: string; gender?: 'female' | 'male' | '女' | '男'; id?: number }) {
     // 如果有自定义头像，直接返回
     if (user.avatar && !user.avatar.includes('xsgames.co')) {
       return user.avatar;
@@ -119,4 +103,4 @@ class AvatarService {
   }
 }
 
-export const avatarService = new AvatarService(); 
+export const avatarService = new AvatarService();

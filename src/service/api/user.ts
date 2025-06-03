@@ -1,15 +1,13 @@
 import { apiClient } from './client';
 
 class UserService {
-  /**
-   * 更新用户资料
-   */
+  /** 更新用户资料 */
   async updateUserProfile(data: {
-    userId: number;
-    userName?: string;
+    avatar?: string;
     email?: string;
     phone?: string;
-    avatar?: string;
+    userId: number;
+    userName?: string;
   }) {
     try {
       const response = await apiClient.put(`/users/${data.userId}/profile`, data);
@@ -20,18 +18,12 @@ class UserService {
     }
   }
 
-  /**
-   * 修改密码
-   */
-  async changePassword(data: {
-    userId: number;
-    oldPassword: string;
-    newPassword: string;
-  }) {
+  /** 修改密码 */
+  async changePassword(data: { newPassword: string; oldPassword: string; userId: number }) {
     try {
       const response = await apiClient.put(`/users/${data.userId}/password`, {
-        oldPassword: data.oldPassword,
-        newPassword: data.newPassword
+        newPassword: data.newPassword,
+        oldPassword: data.oldPassword
       });
       return response;
     } catch (error) {
@@ -41,4 +33,4 @@ class UserService {
   }
 }
 
-export const userService = new UserService(); 
+export const userService = new UserService();

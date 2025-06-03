@@ -1,4 +1,5 @@
 import express from 'express';
+
 import { prisma } from '@/config/database';
 import { logger } from '@/utils/logger';
 
@@ -7,15 +8,7 @@ const router = express.Router();
 // 获取通知列表
 router.get('/', async (req, res) => {
   try {
-    const {
-      current = 1,
-      size = 10,
-      type,
-      readStatus,
-      title,
-      relatedId,
-      relatedType
-    } = req.query;
+    const { current = 1, readStatus, relatedId, relatedType, size = 10, title, type } = req.query;
 
     const where: any = {};
 
@@ -25,7 +18,7 @@ router.get('/', async (req, res) => {
     }
 
     if (readStatus !== undefined) {
-      where.readStatus = parseInt(readStatus as string);
+      where.readStatus = Number.parseInt(readStatus as string);
     }
 
     if (title) {
@@ -36,24 +29,24 @@ router.get('/', async (req, res) => {
     }
 
     if (relatedId) {
-      where.relatedId = parseInt(relatedId as string);
+      where.relatedId = Number.parseInt(relatedId as string);
     }
 
     if (relatedType) {
       where.relatedType = relatedType as string;
     }
 
-    const skip = (parseInt(current as string) - 1) * parseInt(size as string);
-    const take = parseInt(size as string);
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
 
     // 获取通知列表
     const notifications = await prisma.notification.findMany({
-      where,
       orderBy: {
         createTime: 'desc'
       },
       skip,
-      take
+      take,
+      where
     });
 
     // 获取总数
@@ -61,25 +54,25 @@ router.get('/', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '获取通知列表成功',
       data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / Number.parseInt(size as string)),
         records: notifications,
-        total,
-        size: parseInt(size as string),
-        current: parseInt(current as string),
-        pages: Math.ceil(total / parseInt(size as string))
+        size: Number.parseInt(size as string),
+        total
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取通知列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取通知列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取通知列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取通知列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -90,28 +83,28 @@ router.put('/:id/read', async (req, res) => {
     const { id } = req.params;
 
     await prisma.notification.update({
-      where: { id: parseInt(id) },
       data: {
         readStatus: 1,
         readTime: new Date().toISOString()
-      }
+      },
+      where: { id: Number.parseInt(id) }
     });
 
     res.json({
       code: 0,
-      message: '标记已读成功',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '标记已读成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('标记通知已读失败:', error);
     res.status(500).json({
       code: 500,
-      message: '标记通知已读失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '标记通知已读失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -128,19 +121,19 @@ router.put('/read-all', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '全部标记已读成功',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '全部标记已读成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('全部标记已读失败:', error);
     res.status(500).json({
       code: 500,
-      message: '全部标记已读失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '全部标记已读失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -148,14 +141,7 @@ router.put('/read-all', async (req, res) => {
 // 创建通知
 router.post('/', async (req, res) => {
   try {
-    const {
-      title,
-      content,
-      type,
-      targetUserIds = [],
-      relatedId,
-      relatedType
-    } = req.body;
+    const { content, relatedId, relatedType, targetUserIds = [], title, type } = req.body;
 
     const notifications = [];
 
@@ -164,14 +150,14 @@ router.post('/', async (req, res) => {
       for (const userId of targetUserIds) {
         const notification = await prisma.notification.create({
           data: {
-            title,
             content,
-            type,
-            userId,
+            createTime: new Date().toISOString(),
+            readStatus: 0,
             relatedId,
             relatedType,
-            readStatus: 0,
-            createTime: new Date().toISOString()
+            title,
+            type,
+            userId
           }
         });
         notifications.push(notification);
@@ -180,14 +166,15 @@ router.post('/', async (req, res) => {
       // 创建系统通知
       const notification = await prisma.notification.create({
         data: {
-          title,
           content,
-          type,
-          userId: 0, // 系统通知
+          createTime: new Date().toISOString(),
+          readStatus: 0,
+          // 系统通知
           relatedId,
           relatedType,
-          readStatus: 0,
-          createTime: new Date().toISOString()
+          title,
+          type,
+          userId: 0
         }
       });
       notifications.push(notification);
@@ -195,19 +182,19 @@ router.post('/', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '创建通知成功',
       data: notifications[0],
-      timestamp: Date.now(),
-      path: req.path
+      message: '创建通知成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('创建通知失败:', error);
     res.status(500).json({
       code: 500,
-      message: '创建通知失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '创建通知失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -218,24 +205,24 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     await prisma.notification.delete({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     res.json({
       code: 0,
-      message: '删除通知成功',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '删除通知成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('删除通知失败:', error);
     res.status(500).json({
       code: 500,
-      message: '删除通知失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '删除通知失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -251,19 +238,19 @@ router.get('/unread-count', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '获取未读数量成功',
       data: { count },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取未读数量成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取未读数量失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取未读数量失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取未读数量失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -274,34 +261,34 @@ router.put('/batch-read', async (req, res) => {
     const { notificationIds } = req.body;
 
     await prisma.notification.updateMany({
+      data: {
+        readStatus: 1,
+        readTime: new Date().toISOString()
+      },
       where: {
         id: {
           in: notificationIds
         }
-      },
-      data: {
-        readStatus: 1,
-        readTime: new Date().toISOString()
       }
     });
 
     res.json({
       code: 0,
-      message: '批量标记已读成功',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '批量标记已读成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('批量标记已读失败:', error);
     res.status(500).json({
       code: 500,
-      message: '批量标记已读失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '批量标记已读失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
 
-export default router; 
+export default router;

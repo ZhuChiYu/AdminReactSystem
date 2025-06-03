@@ -1,12 +1,11 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Avatar, Button, Card, Descriptions, List, Space, Table, Tabs, Tag } from 'antd';
+import { Avatar, Button, Card, Descriptions, List, Space, Table, Tabs, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { classService, courseService, notificationService } from '@/service/api';
-import type { ClassApi, NotificationApi } from '@/service/api/types';
-import { message } from 'antd';
 
 import UserAvatar from '@/components/UserAvatar';
+import { classService, courseService, notificationService } from '@/service/api';
+import type { ClassApi, NotificationApi } from '@/service/api/types';
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -28,59 +27,59 @@ const ClassDetail = () => {
   // 获取班级详情数据
   const fetchClassData = async () => {
     if (!classId) return;
-    
+
     setLoading(true);
     try {
       // 获取班级基本信息
-      const classResponse = await classService.getClassDetail(parseInt(classId, 10));
+      const classResponse = await classService.getClassDetail(Number.parseInt(classId, 10));
       setClassInfo({
-        id: classResponse.id,
-        className: classResponse.className,
-        teacher: classResponse.teacher || '未分配',
         category: classResponse.category?.name || '未分类',
-        startDate: classResponse.startDate || '',
-        endDate: classResponse.endDate || '',
-        maxStudents: classResponse.maxStudents || 0,
+        className: classResponse.className,
         currentStudents: classResponse.currentStudents || 0,
+        endDate: classResponse.endDate || '',
+        id: classResponse.id,
+        maxStudents: classResponse.maxStudents || 0,
         scheduleInfo: classResponse.scheduleInfo || '',
-        status: classResponse.status
+        startDate: classResponse.startDate || '',
+        status: classResponse.status,
+        teacher: classResponse.teacher || '未分配'
       });
 
       // 获取学生列表
       const studentsResponse = await classService.getClassStudentList({
-        classId: parseInt(classId, 10),
+        classId: Number.parseInt(classId, 10),
         current: 1,
         size: 1000
       });
 
       const formattedStudents = studentsResponse.records.map((student: any) => ({
+        attendanceRate: student.attendanceRate || 0,
+        email: student.email || '',
+        enrollmentDate: student.enrollmentDate || '',
         id: student.id.toString(),
         name: student.name,
         phone: student.phone || '',
-        email: student.email || '',
-        enrollmentDate: student.enrollmentDate || '',
         progress: student.progress || 0,
-        status: student.status || 'active',
-        attendanceRate: student.attendanceRate || 0
+        status: student.status || 'active'
       }));
 
       setStudentList(formattedStudents);
 
       // 获取课程列表
       const coursesResponse = await courseService.getClassCourseList({
-        classId: parseInt(classId, 10),
+        classId: Number.parseInt(classId, 10),
         current: 1,
         size: 1000
       });
 
       const formattedCourses = coursesResponse.records.map((course: any) => ({
-        id: course.id.toString(),
         courseName: course.courseName,
-        instructor: course.instructor || '',
         duration: course.duration || 0,
+        id: course.id.toString(),
+        instructor: course.instructor || '',
+        progress: course.progress || 0,
         schedule: course.schedule || '',
-        status: course.status || 'active',
-        progress: course.progress || 0
+        status: course.status || 'active'
       }));
 
       setCourseList(formattedCourses);
@@ -88,22 +87,23 @@ const ClassDetail = () => {
       // 获取公告列表
       const announcementsResponse = await notificationService.getNotificationList({
         current: 1,
+        relatedId: Number.parseInt(classId, 10),
         size: 1000,
-        type: 'class_announcement',
-        relatedId: parseInt(classId, 10)
+        type: 'class_announcement'
       });
 
-      const formattedAnnouncements = announcementsResponse.records.map((announcement: NotificationApi.NotificationListItem) => ({
-        id: announcement.id.toString(),
-        title: announcement.title,
-        content: announcement.content,
-        publishDate: announcement.createTime,
-        author: '管理员',
-        important: false
-      }));
+      const formattedAnnouncements = announcementsResponse.records.map(
+        (announcement: NotificationApi.NotificationListItem) => ({
+          author: '管理员',
+          content: announcement.content,
+          id: announcement.id.toString(),
+          important: false,
+          publishDate: announcement.createTime,
+          title: announcement.title
+        })
+      );
 
       setAnnounceList(formattedAnnouncements);
-
     } catch (error) {
       message.error('获取班级数据失败');
       console.error('获取班级数据失败:', error);
@@ -162,7 +162,10 @@ const ClassDetail = () => {
       key: 'name',
       render: (text: string) => (
         <Space>
-          <UserAvatar userId={text} size={40} />
+          <UserAvatar
+            size={40}
+            userId={text}
+          />
           {text}
         </Space>
       ),
@@ -309,8 +312,8 @@ const ClassDetail = () => {
 
     return (
       <Card
-        variant="borderless"
         className="mb-4"
+        variant="borderless"
       >
         <Descriptions
           column={{ lg: 3, md: 2, sm: 1, xl: 4, xs: 1, xxl: 4 }}
@@ -353,8 +356,8 @@ const ClassDetail = () => {
   const renderStudentList = () => {
     return (
       <Card
-        variant="borderless"
         title="班级学员"
+        variant="borderless"
         extra={
           <Space>
             <Button type="primary">添加学员</Button>
@@ -377,9 +380,9 @@ const ClassDetail = () => {
   const renderCourseList = () => {
     return (
       <Card
-        variant="borderless"
         extra={<Button type="primary">添加课程</Button>}
         title="班级课程"
+        variant="borderless"
       >
         <Table
           columns={courseColumns}
@@ -396,9 +399,9 @@ const ClassDetail = () => {
   const renderAnnouncements = () => {
     return (
       <Card
-        variant="borderless"
         extra={<Button type="primary">发布通知</Button>}
         title="通知公告"
+        variant="borderless"
       >
         <List
           dataSource={announceList}
@@ -423,7 +426,12 @@ const ClassDetail = () => {
               ]}
             >
               <List.Item.Meta
-                avatar={<UserAvatar userId={item.id} size={40} />}
+                avatar={
+                  <UserAvatar
+                    size={40}
+                    userId={item.id}
+                  />
+                }
                 description={
                   <div>
                     <div>{item.content}</div>

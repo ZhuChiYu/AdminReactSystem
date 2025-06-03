@@ -5,7 +5,7 @@ import type { Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useEcharts } from '@/hooks/common/echarts';
-import { statisticsService, expenseService } from '@/service/api';
+import { expenseService, statisticsService } from '@/service/api';
 import { isSuperAdmin } from '@/utils/auth';
 
 // 报销类型数据
@@ -640,8 +640,8 @@ const FinanceDashboard = () => {
           <Row gutter={[16, 16]}>
             <Col span={24}>
               <Card
-                variant="borderless"
                 title={`${selectedYear}年财务数据图表`}
+                variant="borderless"
                 extra={
                   <DatePicker
                     allowClear={false}
@@ -694,8 +694,8 @@ const FinanceDashboard = () => {
           <Row gutter={[16, 16]}>
             <Col span={24}>
               <Card
-                variant="borderless"
                 title={`${selectedYear}年${selectedMonth}月财务分析`}
+                variant="borderless"
                 extra={
                   <Space>
                     <DatePicker
@@ -747,8 +747,8 @@ const FinanceDashboard = () => {
 
             <Col span={12}>
               <Card
-                variant="borderless"
                 title="支出类型分布"
+                variant="borderless"
               >
                 <div style={{ height: '400px', position: 'relative' }}>
                   {chartLoading && (
@@ -782,8 +782,8 @@ const FinanceDashboard = () => {
 
             <Col span={12}>
               <Card
-                variant="borderless"
                 title="支出类型明细"
+                variant="borderless"
               >
                 <Table
                   columns={expenseTypeColumns}
@@ -797,8 +797,8 @@ const FinanceDashboard = () => {
 
             <Col span={24}>
               <Card
-                variant="borderless"
                 title="月度支出趋势分析"
+                variant="borderless"
               >
                 <div style={{ height: '400px', position: 'relative' }}>
                   {chartLoading && (
@@ -832,8 +832,8 @@ const FinanceDashboard = () => {
 
             <Col span={24}>
               <Card
-                variant="borderless"
                 title="收支趋势分析"
+                variant="borderless"
               >
                 <div style={{ height: '400px', position: 'relative' }}>
                   {chartLoading && (
@@ -870,14 +870,14 @@ const FinanceDashboard = () => {
       key: 'analysis',
       label: '数据分析'
     });
-    }
+  }
 
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        variant="borderless"
         className="h-full"
         title="财务看板"
+        variant="borderless"
       >
         <Tabs
           activeKey={activeTab}

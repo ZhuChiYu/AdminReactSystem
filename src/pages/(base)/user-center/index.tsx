@@ -1,12 +1,12 @@
 import { LockOutlined, MailOutlined, PhoneOutlined, SaveOutlined, UserOutlined } from '@ant-design/icons';
 import { Avatar, Badge, Button, Card, Col, Divider, Form, Input, Row, Space, Tabs, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
-import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
-import { UserRole, isAdmin, isSuperAdmin } from '@/utils/auth';
 import UserAvatar from '@/components/UserAvatar';
-import { userService, authService } from '@/service/api';
+import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
+import { authService, userService } from '@/service/api';
+import { UserRole, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
 
 /** 个人中心组件 */
@@ -33,13 +33,13 @@ const UserCenter = () => {
       dispatch(setUserInfo(latestUserInfo));
       // 更新本地存储
       localStg.set('userInfo', latestUserInfo);
-      
+
       // 更新表单数据
       userForm.setFieldsValue({
-        userName: latestUserInfo.userName,
+        department: latestUserInfo.department || (isUserAdmin ? '管理部门' : '员工部门'),
         email: latestUserInfo.email,
         phone: latestUserInfo.phone,
-        department: latestUserInfo.department || (isUserAdmin ? '管理部门' : '员工部门')
+        userName: latestUserInfo.userName
       });
     } catch (error) {
       console.error('加载用户信息失败:', error);
@@ -58,11 +58,11 @@ const UserCenter = () => {
     try {
       setSubmitting(true);
       await userService.updateUserProfile({
-        userId: parseInt(currentUserData.userId),
+        userId: Number.parseInt(currentUserData.userId),
         ...values
       });
       message.success('个人信息保存成功');
-      
+
       // 重新加载用户信息
       await loadUserInfo();
     } catch (error: any) {
@@ -78,9 +78,9 @@ const UserCenter = () => {
     try {
       setSubmitting(true);
       await userService.changePassword({
-        userId: parseInt(currentUserData.userId),
+        newPassword: values.newPassword,
         oldPassword: values.oldPassword,
-        newPassword: values.newPassword
+        userId: Number.parseInt(currentUserData.userId)
       });
       message.success('密码修改成功');
       passwordForm.resetFields();
@@ -100,13 +100,13 @@ const UserCenter = () => {
       setCurrentUserData(updatedUserInfo);
       dispatch(setUserInfo(updatedUserInfo));
       localStg.set('userInfo', updatedUserInfo);
-      
+
       // 同时更新后端
       await userService.updateUserProfile({
-        userId: parseInt(currentUserData.userId),
-        avatar: newAvatarUrl
+        avatar: newAvatarUrl,
+        userId: Number.parseInt(currentUserData.userId)
       });
-      
+
       message.success('头像更新成功');
     } catch (error) {
       console.error('更新头像失败:', error);
@@ -121,10 +121,10 @@ const UserCenter = () => {
       labelCol={{ span: 5 }}
       wrapperCol={{ span: 16 }}
       initialValues={{
-        userName: currentUserData.userName,
+        department: currentUserData.department || (isUserAdmin ? '管理部门' : '员工部门'),
         email: currentUserData.email,
         phone: currentUserData.phone,
-        department: currentUserData.department || (isUserAdmin ? '管理部门' : '员工部门')
+        userName: currentUserData.userName
       }}
       onFinish={handleSaveProfile}
     >
@@ -133,8 +133,8 @@ const UserCenter = () => {
         name="userName"
       >
         <Input
-          prefix={<UserOutlined />}
           placeholder="请输入用户名"
+          prefix={<UserOutlined />}
         />
       </Form.Item>
       <Form.Item
@@ -145,9 +145,9 @@ const UserCenter = () => {
           { message: '请输入电子邮箱', required: true }
         ]}
       >
-        <Input 
-          prefix={<MailOutlined />} 
+        <Input
           placeholder="请输入电子邮箱"
+          prefix={<MailOutlined />}
         />
       </Form.Item>
       <Form.Item
@@ -158,26 +158,26 @@ const UserCenter = () => {
           { message: '请输入手机号码', required: true }
         ]}
       >
-        <Input 
-          prefix={<PhoneOutlined />} 
+        <Input
           placeholder="请输入手机号码"
+          prefix={<PhoneOutlined />}
         />
       </Form.Item>
       <Form.Item
         label="所属部门"
         name="department"
       >
-        <Input 
+        <Input
           disabled={!isUserSuperAdmin} // 只有超级管理员可以修改部门
           placeholder="所属部门"
         />
       </Form.Item>
       <Form.Item wrapperCol={{ offset: 5, span: 16 }}>
         <Button
-          type="primary"
           htmlType="submit"
-          loading={submitting}
           icon={<SaveOutlined />}
+          loading={submitting}
+          type="primary"
         >
           保存修改
         </Button>
@@ -196,32 +196,32 @@ const UserCenter = () => {
       <Form.Item
         label="当前密码"
         name="oldPassword"
-        rules={[{ required: true, message: '请输入当前密码' }]}
+        rules={[{ message: '请输入当前密码', required: true }]}
       >
         <Input.Password
-          prefix={<LockOutlined />}
           placeholder="请输入当前密码"
+          prefix={<LockOutlined />}
         />
       </Form.Item>
       <Form.Item
         label="新密码"
         name="newPassword"
         rules={[
-          { required: true, message: '请输入新密码' },
-          { min: 6, message: '密码长度不能少于6位' }
+          { message: '请输入新密码', required: true },
+          { message: '密码长度不能少于6位', min: 6 }
         ]}
       >
         <Input.Password
-          prefix={<LockOutlined />}
           placeholder="请输入新密码"
+          prefix={<LockOutlined />}
         />
       </Form.Item>
       <Form.Item
+        dependencies={['newPassword']}
         label="确认密码"
         name="confirmPassword"
-        dependencies={['newPassword']}
         rules={[
-          { required: true, message: '请确认新密码' },
+          { message: '请确认新密码', required: true },
           ({ getFieldValue }) => ({
             validator(_, value) {
               if (!value || getFieldValue('newPassword') === value) {
@@ -233,16 +233,16 @@ const UserCenter = () => {
         ]}
       >
         <Input.Password
-          prefix={<LockOutlined />}
           placeholder="请确认新密码"
+          prefix={<LockOutlined />}
         />
       </Form.Item>
       <Form.Item wrapperCol={{ offset: 5, span: 16 }}>
         <Button
-          type="primary"
           htmlType="submit"
-          loading={submitting}
           icon={<SaveOutlined />}
+          loading={submitting}
+          type="primary"
         >
           修改密码
         </Button>
@@ -266,11 +266,11 @@ const UserCenter = () => {
                 style={{ textAlign: 'center' }}
               >
                 <UserAvatar
-                  userId={parseInt(currentUserData.userId)}
                   avatar={currentUserData.avatar}
+                  editable={true}
                   gender={currentUserData.gender}
                   size={120}
-                  editable={true}
+                  userId={Number.parseInt(currentUserData.userId)}
                   onAvatarChange={handleAvatarChange}
                 />
                 <h3 style={{ marginTop: 16 }}>{currentUserData.userName}</h3>
@@ -283,8 +283,7 @@ const UserCenter = () => {
                     color={role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN ? 'gold' : 'blue'}
                     key={role}
                   >
-                    {role === UserRole.SUPER_ADMIN ? '超级管理员' : 
-                     role === UserRole.ADMIN ? '管理员' : '员工'}
+                    {role === UserRole.SUPER_ADMIN ? '超级管理员' : role === UserRole.ADMIN ? '管理员' : '员工'}
                   </Tag>
                 ))}
               </div>

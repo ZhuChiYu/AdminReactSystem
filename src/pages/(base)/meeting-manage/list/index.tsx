@@ -1,4 +1,18 @@
-import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, Typography, message, App } from 'antd';
+import {
+  App,
+  Button,
+  Card,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  message
+} from 'antd';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -90,14 +104,14 @@ const Component: React.FC = () => {
       const values = await form.validateFields();
 
       const meetingData: MeetingApi.CreateMeetingRequest = {
+        endTime: values.time[1].format('YYYY-MM-DD HH:mm:ss'),
+        isOnline: false,
+        meetingDesc: values.agenda || '',
+        meetingRoom: values.location,
         meetingTitle: values.title,
         meetingType: 'meeting',
-        meetingRoom: values.location,
-        startTime: values.time[0].format('YYYY-MM-DD HH:mm:ss'),
-        endTime: values.time[1].format('YYYY-MM-DD HH:mm:ss'),
-        meetingDesc: values.agenda || '',
-        isOnline: false,
-        participantIds: []
+        participantIds: [],
+        startTime: values.time[0].format('YYYY-MM-DD HH:mm:ss')
       };
 
       await meetingService.createMeeting(meetingData);
@@ -187,46 +201,46 @@ const Component: React.FC = () => {
   // 表格列配置
   const columns = [
     {
-      title: '会议标题',
       dataIndex: 'title',
       key: 'title',
-      ...getCenterColumnConfig(),
+      title: '会议标题',
+      ...getCenterColumnConfig()
     },
     {
-      title: '组织者',
       dataIndex: 'organizer',
       key: 'organizer',
-      ...getCenterColumnConfig(),
+      title: '组织者',
+      ...getCenterColumnConfig()
     },
     {
-      title: '开始时间',
       dataIndex: 'startTime',
       key: 'startTime',
-      ...getCenterColumnConfig(),
+      title: '开始时间',
+      ...getCenterColumnConfig()
     },
     {
-      title: '结束时间',
       dataIndex: 'endTime',
       key: 'endTime',
-      ...getCenterColumnConfig(),
+      title: '结束时间',
+      ...getCenterColumnConfig()
     },
     {
-      title: '地点',
       dataIndex: 'location',
       key: 'location',
-      ...getCenterColumnConfig(),
+      title: '地点',
+      ...getCenterColumnConfig()
     },
     {
-      title: '审批状态',
       dataIndex: 'approvalStatus',
       key: 'approvalStatus',
+      title: '审批状态',
       ...getCenterColumnConfig(),
-      render: (status: number) => getApprovalStatusTag(status),
+      render: (status: number) => getApprovalStatusTag(status)
     },
     {
-      title: '状态',
       dataIndex: 'status',
       key: 'status',
+      title: '状态',
       ...getCenterColumnConfig(),
       render: (status: number) => {
         let color = 'blue';
@@ -244,18 +258,18 @@ const Component: React.FC = () => {
         }
 
         return <Tag color={color}>{text}</Tag>;
-      },
+      }
     },
     {
-      title: '参与人数',
       dataIndex: 'participants',
       key: 'participants',
+      title: '参与人数',
       ...getCenterColumnConfig(),
-      render: (participants: string[]) => participants.length,
+      render: (participants: string[]) => participants.length
     },
     {
-      title: '操作',
       key: 'action',
+      title: '操作',
       ...getActionColumnConfig(200),
       render: (_: any, record: MeetingItem) => (
         <Space>
@@ -283,7 +297,7 @@ const Component: React.FC = () => {
           {record.approvalStatus === 0 && <Tag color="orange">等待审批</Tag>}
           {record.approvalStatus === -1 && <Tag color="red">审批拒绝</Tag>}
         </Space>
-      ),
+      )
     }
   ];
 

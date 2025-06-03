@@ -1,8 +1,9 @@
-import { Router } from 'express';
-import { prisma } from '@/config/database';
-import { logger } from '@/utils/logger';
-import { ApiError } from '@/utils/errors';
 import bcrypt from 'bcryptjs';
+import { Router } from 'express';
+
+import { prisma } from '@/config/database';
+import { ApiError } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 
 const router = Router();
 
@@ -20,14 +21,14 @@ const router = Router();
 router.get('/health', (req, res) => {
   res.json({
     code: 0,
-    message: '系统运行正常',
     data: {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
+      uptime: process.uptime()
     },
-    timestamp: Date.now(),
+    message: '系统运行正常',
     path: req.path,
+    timestamp: Date.now()
   });
 });
 
@@ -80,15 +81,7 @@ router.get('/health', (req, res) => {
 // 获取用户列表
 router.get('/users', async (req, res) => {
   try {
-    const {
-      current = 1,
-      size = 10,
-      userName,
-      nickName,
-      email,
-      status,
-      departmentId
-    } = req.query;
+    const { current = 1, departmentId, email, nickName, size = 10, status, userName } = req.query;
 
     const where: any = {};
 
@@ -114,18 +107,17 @@ router.get('/users', async (req, res) => {
     }
 
     if (status !== undefined) {
-      where.status = parseInt(status as string);
+      where.status = Number.parseInt(status as string);
     }
 
     if (departmentId) {
-      where.departmentId = parseInt(departmentId as string);
+      where.departmentId = Number.parseInt(departmentId as string);
     }
 
-    const skip = (parseInt(current as string) - 1) * parseInt(size as string);
-    const take = parseInt(size as string);
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
 
     const users = await prisma.user.findMany({
-      where,
       include: {
         department: {
           select: {
@@ -138,8 +130,8 @@ router.get('/users', async (req, res) => {
             role: {
               select: {
                 id: true,
-                roleName: true,
-                roleCode: true
+                roleCode: true,
+                roleName: true
               }
             }
           }
@@ -149,49 +141,50 @@ router.get('/users', async (req, res) => {
         createdAt: 'desc'
       },
       skip,
-      take
+      take,
+      where
     });
 
     const total = await prisma.user.count({ where });
 
     const records = users.map(user => ({
-      id: user.id,
-      userName: user.userName,
-      nickName: user.nickName,
-      email: user.email,
-      phone: user.phone,
       avatar: user.avatar,
-      gender: user.gender,
-      status: user.status,
+      createdAt: user.createdAt,
       department: user.department,
+      email: user.email,
+      gender: user.gender,
+      id: user.id,
+      lastLoginTime: user.lastLoginTime,
+      nickName: user.nickName,
+      phone: user.phone,
       position: user.position,
       roles: user.userRoles.map(ur => ur.role),
-      lastLoginTime: user.lastLoginTime,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt
+      status: user.status,
+      updatedAt: user.updatedAt,
+      userName: user.userName
     }));
 
     res.json({
       code: 0,
-      message: '获取用户列表成功',
       data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / take),
         records,
-        total,
-        current: parseInt(current as string),
-        size: parseInt(size as string),
-        pages: Math.ceil(total / take)
+        size: Number.parseInt(size as string),
+        total
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取用户列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取用户列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取用户列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取用户列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -199,17 +192,7 @@ router.get('/users', async (req, res) => {
 // 创建用户
 router.post('/users', async (req, res) => {
   try {
-    const {
-      userName,
-      nickName,
-      email,
-      phone,
-      password,
-      departmentId,
-      position,
-      gender,
-      roleIds = []
-    } = req.body;
+    const { departmentId, email, gender, nickName, password, phone, position, roleIds = [], userName } = req.body;
 
     // 检查用户名是否已存在
     const existingUser = await prisma.user.findUnique({
@@ -237,14 +220,14 @@ router.post('/users', async (req, res) => {
     // 创建用户
     const user = await prisma.user.create({
       data: {
-        userName,
-        nickName,
-        email,
-        phone,
-        password: hashedPassword,
         departmentId,
+        email,
+        gender: gender || 0,
+        nickName,
+        password: hashedPassword,
+        phone,
         position,
-        gender: gender || 0
+        userName
       },
       include: {
         department: true
@@ -255,8 +238,8 @@ router.post('/users', async (req, res) => {
     if (roleIds.length > 0) {
       await prisma.userRole.createMany({
         data: roleIds.map((roleId: number) => ({
-          userId: user.id,
-          roleId
+          roleId,
+          userId: user.id
         }))
       });
     }
@@ -268,28 +251,28 @@ router.post('/users', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '用户创建成功',
       data: userWithoutPassword,
-      timestamp: Date.now(),
-      path: req.path
+      message: '用户创建成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('创建用户失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '创建用户失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '创建用户失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -303,7 +286,7 @@ router.put('/users/:id', async (req, res) => {
 
     // 检查用户是否存在
     const existingUser = await prisma.user.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     if (!existingUser) {
@@ -316,11 +299,11 @@ router.put('/users/:id', async (req, res) => {
     }
 
     const user = await prisma.user.update({
-      where: { id: parseInt(id) },
       data: updateData,
       include: {
         department: true
-      }
+      },
+      where: { id: Number.parseInt(id) }
     });
 
     logger.info(`用户更新成功: ${user.userName}`);
@@ -330,28 +313,28 @@ router.put('/users/:id', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '用户更新成功',
       data: userWithoutPassword,
-      timestamp: Date.now(),
-      path: req.path
+      message: '用户更新成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('更新用户失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '更新用户失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '更新用户失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -364,7 +347,7 @@ router.delete('/users/:id', async (req, res) => {
 
     // 检查用户是否存在
     const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     if (!user) {
@@ -372,35 +355,35 @@ router.delete('/users/:id', async (req, res) => {
     }
 
     await prisma.user.delete({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     logger.info(`用户删除成功: ${user.userName}`);
 
     res.json({
       code: 0,
-      message: '用户删除成功',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '用户删除成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('删除用户失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '删除用户失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '删除用户失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -409,13 +392,7 @@ router.delete('/users/:id', async (req, res) => {
 // 获取角色列表
 router.get('/roles', async (req, res) => {
   try {
-    const {
-      current = 1,
-      size = 10,
-      roleName,
-      roleCode,
-      status
-    } = req.query;
+    const { current = 1, roleCode, roleName, size = 10, status } = req.query;
 
     const where: any = {};
 
@@ -434,19 +411,18 @@ router.get('/roles', async (req, res) => {
     }
 
     if (status !== undefined) {
-      where.status = parseInt(status as string);
+      where.status = Number.parseInt(status as string);
     }
 
-    const skip = (parseInt(current as string) - 1) * parseInt(size as string);
-    const take = parseInt(size as string);
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
 
     const roles = await prisma.role.findMany({
-      where,
       include: {
         _count: {
           select: {
-            userRoles: true,
-            rolePermissions: true
+            rolePermissions: true,
+            userRoles: true
           }
         }
       },
@@ -454,45 +430,46 @@ router.get('/roles', async (req, res) => {
         sort: 'asc'
       },
       skip,
-      take
+      take,
+      where
     });
 
     const total = await prisma.role.count({ where });
 
     const records = roles.map(role => ({
-      id: role.id,
-      roleName: role.roleName,
-      roleCode: role.roleCode,
-      status: role.status,
-      sort: role.sort,
-      remark: role.remark,
-      userCount: role._count.userRoles,
-      permissionCount: role._count.rolePermissions,
       createdAt: role.createdAt,
-      updatedAt: role.updatedAt
+      id: role.id,
+      permissionCount: role._count.rolePermissions,
+      remark: role.remark,
+      roleCode: role.roleCode,
+      roleName: role.roleName,
+      sort: role.sort,
+      status: role.status,
+      updatedAt: role.updatedAt,
+      userCount: role._count.userRoles
     }));
 
     res.json({
       code: 0,
-      message: '获取角色列表成功',
       data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / take),
         records,
-        total,
-        current: parseInt(current as string),
-        size: parseInt(size as string),
-        pages: Math.ceil(total / take)
+        size: Number.parseInt(size as string),
+        total
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取角色列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取角色列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取角色列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取角色列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -500,7 +477,7 @@ router.get('/roles', async (req, res) => {
 // 创建角色
 router.post('/roles', async (req, res) => {
   try {
-    const { roleName, roleCode, status, sort, remark } = req.body;
+    const { remark, roleCode, roleName, sort, status } = req.body;
 
     // 检查角色代码是否已存在
     const existingRole = await prisma.role.findUnique({
@@ -513,11 +490,11 @@ router.post('/roles', async (req, res) => {
 
     const role = await prisma.role.create({
       data: {
-        roleName,
+        remark,
         roleCode,
-        status: status || 1,
+        roleName,
         sort: sort || 0,
-        remark
+        status: status || 1
       }
     });
 
@@ -525,28 +502,28 @@ router.post('/roles', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '角色创建成功',
       data: role,
-      timestamp: Date.now(),
-      path: req.path
+      message: '角色创建成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('创建角色失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '创建角色失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '创建角色失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -556,42 +533,42 @@ router.post('/roles', async (req, res) => {
 router.get('/departments', async (req, res) => {
   try {
     const departments = await prisma.department.findMany({
-      where: { status: 1 },
-      orderBy: { sort: 'asc' },
       include: {
         _count: {
           select: {
             users: true
           }
         }
-      }
+      },
+      orderBy: { sort: 'asc' },
+      where: { status: 1 }
     });
 
     res.json({
       code: 0,
-      message: '获取部门列表成功',
       data: departments.map(dept => ({
-        id: dept.id,
-        name: dept.name,
         code: dept.code,
-        parentId: dept.parentId,
+        id: dept.id,
         level: dept.level,
+        name: dept.name,
+        parentId: dept.parentId,
+        remark: dept.remark,
         sort: dept.sort,
         status: dept.status,
-        userCount: dept._count.users,
-        remark: dept.remark
+        userCount: dept._count.users
       })),
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取部门列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取部门列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取部门列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取部门列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -619,25 +596,25 @@ router.get('/statistics', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '获取系统统计成功',
       data: {
-        totalUsers,
         activeUsers,
-        totalRoles,
+        todayLoginUsers,
         totalDepartments,
-        todayLoginUsers
+        totalRoles,
+        totalUsers
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取系统统计成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取系统统计失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取系统统计失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取系统统计失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });

@@ -19,6 +19,9 @@ import {
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 
+import { projectService } from '@/service/api';
+import type { TaskApi } from '@/service/api/types';
+
 import {
   FollowUpStatus,
   type ProjectItem,
@@ -31,8 +34,6 @@ import {
   taskTypeColors,
   taskTypeNames
 } from '../types';
-import { projectService } from '@/service/api';
-import type { TaskApi } from '@/service/api/types';
 
 /** 我的事项组件 */
 const MyTasks = () => {
@@ -99,19 +100,20 @@ const MyTasks = () => {
 
       // 转换API数据格式
       const formattedTasks: ProjectItem[] = response.records.map((task: TaskApi.TaskListItem) => ({
-        id: task.id,
-        name: task.taskName || '',
-        projectName: task.projectName || '',
+        count: task.actualCount || 0,
+        createdAt: task.createTime || '',
         description: task.taskDesc || '',
         employeeId: task.assignee?.id || 0,
         employeeName: task.assignee?.name || '',
         eventTime: task.dueDate || '',
         followUpStatus: task.taskStatus,
-        createdAt: task.createTime || '',
-        count: task.actualCount || 0,
+        id: task.id,
+        name: task.taskName || '',
+        projectName: task.projectName || '',
+        // 需要根据实际情况映射
+        remark: task.remark || '',
         target: task.targetCount || 0,
-        type: TaskType.CONSULT, // 需要根据实际情况映射
-        remark: task.remark || ''
+        type: TaskType.CONSULT
       }));
 
       setTasks(formattedTasks);
@@ -196,14 +198,14 @@ const MyTasks = () => {
   const handleCreateTask = async () => {
     try {
       const values = await targetForm.validateFields();
-      
+
       const taskData = {
-        taskName: values.name,
-        taskDesc: values.description,
-        projectName: values.projectName,
+        assigneeId: 1,
         dueDate: values.eventTime.format('YYYY-MM-DD HH:mm:ss'),
+        projectName: values.projectName,
         targetCount: values.target,
-        assigneeId: 1, // 需要根据实际用户获取
+        taskDesc: values.description,
+        taskName: values.name, // 需要根据实际用户获取
         taskType: 'weekly'
       };
 
@@ -438,9 +440,9 @@ const MyTasks = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        variant="borderless"
         className="h-full"
         title="我的事项"
+        variant="borderless"
         extra={
           <Button
             icon={<SettingOutlined />}
@@ -530,7 +532,7 @@ const MyTasks = () => {
             <Form.Item
               label="任务名称"
               name="name"
-              rules={[{ required: true, message: '请输入任务名称' }]}
+              rules={[{ message: '请输入任务名称', required: true }]}
             >
               <Input placeholder="请输入任务名称" />
             </Form.Item>
@@ -538,7 +540,7 @@ const MyTasks = () => {
             <Form.Item
               label="项目名称"
               name="projectName"
-              rules={[{ required: true, message: '请输入项目名称' }]}
+              rules={[{ message: '请输入项目名称', required: true }]}
             >
               <Input placeholder="请输入项目名称" />
             </Form.Item>
@@ -547,23 +549,32 @@ const MyTasks = () => {
               label="任务描述"
               name="description"
             >
-              <Input.TextArea placeholder="请输入任务描述" rows={3} />
+              <Input.TextArea
+                placeholder="请输入任务描述"
+                rows={3}
+              />
             </Form.Item>
 
             <Form.Item
               label="目标数量"
               name="target"
-              rules={[{ required: true, message: '请输入目标数量' }]}
+              rules={[{ message: '请输入目标数量', required: true }]}
             >
-              <Input type="number" placeholder="请输入目标数量" />
+              <Input
+                placeholder="请输入目标数量"
+                type="number"
+              />
             </Form.Item>
 
             <Form.Item
               label="截止时间"
               name="eventTime"
-              rules={[{ required: true, message: '请选择截止时间' }]}
+              rules={[{ message: '请选择截止时间', required: true }]}
             >
-              <DatePicker showTime style={{ width: '100%' }} />
+              <DatePicker
+                showTime
+                style={{ width: '100%' }}
+              />
             </Form.Item>
           </Form>
         </Modal>

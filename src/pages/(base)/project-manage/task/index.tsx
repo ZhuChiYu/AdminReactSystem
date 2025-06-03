@@ -16,10 +16,10 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 import { projectService } from '@/service/api';
 import type { TaskApi } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Paragraph } = Typography;
 
@@ -49,22 +49,22 @@ const followUpStatusColors = {
 };
 
 interface TaskRecord {
-  id: number;
-  name: string;
-  projectName: string;
-  description: string;
+  company: string;
   count: number;
-  target: number;
+  createdAt: string;
+  description: string;
   employeeId: string;
   employeeName: string;
   eventTime: string;
   followUpContent: string;
   followUpStatus: number;
   followUpTime: string;
-  createdAt: string;
-  company: string;
+  id: number;
   mobile: string;
+  name: string;
   position: string;
+  projectName: string;
+  target: number;
   telephone: string;
 }
 
@@ -104,22 +104,23 @@ const ItemList = () => {
 
       // 将API返回的数据转换为组件需要的格式
       const formattedTasks: TaskRecord[] = response.records.map((task: TaskApi.TaskListItem) => ({
-        id: task.id,
-        name: task.taskName || '',
-        projectName: task.projectName || '',
-        description: task.taskDesc || '',
+        company: '',
         count: task.actualCount || 0,
-        target: task.targetCount || 0,
+        createdAt: task.createTime || '',
+        description: task.taskDesc || '',
         employeeId: task.assignee?.id?.toString() || '',
         employeeName: task.assignee?.name || '',
         eventTime: task.dueDate || '',
         followUpContent: task.taskDesc || '',
         followUpStatus: task.taskStatus,
         followUpTime: task.updateTime || '',
-        createdAt: task.createTime || '',
-        company: '', // 这些字段在任务表中可能不存在，需要根据实际业务调整
+        id: task.id,
+        // 这些字段在任务表中可能不存在，需要根据实际业务调整
         mobile: '',
+        name: task.taskName || '',
         position: '',
+        projectName: task.projectName || '',
+        target: task.targetCount || 0,
         telephone: ''
       }));
 
@@ -256,80 +257,90 @@ const ItemList = () => {
   // 表格列定义
   const columns = [
     {
-      title: '序号',
       dataIndex: 'id',
       key: 'id',
+      title: '序号',
       ...getCenterColumnConfig(),
       width: 60
     },
     {
-      title: '任务名称',
       dataIndex: 'name',
       key: 'name',
+      title: '任务名称',
       ...getCenterColumnConfig(),
       width: 150
     },
     {
-      title: '项目名称',
       dataIndex: 'projectName',
       key: 'projectName',
+      title: '项目名称',
       ...getCenterColumnConfig(),
       width: 180
     },
     {
-      title: '负责人',
       dataIndex: 'employeeName',
       key: 'employeeName',
+      title: '负责人',
       ...getCenterColumnConfig(),
       width: 100
     },
     {
-      title: '状态',
       dataIndex: 'followUpStatus',
       key: 'followUpStatus',
+      title: '状态',
       ...getCenterColumnConfig(),
-      width: 100,
-      render: (status: number) => getStatusTag(status)
+      render: (status: number) => getStatusTag(status),
+      width: 100
     },
     {
-      title: '完成数量',
       dataIndex: 'count',
       key: 'count',
+      title: '完成数量',
       ...getCenterColumnConfig(),
       width: 80
     },
     {
-      title: '目标数量',
       dataIndex: 'target',
       key: 'target',
+      title: '目标数量',
       ...getCenterColumnConfig(),
       width: 80
     },
     {
-      title: '截止时间',
       dataIndex: 'eventTime',
       key: 'eventTime',
+      title: '截止时间',
       ...getCenterColumnConfig(),
       width: 150
     },
     {
-      title: '操作',
       key: 'action',
+      title: '操作',
       ...getActionColumnConfig(200),
       render: (_: any, record: TaskRecord) => (
         <Space>
-          <Button type="link" size="small">
+          <Button
+            size="small"
+            type="link"
+          >
             查看详情
           </Button>
-          <Button type="link" size="small">
-              编辑
-            </Button>
+          <Button
+            size="small"
+            type="link"
+          >
+            编辑
+          </Button>
           {currentUser.isAdmin && (
-            <Button type="link" size="small" danger>
+            <Button
+              danger
+              size="small"
+              type="link"
+            >
               删除
             </Button>
           )}
-          </Space>
+        </Space>
       )
     }
   ];
@@ -337,8 +348,8 @@ const ItemList = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        variant="borderless"
         className="h-full"
+        variant="borderless"
         title={
           <Space>
             <span>任务列表</span>

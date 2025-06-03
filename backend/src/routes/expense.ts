@@ -1,49 +1,47 @@
 import express from 'express';
+
 import { prisma } from '../config/database';
-import { createSuccessResponse, createErrorResponse } from '../utils/response';
 import { authMiddleware } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { createErrorResponse, createSuccessResponse } from '../utils/response';
 
 const router = express.Router();
 
 // 获取费用申请列表
 router.get('/list', authMiddleware, async (req, res) => {
   try {
-    const { current = 1, size = 10, status, applicantId, expenseType } = req.query;
-    
+    const { applicantId, current = 1, expenseType, size = 10, status } = req.query;
+
     const skip = (Number(current) - 1) * Number(size);
     const take = Number(size);
 
     const where: any = {};
-    
+
     if (status !== undefined) {
       where.applicationStatus = Number(status);
     }
-    
+
     if (applicantId) {
       where.applicantId = Number(applicantId);
     }
-    
+
     if (expenseType) {
       where.expenseType = expenseType as string;
     }
 
     const [applications, total] = await Promise.all([
       prisma.expenseApplication.findMany({
-        where,
-        skip,
-        take,
         include: {
           applicant: {
             select: {
-              id: true,
-              nickName: true,
-              userName: true,
               department: {
                 select: {
                   name: true
                 }
-              }
+              },
+              id: true,
+              nickName: true,
+              userName: true
             }
           },
           approver: {
@@ -57,39 +55,44 @@ router.get('/list', authMiddleware, async (req, res) => {
         },
         orderBy: {
           createdAt: 'desc'
-        }
+        },
+        skip,
+        take,
+        where
       }),
       prisma.expenseApplication.count({ where })
     ]);
 
     const records = applications.map(app => ({
-      id: app.id,
-      applicationNo: app.applicationNo,
+      amount: Number(app.totalAmount),
       applicant: {
         id: app.applicant.id,
         name: app.applicant.nickName || app.applicant.userName
       },
-      department: app.applicant.department?.name || '未知部门',
-      expenseType: app.expenseType,
-      amount: Number(app.totalAmount),
-      description: app.applicationReason,
+      applicationNo: app.applicationNo,
       applicationTime: app.createdAt.toISOString(),
-      status: app.applicationStatus,
-      approver: app.approver ? {
-        id: app.approver.id,
-        name: app.approver.nickName || app.approver.userName
-      } : null,
       approvalTime: app.approvalTime?.toISOString(),
+      approver: app.approver
+        ? {
+            id: app.approver.id,
+            name: app.approver.nickName || app.approver.userName
+          }
+        : null,
+      attachments: app.attachments as any[],
+      department: app.applicant.department?.name || '未知部门',
+      description: app.applicationReason,
+      expenseType: app.expenseType,
+      id: app.id,
       remark: app.approvalComment,
-      attachments: app.attachments as any[]
+      status: app.applicationStatus
     }));
 
     const responseData = {
-      records,
-      total,
       current: Number(current),
+      pages: Math.ceil(total / Number(size)),
+      records,
       size: Number(size),
-      pages: Math.ceil(total / Number(size))
+      total
     };
 
     res.json(createSuccessResponse(responseData, '获取费用申请列表成功', req.path));
@@ -103,20 +106,19 @@ router.get('/list', authMiddleware, async (req, res) => {
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const application = await prisma.expenseApplication.findUnique({
-      where: { id: Number(id) },
       include: {
         applicant: {
           select: {
-            id: true,
-            nickName: true,
-            userName: true,
             department: {
               select: {
                 name: true
               }
-            }
+            },
+            id: true,
+            nickName: true,
+            userName: true
           }
         },
         approver: {
@@ -127,7 +129,8 @@ router.get('/:id', authMiddleware, async (req, res) => {
           }
         },
         items: true
-      }
+      },
+      where: { id: Number(id) }
     });
 
     if (!application) {
@@ -135,35 +138,37 @@ router.get('/:id', authMiddleware, async (req, res) => {
     }
 
     const result = {
-      id: application.id,
-      applicationNo: application.applicationNo,
+      amount: Number(application.totalAmount),
       applicant: {
         id: application.applicant.id,
         name: application.applicant.nickName || application.applicant.userName
       },
-      department: application.applicant.department?.name || '未知部门',
-      expenseType: application.expenseType,
-      amount: Number(application.totalAmount),
-      description: application.applicationReason,
+      applicationNo: application.applicationNo,
       applicationTime: application.createdAt.toISOString(),
-      status: application.applicationStatus,
-      approver: application.approver ? {
-        id: application.approver.id,
-        name: application.approver.nickName || application.approver.userName
-      } : null,
       approvalTime: application.approvalTime?.toISOString(),
-      remark: application.approvalComment,
+      approver: application.approver
+        ? {
+            id: application.approver.id,
+            name: application.approver.nickName || application.approver.userName
+          }
+        : null,
       attachments: application.attachments as any[],
+      department: application.applicant.department?.name || '未知部门',
+      description: application.applicationReason,
+      expenseType: application.expenseType,
+      id: application.id,
       items: application.items.map(item => ({
+        amount: Number(item.amount),
+        description: item.description,
+        expenseDate: item.expenseDate.toISOString(),
         id: item.id,
         itemName: item.itemName,
         itemType: item.itemType,
-        expenseDate: item.expenseDate.toISOString(),
-        amount: Number(item.amount),
-        description: item.description,
         receiptNo: item.receiptNo,
         vendor: item.vendor
-      }))
+      })),
+      remark: application.approvalComment,
+      status: application.applicationStatus
     };
 
     res.json(createSuccessResponse(result, '获取费用申请详情成功', req.path));
@@ -176,36 +181,36 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // 创建费用申请
 router.post('/create', authMiddleware, async (req, res) => {
   try {
-    const { expenseType, applicationReason, expensePeriodStart, expensePeriodEnd, remark, items } = req.body;
+    const { applicationReason, expensePeriodEnd, expensePeriodStart, expenseType, items, remark } = req.body;
     const userId = (req as any).user.id;
 
     // 生成申请编号
     const applicationNo = `EXP${Date.now()}`;
-    
+
     // 计算总金额
     const totalAmount = items.reduce((sum: number, item: any) => sum + Number(item.amount), 0);
 
     const application = await prisma.expenseApplication.create({
       data: {
-        applicationNo,
         applicantId: userId,
-        expenseType,
-        totalAmount,
+        applicationNo,
         applicationReason,
-        expensePeriodStart: expensePeriodStart ? new Date(expensePeriodStart) : null,
         expensePeriodEnd: expensePeriodEnd ? new Date(expensePeriodEnd) : null,
-        remark,
+        expensePeriodStart: expensePeriodStart ? new Date(expensePeriodStart) : null,
+        expenseType,
         items: {
           create: items.map((item: any) => ({
-            itemName: item.itemName,
-            itemType: item.itemType,
-            expenseDate: new Date(item.expenseDate),
             amount: Number(item.amount),
             description: item.description,
+            expenseDate: new Date(item.expenseDate),
+            itemName: item.itemName,
+            itemType: item.itemType,
             receiptNo: item.receiptNo,
             vendor: item.vendor
           }))
-        }
+        },
+        remark,
+        totalAmount
       },
       include: {
         applicant: {
@@ -220,16 +225,16 @@ router.post('/create', authMiddleware, async (req, res) => {
     });
 
     const result = {
-      id: application.id,
-      applicationNo: application.applicationNo,
+      amount: Number(application.totalAmount),
       applicant: {
         id: application.applicant.id,
         name: application.applicant.nickName || application.applicant.userName
       },
-      expenseType: application.expenseType,
-      amount: Number(application.totalAmount),
-      description: application.applicationReason,
+      applicationNo: application.applicationNo,
       applicationTime: application.createdAt.toISOString(),
+      description: application.applicationReason,
+      expenseType: application.expenseType,
+      id: application.id,
       status: application.applicationStatus
     };
 
@@ -244,7 +249,7 @@ router.post('/create', authMiddleware, async (req, res) => {
 router.put('/:id/approve', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, remark } = req.body;
+    const { remark, status } = req.body;
     const userId = (req as any).user.id;
 
     const application = await prisma.expenseApplication.findUnique({
@@ -260,12 +265,11 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
     }
 
     const updatedApplication = await prisma.expenseApplication.update({
-      where: { id: Number(id) },
       data: {
         applicationStatus: Number(status),
-        currentApproverId: userId,
+        approvalComment: remark,
         approvalTime: new Date(),
-        approvalComment: remark
+        currentApproverId: userId
       },
       include: {
         applicant: {
@@ -282,27 +286,30 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
             userName: true
           }
         }
-      }
+      },
+      where: { id: Number(id) }
     });
 
     const result = {
-      id: updatedApplication.id,
-      applicationNo: updatedApplication.applicationNo,
+      amount: Number(updatedApplication.totalAmount),
       applicant: {
         id: updatedApplication.applicant.id,
         name: updatedApplication.applicant.nickName || updatedApplication.applicant.userName
       },
-      expenseType: updatedApplication.expenseType,
-      amount: Number(updatedApplication.totalAmount),
-      description: updatedApplication.applicationReason,
+      applicationNo: updatedApplication.applicationNo,
       applicationTime: updatedApplication.createdAt.toISOString(),
-      status: updatedApplication.applicationStatus,
-      approver: updatedApplication.approver ? {
-        id: updatedApplication.approver.id,
-        name: updatedApplication.approver.nickName || updatedApplication.approver.userName
-      } : null,
       approvalTime: updatedApplication.approvalTime?.toISOString(),
-      remark: updatedApplication.approvalComment
+      approver: updatedApplication.approver
+        ? {
+            id: updatedApplication.approver.id,
+            name: updatedApplication.approver.nickName || updatedApplication.approver.userName
+          }
+        : null,
+      description: updatedApplication.applicationReason,
+      expenseType: updatedApplication.expenseType,
+      id: updatedApplication.id,
+      remark: updatedApplication.approvalComment,
+      status: updatedApplication.applicationStatus
     };
 
     res.json(createSuccessResponse(result, '费用申请审批成功', req.path));
@@ -316,7 +323,7 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { expenseType, applicationReason, expensePeriodStart, expensePeriodEnd, remark, items } = req.body;
+    const { applicationReason, expensePeriodEnd, expensePeriodStart, expenseType, items, remark } = req.body;
     const userId = (req as any).user.id;
 
     const application = await prisma.expenseApplication.findUnique({
@@ -336,17 +343,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
 
     // 计算总金额
-    const totalAmount = items ? items.reduce((sum: number, item: any) => sum + Number(item.amount), 0) : application.totalAmount;
+    const totalAmount = items
+      ? items.reduce((sum: number, item: any) => sum + Number(item.amount), 0)
+      : application.totalAmount;
 
     const updatedApplication = await prisma.expenseApplication.update({
-      where: { id: Number(id) },
       data: {
-        expenseType: expenseType || application.expenseType,
-        totalAmount: totalAmount,
         applicationReason: applicationReason || application.applicationReason,
-        expensePeriodStart: expensePeriodStart ? new Date(expensePeriodStart) : application.expensePeriodStart,
         expensePeriodEnd: expensePeriodEnd ? new Date(expensePeriodEnd) : application.expensePeriodEnd,
-        remark: remark || application.remark
+        expensePeriodStart: expensePeriodStart ? new Date(expensePeriodStart) : application.expensePeriodStart,
+        expenseType: expenseType || application.expenseType,
+        remark: remark || application.remark,
+        totalAmount
       },
       include: {
         applicant: {
@@ -356,7 +364,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
             userName: true
           }
         }
-      }
+      },
+      where: { id: Number(id) }
     });
 
     // 如果提供了items，更新费用项目
@@ -369,12 +378,12 @@ router.put('/:id', authMiddleware, async (req, res) => {
       // 创建新项目
       await prisma.expenseItem.createMany({
         data: items.map((item: any) => ({
+          amount: Number(item.amount),
           applicationId: Number(id),
+          description: item.description,
+          expenseDate: new Date(item.expenseDate),
           itemName: item.itemName,
           itemType: item.itemType,
-          expenseDate: new Date(item.expenseDate),
-          amount: Number(item.amount),
-          description: item.description,
           receiptNo: item.receiptNo,
           vendor: item.vendor
         }))
@@ -382,16 +391,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
 
     const result = {
-      id: updatedApplication.id,
-      applicationNo: updatedApplication.applicationNo,
+      amount: Number(updatedApplication.totalAmount),
       applicant: {
         id: updatedApplication.applicant.id,
         name: updatedApplication.applicant.nickName || updatedApplication.applicant.userName
       },
-      expenseType: updatedApplication.expenseType,
-      amount: Number(updatedApplication.totalAmount),
-      description: updatedApplication.applicationReason,
+      applicationNo: updatedApplication.applicationNo,
       applicationTime: updatedApplication.createdAt.toISOString(),
+      description: updatedApplication.applicationReason,
+      expenseType: updatedApplication.expenseType,
+      id: updatedApplication.id,
       status: updatedApplication.applicationStatus
     };
 
@@ -438,10 +447,10 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 // 获取费用统计
 router.get('/statistics', authMiddleware, async (req, res) => {
   try {
-    const { year, month, status } = req.query;
-    
+    const { month, status, year } = req.query;
+
     const where: any = {};
-    
+
     if (year && month) {
       const startDate = new Date(Number(year), Number(month) - 1, 1);
       const endDate = new Date(Number(year), Number(month), 0);
@@ -450,7 +459,7 @@ router.get('/statistics', authMiddleware, async (req, res) => {
         lte: endDate
       };
     }
-    
+
     if (status !== undefined) {
       where.applicationStatus = Number(status);
     }
@@ -467,35 +476,35 @@ router.get('/statistics', authMiddleware, async (req, res) => {
     ] = await Promise.all([
       prisma.expenseApplication.count({ where }),
       prisma.expenseApplication.aggregate({
-        where,
-        _sum: { totalAmount: true }
+        _sum: { totalAmount: true },
+        where
       }),
       prisma.expenseApplication.count({ where: { ...where, applicationStatus: 0 } }),
       prisma.expenseApplication.aggregate({
-        where: { ...where, applicationStatus: 0 },
-        _sum: { totalAmount: true }
+        _sum: { totalAmount: true },
+        where: { ...where, applicationStatus: 0 }
       }),
       prisma.expenseApplication.count({ where: { ...where, applicationStatus: 1 } }),
       prisma.expenseApplication.aggregate({
-        where: { ...where, applicationStatus: 1 },
-        _sum: { totalAmount: true }
+        _sum: { totalAmount: true },
+        where: { ...where, applicationStatus: 1 }
       }),
       prisma.expenseApplication.count({ where: { ...where, applicationStatus: 2 } }),
       prisma.expenseApplication.aggregate({
-        where: { ...where, applicationStatus: 2 },
-        _sum: { totalAmount: true }
+        _sum: { totalAmount: true },
+        where: { ...where, applicationStatus: 2 }
       })
     ]);
 
     const statistics = {
-      totalCount,
-      totalAmount: Number(totalAmount._sum.totalAmount || 0),
-      pendingCount,
-      pendingAmount: Number(pendingAmount._sum.totalAmount || 0),
-      approvedCount,
       approvedAmount: Number(approvedAmount._sum.totalAmount || 0),
+      approvedCount,
+      pendingAmount: Number(pendingAmount._sum.totalAmount || 0),
+      pendingCount,
+      rejectedAmount: Number(rejectedAmount._sum.totalAmount || 0),
       rejectedCount,
-      rejectedAmount: Number(rejectedAmount._sum.totalAmount || 0)
+      totalAmount: Number(totalAmount._sum.totalAmount || 0),
+      totalCount
     };
 
     res.json(createSuccessResponse(statistics, '获取费用统计成功', req.path));
@@ -505,4 +514,4 @@ router.get('/statistics', authMiddleware, async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

@@ -7,17 +7,17 @@ import { classService } from '@/service/api';
 import type { ClassApi } from '@/service/api/types';
 
 interface ClassItem {
-  id: number;
-  name: string;
   categoryId: number;
   categoryName: string;
-  teacher: string;
-  studentCount: number;
-  startDate: string;
-  endDate: string;
-  status: number;
-  description: string;
   createdAt: string;
+  description: string;
+  endDate: string;
+  id: number;
+  name: string;
+  startDate: string;
+  status: number;
+  studentCount: number;
+  teacher: string;
 }
 
 /** 班级状态枚举 */
@@ -55,22 +55,22 @@ const ClassList = () => {
 
       // 转换API数据格式
       const formattedClasses: ClassItem[] = response.records.map((classItem: ClassApi.ClassListItem) => ({
-        id: classItem.id,
-        name: classItem.className,
         categoryId: classItem.categoryId || 0,
         categoryName: classItem.category?.name || '',
-        teacher: classItem.teacher || '',
-        studentCount: classItem.studentCount || 0,
-        startDate: classItem.startDate || '',
-        endDate: classItem.endDate || '',
-        status: classItem.status || 0,
+        createdAt: classItem.createTime || '',
         description: classItem.description || '',
-        createdAt: classItem.createTime || ''
+        endDate: classItem.endDate || '',
+        id: classItem.id,
+        name: classItem.className,
+        startDate: classItem.startDate || '',
+        status: classItem.status || 0,
+        studentCount: classItem.studentCount || 0,
+        teacher: classItem.teacher || ''
       }));
 
       setClassList(formattedClasses);
       setFilteredList(formattedClasses);
-      } catch (error) {
+    } catch (error) {
       message.error('获取班级列表失败');
       console.error('获取班级列表失败:', error);
     } finally {
@@ -85,12 +85,13 @@ const ClassList = () => {
   // 搜索处理
   const handleSearch = (value: string) => {
     if (!value) {
-    setFilteredList(classList);
+      setFilteredList(classList);
     } else {
-      const filtered = classList.filter(item =>
-        item.name.toLowerCase().includes(value.toLowerCase()) ||
-        item.teacher.toLowerCase().includes(value.toLowerCase()) ||
-        item.categoryName.toLowerCase().includes(value.toLowerCase())
+      const filtered = classList.filter(
+        item =>
+          item.name.toLowerCase().includes(value.toLowerCase()) ||
+          item.teacher.toLowerCase().includes(value.toLowerCase()) ||
+          item.categoryName.toLowerCase().includes(value.toLowerCase())
       );
       setFilteredList(filtered);
     }
@@ -113,19 +114,19 @@ const ClassList = () => {
       const values = await form.validateFields();
 
       const classData = {
-        className: values.name,
         categoryId: values.categoryId,
-        teacher: values.teacher,
-        startDate: values.startDate,
-        endDate: values.endDate,
+        className: values.name,
         description: values.description,
-        status: ClassStatus.NOT_STARTED
+        endDate: values.endDate,
+        startDate: values.startDate,
+        status: ClassStatus.NOT_STARTED,
+        teacher: values.teacher
       };
 
       await classService.createClass(classData);
       message.success('班级创建成功');
       setIsModalVisible(false);
-    form.resetFields();
+      form.resetFields();
       fetchClasses(); // 重新获取列表
     } catch (error) {
       message.error('创建班级失败');
@@ -173,58 +174,56 @@ const ClassList = () => {
 
   const columns = [
     {
-      title: '班级ID',
       dataIndex: 'id',
       key: 'id',
+      title: '班级ID',
       width: 100
     },
     {
-      title: '班级名称',
       dataIndex: 'name',
       key: 'name',
+      title: '班级名称',
       width: 200
     },
     {
-      title: '分类',
       dataIndex: 'categoryName',
       key: 'categoryName',
+      title: '分类',
       width: 120
     },
     {
-      title: '授课老师',
       dataIndex: 'teacher',
       key: 'teacher',
+      title: '授课老师',
       width: 120
     },
     {
-      title: '学员数量',
       dataIndex: 'studentCount',
       key: 'studentCount',
+      title: '学员数量',
       width: 100
     },
     {
-      title: '开始日期',
       dataIndex: 'startDate',
       key: 'startDate',
+      title: '开始日期',
       width: 120
     },
     {
-      title: '结束日期',
       dataIndex: 'endDate',
       key: 'endDate',
+      title: '结束日期',
       width: 120
     },
     {
-      title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
-      render: (status: number) => getStatusTag(status)
+      render: (status: number) => getStatusTag(status),
+      title: '状态',
+      width: 100
     },
     {
-      title: '操作',
       key: 'action',
-      width: 200,
       render: (_: any, record: ClassItem) => (
         <Space>
           <Button
@@ -244,10 +243,10 @@ const ClassList = () => {
             编辑
           </Button>
           <Popconfirm
+            cancelText="取消"
+            okText="确定"
             title="确定要删除这个班级吗？"
             onConfirm={() => handleDelete(record.id)}
-            okText="确定"
-            cancelText="取消"
           >
             <Button
               danger
@@ -259,7 +258,9 @@ const ClassList = () => {
             </Button>
           </Popconfirm>
         </Space>
-      )
+      ),
+      title: '操作',
+      width: 200
     }
   ];
 
@@ -272,100 +273,103 @@ const ClassList = () => {
           </div>
           <div className="flex items-center space-x-4">
             <Input.Search
+              allowClear
               placeholder="搜索班级名称、老师或分类"
-            allowClear
-            style={{ width: 300 }}
+              style={{ width: 300 }}
+              onChange={e => !e.target.value && handleSearch('')}
               onSearch={handleSearch}
-              onChange={(e) => !e.target.value && handleSearch('')}
-          />
-          <Button
-            type="primary"
+            />
+            <Button
               icon={<PlusOutlined />}
+              type="primary"
               onClick={showModal}
-          >
-            新增班级
-          </Button>
+            >
+              新增班级
+            </Button>
           </div>
         </div>
 
         <Table
           columns={columns}
           dataSource={filteredList}
-          rowKey="id"
           loading={loading}
+          rowKey="id"
           pagination={{
             pageSize: 10,
-            showSizeChanger: true,
             showQuickJumper: true,
+            showSizeChanger: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`
           }}
         />
       </Card>
 
       {/* 新增班级弹窗 */}
-        <Modal
-          title="新增班级"
+      <Modal
         open={isModalVisible}
-        onOk={handleOk}
-          onCancel={handleCancel}
+        title="新增班级"
         width={600}
-        >
-          <Form
-            form={form}
+        onCancel={handleCancel}
+        onOk={handleOk}
+      >
+        <Form
+          form={form}
           layout="vertical"
+        >
+          <Form.Item
+            label="班级名称"
+            name="name"
+            rules={[{ message: '请输入班级名称', required: true }]}
           >
-            <Form.Item
-              label="班级名称"
-              name="name"
-            rules={[{ required: true, message: '请输入班级名称' }]}
-            >
-              <Input placeholder="请输入班级名称" />
-            </Form.Item>
+            <Input placeholder="请输入班级名称" />
+          </Form.Item>
 
-            <Form.Item
+          <Form.Item
             label="分类"
-              name="categoryId"
-            rules={[{ required: true, message: '请选择分类' }]}
-            >
+            name="categoryId"
+            rules={[{ message: '请选择分类', required: true }]}
+          >
             <Select placeholder="请选择分类">
               <Select.Option value={ClassCategory.TECHNICAL}>技术培训</Select.Option>
               <Select.Option value={ClassCategory.MANAGEMENT}>管理课程</Select.Option>
               <Select.Option value={ClassCategory.TRAINING}>营销课程</Select.Option>
             </Select>
-            </Form.Item>
+          </Form.Item>
 
-            <Form.Item
+          <Form.Item
             label="授课老师"
-              name="teacher"
-            rules={[{ required: true, message: '请输入授课老师' }]}
-            >
+            name="teacher"
+            rules={[{ message: '请输入授课老师', required: true }]}
+          >
             <Input placeholder="请输入授课老师" />
-            </Form.Item>
+          </Form.Item>
 
-            <Form.Item
-              label="开始日期"
-              name="startDate"
-            rules={[{ required: true, message: '请选择开始日期' }]}
-            >
+          <Form.Item
+            label="开始日期"
+            name="startDate"
+            rules={[{ message: '请选择开始日期', required: true }]}
+          >
             <Input type="date" />
-            </Form.Item>
+          </Form.Item>
 
-            <Form.Item
-              label="结束日期"
-              name="endDate"
-            rules={[{ required: true, message: '请选择结束日期' }]}
-            >
+          <Form.Item
+            label="结束日期"
+            name="endDate"
+            rules={[{ message: '请选择结束日期', required: true }]}
+          >
             <Input type="date" />
-            </Form.Item>
+          </Form.Item>
 
-            <Form.Item
-              label="班级描述"
-              name="description"
-            >
-            <Input.TextArea placeholder="请输入班级描述" rows={4} />
-            </Form.Item>
-          </Form>
-        </Modal>
+          <Form.Item
+            label="班级描述"
+            name="description"
+          >
+            <Input.TextArea
+              placeholder="请输入班级描述"
+              rows={4}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

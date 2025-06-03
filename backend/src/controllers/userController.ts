@@ -469,11 +469,11 @@ class UserController {
   async updateProfile(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { userName, email, phone, avatar, department } = req.body;
+      const { avatar, department, email, phone, userName } = req.body;
 
       // 检查用户是否存在
       const existingUser = await prisma.user.findUnique({
-        where: { id: parseInt(id) }
+        where: { id: Number.parseInt(id) }
       });
 
       if (!existingUser) {
@@ -485,7 +485,7 @@ class UserController {
         const emailExists = await prisma.user.findFirst({
           where: {
             email,
-            id: { not: parseInt(id) }
+            id: { not: Number.parseInt(id) }
           }
         });
 
@@ -498,8 +498,8 @@ class UserController {
       if (phone && phone !== existingUser.phone) {
         const phoneExists = await prisma.user.findFirst({
           where: {
-            phone,
-            id: { not: parseInt(id) }
+            id: { not: Number.parseInt(id) },
+            phone
           }
         });
 
@@ -510,13 +510,13 @@ class UserController {
 
       // 检查用户权限
       const updateData: any = {};
-      
+
       // 判断用户权限 - 用户可以修改自己的资料，管理员可以修改其他用户的资料
-      const canEditProfile = req.user && (
-        req.user.roles.includes('super_admin') || 
-        req.user.roles.includes('admin') ||
-        req.user.id === parseInt(id) // 用户可以修改自己的资料
-      );
+      const canEditProfile =
+        req.user &&
+        (req.user.roles.includes('super_admin') ||
+          req.user.roles.includes('admin') ||
+          req.user.id === Number.parseInt(id)); // 用户可以修改自己的资料
 
       if (!canEditProfile) {
         return res.status(403).json(createErrorResponse(403, '没有权限修改此用户信息', null, req.path));
@@ -531,7 +531,7 @@ class UserController {
       if (email) updateData.email = email;
       if (phone) updateData.phone = phone;
       if (avatar !== undefined) updateData.avatar = avatar; // 允许设置为空字符串
-      
+
       // 部门信息只有超级管理员可以修改
       if (department && req.user.roles.includes('super_admin')) {
         // 这里可以扩展为更新部门关联
@@ -542,7 +542,6 @@ class UserController {
 
       // 更新用户信息
       const updatedUser = await prisma.user.update({
-        where: { id: parseInt(id) },
         data: updateData,
         include: {
           department: true,
@@ -551,16 +550,17 @@ class UserController {
               role: true
             }
           }
-        }
+        },
+        where: { id: Number.parseInt(id) }
       });
 
       // 返回更新后的用户信息（排除敏感信息）
       const { password: _, ...userWithoutPassword } = updatedUser;
 
       logger.info(`用户资料更新成功: ${updatedUser.userName}`, {
-        userId: updatedUser.id,
         updatedBy: req.user?.id,
-        updatedFields: Object.keys(updateData)
+        updatedFields: Object.keys(updateData),
+        userId: updatedUser.id
       });
 
       res.json(createSuccessResponse(userWithoutPassword, '个人资料更新成功', req.path));
@@ -574,7 +574,7 @@ class UserController {
   async changePassword(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { oldPassword, newPassword } = req.body;
+      const { newPassword, oldPassword } = req.body;
 
       if (!oldPassword || !newPassword) {
         return res.status(400).json(createErrorResponse(400, '旧密码和新密码不能为空', null, req.path));
@@ -590,7 +590,7 @@ class UserController {
 
       // 检查用户是否存在
       const user = await prisma.user.findUnique({
-        where: { id: parseInt(id) }
+        where: { id: Number.parseInt(id) }
       });
 
       if (!user) {
@@ -598,18 +598,18 @@ class UserController {
       }
 
       // 检查权限 - 用户只能修改自己的密码，或者管理员可以修改其他用户的密码
-      const canChangePassword = req.user && (
-        req.user.id === parseInt(id) || 
-        req.user.roles.includes('super_admin') || 
-        req.user.roles.includes('admin')
-      );
+      const canChangePassword =
+        req.user &&
+        (req.user.id === Number.parseInt(id) ||
+          req.user.roles.includes('super_admin') ||
+          req.user.roles.includes('admin'));
 
       if (!canChangePassword) {
         return res.status(403).json(createErrorResponse(403, '没有权限修改此用户密码', null, req.path));
       }
 
       // 如果是用户修改自己的密码，需要验证旧密码
-      if (req.user.id === parseInt(id)) {
+      if (req.user.id === Number.parseInt(id)) {
         const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
         if (!isOldPasswordValid) {
           return res.status(400).json(createErrorResponse(400, '旧密码错误', null, req.path));
@@ -621,16 +621,16 @@ class UserController {
 
       // 更新密码
       await prisma.user.update({
-        where: { id: parseInt(id) },
         data: {
           password: hashedNewPassword,
           updatedAt: new Date()
-        }
+        },
+        where: { id: Number.parseInt(id) }
       });
 
       logger.info(`用户密码修改成功: ${user.userName}`, {
-        userId: user.id,
-        updatedBy: req.user?.id
+        updatedBy: req.user?.id,
+        userId: user.id
       });
 
       res.json(createSuccessResponse(null, '密码修改成功', req.path));

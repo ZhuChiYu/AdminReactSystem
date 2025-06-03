@@ -106,9 +106,9 @@ async function main() {
       create: {
         code: 'system:user:delete',
         name: '删除用户',
-        type: 'button',
         sort: 4,
-        status: 1
+        status: 1,
+        type: 'button'
       },
       update: {},
       where: { code: 'system:user:delete' }
@@ -117,9 +117,9 @@ async function main() {
       create: {
         code: 'system:user:import',
         name: '导入用户',
-        type: 'button',
         sort: 5,
-        status: 1
+        status: 1,
+        type: 'button'
       },
       update: {},
       where: { code: 'system:user:import' }
@@ -343,99 +343,106 @@ async function main() {
   const users = [
     // 1个超级管理员
     {
-      userName: 'admin',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '超级管理员',
-      email: 'admin@soybean.com',
-      phone: '13800000001',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_1.webp',
-      gender: 1, // 1-男
-      status: 1, // 1-启用
-      departmentId: departments[0].id, // 总公司
-      position: '超级管理员',
+      // 1-启用
+      departmentId: departments[0].id,
+      email: 'admin@soybean.com',
+      gender: 1,
+      nickName: '超级管理员',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000001', // 总公司
+      position: '超级管理员', // 1-男
+      status: 1,
+      userName: 'admin'
     },
     // 2个管理员
     {
-      userName: 'manager1',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '技术部经理',
-      email: 'manager1@soybean.com',
-      phone: '13800000002',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_2.webp',
-      gender: 1, // 1-男
-      status: 1, // 1-启用
-      departmentId: departments[1].id, // 技术部
-      position: '部门经理',
+      // 1-启用
+      departmentId: departments[1].id,
+      email: 'manager1@soybean.com',
+      gender: 1,
+      nickName: '技术部经理',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000002', // 技术部
+      position: '部门经理', // 1-男
+      status: 1,
+      userName: 'manager1'
     },
     {
-      userName: 'manager2',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '市场部经理',
-      email: 'manager2@soybean.com',
-      phone: '13800000003',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_3.webp',
-      gender: 2, // 2-女
-      status: 1, // 1-启用
-      departmentId: departments[2].id, // 市场部
-      position: '部门经理',
+      // 1-启用
+      departmentId: departments[2].id,
+      email: 'manager2@soybean.com',
+      gender: 2,
+      nickName: '市场部经理',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000003', // 市场部
+      position: '部门经理', // 2-女
+      status: 1,
+      userName: 'manager2'
     },
     // 4名员工
     {
-      userName: 'employee1',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '前端开发工程师',
-      email: 'employee1@soybean.com',
-      phone: '13800000004',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_4.webp',
-      gender: 1, // 1-男
-      status: 1, // 1-启用
-      departmentId: departments[1].id, // 技术部
-      position: '前端工程师',
+      // 1-启用
+      departmentId: departments[1].id,
+      email: 'employee1@soybean.com',
+      gender: 1,
+      nickName: '前端开发工程师',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000004', // 技术部
+      position: '前端工程师', // 1-男
+      status: 1,
+      userName: 'employee1'
     },
     {
-      userName: 'employee2',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '后端开发工程师',
-      email: 'employee2@soybean.com',
-      phone: '13800000005',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_5.webp',
-      gender: 1, // 1-男
-      status: 1, // 1-启用
-      departmentId: departments[1].id, // 技术部
-      position: '后端工程师',
+      // 1-启用
+      departmentId: departments[1].id,
+      email: 'employee2@soybean.com',
+      gender: 1,
+      nickName: '后端开发工程师',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000005', // 技术部
+      position: '后端工程师', // 1-男
+      status: 1,
+      userName: 'employee2'
     },
     {
-      userName: 'employee3',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '市场专员',
-      email: 'employee3@soybean.com',
-      phone: '13800000006',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_6.webp',
-      gender: 2, // 2-女
-      status: 1, // 1-启用
-      departmentId: departments[2].id, // 市场部
-      position: '市场专员',
+      // 1-启用
+      departmentId: departments[2].id,
+      email: 'employee3@soybean.com',
+      gender: 2,
+      nickName: '市场专员',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000006', // 市场部
+      position: '市场专员', // 2-女
+      status: 1,
+      userName: 'employee3'
     },
     {
-      userName: 'employee4',
-      password: await bcrypt.hash('123456', 10),
-      nickName: '销售代表',
-      email: 'employee4@soybean.com',
-      phone: '13800000007',
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_7.webp',
-      gender: 2, // 2-女
-      status: 1, // 1-启用
-      departmentId: departments[3].id, // 销售部
-      position: '销售代表',
-    },
+      // 1-启用
+      departmentId: departments[3].id,
+      email: 'employee4@soybean.com',
+      gender: 2,
+      nickName: '销售代表',
+      password: await bcrypt.hash('123456', 10),
+      phone: '13800000007', // 销售部
+      position: '销售代表', // 2-女
+      status: 1,
+      userName: 'employee4'
+    }
   ];
 
   const createdUsers = [];
   for (const userData of users) {
     const user = await prisma.user.upsert({
-      where: { userName: userData.userName },
-      update: userData,
       create: userData,
+      update: userData,
+      where: { userName: userData.userName }
     });
     createdUsers.push(user);
   }
@@ -552,42 +559,43 @@ async function main() {
   const superAdminRole = roles[0]; // super_admin
   for (const permission of permissions) {
     await prisma.rolePermission.upsert({
-      where: {
-        roleId_permissionId: {
-          roleId: superAdminRole.id,
-          permissionId: permission.id,
-        }
-      },
       create: {
-        roleId: superAdminRole.id,
         permissionId: permission.id,
+        roleId: superAdminRole.id
       },
       update: {},
+      where: {
+        roleId_permissionId: {
+          permissionId: permission.id,
+          roleId: superAdminRole.id
+        }
+      }
     });
   }
 
   // 为管理员角色分配基本权限
   const adminRole = roles[1]; // admin
-  const adminPermissions = permissions.filter(p =>
-    p.code.includes('customer:') ||
-    p.code.includes('course:') ||
-    p.code.includes('meeting:') ||
-    p.code.includes('system:user:')
+  const adminPermissions = permissions.filter(
+    p =>
+      p.code.includes('customer:') ||
+      p.code.includes('course:') ||
+      p.code.includes('meeting:') ||
+      p.code.includes('system:user:')
   );
 
   for (const permission of adminPermissions) {
     await prisma.rolePermission.upsert({
-      where: {
-        roleId_permissionId: {
-          roleId: adminRole.id,
-          permissionId: permission.id,
-        }
-      },
       create: {
-        roleId: adminRole.id,
         permissionId: permission.id,
+        roleId: adminRole.id
       },
       update: {},
+      where: {
+        roleId_permissionId: {
+          permissionId: permission.id,
+          roleId: adminRole.id
+        }
+      }
     });
   }
 

@@ -4,9 +4,7 @@ import type { PageResponse, TaskApi } from './types';
 /** 项目管理相关API服务 */
 export class ProjectService {
   /** 获取任务列表 */
-  async getTaskList(
-    params?: TaskApi.TaskQueryParams
-  ): Promise<PageResponse<TaskApi.TaskListItem>['data']> {
+  async getTaskList(params?: TaskApi.TaskQueryParams): Promise<PageResponse<TaskApi.TaskListItem>['data']> {
     try {
       const response = await apiClient.get('/tasks', { params });
       return response;
@@ -14,10 +12,10 @@ export class ProjectService {
       console.error('获取任务列表失败:', error);
       return {
         current: params?.current || 1,
+        pages: 0,
         records: [],
         size: params?.size || 10,
-        total: 0,
-        pages: 0
+        total: 0
       };
     }
   }
@@ -95,20 +93,20 @@ export class ProjectService {
     } catch (error) {
       console.error('获取任务统计失败:', error);
       return {
-        total: 0,
-        pending: 0,
-        inProgress: 0,
         completed: 0,
-        overdue: 0
+        inProgress: 0,
+        overdue: 0,
+        pending: 0,
+        total: 0
       };
     }
   }
 
   /** 获取我的任务 */
   async getMyTasks(params?: {
-    status?: number;
     current?: number;
     size?: number;
+    status?: number;
   }): Promise<PageResponse<TaskApi.TaskListItem>['data']> {
     try {
       const response = await apiClient.get('/tasks/my', { params });
@@ -117,10 +115,10 @@ export class ProjectService {
       console.error('获取我的任务失败:', error);
       return {
         current: params?.current || 1,
+        pages: 0,
         records: [],
         size: params?.size || 10,
-        total: 0,
-        pages: 0
+        total: 0
       };
     }
   }

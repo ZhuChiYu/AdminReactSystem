@@ -1,5 +1,5 @@
 import { BellOutlined } from '@ant-design/icons';
-import { Badge, Button, Dropdown, Empty, List, Spin, Typography, App } from 'antd';
+import { App, Badge, Button, Dropdown, Empty, List, Spin, Typography } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,7 +13,7 @@ interface Notification {
   read: boolean;
   time: string;
   title: string;
-  type: 'error' | 'info' | 'success' | 'warning' | 'meeting';
+  type: 'error' | 'info' | 'meeting' | 'success' | 'warning';
 }
 
 const NotificationDropdown: React.FC = () => {
@@ -32,6 +32,8 @@ const NotificationDropdown: React.FC = () => {
         size: 10
       });
 
+      console.log('✅ 通知API响应:', response);
+
       // 检查响应数据格式
       if (response && response.records && Array.isArray(response.records)) {
         // 转换API数据格式
@@ -41,18 +43,19 @@ const NotificationDropdown: React.FC = () => {
           read: notification.readStatus === 1,
           time: new Date(notification.createTime).toLocaleString(),
           title: notification.title,
-          type: notification.type as 'error' | 'info' | 'success' | 'warning' | 'meeting'
+          type: notification.type as 'error' | 'info' | 'meeting' | 'success' | 'warning'
         }));
 
+        console.log('✅ 格式化后的通知:', formattedNotifications);
         setNotifications(formattedNotifications);
         setUnreadCount(formattedNotifications.filter(n => !n.read).length);
       } else {
-        console.warn('通知API返回数据格式异常:', response);
+        console.warn('❌ 通知API返回数据格式异常:', response);
         setNotifications([]);
         setUnreadCount(0);
       }
     } catch (error) {
-      console.error('获取通知失败:', error);
+      console.error('❌ 获取通知失败:', error);
       setNotifications([]);
       setUnreadCount(0);
     } finally {
@@ -141,35 +144,35 @@ const NotificationDropdown: React.FC = () => {
           renderItem={item => (
             <List.Item
               className={`cursor-pointer hover:bg-gray-50 transition-colors ${!item.read ? 'bg-blue-50' : ''}`}
-              style={{ 
-                padding: '12px 16px',
-                borderBottom: '1px solid #f0f0f0'
+              style={{
+                borderBottom: '1px solid #f0f0f0',
+                padding: '12px 16px'
               }}
               onClick={() => viewNotification(item)}
             >
               <div className="w-full">
                 <div className="mb-1 flex items-center justify-between">
                   <Text
+                    ellipsis={{ tooltip: item.title }}
                     strong={!item.read}
-                    style={{ 
+                    style={{
                       fontSize: '14px',
                       maxWidth: '220px'
                     }}
-                    ellipsis={{ tooltip: item.title }}
                   >
                     {item.title}
                   </Text>
-                  {!item.read && <div className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />}
+                  {!item.read && <div className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />}
                 </div>
                 <Text
-                  style={{ 
-                    fontSize: '12px', 
-                    lineHeight: '16px',
+                  ellipsis={{ tooltip: item.content }}
+                  type="secondary"
+                  style={{
                     display: 'block',
+                    fontSize: '12px',
+                    lineHeight: '16px',
                     maxWidth: '260px'
                   }}
-                  type="secondary"
-                  ellipsis={{ tooltip: item.content }}
                 >
                   {item.content}
                 </Text>
@@ -190,8 +193,19 @@ const NotificationDropdown: React.FC = () => {
   };
 
   const notificationItems = (
-    <div style={{ width: 320, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)', border: '1px solid #f0f0f0' }}>
-      <div className="flex items-center justify-between border-b p-3" style={{ backgroundColor: '#fafafa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
+    <div
+      style={{
+        backgroundColor: 'white',
+        border: '1px solid #f0f0f0',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        width: 320
+      }}
+    >
+      <div
+        className="flex items-center justify-between border-b p-3"
+        style={{ backgroundColor: '#fafafa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}
+      >
         <Text strong>通知</Text>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (

@@ -9,10 +9,10 @@ export function fetchGetRoleList(params?: Api.SystemManage.RoleSearchParams) {
     console.error('获取角色列表失败:', error);
     return {
       current: params?.current || 1,
+      pages: 0,
       records: [],
       size: params?.size || 10,
-      total: 0,
-      pages: 0
+      total: 0
     };
   }
 }
@@ -78,10 +78,10 @@ export function fetchGetUserList(params?: Api.SystemManage.UserSearchParams) {
     console.error('获取用户列表失败:', error);
     return {
       current: params?.current || 1,
+      pages: 0,
       records: [],
       size: params?.size || 10,
-      total: 0,
-      pages: 0
+      total: 0
     };
   }
 }
@@ -171,11 +171,11 @@ export function fetchGetSystemStatistics() {
   } catch (error) {
     console.error('获取系统统计失败:', error);
     return {
-      totalUsers: 0,
       activeUsers: 0,
-      totalRoles: 0,
+      todayLoginUsers: 0,
       totalDepartments: 0,
-      todayLoginUsers: 0
+      totalRoles: 0,
+      totalUsers: 0
     };
   }
 }

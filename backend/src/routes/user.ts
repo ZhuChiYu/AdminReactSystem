@@ -4,7 +4,7 @@ import { Router } from 'express';
 import multer from 'multer';
 
 import { userController } from '@/controllers/userController';
-import { permissionMiddleware, authMiddleware } from '@/middleware/auth';
+import { authMiddleware, permissionMiddleware } from '@/middleware/auth';
 import { asyncErrorHandler } from '@/middleware/errorHandler';
 
 const router = Router();

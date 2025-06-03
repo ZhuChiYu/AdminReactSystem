@@ -40,14 +40,16 @@ const NotificationsPage: React.FC = () => {
       });
 
       // 转换API数据格式
-      const formattedNotifications: Notification[] = response.records.map((notification: NotificationApi.NotificationListItem) => ({
-        id: notification.id.toString(),
-        title: notification.title,
-        content: notification.content,
-        type: notification.type as 'info' | 'meeting' | 'success' | 'warning',
-        datetime: notification.createTime,
-        read: notification.readStatus === 1
-      }));
+      const formattedNotifications: Notification[] = response.records.map(
+        (notification: NotificationApi.NotificationListItem) => ({
+          content: notification.content,
+          datetime: notification.createTime,
+          id: notification.id.toString(),
+          read: notification.readStatus === 1,
+          title: notification.title,
+          type: notification.type as 'info' | 'meeting' | 'success' | 'warning'
+        })
+      );
 
       setNotifications(formattedNotifications);
       filterNotifications(formattedNotifications, activeTab);
@@ -77,8 +79,8 @@ const NotificationsPage: React.FC = () => {
   // 标记通知为已读
   const markAsRead = async (id: string) => {
     try {
-      await notificationService.markAsRead(parseInt(id));
-      
+      await notificationService.markAsRead(Number.parseInt(id));
+
       const updatedNotifications = notifications.map(notification =>
         notification.id === id ? { ...notification, read: true } : notification
       );
@@ -95,7 +97,7 @@ const NotificationsPage: React.FC = () => {
   const markAllAsRead = async () => {
     try {
       await notificationService.markAllAsRead();
-      
+
       const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
       setNotifications(updatedNotifications);
       filterNotifications(updatedNotifications, activeTab);

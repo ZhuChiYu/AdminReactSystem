@@ -1,5 +1,5 @@
 import { UserAddOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message, App } from 'antd';
+import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { customerService } from '@/service/api';
@@ -35,8 +35,8 @@ const followUpStatusNames = {
   [FollowUpStatus.ARRIVED]: '已实到',
   [FollowUpStatus.NOT_ARRIVED]: '未实到',
   [FollowUpStatus.NEW_DEVELOP]: '新开发',
-  'already_signed': '已报名',
-  'already_paid': '已实到'
+  already_paid: '已实到',
+  already_signed: '已报名'
 };
 
 /** 跟进状态颜色 */
@@ -51,8 +51,8 @@ const followUpStatusColors = {
   [FollowUpStatus.ARRIVED]: 'green',
   [FollowUpStatus.NOT_ARRIVED]: 'orange',
   [FollowUpStatus.NEW_DEVELOP]: 'geekblue',
-  'already_signed': 'success',
-  'already_paid': 'green'
+  already_paid: 'green',
+  already_signed: 'success'
 };
 
 /** 客户信息管理组件 */
@@ -63,7 +63,7 @@ const CustomerManagement = () => {
   const [currentCustomer, setCurrentCustomer] = useState<CustomerApi.CustomerListItem | null>(null);
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
-  
+
   // 数据状态
   const [customers, setCustomers] = useState<CustomerApi.CustomerListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -87,8 +87,8 @@ const CustomerManagement = () => {
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
     company: '',
-    followStatus: '',
     customerName: '',
+    followStatus: '',
     phone: ''
   });
 
@@ -97,11 +97,11 @@ const CustomerManagement = () => {
     setLoading(true);
     try {
       const params: CustomerApi.CustomerQueryParams = {
-        current: pagination.current,
-        size: pagination.pageSize,
-        customerName: searchParams.customerName || undefined,
         company: searchParams.company || undefined,
-        followStatus: searchParams.followStatus || undefined
+        current: pagination.current,
+        customerName: searchParams.customerName || undefined,
+        followStatus: searchParams.followStatus || undefined,
+        size: pagination.pageSize
       };
 
       const response = await customerService.getCustomerList(params);
@@ -202,8 +202,8 @@ const CustomerManagement = () => {
   const resetSearch = () => {
     setSearchParams({
       company: '',
-      followStatus: '',
       customerName: '',
+      followStatus: '',
       phone: ''
     });
     setPagination({ ...pagination, current: 1 });
@@ -258,7 +258,8 @@ const CustomerManagement = () => {
           followStatus
         };
 
-        customerService.updateCustomer(currentCustomer.id, updateData)
+        customerService
+          .updateCustomer(currentCustomer.id, updateData)
           .then(() => {
             message.success('更新成功');
             setIsModalVisible(false);
@@ -277,19 +278,20 @@ const CustomerManagement = () => {
     addForm.validateFields().then(values => {
       // 添加新客户
       const newCustomer: CustomerApi.CreateCustomerRequest = {
-        customerName: values.customerName,
         company: values.company,
-        position: values.position || '',
-        phone: values.phone || '',
-        mobile: values.mobile || '',
+        customerName: values.customerName,
         email: values.email || '',
-        industry: values.industry || '',
-        source: values.source || '手动添加',
         followStatus: values.followStatus,
-        remark: values.remark || ''
+        industry: values.industry || '',
+        mobile: values.mobile || '',
+        phone: values.phone || '',
+        position: values.position || '',
+        remark: values.remark || '',
+        source: values.source || '手动添加'
       };
 
-      customerService.createCustomer(newCustomer)
+      customerService
+        .createCustomer(newCustomer)
         .then(() => {
           message.success('添加成功');
           setIsAddModalVisible(false);
@@ -313,50 +315,47 @@ const CustomerManagement = () => {
   // 表格列配置
   const columns = [
     {
-      title: '客户姓名',
       dataIndex: 'customerName',
       key: 'customerName',
+      title: '客户姓名',
       ...getCenterColumnConfig(),
-      render: (text: string, record: CustomerApi.CustomerListItem) => 
-        canViewName(record) ? text : '***',
-      width: 120,
+      render: (text: string, record: CustomerApi.CustomerListItem) => (canViewName(record) ? text : '***'),
+      width: 120
     },
     {
-      title: '单位名称',
       dataIndex: 'company',
       key: 'company',
+      title: '单位名称',
       ...getCenterColumnConfig(),
-      width: 200,
+      width: 200
     },
     {
-      title: '职位',
       dataIndex: 'position',
       key: 'position',
+      title: '职位',
       ...getCenterColumnConfig(),
-      width: 120,
+      width: 120
     },
     {
-      title: '电话',
       dataIndex: 'phone',
       key: 'phone',
+      title: '电话',
       ...getCenterColumnConfig(),
-      render: (text: string, record: CustomerApi.CustomerListItem) => 
-        canViewPhone(record) ? text || '-' : '***',
-      width: 120,
+      render: (text: string, record: CustomerApi.CustomerListItem) => (canViewPhone(record) ? text || '-' : '***'),
+      width: 120
     },
     {
-      title: '手机',
       dataIndex: 'mobile',
       key: 'mobile',
+      title: '手机',
       ...getCenterColumnConfig(),
-      render: (text: string, record: CustomerApi.CustomerListItem) => 
-        canViewMobile(record) ? text || '-' : '***',
-      width: 120,
+      render: (text: string, record: CustomerApi.CustomerListItem) => (canViewMobile(record) ? text || '-' : '***'),
+      width: 120
     },
     {
-      title: '跟进状态',
       dataIndex: 'followStatus',
       key: 'followStatus',
+      title: '跟进状态',
       ...getCenterColumnConfig(),
       render: (status: string) => {
         const statusName = followUpStatusNames[status] || status;
@@ -365,57 +364,53 @@ const CustomerManagement = () => {
           [FollowUpStatus.REGISTERED]: 'green',
           [FollowUpStatus.EFFECTIVE_VISIT]: 'blue',
           [FollowUpStatus.WECHAT_ADDED]: 'cyan',
-          [FollowUpStatus.NEW_DEVELOP]: 'orange',
+          [FollowUpStatus.NEW_DEVELOP]: 'orange'
         };
-        return (
-          <Tag color={colorMap[status] || 'default'}>
-            {statusName}
-          </Tag>
-        );
+        return <Tag color={colorMap[status] || 'default'}>{statusName}</Tag>;
       },
-      width: 120,
+      width: 120
     },
     {
-      title: '跟进次数',
       dataIndex: 'followCount',
       key: 'followCount',
+      title: '跟进次数',
       ...getCenterColumnConfig(),
       render: (count: number) => count || 0,
-      width: 100,
+      width: 100
     },
     {
-      title: '负责人',
       dataIndex: 'assignedTo',
       key: 'assignedTo',
+      title: '负责人',
       ...getCenterColumnConfig(),
       render: (assignedTo: any) => assignedTo?.name || '-',
-      width: 120,
+      width: 120
     },
     {
-      title: '操作',
       key: 'action',
+      title: '操作',
       ...getActionColumnConfig(120),
       render: (_: any, record: CustomerApi.CustomerListItem) => (
         <Space>
           <Button
+            disabled={!canEditCustomer(record)}
             size="small"
             type="link"
             onClick={() => openFollowStatusModal(record)}
-            disabled={!canEditCustomer(record)}
           >
             修改状态
           </Button>
         </Space>
-      ),
+      )
     }
   ];
 
   // 如果是超级管理员或管理员，显示"分配者"列
   if (isUserAdmin || isUserSuperAdmin) {
     columns.splice(7, 0, {
-      title: '分配者',
       dataIndex: 'createdBy',
       key: 'createdBy',
+      title: '分配者',
       ...getCenterColumnConfig(),
       render: (createdBy: any) => createdBy?.userName || '-',
       width: 120
@@ -494,9 +489,9 @@ const CustomerManagement = () => {
           pagination={{
             ...getFullTableConfig(10).pagination,
             current: pagination.current,
+            onChange: handleTableChange,
             pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: handleTableChange
+            total: pagination.total
           }}
         />
       </Card>

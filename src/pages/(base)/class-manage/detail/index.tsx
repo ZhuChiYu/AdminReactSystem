@@ -107,18 +107,18 @@ const ClassDetail = () => {
       // 获取班级基本信息
       const classResponse = await classService.getClassDetail(Number.parseInt(classId, 10));
       setClassInfo({
-        category: classResponse.category?.name || '未分类',
-        className: classResponse.className,
-        currentStudents: classResponse.currentStudents || 0,
+        categoryName: classResponse.categoryName || '未分类',
+        courseName: classResponse.courseName || '',
+        coursePrice: classResponse.coursePrice || 0,
+        createdAt: classResponse.createdAt || '',
         description: classResponse.description || '',
         endDate: classResponse.endDate || '',
         id: classResponse.id,
-        location: classResponse.location || '',
-        maxStudents: classResponse.maxStudents || 0,
-        scheduleInfo: classResponse.scheduleInfo || '',
+        name: classResponse.name || '',
         startDate: classResponse.startDate || '',
-        status: classResponse.status,
-        teacher: classResponse.teacher || '未分配'
+        status: classResponse.status || 0,
+        studentCount: classResponse.studentCount || 0,
+        trainingFee: classResponse.trainingFee || '0.00'
       });
 
       // 获取学生列表
@@ -1028,9 +1028,13 @@ const ClassDetail = () => {
           <Descriptions.Item label="班级名称">{classInfo.name}</Descriptions.Item>
           <Descriptions.Item label="班级ID">{classInfo.id}</Descriptions.Item>
           <Descriptions.Item label="班级类型">{classInfo.categoryName}</Descriptions.Item>
+          <Descriptions.Item label="培训课程">{classInfo.courseName || '暂无'}</Descriptions.Item>
           <Descriptions.Item label="学员人数">{classInfo.studentCount}</Descriptions.Item>
           <Descriptions.Item label="状态">
             <Tag color={getStatusColor(classInfo.status)}>{getStatusText(classInfo.status)}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="培训费">
+            {classInfo.trainingFee ? `¥${Number(classInfo.trainingFee).toFixed(2)}` : '¥0.00'}
           </Descriptions.Item>
           <Descriptions.Item label="开始日期">{classInfo.startDate}</Descriptions.Item>
           <Descriptions.Item label="结束日期">{classInfo.endDate}</Descriptions.Item>

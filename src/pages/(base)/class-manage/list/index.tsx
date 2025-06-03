@@ -4,8 +4,14 @@ import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { type ClassApi, classService } from '@/service/api';
 import { courseService } from '@/service/api';
+import {
+  type ClassCategory,
+  type ClassListItem,
+  type ClassQueryParams,
+  type CreateClassParams,
+  classService
+} from '@/service/api/class';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
@@ -17,21 +23,11 @@ enum ClassStatus {
   COMPLETED = 2
 }
 
-/** 班级类型枚举 */
-enum ClassCategory {
-  TECHNICAL = 1,
-  MANAGEMENT = 2,
-  TRAINING = 3,
-  OTHER = 4
-}
-
 /** 班级列表组件 */
 const ClassList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [classList, setClassList] = useState<ClassApi.ClassListItem[]>([]);
-  const [filteredList, setFilteredList] = useState<ClassApi.ClassListItem[]>([]);
-  const [courseList, setCourseList] = useState<any[]>([]);
+  const [filteredList, setFilteredList] = useState<ClassListItem[]>([]);
   const [pagination, setPagination] = useState({
     current: 1,
     size: 10,
@@ -39,7 +35,7 @@ const ClassList = () => {
   });
 
   // 班级分类数据状态
-  const [classCategories, setClassCategories] = useState<ClassApi.ClassCategory[]>([]);
+  const [classCategories, setClassCategories] = useState<ClassCategory[]>([]);
 
   // 筛选条件
   const [searchName, setSearchName] = useState('');
@@ -90,20 +86,8 @@ const ClassList = () => {
     fetchClassCategories(); // 同时获取班级分类数据
   }, []);
 
-  // 根据类别获取对应课程的价格
-  const getCoursePrice = (categoryName: string) => {
-    const course = courseList.find(c => c.category === categoryName);
-    return course ? course.price : 0;
-  };
-
-  // 计算培训费用（课程价格 × 学员人数）
-  const calculateTrainingFee = (categoryName: string, studentCount: number) => {
-    const price = getCoursePrice(categoryName);
-    return price * studentCount;
-  };
-
   // 加载班级列表数据
-  const loadClassList = async (params: ClassApi.ClassQueryParams = {}) => {
+  const loadClassList = async (params: ClassQueryParams = {}) => {
     try {
       setLoading(true);
       const response = await classService.getClassList({
@@ -112,12 +96,11 @@ const ClassList = () => {
         ...params
       });
 
-      setClassList(response.records);
-      setFilteredList(response.records);
+      setFilteredList(response.records || []);
       setPagination({
-        current: response.current,
-        size: response.size,
-        total: response.total
+        current: response.current || 1,
+        size: response.size || 10,
+        total: response.total || 0
       });
     } catch (error) {
       console.error('获取班级列表失败:', error);
@@ -134,7 +117,7 @@ const ClassList = () => {
 
   // 应用筛选
   const applyFilters = () => {
-    const params: ClassApi.ClassQueryParams = {
+    const params: ClassQueryParams = {
       current: 1,
       size: pagination.size
     };
@@ -166,20 +149,6 @@ const ClassList = () => {
     setSelectedStatus('');
     setDateRange(null);
     loadClassList({ current: 1, size: pagination.size });
-  };
-
-  // 处理分页变化
-  const handleTableChange = (page: number, pageSize: number) => {
-    const params: ClassApi.ClassQueryParams = {
-      current: page,
-      size: pageSize
-    };
-
-    if (searchName) params.name = searchName;
-    if (selectedCategory !== '') params.categoryId = Number(selectedCategory);
-    if (selectedStatus !== '') params.status = Number(selectedStatus);
-
-    loadClassList(params);
   };
 
   // 获取状态标签颜色
@@ -231,8 +200,7 @@ const ClassList = () => {
         description: classDetail.description,
         endDate: dayjs(classDetail.endDate),
         name: classDetail.name,
-        startDate: dayjs(classDetail.startDate),
-        teacher: classDetail.teacher
+        startDate: dayjs(classDetail.startDate)
       });
 
       // 设置编辑模式并保存当前编辑的班级ID
@@ -273,14 +241,13 @@ const ClassList = () => {
       const values = await form.validateFields();
       setSubmitting(true);
 
-      const classData: ClassApi.CreateClassParams = {
+      const classData: CreateClassParams = {
         categoryId: values.categoryId,
-        categoryName: classCategories.find(cat => cat.id === values.categoryId)?.name || '',
+        courseId: values.courseId,
         description: values.description,
         endDate: values.endDate.format('YYYY-MM-DD'),
         name: values.name,
-        startDate: values.startDate.format('YYYY-MM-DD'),
-        teacher: values.teacher || '专业讲师'
+        startDate: values.startDate.format('YYYY-MM-DD')
       };
 
       if (editingClassId !== null) {
@@ -348,10 +315,18 @@ const ClassList = () => {
       width: 150
     },
     {
+      dataIndex: 'courseName',
+      key: 'courseName',
+      ...getCenterColumnConfig(),
+      render: (courseName: string) => courseName || '暂无',
+      title: '培训课程',
+      width: 180
+    },
+    {
       key: 'trainingFee',
       ...getCenterColumnConfig(),
       render: (_: unknown, record: any) => {
-        const fee = calculateTrainingFee(record.categoryName, record.studentCount);
+        const fee = Number(record.trainingFee || 0);
         return `¥${fee.toFixed(2)}`;
       },
       title: '培训费',
@@ -520,13 +495,16 @@ const ClassList = () => {
               />
             </Form.Item>
             <Form.Item
-              label="学员人数"
-              name="studentCount"
-              rules={[{ message: '请输入学员人数', required: true }]}
+              label="培训课程"
+              name="courseId"
             >
-              <Input
-                placeholder="请输入学员人数"
-                type="number"
+              <Select
+                allowClear
+                placeholder="请选择培训课程（可选）"
+                options={availableCourses.map(course => ({
+                  label: `${course.courseName} (¥${course.price})`,
+                  value: course.id
+                }))}
               />
             </Form.Item>
             <Form.Item

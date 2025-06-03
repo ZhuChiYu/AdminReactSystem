@@ -73,11 +73,11 @@ const UserAvatar = memo(() => {
       placement="bottomRight"
       trigger={['click']}
     >
-      <div className="flex items-center px-12px cursor-pointer">
+      <div className="flex cursor-pointer items-center px-12px">
         <UserAvatarComponent
-          userId={userInfo.userId}
           avatar={userInfo.avatar}
           size={32}
+          userId={userInfo.userId}
         />
         <span className="ml-8px text-16px font-medium">{userInfo.userName}</span>
       </div>

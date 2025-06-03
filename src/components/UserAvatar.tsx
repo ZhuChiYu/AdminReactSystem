@@ -1,32 +1,33 @@
-import { Avatar, Upload, message } from 'antd';
 import { LoadingOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
-import React, { useState, useEffect } from 'react';
+import { Avatar, Upload, message } from 'antd';
 import type { UploadChangeParam } from 'antd/es/upload';
 import type { RcFile, UploadFile, UploadProps } from 'antd/es/upload/interface';
+import React, { useEffect, useState } from 'react';
 
 import { avatarService } from '@/service/api/avatar';
+
 import DefaultAvatar from './DefaultAvatar';
 
 interface UserAvatarProps {
-  userId?: number;
-  size?: number;
-  editable?: boolean;
-  className?: string;
-  gender?: 'male' | 'female' | '男' | '女';
   avatar?: string;
-  onClick?: () => void;
+  className?: string;
+  editable?: boolean;
+  gender?: 'female' | 'male' | '女' | '男';
   onAvatarChange?: (avatarUrl: string) => void;
+  onClick?: () => void;
+  size?: number;
+  userId?: number;
 }
 
 const UserAvatar: React.FC<UserAvatarProps> = ({
-  userId,
-  size = 64,
-  editable = false,
-  className,
-  gender,
   avatar,
+  className,
+  editable = false,
+  gender,
+  onAvatarChange,
   onClick,
-  onAvatarChange
+  size = 64,
+  userId
 }) => {
   const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -48,7 +49,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
 
   const loadUserAvatar = async () => {
     if (!userId) return;
-    
+
     try {
       const avatarInfo = await avatarService.getUserAvatar(userId);
       if (avatarInfo?.avatarUrl && avatarInfo.avatarUrl.trim()) {
@@ -100,7 +101,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     }
   };
 
-  const customRequest = async ({ file, onSuccess, onError }: any) => {
+  const customRequest = async ({ file, onError, onSuccess }: any) => {
     try {
       const response = await avatarService.uploadAvatar(file as File, userId);
       onSuccess(response);
@@ -117,30 +118,29 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   );
 
   // 转换性别格式
-  const normalizedGender = 
-    gender === '男' || gender === 'male' ? 'male' :
-    gender === '女' || gender === 'female' ? 'female' : undefined;
+  const normalizedGender =
+    gender === '男' || gender === 'male' ? 'male' : gender === '女' || gender === 'female' ? 'female' : undefined;
 
   if (editable) {
     return (
       <Upload
-        name="avatar"
-        listType="picture-circle"
-        className={className}
-        showUploadList={false}
         beforeUpload={beforeUpload}
-        onChange={handleChange}
+        className={className}
         customRequest={customRequest}
+        listType="picture-circle"
+        name="avatar"
+        showUploadList={false}
+        onChange={handleChange}
       >
         {avatarUrl && avatarUrl.trim() && !useDefault ? (
-          <Avatar 
-            size={size} 
-            src={avatarUrl}
+          <Avatar
             icon={<UserOutlined />}
+            size={size}
+            src={avatarUrl}
           />
         ) : useDefault ? (
-          <DefaultAvatar 
-            gender={normalizedGender} 
+          <DefaultAvatar
+            gender={normalizedGender}
             size={size}
           />
         ) : (
@@ -152,24 +152,24 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
 
   if (useDefault) {
     return (
-      <DefaultAvatar 
-        gender={normalizedGender} 
-        size={size}
+      <DefaultAvatar
         className={className}
+        gender={normalizedGender}
+        size={size}
       />
     );
   }
 
   return (
     <Avatar
+      className={className}
+      icon={<UserOutlined />}
       size={size}
       src={avatarUrl && avatarUrl.trim() ? avatarUrl : undefined}
-      icon={<UserOutlined />}
-      className={className}
-      onClick={onClick}
       style={{ cursor: onClick ? 'pointer' : 'default' }}
+      onClick={onClick}
     />
   );
 };
 
-export default UserAvatar; 
+export default UserAvatar;

@@ -4,14 +4,7 @@
   "description": "React SoybeanAdmin Backend API",
   "author": "React SoybeanAdmin Team",
   "license": "MIT",
-  "keywords": [
-    "nodejs",
-    "express",
-    "typescript",
-    "prisma",
-    "postgresql",
-    "api"
-  ],
+  "keywords": ["nodejs", "express", "typescript", "prisma", "postgresql", "api"],
   "main": "dist/server.js",
   "engines": {
     "node": ">=18.0.0",

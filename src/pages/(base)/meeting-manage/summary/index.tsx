@@ -3,10 +3,10 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
   EditOutlined,
+  EyeOutlined,
   FileTextOutlined,
   PlusOutlined,
-  UserOutlined,
-  EyeOutlined
+  UserOutlined
 } from '@ant-design/icons';
 import {
   Avatar,
@@ -20,18 +20,18 @@ import {
   Modal,
   Select,
   Space,
+  Table,
   Tag,
   Typography,
-  Table,
   message
 } from 'antd';
-import React, { useState, useEffect } from 'react';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import React, { useEffect, useState } from 'react';
 
 import { meetingService } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
-const { Paragraph, Title, Text } = Typography;
+const { Paragraph, Text, Title } = Typography;
 const { TextArea } = Input;
 
 interface MeetingSummary {
@@ -63,13 +63,13 @@ const MeetingSummaryPage = () => {
 
       // 转换API数据格式
       const formattedSummaries: MeetingSummary[] = response.records.map((summary: any) => ({
+        content: summary.content,
+        createTime: summary.createTime,
+        creator: summary.creator?.name || '',
         id: summary.id,
+        meetingDate: summary.meetingDate,
         meetingId: summary.meetingId,
         meetingTitle: summary.meetingTitle,
-        meetingDate: summary.meetingDate,
-        content: summary.content,
-        creator: summary.creator?.name || '',
-        createTime: summary.createTime,
         participants: summary.participants || [],
         status: summary.status === 1 ? 'published' : 'draft'
       }));
@@ -94,57 +94,55 @@ const MeetingSummaryPage = () => {
 
   const columns = [
     {
-      title: '会议标题',
       dataIndex: 'meetingTitle',
       key: 'meetingTitle',
+      title: '会议标题',
       ...getCenterColumnConfig(),
       render: (text: string) => <Text strong>{text}</Text>
     },
     {
-      title: '会议日期',
       dataIndex: 'meetingDate',
       key: 'meetingDate',
+      title: '会议日期',
       ...getCenterColumnConfig()
     },
     {
-      title: '创建人',
       dataIndex: 'creator',
       key: 'creator',
+      title: '创建人',
       ...getCenterColumnConfig()
     },
     {
-      title: '创建时间',
       dataIndex: 'createTime',
       key: 'createTime',
+      title: '创建时间',
       ...getCenterColumnConfig()
     },
     {
-      title: '参与人数',
       dataIndex: 'participants',
       key: 'participants',
+      title: '参与人数',
       ...getCenterColumnConfig(),
       render: (participants: string[]) => participants.length
     },
     {
-      title: '状态',
       dataIndex: 'status',
       key: 'status',
+      title: '状态',
       ...getCenterColumnConfig(),
       render: (status: string) => (
-        <Tag color={status === 'published' ? 'green' : 'orange'}>
-          {status === 'published' ? '已发布' : '草稿'}
-        </Tag>
+        <Tag color={status === 'published' ? 'green' : 'orange'}>{status === 'published' ? '已发布' : '草稿'}</Tag>
       )
     },
     {
-      title: '操作',
       key: 'action',
+      title: '操作',
       ...getActionColumnConfig(120),
       render: (_: any, record: MeetingSummary) => (
         <Space>
           <Button
-            type="link"
             icon={<EyeOutlined />}
+            type="link"
             onClick={() => showDetail(record)}
           >
             查看详情
@@ -162,15 +160,18 @@ const MeetingSummaryPage = () => {
             <FileTextOutlined className="mr-2" />
             会议总结
           </Title>
-          <Button type="primary" icon={<PlusOutlined />}>
+          <Button
+            icon={<PlusOutlined />}
+            type="primary"
+          >
             新建总结
           </Button>
         </div>
 
         <div className="mb-4">
           <Input.Search
-            placeholder="搜索会议标题或创建人"
             allowClear
+            placeholder="搜索会议标题或创建人"
             style={{ width: 300 }}
           />
         </div>
@@ -186,11 +187,11 @@ const MeetingSummaryPage = () => {
 
       {/* 详情弹窗 */}
       <Modal
-        title="会议总结详情"
-        open={detailVisible}
-        onCancel={() => setDetailVisible(false)}
         footer={null}
+        open={detailVisible}
+        title="会议总结详情"
         width={800}
+        onCancel={() => setDetailVisible(false)}
       >
         {selectedSummary && (
           <div>
@@ -206,21 +207,19 @@ const MeetingSummaryPage = () => {
                 <Text type="secondary">创建时间：{selectedSummary.createTime}</Text>
               </div>
               <div className="mb-4">
-                <Text type="secondary">
-                  参与人员：{selectedSummary.participants.join('、')}
-                </Text>
+                <Text type="secondary">参与人员：{selectedSummary.participants.join('、')}</Text>
               </div>
             </div>
-            
+
             <div>
               <Title level={5}>会议总结内容</Title>
               <div
                 style={{
+                  background: '#fafafa',
                   border: '1px solid #d9d9d9',
                   borderRadius: '6px',
-                  padding: '16px',
-                  background: '#fafafa',
                   minHeight: '200px',
+                  padding: '16px',
                   whiteSpace: 'pre-wrap'
                 }}
               >

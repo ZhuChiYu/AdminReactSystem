@@ -1,8 +1,9 @@
 import { Router } from 'express';
+
 import { prisma } from '@/config/database';
-import { logger } from '@/utils/logger';
-import { ApiError } from '@/utils/errors';
 import { authMiddleware } from '@/middleware/auth';
+import { ApiError } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 
 const router = Router();
 
@@ -56,15 +57,15 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const {
+      approvalStatus,
       current = 1,
-      size = 10,
-      title,
-      organizerId,
-      status,
-      meetingType,
-      startDate,
       endDate,
-      approvalStatus
+      meetingType,
+      organizerId,
+      size = 10,
+      startDate,
+      status,
+      title
     } = req.query;
 
     const where: any = {};
@@ -78,11 +79,11 @@ router.get('/', async (req, res) => {
     }
 
     if (organizerId) {
-      where.organizerId = parseInt(organizerId as string);
+      where.organizerId = Number.parseInt(organizerId as string);
     }
 
     if (status !== undefined) {
-      where.status = parseInt(status as string);
+      where.status = Number.parseInt(status as string);
     }
 
     if (meetingType) {
@@ -90,7 +91,7 @@ router.get('/', async (req, res) => {
     }
 
     if (approvalStatus !== undefined) {
-      where.approvalStatus = parseInt(approvalStatus as string);
+      where.approvalStatus = Number.parseInt(approvalStatus as string);
     }
 
     if (startDate && endDate) {
@@ -100,25 +101,22 @@ router.get('/', async (req, res) => {
       };
     }
 
-    const skip = (parseInt(current as string) - 1) * parseInt(size as string);
-    const take = parseInt(size as string);
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
 
     // 获取会议列表
     const meetings = await prisma.meeting.findMany({
-      where,
       include: {
+        _count: {
+          select: {
+            participants: true
+          }
+        },
         organizer: {
           select: {
             id: true,
-            userName: true,
-            nickName: true
-          }
-        },
-        room: {
-          select: {
-            id: true,
-            name: true,
-            location: true
+            nickName: true,
+            userName: true
           }
         },
         participants: {
@@ -126,15 +124,17 @@ router.get('/', async (req, res) => {
             user: {
               select: {
                 id: true,
-                userName: true,
-                nickName: true
+                nickName: true,
+                userName: true
               }
             }
           }
         },
-        _count: {
+        room: {
           select: {
-            participants: true
+            id: true,
+            location: true,
+            name: true
           }
         }
       },
@@ -142,23 +142,22 @@ router.get('/', async (req, res) => {
         createdAt: 'desc'
       },
       skip,
-      take
+      take,
+      where
     });
 
     // 获取总数
     const total = await prisma.meeting.count({ where });
 
     const records = meetings.map(meeting => ({
-      id: meeting.id,
-      title: meeting.title,
+      approvalStatus: meeting.approvalStatus,
+      createdAt: meeting.createdAt,
       description: meeting.description,
-      startTime: meeting.startTime,
       endTime: meeting.endTime,
+      id: meeting.id,
       location: meeting.location,
       meetingType: meeting.meetingType,
-      status: meeting.status,
       organizer: meeting.organizer,
-      room: meeting.room,
       participantCount: meeting._count.participants,
       participants: meeting.participants.map(p => ({
         id: p.id,
@@ -166,32 +165,88 @@ router.get('/', async (req, res) => {
         status: p.status,
         user: p.user
       })),
-      approvalStatus: meeting.approvalStatus,
-      createdAt: meeting.createdAt,
+      room: meeting.room,
+      startTime: meeting.startTime,
+      status: meeting.status,
+      title: meeting.title,
       updatedAt: meeting.updatedAt
     }));
 
     res.json({
       code: 0,
-      message: '获取会议列表成功',
       data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / take),
         records,
-        total,
-        current: parseInt(current as string),
-        size: parseInt(size as string),
-        pages: Math.ceil(total / take)
+        size: Number.parseInt(size as string),
+        total
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取会议列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取会议列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取会议列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取会议列表失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 获取会议总结列表
+router.get('/summaries', async (req, res) => {
+  try {
+    const { creator, current = 1, meetingId, size = 10 } = req.query;
+
+    const where: any = {};
+
+    // 构建查询条件
+    if (meetingId) {
+      where.meetingId = Number.parseInt(meetingId as string);
+    }
+
+    if (creator) {
+      where.creator = {
+        nickName: {
+          contains: creator as string,
+          mode: 'insensitive'
+        }
+      };
+    }
+
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
+
+    // 由于我们还没有meeting_summaries表，暂时返回空数据
+    // 后续可以创建该表并实现完整功能
+    const records: any[] = [];
+    const total = 0;
+
+    res.json({
+      code: 0,
+      data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / take),
+        records,
+        size: Number.parseInt(size as string),
+        total
+      },
+      message: '获取会议总结列表成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('获取会议总结列表失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '获取会议总结列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -202,35 +257,35 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     const meeting = await prisma.meeting.findUnique({
-      where: { id: parseInt(id) },
       include: {
         organizer: {
           select: {
+            email: true,
             id: true,
-            userName: true,
             nickName: true,
-            email: true
+            userName: true
           }
         },
-        room: true,
         participants: {
           include: {
             user: {
               select: {
-                id: true,
-                userName: true,
-                nickName: true,
-                email: true,
                 department: {
                   select: {
                     name: true
                   }
-                }
+                },
+                email: true,
+                id: true,
+                nickName: true,
+                userName: true
               }
             }
           }
-        }
-      }
+        },
+        room: true
+      },
+      where: { id: Number.parseInt(id) }
     });
 
     if (!meeting) {
@@ -239,28 +294,28 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '获取会议详情成功',
       data: meeting,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取会议详情成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取会议详情失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '获取会议详情失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '获取会议详情失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -270,24 +325,28 @@ router.get('/:id', async (req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const {
-      title,
-      meetingTitle, // 兼容前端字段名
+      agenda,
+      // 兼容前端字段名
       description,
-      meetingDesc, // 兼容前端字段名
-      startTime,
       endTime,
-      roomId,
+      // 兼容前端字段名
+      isRecurring = false,
       location,
-      meetingRoom, // 兼容前端字段名
+      meetingAgenda,
+      meetingDesc,
+      meetingRoom,
+      meetingTitle, // 兼容前端字段名
       meetingType,
       organizerId,
-      agenda,
-      meetingAgenda, // 兼容前端字段名
+      participantIds = [],
+      // 兼容前端字段名
       participants = [],
-      participantIds = [], // 兼容前端字段名
-      isRecurring = false,
       recurringRule,
-      reminderTime = 15
+      reminderTime = 15,
+      roomId,
+      // 兼容前端字段名
+      startTime,
+      title
     } = req.body;
 
     // 字段映射处理
@@ -301,20 +360,20 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!actualTitle) {
       return res.status(400).json({
         code: 400,
-        message: '会议标题不能为空',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '会议标题不能为空',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
 
     if (!startTime || !endTime) {
       return res.status(400).json({
         code: 400,
-        message: '会议时间不能为空',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '会议时间不能为空',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
 
@@ -335,18 +394,19 @@ router.post('/', authMiddleware, async (req, res) => {
       // 检查时间冲突
       const conflictMeeting = await prisma.meeting.findFirst({
         where: {
-          roomId,
-          status: { in: [1, 2] }, // 已安排或进行中
+          // 已安排或进行中
           OR: [
             {
-              startTime: { lte: new Date(startTime) },
-              endTime: { gt: new Date(startTime) }
+              endTime: { gt: new Date(startTime) },
+              startTime: { lte: new Date(startTime) }
             },
             {
-              startTime: { lt: new Date(endTime) },
-              endTime: { gte: new Date(endTime) }
+              endTime: { gte: new Date(endTime) },
+              startTime: { lt: new Date(endTime) }
             }
-          ]
+          ],
+          roomId,
+          status: { in: [1, 2] }
         }
       });
 
@@ -361,18 +421,18 @@ router.post('/', authMiddleware, async (req, res) => {
     // 创建会议
     const meeting = await prisma.meeting.create({
       data: {
-        title: actualTitle,
+        agenda,
         description: actualDescription,
-        startTime: new Date(startTime),
         endTime: new Date(endTime),
-        roomId,
+        isRecurring,
         location: actualLocation,
         meetingType: actualMeetingType,
         organizerId: actualOrganizerId,
-        agenda,
-        isRecurring,
         recurringRule,
-        reminderTime
+        reminderTime,
+        roomId,
+        startTime: new Date(startTime),
+        title: actualTitle
       }
     });
 
@@ -381,9 +441,9 @@ router.post('/', authMiddleware, async (req, res) => {
       await prisma.meetingParticipant.createMany({
         data: actualParticipants.map((participantId: number) => ({
           meetingId: meeting.id,
-          userId: participantId,
           role: 'participant',
-          status: 1 // 待确认
+          status: 1,
+          userId: participantId // 待确认
         }))
       });
 
@@ -391,9 +451,9 @@ router.post('/', authMiddleware, async (req, res) => {
       await prisma.meetingParticipant.create({
         data: {
           meetingId: meeting.id,
-          userId: actualOrganizerId,
           role: 'organizer',
-          status: 2 // 已接受
+          status: 2,
+          userId: actualOrganizerId // 已接受
         }
       });
     }
@@ -402,28 +462,28 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.json({
       code: 0,
-      message: '会议创建成功',
       data: meeting,
-      timestamp: Date.now(),
-      path: req.path
+      message: '会议创建成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('创建会议失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '创建会议失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '创建会议失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -437,7 +497,7 @@ router.put('/:id', async (req, res) => {
 
     // 检查会议是否存在
     const existingMeeting = await prisma.meeting.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     if (!existingMeeting) {
@@ -453,46 +513,46 @@ router.put('/:id', async (req, res) => {
     }
 
     const meeting = await prisma.meeting.update({
-      where: { id: parseInt(id) },
       data: updateData,
       include: {
         organizer: {
           select: {
             id: true,
-            userName: true,
-            nickName: true
+            nickName: true,
+            userName: true
           }
         },
         room: true
-      }
+      },
+      where: { id: Number.parseInt(id) }
     });
 
     logger.info(`会议更新成功: ${meeting.title}`);
 
     res.json({
       code: 0,
-      message: '会议更新成功',
       data: meeting,
-      timestamp: Date.now(),
-      path: req.path
+      message: '会议更新成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('更新会议失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '更新会议失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '更新会议失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -505,7 +565,7 @@ router.delete('/:id', async (req, res) => {
 
     // 检查会议是否存在
     const meeting = await prisma.meeting.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     if (!meeting) {
@@ -518,35 +578,35 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.meeting.delete({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     logger.info(`会议删除成功: ${meeting.title}`);
 
     res.json({
       code: 0,
-      message: '会议删除成功',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '会议删除成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('删除会议失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '删除会议失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '删除会议失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -559,20 +619,20 @@ router.put('/:id/approval', async (req, res) => {
     const { approvalStatus, approverId, remark } = req.body;
 
     const meeting = await prisma.meeting.update({
-      where: { id: parseInt(id) },
       data: {
         approvalStatus,
-        approverId,
-        approvalTime: approvalStatus !== 1 ? new Date() : null
+        approvalTime: approvalStatus !== 1 ? new Date() : null,
+        approverId
       },
       include: {
         organizer: {
           select: {
-            userName: true,
-            nickName: true
+            nickName: true,
+            userName: true
           }
         }
-      }
+      },
+      where: { id: Number.parseInt(id) }
     });
 
     const statusText = approvalStatus === 2 ? '通过' : '拒绝';
@@ -580,19 +640,19 @@ router.put('/:id/approval', async (req, res) => {
 
     res.json({
       code: 0,
-      message: `会议审批${statusText}`,
       data: meeting,
-      timestamp: Date.now(),
-      path: req.path
+      message: `会议审批${statusText}`,
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('会议审批失败:', error);
     res.status(500).json({
       code: 500,
-      message: '会议审批失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '会议审批失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -601,25 +661,25 @@ router.put('/:id/approval', async (req, res) => {
 router.get('/rooms/list', async (req, res) => {
   try {
     const rooms = await prisma.meetingRoom.findMany({
-      where: { status: 1 },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
+      where: { status: 1 }
     });
 
     res.json({
       code: 0,
-      message: '获取会议室列表成功',
       data: rooms,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取会议室列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取会议室列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取会议室列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取会议室列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -647,34 +707,34 @@ router.get('/statistics/overview', async (req, res) => {
 
     // 会议类型统计
     const typeStats = await prisma.meeting.groupBy({
-      by: ['meetingType'],
-      _count: true
+      _count: true,
+      by: ['meetingType']
     });
 
     res.json({
       code: 0,
-      message: '获取会议统计成功',
       data: {
-        totalMeetings,
-        todayMeetings,
         ongoingMeetings,
         pendingApproval,
+        todayMeetings,
+        totalMeetings,
         typeStats: typeStats.map(stat => ({
-          type: stat.meetingType,
-          count: stat._count
+          count: stat._count,
+          type: stat.meetingType
         }))
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取会议统计成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取会议统计失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取会议统计失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取会议统计失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });

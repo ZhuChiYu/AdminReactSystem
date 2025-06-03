@@ -16,7 +16,10 @@ import {
   message
 } from 'antd';
 import dayjs from 'dayjs';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
+import { meetingService } from '@/service/api';
+import type { MeetingApi } from '@/service/api/types';
 
 const { Paragraph, Text, Title } = Typography;
 const { TextArea } = Input;
@@ -46,66 +49,47 @@ const Component: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [participantRecordModalVisible, setParticipantRecordModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MeetingRecord | null>(null);
+  const [records, setRecords] = useState<MeetingRecord[]>([]);
+  const [meetings, setMeetings] = useState<MeetingApi.MeetingListItem[]>([]);
 
   // 模拟当前用户，实际应用中应从用户认证上下文中获取
   const currentUser = '张三';
 
-  // 模拟数据
-  const [records, setRecords] = useState<MeetingRecord[]>([
-    {
-      attendees: ['张三', '李四', '王五', '赵六'],
-      content: '讨论了项目当前进度，确定了下一阶段的目标和任务分配。张三负责前端开发，李四负责后端开发，王五负责测试。',
-      id: '1',
-      meetingId: '1',
-      meetingTitle: '项目进度汇报会',
-      participantRecords: [
-        {
-          content: '我负责前端开发部分，计划在下周完成UI设计和主要页面开发。',
-          createdAt: '2023-10-20 15:30',
-          id: '101',
-          recorder: '张三'
-        },
-        {
-          content: '后端API设计已完成60%，数据库设计已完成，下周进行接口开发。',
-          createdAt: '2023-10-20 16:15',
-          id: '102',
-          recorder: '李四'
-        }
-      ],
-      recordDate: '2023-10-20',
-      recorder: '赵六',
-      tags: ['项目进度', '任务分配']
-    },
-    {
-      attendees: ['张三', '李四', '王五', '钱七'],
-      content: '分析了上季度的业绩数据，讨论了销售策略调整，确定了下季度的销售目标。',
-      id: '2',
-      meetingId: '2',
-      meetingTitle: '季度业绩分析会',
-      participantRecords: [],
-      recordDate: '2023-10-22',
-      recorder: '张三',
-      tags: ['业绩分析', '销售策略']
-    },
-    {
-      attendees: ['张三', '李四', '王五', '孙八'],
-      content: '讨论了新产品的设计方案，确定了主要功能和界面风格，计划下周开始进行原型设计。',
-      id: '3',
-      meetingId: '3',
-      meetingTitle: '产品设计讨论会',
-      participantRecords: [
-        {
-          content: '界面设计将采用扁平化风格，主色调为蓝色系。',
-          createdAt: '2023-10-18 10:30',
-          id: '301',
-          recorder: '王五'
-        }
-      ],
-      recordDate: '2023-10-18',
-      recorder: '李四',
-      tags: ['产品设计', '功能规划']
+  // 获取会议标题的辅助函数
+  const getMeetingTitle = (meetingId: string): string => {
+    const meeting = meetings.find(m => m.id.toString() === meetingId);
+    return meeting ? meeting.meetingTitle : '未知会议';
+  };
+
+  // 获取会议列表
+  const fetchMeetings = async () => {
+    try {
+      const response = await meetingService.getMeetingList({
+        current: 1,
+        size: 1000
+      });
+      setMeetings(response.records);
+    } catch (error) {
+      console.error('获取会议列表失败:', error);
     }
-  ]);
+  };
+
+  // 获取会议记录列表
+  const fetchRecords = async () => {
+    try {
+      // 由于后端还没有会议记录API，暂时使用空数据
+      // 这里可以调用 meetingService.getMeetingRecordList() 当API实现后
+      setRecords([]);
+    } catch (error) {
+      message.error('获取会议记录失败');
+      console.error('获取会议记录失败:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMeetings();
+    fetchRecords();
+  }, []);
 
   const showModal = (record?: MeetingRecord) => {
     form.resetFields();
@@ -164,19 +148,6 @@ const Component: React.FC = () => {
       .catch(info => {
         console.error('表单验证失败:', info);
       });
-  };
-
-  const getMeetingTitle = (meetingId: string): string => {
-    switch (meetingId) {
-      case '1':
-        return '项目进度汇报会';
-      case '2':
-        return '季度业绩分析会';
-      case '3':
-        return '产品设计讨论会';
-      default:
-        return '未知会议';
-    }
   };
 
   const handleDeleteRecord = (id: string) => {

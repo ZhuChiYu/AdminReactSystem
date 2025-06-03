@@ -14,10 +14,10 @@ export class MeetingService {
       console.error('获取会议列表失败:', error);
       return {
         current: params?.current || 1,
+        pages: 0,
         records: [],
         size: params?.size || 10,
-        total: 0,
-        pages: 0
+        total: 0
       };
     }
   }
@@ -66,10 +66,13 @@ export class MeetingService {
   }
 
   /** 会议审批 */
-  async approveMeeting(id: number, data: {
-    approvalStatus: number;
-    remark?: string;
-  }): Promise<MeetingApi.MeetingListItem> {
+  async approveMeeting(
+    id: number,
+    data: {
+      approvalStatus: number;
+      remark?: string;
+    }
+  ): Promise<MeetingApi.MeetingListItem> {
     try {
       const response = await apiClient.put(`/meetings/${id}/approval`, data);
       return response;
@@ -87,13 +90,13 @@ export class MeetingService {
     } catch (error) {
       console.error('获取会议统计失败:', error);
       return {
-        total: 0,
-        scheduled: 0,
-        completed: 0,
         cancelled: 0,
-        this_week: 0,
+        completed: 0,
+        pending_approval: 0,
+        scheduled: 0,
         this_month: 0,
-        pending_approval: 0
+        this_week: 0,
+        total: 0
       };
     }
   }
@@ -113,7 +116,7 @@ export class MeetingService {
   async checkRoomAvailability(roomId: number, startTime: string, endTime: string): Promise<boolean> {
     try {
       const response = await apiClient.get(`/meetings/rooms/${roomId}/availability`, {
-        params: { startTime, endTime }
+        params: { endTime, startTime }
       });
       return response.available;
     } catch (error) {
@@ -132,9 +135,7 @@ export class MeetingService {
     }
   }
 
-  /**
-   * 获取会议总结列表
-   */
+  /** 获取会议总结列表 */
   async getMeetingSummaryList(params: MeetingApi.MeetingQueryParams) {
     try {
       const response = await apiClient.get<PageResponse<any>>('/meetings/summaries', {
@@ -145,22 +146,16 @@ export class MeetingService {
       console.error('获取会议总结列表失败:', error);
       return {
         current: params?.current || 1,
+        pages: 0,
         records: [],
         size: params?.size || 10,
-        total: 0,
-        pages: 0
+        total: 0
       };
     }
   }
 
-  /**
-   * 创建会议总结
-   */
-  async createMeetingSummary(data: {
-    meetingId: number;
-    content: string;
-    participants?: string[];
-  }) {
+  /** 创建会议总结 */
+  async createMeetingSummary(data: { content: string; meetingId: number; participants?: string[] }) {
     try {
       const response = await apiClient.post<ApiResponse<any>>('/meetings/summaries', data);
       return response;
@@ -170,14 +165,15 @@ export class MeetingService {
     }
   }
 
-  /**
-   * 更新会议总结
-   */
-  async updateMeetingSummary(summaryId: number, data: {
-    content?: string;
-    participants?: string[];
-    status?: number;
-  }) {
+  /** 更新会议总结 */
+  async updateMeetingSummary(
+    summaryId: number,
+    data: {
+      content?: string;
+      participants?: string[];
+      status?: number;
+    }
+  ) {
     try {
       const response = await apiClient.put<ApiResponse<any>>(`/meetings/summaries/${summaryId}`, data);
       return response;

@@ -6,15 +6,19 @@ import { logger } from '@/utils/logger';
 // 创建Redis客户端
 export const redis = createClient({
   socket: {
+    connectTimeout: 5000,
+    host: 'localhost',
+    port: 6379,
     reconnectStrategy: retries => {
-      if (retries > 10) {
+      if (retries > 20) {
         logger.error('Redis重连次数超过限制，停止重连');
         return false;
       }
-      return Math.min(retries * 100, 3000);
+      const delay = Math.min(retries * 100, 3000);
+      logger.info(`Redis重连尝试 ${retries}，${delay}ms 后重试`);
+      return delay;
     }
-  },
-  url: config.redisUrl
+  }
 });
 
 // Redis事件监听
@@ -41,12 +45,25 @@ redis.on('reconnecting', () => {
 // 连接Redis
 export const connectRedis = async () => {
   try {
-    await redis.connect();
+    if (!redis.isOpen) {
+      await redis.connect();
+    }
     logger.info('✅ Redis连接初始化成功');
   } catch (error) {
     logger.error('❌ Redis连接失败:', error);
-    // 在开发环境下，Redis连接失败不应该导致应用退出
-    if (config.nodeEnv === 'production') {
+
+    // 在开发环境中，等待几秒后重试
+    if (config.nodeEnv === 'development') {
+      logger.info('🔄 开发环境下Redis连接失败，3秒后重试...');
+      setTimeout(async () => {
+        try {
+          await connectRedis();
+        } catch (retryError) {
+          logger.error('❌ Redis重试连接失败:', retryError);
+        }
+      }, 3000);
+    } else {
+      // 生产环境仍然退出
       process.exit(1);
     }
   }

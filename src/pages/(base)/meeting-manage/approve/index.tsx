@@ -8,11 +8,11 @@ import {
   UserOutlined
 } from '@ant-design/icons';
 import { Badge, Button, Card, Form, Input, Modal, Radio, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import React, { useState, useEffect } from 'react';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import React, { useEffect, useState } from 'react';
 
 import { meetingService } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -46,26 +46,26 @@ const Component: React.FC = () => {
     setLoading(true);
     try {
       const response = await meetingService.getMeetingList({
+        approvalStatus: 0,
         current: 1,
-        size: 1000,
-        approvalStatus: 0 // 只获取待审批的会议
+        size: 1000 // 只获取待审批的会议
       });
 
       // 转换API数据格式
       const formattedMeetings: MeetingApproval[] = response.records.map((meeting: MeetingApi.MeetingListItem) => ({
-        id: meeting.id,
-        meetingTitle: meeting.meetingTitle,
-        proposer: meeting.organizer?.name || '',
-        department: meeting.organizer?.department || '',
-        startTime: meeting.startTime,
-        endTime: meeting.endTime,
-        location: meeting.meetingRoom || meeting.meetingUrl || '',
-        participantsCount: meeting.participants?.length || 0,
-        purpose: meeting.meetingDesc || '',
-        status: meeting.approvalStatus || 0,
-        approver: meeting.approver?.name || '',
         approvalDate: meeting.approvalTime || '',
-        comment: meeting.approvalComment || ''
+        approver: meeting.approver?.name || '',
+        comment: meeting.approvalComment || '',
+        department: meeting.organizer?.department || '',
+        endTime: meeting.endTime,
+        id: meeting.id,
+        location: meeting.meetingRoom || meeting.meetingUrl || '',
+        meetingTitle: meeting.meetingTitle,
+        participantsCount: meeting.participants?.length || 0,
+        proposer: meeting.organizer?.name || '',
+        purpose: meeting.meetingDesc || '',
+        startTime: meeting.startTime,
+        status: meeting.approvalStatus || 0
       }));
 
       setMeetings(formattedMeetings);
@@ -103,7 +103,7 @@ const Component: React.FC = () => {
         });
 
         message.success('审批完成');
-      setVisible(false);
+        setVisible(false);
         fetchMeetings(); // 重新获取列表
       }
     } catch (error) {
@@ -226,8 +226,8 @@ const Component: React.FC = () => {
         <Table
           columns={columns}
           dataSource={meetings}
-          rowKey="id"
           loading={loading}
+          rowKey="id"
           {...getFullTableConfig(10)}
         />
       </Card>
@@ -243,7 +243,11 @@ const Component: React.FC = () => {
       >
         {currentMeeting && (
           <div>
-            <Card className="mb-4" size="small" title="会议详情">
+            <Card
+              className="mb-4"
+              size="small"
+              title="会议详情"
+            >
               <div className="space-y-2">
                 <div className="flex items-center">
                   <CalendarOutlined className="mr-2" />
@@ -281,40 +285,40 @@ const Component: React.FC = () => {
                   <Text strong>会议目的：</Text>
                   <Text className="ml-2">{currentMeeting.purpose}</Text>
                 </div>
-          </div>
+              </div>
             </Card>
 
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <Form.Item
+            <Form
+              form={form}
+              layout="vertical"
+            >
+              <Form.Item
                 label="审批决定"
                 name="approval"
-            rules={[{ message: '请选择审批结果', required: true }]}
-          >
-            <Radio.Group>
+                rules={[{ message: '请选择审批结果', required: true }]}
+              >
+                <Radio.Group>
                   <Radio value={1}>
                     <CheckCircleOutlined className="text-green-500" />
                     &nbsp;同意
-              </Radio>
+                  </Radio>
                   <Radio value={-1}>
                     <CloseCircleOutlined className="text-red-500" />
                     &nbsp;拒绝
-              </Radio>
-            </Radio.Group>
-          </Form.Item>
+                  </Radio>
+                </Radio.Group>
+              </Form.Item>
 
-          <Form.Item
-            label="审批意见"
-            name="comment"
-          >
-            <TextArea
+              <Form.Item
+                label="审批意见"
+                name="comment"
+              >
+                <TextArea
                   placeholder="请输入审批意见（可选）"
-              rows={4}
-            />
-          </Form.Item>
-        </Form>
+                  rows={4}
+                />
+              </Form.Item>
+            </Form>
           </div>
         )}
       </Modal>
@@ -330,7 +334,10 @@ const Component: React.FC = () => {
       >
         {currentMeeting && (
           <div>
-            <Card size="small" title="基本信息">
+            <Card
+              size="small"
+              title="基本信息"
+            >
               <div className="space-y-2">
                 <div className="flex items-center">
                   <CalendarOutlined className="mr-2" />
@@ -346,7 +353,7 @@ const Component: React.FC = () => {
                   <TeamOutlined className="mr-2" />
                   <Text strong>部门：</Text>
                   <Text className="ml-2">{currentMeeting.department}</Text>
-              </div>
+                </div>
                 <div className="flex items-center">
                   <CalendarOutlined className="mr-2" />
                   <Text strong>会议时间：</Text>
@@ -372,16 +379,16 @@ const Component: React.FC = () => {
             </Card>
 
             {(currentMeeting.status === 1 || currentMeeting.status === -1) && (
-              <Card className="mt-4" size="small" title="审批结果">
+              <Card
+                className="mt-4"
+                size="small"
+                title="审批结果"
+              >
                 <div className="space-y-2">
                   <div className="flex items-center">
                     <Text strong>审批状态：</Text>
                     <Text className="ml-2">
-                      {currentMeeting.status === 1 ? (
-                        <Tag color="green">已通过</Tag>
-                      ) : (
-                        <Tag color="red">已拒绝</Tag>
-                      )}
+                      {currentMeeting.status === 1 ? <Tag color="green">已通过</Tag> : <Tag color="red">已拒绝</Tag>}
                     </Text>
                   </div>
                   <div className="flex items-center">
@@ -396,10 +403,10 @@ const Component: React.FC = () => {
                     <div className="flex">
                       <Text strong>审批意见：</Text>
                       <Text className="ml-2">{currentMeeting.comment}</Text>
-            </div>
+                    </div>
                   )}
                 </div>
-                </Card>
+              </Card>
             )}
           </div>
         )}

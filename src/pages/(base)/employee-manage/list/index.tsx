@@ -113,69 +113,69 @@ const Component: React.FC = () => {
   // 表格列配置
   const columns = [
     {
-      title: '序号',
       dataIndex: 'id',
       key: 'id',
+      title: '序号',
       ...getCenterColumnConfig(),
       width: 80
     },
     {
-      title: '员工姓名',
       dataIndex: 'nickName',
       key: 'nickName',
+      title: '员工姓名',
       ...getCenterColumnConfig(),
       render: (text: string) => text || '-'
     },
     {
-      title: '用户名',
       dataIndex: 'userName',
       key: 'userName',
-      ...getCenterColumnConfig(),
+      title: '用户名',
+      ...getCenterColumnConfig()
     },
     {
-      title: '性别',
       dataIndex: 'gender',
       key: 'gender',
+      title: '性别',
       ...getCenterColumnConfig(),
       render: (gender: string) => getGenderText(gender),
       width: 80
     },
     {
-      title: '角色',
       dataIndex: 'roleNames',
       key: 'roleNames',
+      title: '角色',
       ...getCenterColumnConfig(),
       render: (roleNames: string[]) => roleNames?.join(', ') || '-',
       width: 150
     },
     {
-      title: '职位',
       dataIndex: 'position',
       key: 'position',
+      title: '职位',
       ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
       width: 120
     },
     {
-      title: '部门',
       dataIndex: ['department', 'name'],
       key: 'department',
+      title: '部门',
       ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
       width: 120
     },
     {
-      title: '合同年限',
       dataIndex: 'contractYears',
       key: 'contractYears',
+      title: '合同年限',
       ...getCenterColumnConfig(),
       render: (years: number) => (years ? `${years}年` : '-'),
       width: 100
     },
     {
-      title: '合同开始',
       dataIndex: 'contractStartDate',
       key: 'contractStartDate',
+      title: '合同开始',
       ...getCenterColumnConfig(),
       render: (date: string) => {
         if (!date) return '-';
@@ -184,9 +184,9 @@ const Component: React.FC = () => {
       width: 120
     },
     {
-      title: '合同结束',
       dataIndex: 'contractEndDate',
       key: 'contractEndDate',
+      title: '合同结束',
       ...getCenterColumnConfig(),
       render: (date: string) => {
         if (!date) return '-';
@@ -195,25 +195,25 @@ const Component: React.FC = () => {
       width: 120
     },
     {
-      title: '电话',
       dataIndex: 'phone',
       key: 'phone',
+      title: '电话',
       ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
       width: 120
     },
     {
-      title: '邮箱',
       dataIndex: 'email',
       key: 'email',
+      title: '邮箱',
       ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
       width: 200
     },
     {
-      title: '状态',
       dataIndex: 'status',
       key: 'status',
+      title: '状态',
       ...getCenterColumnConfig(),
       render: (status: string) => {
         const { color, text } = getStatusTag(status);
@@ -222,9 +222,9 @@ const Component: React.FC = () => {
       width: 100
     },
     {
-      title: '入职日期',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      title: '入职日期',
       ...getCenterColumnConfig(),
       render: (text: string) => {
         if (!text) return '-';
@@ -234,8 +234,8 @@ const Component: React.FC = () => {
       width: 120
     },
     {
-      title: '操作',
       key: 'action',
+      title: '操作',
       ...getActionColumnConfig(320),
       render: (_: any, record: EmployeeApiType.EmployeeListItem) => (
         <Space size="small">
@@ -277,7 +277,7 @@ const Component: React.FC = () => {
             </Button>
           </Popconfirm>
         </Space>
-      ),
+      )
     }
   ];
 

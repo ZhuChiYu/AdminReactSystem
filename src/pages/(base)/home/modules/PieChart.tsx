@@ -15,10 +15,10 @@ const PieChart = (props: Props) => {
   async function fetchData() {
     try {
       const response = await statisticsService.getPieChartData({
-        type: 'user_source',
-        period: 'month'
+        period: 'month',
+        type: 'user_source'
       });
-      
+
       return response.map(item => ({
         name: item.name,
         value: item.value
@@ -37,54 +37,54 @@ const PieChart = (props: Props) => {
 
   async function getOption() {
     const data = await fetchData();
-    
+
     const option: echarts.EChartsOption = {
-      tooltip: {
-        trigger: 'item'
-      },
       legend: {
         bottom: '1%',
-        left: 'center',
         itemStyle: {
           borderWidth: 0
-        }
+        },
+        left: 'center'
       },
       series: [
         {
-          name: '时间安排',
-          type: 'pie',
-          radius: ['45%', '75%'],
           avoidLabelOverlap: false,
+          color: ['#5da8ff', '#8e9dff', '#fedc69', '#26deca'],
+          data,
+          emphasis: {
+            label: {
+              fontSize: '12',
+              show: true
+            }
+          },
           itemStyle: {
-            borderRadius: 10,
             borderColor: '#fff',
+            borderRadius: 10,
             borderWidth: 1
           },
           label: {
-            show: false,
-            position: 'center'
-          },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: '12'
-            }
+            position: 'center',
+            show: false
           },
           labelLine: {
             show: false
           },
-          data: data,
-          color: ['#5da8ff', '#8e9dff', '#fedc69', '#26deca']
+          name: '时间安排',
+          radius: ['45%', '75%'],
+          type: 'pie'
         }
-      ]
+      ],
+      tooltip: {
+        trigger: 'item'
+      }
     };
     return option;
   }
 
   return (
     <div
-      ref={domRef}
       className={className}
+      ref={domRef}
     />
   );
 };

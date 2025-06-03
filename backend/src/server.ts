@@ -16,6 +16,7 @@ import { errorHandler } from '@/middleware/errorHandler';
 import { logMiddleware } from '@/middleware/log';
 
 // 路由导入
+import attachmentRoutes from '@/routes/attachment';
 import authRoutes from '@/routes/auth';
 import avatarRoutes from '@/routes/avatar';
 import classRoutes from '@/routes/class';
@@ -27,7 +28,6 @@ import notificationRoutes from '@/routes/notification';
 import systemRoutes from '@/routes/system';
 import taskRoutes from '@/routes/task';
 import userRoutes from '@/routes/user';
-import attachmentRoutes from '@/routes/attachment';
 import { logger } from '@/utils/logger';
 
 // 加载环境变量
@@ -94,6 +94,12 @@ app.use(
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 设置响应编码为UTF-8
+app.use((req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
 
 // 请求日志
 app.use(

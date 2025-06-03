@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: soybean123
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -46,7 +46,7 @@ services:
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
       JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       - postgres
       - redis
