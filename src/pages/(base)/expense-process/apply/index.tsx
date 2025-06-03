@@ -164,18 +164,18 @@ const Component: React.FC = () => {
     try {
       // 构造API请求数据
       const expenseData = {
-        expenseType: expenseItems.length > 0 ? expenseItems[0].itemType : '其他',
         applicationReason: values.title,
-        expensePeriodStart: values.dateRange?.[0]?.format('YYYY-MM-DD'),
         expensePeriodEnd: values.dateRange?.[1]?.format('YYYY-MM-DD'),
-        remark: values.description,
+        expensePeriodStart: values.dateRange?.[0]?.format('YYYY-MM-DD'),
+        expenseType: expenseItems.length > 0 ? expenseItems[0].itemType : '其他',
         items: expenseItems.map(item => ({
-          itemName: item.itemName,
-          itemType: item.itemType,
-          expenseDate: item.date.format('YYYY-MM-DD'),
           amount: item.amount,
-          description: item.description
-        }))
+          description: item.description,
+          expenseDate: item.date.format('YYYY-MM-DD'),
+          itemName: item.itemName,
+          itemType: item.itemType
+        })),
+        remark: values.description
       };
 
       // 调用API提交费用申请
@@ -183,11 +183,11 @@ const Component: React.FC = () => {
 
       // 发送通知给管理员
       await notificationService.createNotification({
-        title: '新报销申请待审核',
         content: `${values.applicant || '员工'}提交了新的报销申请: ${values.title}，请尽快审核`,
-        type: 'expense',
         relatedId: response.id,
-        relatedType: 'expense_application'
+        relatedType: 'expense_application',
+        title: '新报销申请待审核',
+        type: 'expense'
       });
 
       message.success('报销申请提交成功');
