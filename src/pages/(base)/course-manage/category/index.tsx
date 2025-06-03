@@ -1,10 +1,9 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { courseService } from '@/service/api';
-import type { CourseApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 interface CategoryItem {
@@ -35,13 +34,13 @@ const CourseCategory = () => {
       const response = await courseService.getCourseCategories();
 
       // 转换API数据格式
-      const formattedCategories: CategoryItem[] = response.map((category: CourseApi.CourseCategory) => ({
-        createdAt: category.createTime || '',
+      const formattedCategories: CategoryItem[] = response.map((category: any) => ({
+        createdAt: category.createdAt || new Date().toISOString(),
         description: category.description || '',
         id: category.id,
         name: category.name,
         status: category.status === 1 ? '启用' : '禁用',
-        updatedAt: category.updateTime || ''
+        updatedAt: category.updatedAt || new Date().toISOString()
       }));
 
       setCategories(formattedCategories);
@@ -85,6 +84,7 @@ const CourseCategory = () => {
   // 保存分类
   const handleSave = async () => {
     try {
+      setConfirmLoading(true);
       const values = await form.validateFields();
 
       const categoryData = {
@@ -94,12 +94,12 @@ const CourseCategory = () => {
       };
 
       if (currentCategory) {
-        // 编辑分类 - 这里需要实现更新分类的API
-        // await courseService.updateCategory(currentCategory.id, categoryData);
+        // 编辑分类
+        await courseService.updateCategory(currentCategory.id, categoryData);
         message.success('分类更新成功');
       } else {
-        // 新增分类 - 这里需要实现创建分类的API
-        // await courseService.createCategory(categoryData);
+        // 新增分类
+        await courseService.createCategory(categoryData);
         message.success('分类创建成功');
       }
 
@@ -112,14 +112,15 @@ const CourseCategory = () => {
         message.error('分类创建失败');
       }
       console.error('保存分类失败:', error);
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
   // 删除分类
   const handleDelete = async (id: number) => {
     try {
-      // 这里需要实现删除分类的API
-      // await courseService.deleteCategory(id);
+      await courseService.deleteCategory(id);
       message.success('删除成功');
       fetchCategories(); // 重新获取列表
     } catch (error) {
