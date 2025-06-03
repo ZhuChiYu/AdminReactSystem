@@ -59,11 +59,26 @@ export function useInitAuth() {
       try {
         const info = await fetchGetUserInfo();
 
+        // 转换用户信息类型以匹配Redux store的期望
+        const userInfo: Api.Auth.UserInfo = {
+          avatar: info.avatar,
+          buttons: info.buttons,
+          department: info.department,
+          email: info.email,
+          gender: info.gender,
+          nickName: info.nickName,
+          phone: info.phone,
+          position: info.position,
+          roles: info.roles.map(role => (typeof role === 'string' ? role : role.roleCode)),
+          userId: info.id?.toString() || '',
+          userName: info.userName
+        };
+
         // 2. store user info
-        localStg.set('userInfo', info);
+        localStg.set('userInfo', userInfo);
 
         dispatch(setToken(loginToken.token));
-        dispatch(setUserInfo(info));
+        dispatch(setUserInfo(userInfo));
 
         if (redirect) {
           if (redirectUrl) {
@@ -74,7 +89,7 @@ export function useInitAuth() {
         }
 
         window.$notification?.success({
-          description: t('page.login.common.welcomeBack', { userName: info.userName }),
+          description: t('page.login.common.welcomeBack', { userName: userInfo.userName }),
           message: t('page.login.common.loginSuccess')
         });
       } catch (userInfoError) {
