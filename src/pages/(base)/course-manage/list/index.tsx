@@ -1,32 +1,28 @@
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
-import type { Dayjs } from 'dayjs';
+import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { courseService } from '@/service/api';
+import { attachmentService, courseService } from '@/service/api';
 import type { CourseApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
-import { attachmentService } from '@/service/api';
 
 const { RangePicker } = DatePicker;
 
 interface CourseItem {
+  attachment: string;
+  attachmentCount: number;
+  category: string;
+  createdAt: string;
+  date: string;
   id: number;
   name: string;
   price: number;
-  category: string;
-  date: string;
-  createdAt: string;
   status: string;
-  attachment: string;
-  attachmentCount: number;
 }
 
 const CourseList = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [courseList, setCourseList] = useState<CourseItem[]>([]);
@@ -60,15 +56,15 @@ const CourseList = () => {
 
       // 先转换基本的课程数据
       const basicCourses: CourseItem[] = response.records.map((course: CourseApi.CourseListItem) => ({
+        attachment: '获取中...',
+        attachmentCount: 0,
+        category: course.category.name,
+        createdAt: course.createTime || course.createdAt || new Date().toISOString(),
+        date: course.createTime || course.createdAt || new Date().toISOString(),
         id: course.id,
         name: course.courseName,
-        price: typeof course.price === 'string' ? parseFloat(course.price) : course.price,
-        category: course.category.name,
-        date: course.createTime || course.createdAt || new Date().toISOString(),
-        createdAt: course.createTime || course.createdAt || new Date().toISOString(),
-        status: course.status === 1 ? '已上线' : '未上线',
-        attachment: '获取中...',
-        attachmentCount: 0
+        price: typeof course.price === 'string' ? Number.parseFloat(course.price) : course.price,
+        status: course.status === 1 ? '已上线' : '未上线'
       }));
 
       // 先设置基本数据，让用户看到列表
@@ -78,37 +74,36 @@ const CourseList = () => {
       // 批量获取附件数量（并发限制为5个）
       const batchSize = 5;
       const updatedCourses = [...basicCourses];
-      
+
       for (let i = 0; i < basicCourses.length; i += batchSize) {
         const batch = basicCourses.slice(i, i + batchSize);
-        
+
         const batchPromises = batch.map(async (course, index) => {
           try {
             const stats = await attachmentService.getCourseAttachmentStats(course.id);
             const actualIndex = i + index;
             updatedCourses[actualIndex] = {
               ...course,
-              attachmentCount: stats.data?.totalCount || 0,
-              attachment: (stats.data?.totalCount || 0) > 0 ? '有附件' : '无附件'
+              attachment: (stats?.totalCount || 0) > 0 ? '有附件' : '无附件',
+              attachmentCount: stats?.totalCount || 0
             };
           } catch (error) {
             console.warn(`获取课程 ${course.id} 附件统计失败:`, error);
             const actualIndex = i + index;
             updatedCourses[actualIndex] = {
               ...course,
-              attachmentCount: 0,
-              attachment: '获取失败'
+              attachment: '获取失败',
+              attachmentCount: 0
             };
           }
         });
 
         await Promise.all(batchPromises);
-        
+
         // 每完成一批就更新界面
         setCourseList([...updatedCourses]);
         setFilteredList([...updatedCourses]);
       }
-
     } catch (error) {
       message.error('获取课程列表失败');
       console.error('获取课程列表失败:', error);
@@ -179,17 +174,8 @@ const CourseList = () => {
     return 'error';
   };
 
-  // 提取所有分类作为选项
-  const categoryOptions = [
-    { label: '全部分类', value: '' },
-    ...Array.from(new Set(courseList.map(course => course.category))).map(category => ({
-      label: category,
-      value: category
-    }))
-  ];
-
   // 分类选项（不包含"全部分类"项）
-  const categoryOptionsForForm = categories.map(category => ({
+  const categoryOptionsForForm = (categories || []).map(category => ({
     label: category.name,
     value: category.name
   }));
@@ -203,11 +189,6 @@ const CourseList = () => {
   // 关闭添加课程模态框
   const handleCancel = () => {
     setIsModalOpen(false);
-  };
-
-  // 跳转到附件管理页面
-  const handleAttachment = (courseId: number) => {
-    navigate(`/course-manage/attachments/${courseId}`);
   };
 
   // 打开编辑课程模态框
@@ -235,24 +216,28 @@ const CourseList = () => {
 
       // 准备API请求数据
       const courseData = {
-        courseName: values.name,
-        courseCode: `COURSE_${Date.now()}`, // 生成唯一课程编码
+        // 生成唯一课程编码
         categoryId: categories.find(cat => cat.name === values.category)?.id || 1,
-        instructor: '系统管理员', // 默认讲师
+        courseCode: `COURSE_${Date.now()}`,
+        courseName: values.name,
+        // 默认讲师
         description: `${values.name}课程`,
-        duration: 30, // 默认30天
-        price: values.price,
-        originalPrice: values.price,
-        maxStudents: 50, // 默认最大学员数
-        startDate: values.date.format('YYYY-MM-DD'),
-        endDate: values.date.add(30, 'day').format('YYYY-MM-DD'), // 默认30天后结束
+        duration: 30,
+        endDate: values.date.add(30, 'day').format('YYYY-MM-DD'),
+        instructor: '系统管理员',
+        // 默认30天后结束
         location: '线上课程',
+        maxStudents: 50,
+        originalPrice: values.price,
+        // 默认30天
+        price: values.price, // 默认最大学员数
+        startDate: values.date.format('YYYY-MM-DD'),
         tags: []
       };
 
       // 调用真实的API
       await courseService.createCourse(courseData);
-      
+
       message.success(`课程"${values.name}"已成功添加`);
       setIsModalOpen(false);
       form.resetFields();
@@ -279,22 +264,22 @@ const CourseList = () => {
 
       // 准备API请求数据
       const courseData = {
-        courseName: values.name,
         categoryId: categories.find(cat => cat.name === values.category)?.id || 1,
-        price: values.price.toString(),
+        courseName: values.name,
         courseStartDate: values.date.format('YYYY-MM-DD'),
+        price: values.price.toString(),
         status: 1 // 默认状态为已上线
       };
 
       try {
         await courseService.updateCourse(currentCourse.id, courseData);
-        
+
         message.success(`课程"${values.name}"已成功更新`);
-        
+
         // 关闭模态框并重置状态
         setEditModalOpen(false);
         setCurrentCourse(null);
-        
+
         // 重新获取课程列表
         fetchCourseList();
       } catch (error) {
@@ -340,70 +325,76 @@ const CourseList = () => {
   // 表格列配置
   const columns = [
     {
-      title: '课程名称',
       dataIndex: 'name',
       key: 'name',
-      ...getCenterColumnConfig(),
+      title: '课程名称',
+      ...getCenterColumnConfig()
     },
     {
-      title: '分类',
       dataIndex: 'category',
       key: 'category',
+      title: '分类',
       ...getCenterColumnConfig(),
       render: (category: string) => <Tag color="blue">{category}</Tag>
     },
     {
-      title: '价格',
       dataIndex: 'price',
       key: 'price',
+      title: '价格',
       ...getCenterColumnConfig(),
       render: (price: number) => `¥${price}`
     },
     {
-      title: '状态',
       dataIndex: 'status',
       key: 'status',
+      title: '状态',
       ...getCenterColumnConfig(),
-      render: (status: string) => (
-        <Tag color={getStatusColor(status)}>
-          {status}
-        </Tag>
-      )
+      render: (status: string) => <Tag color={getStatusColor(status)}>{status}</Tag>
     },
     {
-      title: '附件数量',
       dataIndex: 'attachmentCount',
       key: 'attachmentCount',
+      title: '附件数量',
       ...getCenterColumnConfig(),
-      render: (count: number) => (
-        <Tag color={count > 0 ? 'green' : 'gray'}>
-          {count || 0} 个
-        </Tag>
-      )
+      render: (count: number) => <Tag color={count > 0 ? 'green' : 'gray'}>{count || 0} 个</Tag>
     },
     {
-      title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      title: '创建时间',
       ...getCenterColumnConfig(),
       render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss')
     },
     {
-      title: '操作',
       key: 'action',
+      title: '操作',
       ...getActionColumnConfig(300),
       render: (_: any, record: CourseItem) => (
         <Space>
-          <Button size="small" onClick={() => goToDetail(record.id)}>
+          <Button
+            size="small"
+            onClick={() => goToDetail(record.id)}
+          >
             查看详情
           </Button>
-          <Button size="small" onClick={() => goToAttachments(record.id)}>
+          <Button
+            size="small"
+            onClick={() => goToAttachments(record.id)}
+          >
             附件管理
           </Button>
-          <Button size="small" type="primary" onClick={() => showEditModal(record)}>
+          <Button
+            size="small"
+            type="primary"
+            onClick={() => showEditModal(record)}
+          >
             编辑
           </Button>
-          <Button size="small" danger onClick={() => showDeleteConfirm(record)}>
+          <Button
+            danger
+            size="small"
+            onClick={() => showDeleteConfirm(record)}
+          >
             删除
           </Button>
         </Space>
@@ -436,37 +427,48 @@ const CourseList = () => {
         <div className="mb-4 space-y-4">
           <div className="flex flex-wrap gap-4">
             <Input
-              placeholder="搜索课程名称"
-            value={searchName}
-            onChange={e => setSearchName(e.target.value)}
-              style={{ width: 200 }}
               allowClear
-          />
-          <Select
-            placeholder="选择分类"
+              placeholder="搜索课程名称"
+              style={{ width: 200 }}
+              value={searchName}
+              onChange={e => setSearchName(e.target.value)}
+            />
+            <Select
+              allowClear
+              placeholder="选择分类"
+              style={{ width: 150 }}
               value={selectedCategory}
               onChange={setSelectedCategory}
-            style={{ width: 150 }}
-              allowClear
             >
-              {categories.map(category => (
-                <Select.Option key={category.id} value={category.name}>
+              {(categories || []).map(category => (
+                <Select.Option
+                  key={category.id}
+                  value={category.name}
+                >
                   {category.name}
                 </Select.Option>
               ))}
             </Select>
             <RangePicker
+              placeholder={['开始日期', '结束日期']}
               value={dateRange}
-              onChange={setDateRange}
-            placeholder={['开始日期', '结束日期']}
+              onChange={dates => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | null)}
             />
           </div>
           <div className="flex gap-2">
-            <Button icon={<SearchOutlined />} type="primary" onClick={applyFilters}>
+            <Button
+              icon={<SearchOutlined />}
+              type="primary"
+              onClick={applyFilters}
+            >
               搜索
             </Button>
             <Button onClick={resetFilters}>重置</Button>
-            <Button icon={<PlusOutlined />} type="primary" onClick={showAddModal}>
+            <Button
+              icon={<PlusOutlined />}
+              type="primary"
+              onClick={showAddModal}
+            >
               新增课程
             </Button>
           </div>
@@ -476,25 +478,25 @@ const CourseList = () => {
         <Table
           columns={columns}
           dataSource={filteredList}
-          rowKey="id"
           loading={loading}
+          rowKey="id"
           rowSelection={{
-            selectedRowKeys,
             onChange: setSelectedRowKeys,
+            selectedRowKeys
           }}
           {...getFullTableConfig(10)}
         />
 
         {/* 删除确认对话框 */}
         <Modal
-          title="确认删除"
-          open={deleteModalVisible}
-          onOk={() => courseToDelete && handleDelete(courseToDelete)}
-          onCancel={() => setDeleteModalVisible(false)}
-          okText="确认"
           cancelText="取消"
+          okText="确认"
+          open={deleteModalVisible}
+          title="确认删除"
+          onCancel={() => setDeleteModalVisible(false)}
+          onOk={() => courseToDelete && handleDelete(courseToDelete)}
         >
-          <p>确定要删除课程 "{courseToDelete?.name}" 吗？此操作不可撤销。</p>
+          <p>确定要删除课程 &ldquo;{courseToDelete?.name}&rdquo; 吗？此操作不可撤销。</p>
         </Modal>
       </Card>
 
