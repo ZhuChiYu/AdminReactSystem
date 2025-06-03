@@ -453,10 +453,13 @@ model ClassStudent {
   id             Int      @id @default(autoincrement())
   classId        Int      @map("class_id")
   name           String   @db.VarChar(100)
+  gender         String?  @db.VarChar(10)  // 性别：男/女
   company        String   @db.VarChar(200)
   position       String?  @db.VarChar(100)
   phone          String?  @db.VarChar(20)
   email          String?  @db.VarChar(100)
+  avatar         String?  @db.VarChar(500) // 头像URL
+  trainingFee    Decimal? @map("training_fee") @db.Decimal(10, 2) // 培训费
   joinDate       DateTime @map("join_date")
   attendanceRate Int      @default(100) @map("attendance_rate") // 出勤率
   status         Int      @default(1) // 1-正常, 2-请假, 3-退学
