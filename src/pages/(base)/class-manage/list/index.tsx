@@ -3,10 +3,11 @@ import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { type ClassApi, classService } from '@/service/api';
+import { courseService } from '@/service/api';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
-import { classService, type ClassApi } from '@/service/api';
-import { courseService } from '@/service/api';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 /** 班级状态枚举 */
@@ -37,6 +38,9 @@ const ClassList = () => {
     total: 0
   });
 
+  // 班级分类数据状态
+  const [classCategories, setClassCategories] = useState<ClassApi.ClassCategory[]>([]);
+
   // 筛选条件
   const [searchName, setSearchName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | ''>('');
@@ -56,6 +60,17 @@ const ClassList = () => {
   // 获取可选课程列表
   const [availableCourses, setAvailableCourses] = useState<any[]>([]);
 
+  // 获取班级分类数据
+  const fetchClassCategories = async () => {
+    try {
+      const categories = await classService.getClassCategories();
+      setClassCategories(categories || []);
+    } catch (error) {
+      console.error('获取班级分类失败:', error);
+      setClassCategories([]);
+    }
+  };
+
   // 获取课程列表数据
   useEffect(() => {
     const fetchCourses = async () => {
@@ -72,6 +87,7 @@ const ClassList = () => {
     };
 
     fetchCourses();
+    fetchClassCategories(); // 同时获取班级分类数据
   }, []);
 
   // 根据类别获取对应课程的价格
@@ -180,13 +196,13 @@ const ClassList = () => {
     return '已结束';
   };
 
-  // 分类选项
+  // 分类选项 - 从API获取的数据
   const categoryOptions = [
     { label: '全部类型', value: '' },
-    { label: '技术培训', value: ClassCategory.TECHNICAL },
-    { label: '管理课程', value: ClassCategory.MANAGEMENT },
-    { label: '营销课程', value: ClassCategory.TRAINING },
-    { label: '其他课程', value: ClassCategory.OTHER }
+    ...classCategories.map(category => ({
+      label: category.name,
+      value: category.id
+    }))
   ];
 
   // 状态选项
@@ -211,12 +227,12 @@ const ClassList = () => {
 
       // 打开编辑模态框并填充表单
       form.setFieldsValue({
-        name: classDetail.name,
         categoryId: classDetail.categoryId,
-        teacher: classDetail.teacher,
         description: classDetail.description,
+        endDate: dayjs(classDetail.endDate),
+        name: classDetail.name,
         startDate: dayjs(classDetail.startDate),
-        endDate: dayjs(classDetail.endDate)
+        teacher: classDetail.teacher
       });
 
       // 设置编辑模式并保存当前编辑的班级ID
@@ -258,13 +274,13 @@ const ClassList = () => {
       setSubmitting(true);
 
       const classData: ClassApi.CreateClassParams = {
-        name: values.name,
         categoryId: values.categoryId,
-        categoryName: categoryOptions.find(opt => opt.value === values.categoryId)?.label || '',
-        teacher: values.teacher || '专业讲师',
+        categoryName: classCategories.find(cat => cat.id === values.categoryId)?.name || '',
         description: values.description,
+        endDate: values.endDate.format('YYYY-MM-DD'),
+        name: values.name,
         startDate: values.startDate.format('YYYY-MM-DD'),
-        endDate: values.endDate.format('YYYY-MM-DD')
+        teacher: values.teacher || '专业讲师'
       };
 
       if (editingClassId !== null) {
@@ -382,7 +398,8 @@ const ClassList = () => {
       ...getActionColumnConfig(200),
       render: (_: unknown, record: any) => {
         // 权限判断：超级管理员或有EDIT_CLASS权限才显示编辑按钮
-        const canEdit = isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, record.id);
+        const canEdit =
+          isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, record.id);
         return (
           <Space size="middle">
             <Button
@@ -421,9 +438,9 @@ const ClassList = () => {
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
-        variant="borderless"
         className="h-full"
         title="班级列表"
+        variant="borderless"
       >
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Input
