@@ -4,9 +4,7 @@ import type { CourseApi, PageResponse } from './types';
 /** 课程管理相关API服务 */
 export class CourseService {
   /** 获取课程列表 */
-  async getCourseList(
-    params?: CourseApi.CourseQueryParams
-  ): Promise<PageResponse<CourseApi.CourseListItem>['data']> {
+  async getCourseList(params?: CourseApi.CourseQueryParams): Promise<PageResponse<CourseApi.CourseListItem>['data']> {
     try {
       const response = await apiClient.get('/courses', { params });
       return response;
@@ -14,10 +12,10 @@ export class CourseService {
       console.error('获取课程列表失败:', error);
       return {
         current: params?.current || 1,
+        pages: 0,
         records: [],
         size: params?.size || 10,
-        total: 0,
-        pages: 0
+        total: 0
       };
     }
   }
@@ -55,9 +53,7 @@ export class CourseService {
     }
   }
 
-  /**
-   * 删除课程
-   */
+  /** 删除课程 */
   async deleteCourse(courseId: number) {
     try {
       const response = await apiClient.delete(`/courses/${courseId}`);
@@ -68,9 +64,7 @@ export class CourseService {
     }
   }
 
-  /**
-   * 批量删除课程
-   */
+  /** 批量删除课程 */
   async batchDeleteCourses(courseIds: number[]) {
     try {
       const response = await apiClient.delete('/courses/batch', {
@@ -102,12 +96,12 @@ export class CourseService {
     } catch (error) {
       console.error('获取课程统计失败:', error);
       return {
-        total: 0,
-        published: 0,
-        draft: 0,
         archived: 0,
-        totalStudents: 0,
-        totalRevenue: 0
+        draft: 0,
+        published: 0,
+        total: 0,
+        totalRevenue: 0,
+        totalStudents: 0
       };
     }
   }
@@ -134,11 +128,7 @@ export class CourseService {
   }
 
   /** 添加课程评价 */
-  async addCourseReview(data: {
-    courseId: number;
-    rating: number;
-    comment: string;
-  }): Promise<CourseApi.CourseReview> {
+  async addCourseReview(data: { comment: string; courseId: number; rating: number }): Promise<CourseApi.CourseReview> {
     try {
       const response = await apiClient.post(`/courses/${data.courseId}/reviews`, data);
       return response;
@@ -148,14 +138,8 @@ export class CourseService {
     }
   }
 
-  /**
-   * 获取班级课程列表
-   */
-  async getClassCourseList(params: {
-    classId: number;
-    current?: number;
-    size?: number;
-  }) {
+  /** 获取班级课程列表 */
+  async getClassCourseList(params: { classId: number; current?: number; size?: number }) {
     try {
       const response = await apiClient.get('/courses/class', {
         params
@@ -165,11 +149,50 @@ export class CourseService {
       console.error('获取班级课程列表失败:', error);
       return {
         current: params?.current || 1,
+        pages: 0,
         records: [],
         size: params?.size || 10,
-        total: 0,
-        pages: 0
+        total: 0
       };
+    }
+  }
+
+  /** 创建课程分类 */
+  async createCategory(data: {
+    description?: string;
+    name: string;
+    status?: number;
+  }): Promise<CourseApi.CourseCategory> {
+    try {
+      const response = await apiClient.post('/courses/categories', data);
+      return response;
+    } catch (error) {
+      console.error('创建课程分类失败:', error);
+      throw error;
+    }
+  }
+
+  /** 更新课程分类 */
+  async updateCategory(
+    id: number,
+    data: { description?: string; name?: string; status?: number }
+  ): Promise<CourseApi.CourseCategory> {
+    try {
+      const response = await apiClient.put(`/courses/categories/${id}`, data);
+      return response;
+    } catch (error) {
+      console.error('更新课程分类失败:', error);
+      throw error;
+    }
+  }
+
+  /** 删除课程分类 */
+  async deleteCategory(id: number): Promise<void> {
+    try {
+      await apiClient.delete(`/courses/categories/${id}`);
+    } catch (error) {
+      console.error('删除课程分类失败:', error);
+      throw error;
     }
   }
 }
