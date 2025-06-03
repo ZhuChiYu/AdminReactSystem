@@ -239,6 +239,7 @@ model Course {
   category    CourseCategory @relation(fields: [categoryId], references: [id])
   enrollments CourseEnrollment[]
   attachments Attachment[]
+  classes     Class[]
 
   @@map("courses")
 }
@@ -408,13 +409,29 @@ model Attachment {
   @@map("attachments")
 }
 
+// 班级分类表
+model ClassCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  code        String   @unique @db.VarChar(50)
+  description String?  @db.Text
+  sort        Int      @default(0)
+  status      Int      @default(1) // 0-禁用, 1-启用
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  classes Class[]
+
+  @@map("class_categories")
+}
+
 // 班级表
 model Class {
   id          Int      @id @default(autoincrement())
   name        String   @db.VarChar(200)
   categoryId  Int      @map("category_id")
-  categoryName String  @map("category_name") @db.VarChar(100)
-  teacher     String   @db.VarChar(100)
+  courseId    Int?     @map("course_id")
   description String?  @db.Text
   startDate   DateTime @map("start_date")
   endDate     DateTime @map("end_date")
@@ -424,6 +441,8 @@ model Class {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // 关联关系
+  category    ClassCategory @relation(fields: [categoryId], references: [id])
+  course      Course?       @relation(fields: [courseId], references: [id])
   students    ClassStudent[]
 
   @@map("classes")

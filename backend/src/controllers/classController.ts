@@ -38,6 +38,8 @@ class ClassController {
       const [classes, total] = await Promise.all([
         prisma.class.findMany({
           include: {
+            category: true,
+            course: true,
             students: {
               select: {
                 company: true,
@@ -61,20 +63,28 @@ class ClassController {
       ]);
 
       // 格式化返回数据
-      const formattedClasses = classes.map(classItem => ({
-        categoryId: classItem.categoryId,
-        categoryName: classItem.categoryName,
-        createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
-        description: classItem.description,
-        endDate: classItem.endDate.toISOString().split('T')[0],
-        id: classItem.id,
-        name: classItem.name,
-        startDate: classItem.startDate.toISOString().split('T')[0],
-        status: classItem.status,
-        studentCount: classItem.students.length,
-        teacher: classItem.teacher,
-        updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
-      }));
+      const formattedClasses = classes.map((classItem: any) => {
+        const studentCount = classItem.students ? classItem.students.length : 0;
+        const coursePrice = classItem.course?.price || 0;
+
+        return {
+          categoryId: classItem.categoryId,
+          categoryName: classItem.category?.name || '',
+          courseId: classItem.courseId,
+          courseName: classItem.course?.courseName || '',
+          coursePrice: coursePrice,
+          trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
+          createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
+          description: classItem.description,
+          endDate: classItem.endDate.toISOString().split('T')[0],
+          id: classItem.id,
+          name: classItem.name,
+          startDate: classItem.startDate.toISOString().split('T')[0],
+          status: classItem.status,
+          studentCount: studentCount,
+          updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
+        };
+      });
 
       const result = {
         current: page,
@@ -98,6 +108,8 @@ class ClassController {
 
       const classItem = await prisma.class.findUnique({
         include: {
+          category: true,
+          course: true,
           students: {
             orderBy: {
               createdAt: 'asc'
@@ -112,9 +124,16 @@ class ClassController {
       }
 
       // 格式化返回数据
+      const studentCount = classItem.students ? classItem.students.length : 0;
+      const coursePrice = classItem.course?.price || 0;
+
       const formattedClass = {
         categoryId: classItem.categoryId,
-        categoryName: classItem.categoryName,
+        categoryName: classItem.category?.name || '',
+        courseId: classItem.courseId,
+        courseName: classItem.course?.courseName || '',
+        coursePrice: coursePrice,
+        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
         createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
         description: classItem.description,
         endDate: classItem.endDate.toISOString().split('T')[0],
@@ -122,8 +141,8 @@ class ClassController {
         name: classItem.name,
         startDate: classItem.startDate.toISOString().split('T')[0],
         status: classItem.status,
-        studentCount: classItem.students.length,
-        students: classItem.students.map(student => ({
+        studentCount: studentCount,
+        students: classItem.students.map((student: any) => ({
           attendanceRate: student.attendanceRate,
           company: student.company,
           createdAt: student.createdAt.toISOString().replace('T', ' ').substring(0, 19),
@@ -135,7 +154,6 @@ class ClassController {
           position: student.position,
           status: student.status
         })),
-        teacher: classItem.teacher,
         updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       };
 
@@ -149,10 +167,10 @@ class ClassController {
   /** 创建班级 */
   async createClass(req: Request, res: Response) {
     try {
-      const { categoryId, categoryName, description, endDate, name, startDate, students = [], teacher } = req.body;
+      const { categoryId, courseId, description, endDate, name, startDate } = req.body;
 
       // 验证必填字段
-      if (!name || !categoryId || !categoryName || !teacher || !startDate || !endDate) {
+      if (!name || !categoryId || !startDate || !endDate) {
         return res.status(400).json(createErrorResponse(400, '缺少必填字段', null, req.path));
       }
 
@@ -171,33 +189,43 @@ class ClassController {
       const newClass = await prisma.class.create({
         data: {
           categoryId: Number(categoryId),
-          categoryName,
+          courseId: courseId ? Number(courseId) : null,
           description,
           endDate: new Date(endDate),
           name,
           startDate: new Date(startDate),
-          status,
-          studentCount: students.length,
-          students: {
-            create: students.map((student: any) => ({
-              attendanceRate: student.attendanceRate || 100,
-              company: student.company || '',
-              email: student.email || '',
-              joinDate: new Date(student.joinDate || startDate),
-              name: student.name,
-              phone: student.phone || '',
-              position: student.position || '',
-              status: student.status || 1
-            }))
-          },
-          teacher
+          status
         },
         include: {
+          category: true,
+          course: true,
           students: true
         }
       });
 
-      res.json(createSuccessResponse(newClass, '创建班级成功', req.path));
+      // 格式化返回数据
+      const studentCount = newClass.students ? newClass.students.length : 0;
+      const coursePrice = newClass.course?.price || 0;
+
+      const formattedClass = {
+        categoryId: newClass.categoryId,
+        categoryName: newClass.category?.name || '',
+        courseId: newClass.courseId,
+        courseName: newClass.course?.courseName || '',
+        coursePrice: coursePrice,
+        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
+        createdAt: newClass.createdAt.toISOString().replace('T', ' ').substring(0, 19),
+        description: newClass.description,
+        endDate: newClass.endDate.toISOString().split('T')[0],
+        id: newClass.id,
+        name: newClass.name,
+        startDate: newClass.startDate.toISOString().split('T')[0],
+        status: newClass.status,
+        studentCount: studentCount,
+        updatedAt: newClass.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
+      };
+
+      res.json(createSuccessResponse(formattedClass, '创建班级成功', req.path));
     } catch (error) {
       logger.error('创建班级失败:', error);
       res.status(500).json(createErrorResponse(500, '创建班级失败', null, req.path));
@@ -208,7 +236,7 @@ class ClassController {
   async updateClass(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { categoryId, categoryName, description, endDate, name, startDate, teacher } = req.body;
+      const { categoryId, courseId, description, endDate, name, startDate } = req.body;
 
       // 检查班级是否存在
       const existingClass = await prisma.class.findUnique({
@@ -234,21 +262,44 @@ class ClassController {
       const updatedClass = await prisma.class.update({
         data: {
           categoryId: Number(categoryId),
-          categoryName,
+          courseId: courseId ? Number(courseId) : null,
           description,
           endDate: new Date(endDate),
           name,
           startDate: new Date(startDate),
-          status,
-          teacher
+          status
         },
         include: {
+          category: true,
+          course: true,
           students: true
         },
         where: { id: Number(id) }
       });
 
-      res.json(createSuccessResponse(updatedClass, '更新班级成功', req.path));
+      // 格式化返回数据
+      const studentCount = updatedClass.students ? updatedClass.students.length : 0;
+      const coursePrice = updatedClass.course?.price || 0;
+
+      const formattedClass = {
+        categoryId: updatedClass.categoryId,
+        categoryName: updatedClass.category?.name || '',
+        courseId: updatedClass.courseId,
+        courseName: updatedClass.course?.courseName || '',
+        coursePrice: coursePrice,
+        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
+        createdAt: updatedClass.createdAt.toISOString().replace('T', ' ').substring(0, 19),
+        description: updatedClass.description,
+        endDate: updatedClass.endDate.toISOString().split('T')[0],
+        id: updatedClass.id,
+        name: updatedClass.name,
+        startDate: updatedClass.startDate.toISOString().split('T')[0],
+        status: updatedClass.status,
+        studentCount: studentCount,
+        updatedAt: updatedClass.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
+      };
+
+      res.json(createSuccessResponse(formattedClass, '更新班级成功', req.path));
     } catch (error) {
       logger.error('更新班级失败:', error);
       res.status(500).json(createErrorResponse(500, '更新班级失败', null, req.path));
