@@ -1,25 +1,19 @@
 import { apiClient } from './client';
-import type { ApiResponse, PageResponse, AttachmentApi } from './types';
+import type { ApiResponse, AttachmentApi, PageResponse } from './types';
 
-/**
- * 附件服务
- */
+/** 附件服务 */
 class AttachmentService {
   private readonly baseURL = '/attachments';
 
-  /**
-   * 获取附件列表
-   */
+  /** 获取附件列表 */
   async getAttachmentList(params: AttachmentApi.AttachmentQueryParams) {
     const response = await apiClient.get<PageResponse<AttachmentApi.AttachmentListItem>>(`${this.baseURL}`, {
       params
     });
-    return response;
+    return response.data;
   }
 
-  /**
-   * 上传附件
-   */
+  /** 上传附件 */
   async uploadAttachment(data: AttachmentApi.UploadAttachmentRequest & { onProgress?: (progress: number) => void }) {
     const formData = new FormData();
     formData.append('file', data.file);
@@ -28,78 +22,77 @@ class AttachmentService {
       formData.append('description', data.description);
     }
 
-    const response = await apiClient.post<ApiResponse<AttachmentApi.AttachmentListItem>>(`${this.baseURL}/upload`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.total) {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          console.log(`Upload Progress: ${percentCompleted}%`);
-          if (data.onProgress) {
-            data.onProgress(percentCompleted);
+    const response = await apiClient.post<ApiResponse<AttachmentApi.AttachmentListItem>>(
+      `${this.baseURL}/upload`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: progressEvent => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            console.log(`Upload Progress: ${percentCompleted}%`);
+            if (data.onProgress) {
+              data.onProgress(percentCompleted);
+            }
           }
         }
       }
-    });
-    return response;
+    );
+    return response.data;
   }
 
-  /**
-   * 删除附件
-   */
+  /** 删除附件 */
   async deleteAttachment(attachmentId: number) {
     const response = await apiClient.delete<ApiResponse>(`${this.baseURL}/${attachmentId}`);
-    return response;
+    return response.data;
   }
 
-  /**
-   * 获取附件详情
-   */
+  /** 获取附件详情 */
   async getAttachmentDetail(attachmentId: number) {
-    const response = await apiClient.get<ApiResponse<AttachmentApi.AttachmentListItem>>(`${this.baseURL}/${attachmentId}`);
-    return response;
+    const response = await apiClient.get<ApiResponse<AttachmentApi.AttachmentListItem>>(
+      `${this.baseURL}/${attachmentId}`
+    );
+    return response.data;
   }
 
-  /**
-   * 下载附件
-   */
+  /** 下载附件 */
   async downloadAttachment(attachmentId: number) {
     const response = await apiClient.get(`${this.baseURL}/${attachmentId}/download`, {
       responseType: 'blob'
     });
-    return response;
+    return response.data;
   }
 
-  /**
-   * 批量删除附件
-   */
+  /** 批量删除附件 */
   async batchDeleteAttachments(attachmentIds: number[]) {
     const response = await apiClient.delete<ApiResponse>(`${this.baseURL}/batch`, {
       data: { attachmentIds }
     });
-    return response;
+    return response.data;
   }
 
-  /**
-   * 更新附件信息
-   */
-  async updateAttachment(attachmentId: number, data: { fileName?: string; description?: string }) {
-    const response = await apiClient.put<ApiResponse<AttachmentApi.AttachmentListItem>>(`${this.baseURL}/${attachmentId}`, data);
-    return response;
+  /** 更新附件信息 */
+  async updateAttachment(attachmentId: number, data: { description?: string; fileName?: string }) {
+    const response = await apiClient.put<ApiResponse<AttachmentApi.AttachmentListItem>>(
+      `${this.baseURL}/${attachmentId}`,
+      data
+    );
+    return response.data;
   }
 
-  /**
-   * 获取课程的附件统计
-   */
+  /** 获取课程的附件统计 */
   async getCourseAttachmentStats(courseId: number) {
-    const response = await apiClient.get<ApiResponse<{
-      totalCount: number;
-      totalSize: number;
-      fileTypes: { type: string; count: number }[];
-    }>>(`${this.baseURL}/course/${courseId}/stats`);
-    return response;
+    const response = await apiClient.get<
+      ApiResponse<{
+        fileTypes: { count: number; type: string }[];
+        totalCount: number;
+        totalSize: number;
+      }>
+    >(`${this.baseURL}/course/${courseId}/stats`);
+    return response.data;
   }
 }
 
-export const attachmentService = new AttachmentService(); 
+export const attachmentService = new AttachmentService();
