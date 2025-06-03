@@ -39,16 +39,16 @@ class ApiClient {
       config => {
         // 打印请求信息
         console.log('🚀 发送请求:', {
-          method: config.method?.toUpperCase(),
-          url: config.url,
           baseURL: config.baseURL,
-          fullURL: `${config.baseURL}${config.url}`,
-          params: config.params,
           data: config.data,
+          fullURL: `${config.baseURL}${config.url}`,
           headers: {
             Authorization: config.headers?.Authorization ? '已设置' : '未设置',
             'Content-Type': config.headers?.['Content-Type']
-          }
+          },
+          method: config.method?.toUpperCase(),
+          params: config.params,
+          url: config.url
         });
 
         // 添加认证token
@@ -82,10 +82,10 @@ class ApiClient {
     this.instance.interceptors.response.use(
       (response: AxiosResponse<ApiResponse>) => {
         console.log('📨 收到响应:', {
+          data: response.data,
           status: response.status,
           statusText: response.statusText,
-          url: response.config.url,
-          data: response.data
+          url: response.config.url
         });
 
         // 如果是blob类型响应，直接返回数据
@@ -110,14 +110,14 @@ class ApiClient {
       },
       error => {
         console.error('❌ HTTP响应错误:', {
+          config: {
+            baseURL: error.config?.baseURL,
+            method: error.config?.method,
+            url: error.config?.url
+          },
           message: error.message,
           response: error.response?.data,
-          status: error.response?.status,
-          config: {
-            method: error.config?.method,
-            url: error.config?.url,
-            baseURL: error.config?.baseURL
-          }
+          status: error.response?.status
         });
 
         // 网络错误或HTTP状态码错误
