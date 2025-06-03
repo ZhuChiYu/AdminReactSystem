@@ -45,7 +45,8 @@ app.use(
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"]
       }
-    }
+    },
+    crossOriginResourcePolicy: { policy: "cross-origin" }
   })
 );
 
@@ -95,8 +96,8 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 设置响应编码为UTF-8
-app.use((req, res, next) => {
+// 设置响应编码为UTF-8，但只针对API路由
+app.use('/api', (req, res, next) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   next();
 });
@@ -162,8 +163,21 @@ if (process.env.API_DOC_ENABLED === 'true') {
   setupSwagger(app);
 }
 
-// 静态文件服务
-app.use('/uploads', express.static(config.uploadPath));
+// 静态文件服务 - 添加CORS支持
+app.use('/uploads', (req, res, next) => {
+  // 设置CORS头部
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+  // 处理预检请求
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  next();
+}, express.static(config.uploadPath));
 
 // 404处理
 app.use('*', (req, res) => {

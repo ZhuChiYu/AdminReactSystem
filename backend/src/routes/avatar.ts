@@ -1,4 +1,5 @@
 import path from 'node:path';
+import fs from 'node:fs';
 
 import express from 'express';
 import multer from 'multer';
@@ -8,10 +9,16 @@ import { logger } from '@/utils/logger';
 
 const router = express.Router();
 
+// 确保上传目录存在
+const avatarsDir = 'uploads/avatars';
+if (!fs.existsSync(avatarsDir)) {
+  fs.mkdirSync(avatarsDir, { recursive: true });
+}
+
 // 配置文件上传
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/avatars');
+    cb(null, avatarsDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -183,7 +190,7 @@ router.post('/batch', async (req, res) => {
       }
     });
 
-    const avatarInfo = users.map(user => ({
+    const avatarInfo = users.map((user: { avatar: string | null; id: number; nickName: string }) => ({
       avatarUrl: user.avatar,
       userId: user.id,
       username: user.nickName
