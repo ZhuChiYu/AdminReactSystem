@@ -1,16 +1,34 @@
 import clsx from 'clsx';
+import { useSelector } from 'react-redux';
 
-import soybeanAvatar from '@/assets/imgs/soybean.jpg';
+import UserAvatar from '@/components/UserAvatar';
+import { selectUserInfo } from '@/features/auth/authStore';
 
-const SoybeanAvatar = ({ className, ...props }: React.ComponentProps<'div'>) => {
+interface SoybeanAvatarProps extends React.ComponentProps<'div'> {
+  size?: number;
+}
+
+const SoybeanAvatar = ({ className, size = 72, ...props }: SoybeanAvatarProps) => {
+  const userInfo = useSelector(selectUserInfo);
+
+  // 转换性别格式
+  const convertGender = (gender: number | undefined): 'male' | 'female' | undefined => {
+    if (gender === 1) return 'male';
+    if (gender === 2) return 'female';
+    return undefined;
+  };
+
   return (
     <div
       {...props}
-      className={clsx('size-72px  overflow-hidden rd-1/2', className)}
+      className={clsx('overflow-hidden rd-1/2', className)}
+      style={{ height: size, width: size }}
     >
-      <img
-        className="size-full"
-        src={soybeanAvatar}
+      <UserAvatar
+        avatar={userInfo.avatar}
+        gender={convertGender(userInfo.gender)}
+        size={size}
+        userId={Number.parseInt(userInfo.userId, 10)}
       />
     </div>
   );

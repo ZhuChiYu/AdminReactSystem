@@ -2,21 +2,15 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { useEffect, useState } from 'react';
 
-import avatar from '@/assets/imgs/soybean.jpg';
+import UserAvatar from '@/components/UserAvatar';
 import { selectUserInfo } from '@/features/auth/authStore';
+import { useAppSelector } from '@/hooks/business/useStore';
 import 'dayjs/locale/zh-cn';
 
 dayjs.extend(duration);
 dayjs.locale('zh-cn');
 
-interface StatisticData {
-  id: number;
-  title: string;
-  value: string;
-}
-
 const HeaderBanner = () => {
-  const { t } = useTranslation();
   const userInfo = useAppSelector(selectUserInfo);
 
   // 用户注册时间，模拟数据
@@ -46,6 +40,13 @@ const HeaderBanner = () => {
     setJoinTime(timeString);
   }, []);
 
+  // 转换性别格式
+  const convertGender = (gender: number | undefined): 'male' | 'female' | undefined => {
+    if (gender === 1) return 'male';
+    if (gender === 2) return 'female';
+    return undefined;
+  };
+
   return (
     <ACard
       className="card-wrapper"
@@ -53,9 +54,11 @@ const HeaderBanner = () => {
     >
       <div className="flex-y-center">
         <div className="size-72px shrink-0 overflow-hidden rd-1/2">
-          <img
-            className="size-full"
-            src={avatar}
+          <UserAvatar
+            avatar={userInfo.avatar}
+            gender={convertGender(userInfo.gender)}
+            size={72}
+            userId={Number.parseInt(userInfo.userId, 10)}
           />
         </div>
         <div className="pl-12px">
