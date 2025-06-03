@@ -1,5 +1,5 @@
 import { LockOutlined, MailOutlined, PhoneOutlined, SaveOutlined, UserOutlined } from '@ant-design/icons';
-import { Avatar, Badge, Button, Card, Col, Divider, Form, Input, Row, Space, Tabs, Tag, message } from 'antd';
+import { Button, Card, Col, Divider, Form, Input, Row, Tabs, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -8,6 +8,17 @@ import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
 import { authService, userService } from '@/service/api';
 import { UserRole, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
+
+// 扩展用户信息接口以包含更多属性
+interface ExtendedUserInfo extends Api.Auth.UserInfo {
+  avatar?: string;
+  department?: string;
+  email?: string;
+  gender?: number;
+  nickName?: string;
+  phone?: string;
+  position?: string;
+}
 
 /** 个人中心组件 */
 const UserCenter = () => {
@@ -18,7 +29,7 @@ const UserCenter = () => {
   const [passwordForm] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [currentUserData, setCurrentUserData] = useState(userInfo);
+  const [currentUserData, setCurrentUserData] = useState<ExtendedUserInfo>(userInfo);
 
   // 判断当前用户权限
   const isUserAdmin = isAdmin();
@@ -29,17 +40,59 @@ const UserCenter = () => {
     try {
       setLoading(true);
       const latestUserInfo = await authService.getUserInfo();
-      setCurrentUserData(latestUserInfo);
-      dispatch(setUserInfo(latestUserInfo));
-      // 更新本地存储
-      localStg.set('userInfo', latestUserInfo);
+
+      // 转换API返回的用户信息格式以匹配本地状态
+      const convertedUserInfo: ExtendedUserInfo = {
+        // 扩展属性
+        avatar: latestUserInfo.avatar || '',
+        buttons: latestUserInfo.buttons || [],
+        department: latestUserInfo.department || (isUserAdmin ? '管理部门' : '员工部门'),
+        email: latestUserInfo.email || '',
+        gender: latestUserInfo.gender || undefined,
+        nickName: latestUserInfo.nickName || '',
+        phone: latestUserInfo.phone || '',
+        position: latestUserInfo.position || '',
+        roles: latestUserInfo.roles?.map((role: any) => role.roleCode || role) || [],
+        userId: latestUserInfo.id?.toString() || currentUserData.userId,
+        userName: latestUserInfo.userName || ''
+      };
+
+      setCurrentUserData(convertedUserInfo);
+      dispatch(
+        setUserInfo({
+          avatar: convertedUserInfo.avatar,
+          buttons: convertedUserInfo.buttons,
+          department: convertedUserInfo.department,
+          email: convertedUserInfo.email,
+          gender: convertedUserInfo.gender,
+          nickName: convertedUserInfo.nickName,
+          phone: convertedUserInfo.phone,
+          position: convertedUserInfo.position,
+          roles: convertedUserInfo.roles,
+          userId: convertedUserInfo.userId,
+          userName: convertedUserInfo.userName
+        })
+      );
+      localStg.set('userInfo', {
+        avatar: convertedUserInfo.avatar,
+        buttons: convertedUserInfo.buttons,
+        department: convertedUserInfo.department,
+        email: convertedUserInfo.email,
+        gender: convertedUserInfo.gender,
+        nickName: convertedUserInfo.nickName,
+        phone: convertedUserInfo.phone,
+        position: convertedUserInfo.position,
+        roles: convertedUserInfo.roles,
+        userId: convertedUserInfo.userId,
+        userName: convertedUserInfo.userName
+      });
 
       // 更新表单数据
       userForm.setFieldsValue({
-        department: latestUserInfo.department || (isUserAdmin ? '管理部门' : '员工部门'),
-        email: latestUserInfo.email,
-        phone: latestUserInfo.phone,
-        userName: latestUserInfo.userName
+        department: convertedUserInfo.department,
+        email: convertedUserInfo.email,
+        phone: convertedUserInfo.phone,
+        userName: convertedUserInfo.userName
       });
     } catch (error) {
       console.error('加载用户信息失败:', error);
@@ -58,7 +111,7 @@ const UserCenter = () => {
     try {
       setSubmitting(true);
       await userService.updateUserProfile({
-        userId: Number.parseInt(currentUserData.userId),
+        userId: Number.parseInt(currentUserData.userId, 10),
         ...values
       });
       message.success('个人信息保存成功');
@@ -80,7 +133,7 @@ const UserCenter = () => {
       await userService.changePassword({
         newPassword: values.newPassword,
         oldPassword: values.oldPassword,
-        userId: Number.parseInt(currentUserData.userId)
+        userId: Number.parseInt(currentUserData.userId, 10)
       });
       message.success('密码修改成功');
       passwordForm.resetFields();
@@ -95,23 +148,57 @@ const UserCenter = () => {
   // 头像更新回调
   const handleAvatarChange = async (newAvatarUrl: string) => {
     try {
-      // 更新用户头像
+      // 立即更新前端显示
       const updatedUserInfo = { ...currentUserData, avatar: newAvatarUrl };
       setCurrentUserData(updatedUserInfo);
-      dispatch(setUserInfo(updatedUserInfo));
-      localStg.set('userInfo', updatedUserInfo);
 
-      // 同时更新后端
-      await userService.updateUserProfile({
-        avatar: newAvatarUrl,
-        userId: Number.parseInt(currentUserData.userId)
+      // 更新Redux状态和本地存储
+      dispatch(
+        setUserInfo({
+          avatar: updatedUserInfo.avatar,
+          buttons: updatedUserInfo.buttons,
+          department: updatedUserInfo.department,
+          email: updatedUserInfo.email,
+          gender: updatedUserInfo.gender,
+          nickName: updatedUserInfo.nickName,
+          phone: updatedUserInfo.phone,
+          position: updatedUserInfo.position,
+          roles: updatedUserInfo.roles,
+          userId: updatedUserInfo.userId,
+          userName: updatedUserInfo.userName
+        })
+      );
+      localStg.set('userInfo', {
+        avatar: updatedUserInfo.avatar,
+        buttons: updatedUserInfo.buttons,
+        department: updatedUserInfo.department,
+        email: updatedUserInfo.email,
+        gender: updatedUserInfo.gender,
+        nickName: updatedUserInfo.nickName,
+        phone: updatedUserInfo.phone,
+        position: updatedUserInfo.position,
+        roles: updatedUserInfo.roles,
+        userId: updatedUserInfo.userId,
+        userName: updatedUserInfo.userName
       });
+
+      // 重新加载最新的用户信息以确保数据同步
+      await loadUserInfo();
 
       message.success('头像更新成功');
     } catch (error) {
       console.error('更新头像失败:', error);
       message.error('更新头像失败');
+      // 发生错误时重新加载用户信息
+      await loadUserInfo();
     }
+  };
+
+  // 转换性别格式
+  const convertGender = (gender: number | undefined): 'male' | 'female' | undefined => {
+    if (gender === 1) return 'male';
+    if (gender === 2) return 'female';
+    return undefined;
   };
 
   // 基本信息表单
@@ -250,6 +337,17 @@ const UserCenter = () => {
     </Form>
   );
 
+  // 渲染角色标签
+  const renderRoleTag = (role: string) => {
+    if (role === UserRole.SUPER_ADMIN) {
+      return '超级管理员';
+    }
+    if (role === UserRole.ADMIN) {
+      return '管理员';
+    }
+    return '员工';
+  };
+
   return (
     <div className="h-full bg-white p-6 dark:bg-[#141414]">
       <Row gutter={24}>
@@ -261,49 +359,67 @@ const UserCenter = () => {
         >
           <Card loading={loading}>
             <div className="flex flex-col items-center">
-              <Card
-                bordered={false}
-                style={{ textAlign: 'center' }}
-              >
-                <UserAvatar
-                  avatar={currentUserData.avatar}
-                  editable={true}
-                  gender={currentUserData.gender}
-                  size={120}
-                  userId={Number.parseInt(currentUserData.userId)}
-                  onAvatarChange={handleAvatarChange}
-                />
-                <h3 style={{ marginTop: 16 }}>{currentUserData.userName}</h3>
-              </Card>
-              <Divider />
-              <p className="mb-2 text-gray-500">ID: {currentUserData.userId || '未设置'}</p>
-              <div className="mt-2">
+              <div className="mb-6 flex flex-col items-center">
+                <div className="relative mb-4">
+                  <div className="rounded-full from-blue-400 to-purple-500 bg-gradient-to-r p-1">
+                    <div className="rounded-full bg-white p-2">
+                      <div className="overflow-hidden rounded-full">
+                        <UserAvatar
+                          avatar={currentUserData.avatar}
+                          editable={true}
+                          gender={convertGender(currentUserData.gender)}
+                          size={120}
+                          userId={Number.parseInt(currentUserData.userId, 10)}
+                          onAvatarChange={handleAvatarChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {/* 在线状态指示器 */}
+                  <div className="absolute bottom-2 right-2 h-6 w-6 border-2 border-white rounded-full bg-green-500" />
+                </div>
+                <h3 className="text-xl text-gray-800 font-bold dark:text-white">{currentUserData.userName}</h3>
+                <p className="text-sm text-gray-500">ID: {currentUserData.userId || '未设置'}</p>
+              </div>
+
+              <div className="mb-4 flex flex-wrap justify-center gap-2">
                 {currentUserData.roles?.map(role => (
                   <Tag
+                    className="px-3 py-1"
                     color={role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN ? 'gold' : 'blue'}
                     key={role}
                   >
-                    {role === UserRole.SUPER_ADMIN ? '超级管理员' : role === UserRole.ADMIN ? '管理员' : '员工'}
+                    {renderRoleTag(role)}
                   </Tag>
                 ))}
               </div>
-              <Divider />
-              <div className="w-full">
-                <p className="mb-1 text-gray-500">
-                  <UserOutlined className="mr-2" />
-                  上次登录时间
-                </p>
-                <p className="mb-3 text-gray-700">{new Date().toLocaleString()}</p>
-                <p className="mb-1 text-gray-500">
-                  <MailOutlined className="mr-2" />
-                  电子邮箱
-                </p>
-                <p className="mb-3 text-gray-700">{currentUserData.email || '未设置'}</p>
-                <p className="mb-1 text-gray-500">
-                  <PhoneOutlined className="mr-2" />
-                  联系电话
-                </p>
-                <p className="text-gray-700">{currentUserData.phone || '未设置'}</p>
+
+              <Divider className="my-4" />
+
+              <div className="w-full space-y-4">
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                  <p className="mb-1 flex items-center text-sm text-gray-500">
+                    <UserOutlined className="mr-2" />
+                    上次登录时间
+                  </p>
+                  <p className="text-gray-700 dark:text-gray-300">{new Date().toLocaleString()}</p>
+                </div>
+
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                  <p className="mb-1 flex items-center text-sm text-gray-500">
+                    <MailOutlined className="mr-2" />
+                    电子邮箱
+                  </p>
+                  <p className="text-gray-700 dark:text-gray-300">{currentUserData.email || '未设置'}</p>
+                </div>
+
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                  <p className="mb-1 flex items-center text-sm text-gray-500">
+                    <PhoneOutlined className="mr-2" />
+                    联系电话
+                  </p>
+                  <p className="text-gray-700 dark:text-gray-300">{currentUserData.phone || '未设置'}</p>
+                </div>
               </div>
             </div>
           </Card>

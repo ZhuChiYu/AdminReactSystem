@@ -67,6 +67,12 @@ const UserAvatar = memo(() => {
     }
   ];
 
+  const convertGender = (gender: number | undefined): 'male' | 'female' | undefined => {
+    if (gender === 1) return 'male';
+    if (gender === 2) return 'female';
+    return undefined;
+  };
+
   return token ? (
     <ADropdown
       menu={{ items, onClick }}
@@ -76,8 +82,9 @@ const UserAvatar = memo(() => {
       <div className="flex cursor-pointer items-center px-12px">
         <UserAvatarComponent
           avatar={userInfo.avatar}
+          gender={convertGender(userInfo.gender)}
           size={32}
-          userId={userInfo.userId}
+          userId={Number.parseInt(userInfo.userId, 10)}
         />
         <span className="ml-8px text-16px font-medium">{userInfo.userName}</span>
       </div>

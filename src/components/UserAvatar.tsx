@@ -1,8 +1,8 @@
 import { LoadingOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
-import { Avatar, Upload, message } from 'antd';
+import { App, Avatar, Upload } from 'antd';
 import type { UploadChangeParam } from 'antd/es/upload';
 import type { RcFile, UploadFile, UploadProps } from 'antd/es/upload/interface';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import { avatarService } from '@/service/api/avatar';
 
@@ -32,31 +32,32 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [useDefault, setUseDefault] = useState(false);
+  const { message } = App.useApp();
 
-  useEffect(() => {
-    if (avatar && avatar.trim() && !avatar.includes('xsgames.co') && !avatar.includes('randomusers')) {
-      // 如果有真实的自定义头像
-      setAvatarUrl(avatar);
-      setUseDefault(false);
-    } else if (userId) {
-      // 如果没有avatar但有userId，从API获取
-      loadUserAvatar();
-    } else {
-      // 都没有，使用默认头像
-      setUseDefault(true);
-    }
-  }, [userId, avatar, gender, size]);
-
-  const loadUserAvatar = async () => {
+  const loadUserAvatar = useCallback(async () => {
     if (!userId) return;
 
     try {
+      console.log('调用avatarService.getUserAvatar, userId:', userId);
       const avatarInfo = await avatarService.getUserAvatar(userId);
+      console.log('获取到的头像信息:', avatarInfo);
+
       if (avatarInfo?.avatarUrl && avatarInfo.avatarUrl.trim()) {
-        setAvatarUrl(avatarInfo.avatarUrl);
+        let fullAvatarUrl = avatarInfo.avatarUrl;
+
+        // 如果是相对路径，转换为完整的后端URL
+        if (fullAvatarUrl.startsWith('/')) {
+          const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+          const backendDomain = backendBaseUrl.replace('/api', '');
+          fullAvatarUrl = backendDomain + fullAvatarUrl;
+        }
+
+        console.log('设置头像URL:', fullAvatarUrl);
+        setAvatarUrl(fullAvatarUrl);
         setUseDefault(false);
       } else {
         // 使用默认头像
+        console.log('头像信息为空，使用默认头像');
         setUseDefault(true);
       }
     } catch (error) {
@@ -64,7 +65,52 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       // 使用默认头像
       setUseDefault(true);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    console.log('UserAvatar useEffect 触发:', { avatar, gender, size, userId });
+
+    // 如果传入了有效的头像URL，直接使用
+    if (avatar && avatar.trim() && (avatar.startsWith('/uploads/') || avatar.startsWith('http'))) {
+      console.log('使用传入的有效头像路径:', avatar);
+
+      let fullAvatarUrl = avatar;
+      // 如果是相对路径，转换为完整的后端URL
+      if (fullAvatarUrl.startsWith('/')) {
+        const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+        const backendDomain = backendBaseUrl.replace('/api', '');
+        fullAvatarUrl = backendDomain + fullAvatarUrl;
+      }
+
+      setAvatarUrl(fullAvatarUrl);
+      setUseDefault(false);
+      return;
+    }
+
+    // 优先从API获取最新的头像信息（只有在没有有效avatar参数时）
+    if (userId && (!avatar || !avatar.trim() || (!avatar.startsWith('/uploads/') && !avatar.startsWith('http')))) {
+      console.log('从API获取用户头像, userId:', userId);
+      loadUserAvatar();
+    } else if (avatar && avatar.trim() && !avatar.includes('xsgames.co') && !avatar.includes('randomusers')) {
+      // 如果没有userId但有真实的自定义头像，则使用传入的avatar
+      console.log('使用传入的头像:', avatar);
+
+      let fullAvatarUrl = avatar;
+      // 如果是相对路径，转换为完整的后端URL
+      if (fullAvatarUrl.startsWith('/')) {
+        const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+        const backendDomain = backendBaseUrl.replace('/api', '');
+        fullAvatarUrl = backendDomain + fullAvatarUrl;
+      }
+
+      setAvatarUrl(fullAvatarUrl);
+      setUseDefault(false);
+    } else {
+      // 都没有，使用默认头像
+      console.log('使用默认头像');
+      setUseDefault(true);
+    }
+  }, [userId, avatar, gender, size, loadUserAvatar]);
 
   const beforeUpload = (file: RcFile) => {
     const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
@@ -89,9 +135,10 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       setLoading(false);
       // 上传成功，获取新的头像URL
       if (info.file.response?.url && info.file.response.url.trim()) {
-        setAvatarUrl(info.file.response.url);
+        const newAvatarUrl = info.file.response.url;
+        setAvatarUrl(newAvatarUrl);
         setUseDefault(false);
-        onAvatarChange?.(info.file.response.url);
+        onAvatarChange?.(newAvatarUrl);
         message.success('头像上传成功!');
       }
     }
@@ -118,9 +165,14 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   );
 
   // 转换性别格式
-  const normalizedGender =
-    gender === '男' || gender === 'male' ? 'male' : gender === '女' || gender === 'female' ? 'female' : undefined;
+  let normalizedGender: 'male' | 'female' | undefined;
+  if (gender === '男' || gender === 'male') {
+    normalizedGender = 'male';
+  } else if (gender === '女' || gender === 'female') {
+    normalizedGender = 'female';
+  }
 
+  // 渲染可编辑的头像
   if (editable) {
     return (
       <Upload
@@ -132,24 +184,32 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
         showUploadList={false}
         onChange={handleChange}
       >
-        {avatarUrl && avatarUrl.trim() && !useDefault ? (
-          <Avatar
-            icon={<UserOutlined />}
-            size={size}
-            src={avatarUrl}
-          />
-        ) : useDefault ? (
-          <DefaultAvatar
-            gender={normalizedGender}
-            size={size}
-          />
-        ) : (
-          uploadButton
-        )}
+        {(() => {
+          if (!useDefault && avatarUrl && avatarUrl.trim()) {
+            return (
+              <Avatar
+                icon={<UserOutlined />}
+                size={size}
+                src={avatarUrl}
+                style={{ objectFit: 'cover' }}
+              />
+            );
+          }
+          if (useDefault) {
+            return (
+              <DefaultAvatar
+                gender={normalizedGender}
+                size={size}
+              />
+            );
+          }
+          return uploadButton;
+        })()}
       </Upload>
     );
   }
 
+  // 渲染只读头像
   if (useDefault) {
     return (
       <DefaultAvatar
@@ -166,7 +226,10 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       icon={<UserOutlined />}
       size={size}
       src={avatarUrl && avatarUrl.trim() ? avatarUrl : undefined}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={{
+        cursor: onClick ? 'pointer' : 'default',
+        objectFit: 'cover'
+      }}
       onClick={onClick}
     />
   );
