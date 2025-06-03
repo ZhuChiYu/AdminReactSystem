@@ -1,7 +1,8 @@
 import { Router } from 'express';
+
 import { prisma } from '@/config/database';
-import { logger } from '@/utils/logger';
 import { ApiError } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 
 const router = Router();
 
@@ -54,16 +55,7 @@ const router = Router();
 // 获取课程列表
 router.get('/', async (req, res) => {
   try {
-    const {
-      current = 1,
-      size = 10,
-      courseName,
-      categoryId,
-      instructor,
-      status,
-      startDate,
-      endDate
-    } = req.query;
+    const { categoryId, courseName, current = 1, endDate, instructor, size = 10, startDate, status } = req.query;
 
     const where: any = {};
 
@@ -76,7 +68,7 @@ router.get('/', async (req, res) => {
     }
 
     if (categoryId) {
-      where.categoryId = parseInt(categoryId as string);
+      where.categoryId = Number.parseInt(categoryId as string);
     }
 
     if (instructor) {
@@ -87,7 +79,7 @@ router.get('/', async (req, res) => {
     }
 
     if (status !== undefined) {
-      where.status = parseInt(status as string);
+      where.status = Number.parseInt(status as string);
     }
 
     if (startDate && endDate) {
@@ -97,73 +89,73 @@ router.get('/', async (req, res) => {
       };
     }
 
-    const skip = (parseInt(current as string) - 1) * parseInt(size as string);
-    const take = parseInt(size as string);
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
 
     // 获取课程列表
     const courses = await prisma.course.findMany({
-      where,
       include: {
-        category: true,
         _count: {
           select: {
             enrollments: true
           }
-        }
+        },
+        category: true
       },
       orderBy: { createdAt: 'desc' },
       skip,
-      take
+      take,
+      where
     });
 
     // 获取总数
     const total = await prisma.course.count({ where });
 
-    const records = courses.map(course => ({
-      id: course.id,
-      courseName: course.courseName,
-      courseCode: course.courseCode,
+    const records = courses.map((course: any) => ({
       category: {
         id: course.category.id,
         name: course.category.name
       },
-      instructor: course.instructor,
+      courseCode: course.courseCode,
+      courseName: course.courseName,
+      createdAt: course.createdAt,
+      currentStudents: course.currentStudents,
       description: course.description,
       duration: course.duration,
-      price: course.price,
-      originalPrice: course.originalPrice,
-      maxStudents: course.maxStudents,
-      currentStudents: course.currentStudents,
-      startDate: course.startDate,
       endDate: course.endDate,
-      location: course.location,
-      status: course.status,
       enrollmentCount: course._count.enrollments,
-      createdAt: course.createdAt,
+      id: course.id,
+      instructor: course.instructor,
+      location: course.location,
+      maxStudents: course.maxStudents,
+      originalPrice: course.originalPrice,
+      price: course.price,
+      startDate: course.startDate,
+      status: course.status,
       updatedAt: course.updatedAt
     }));
 
     res.json({
       code: 0,
-      message: '获取课程列表成功',
       data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / take),
         records,
-        total,
-        current: parseInt(current as string),
-        size: parseInt(size as string),
-        pages: Math.ceil(total / take)
+        size: Number.parseInt(size as string),
+        total
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取课程列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取课程列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取课程列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取课程列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -193,22 +185,22 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     const course = await prisma.course.findUnique({
-      where: {
-        id: Number.parseInt(id)
-      },
       include: {
+        _count: {
+          select: {
+            enrollments: true
+          }
+        },
         category: true,
         enrollments: {
           orderBy: {
             enrollTime: 'desc'
           },
           take: 10
-        },
-        _count: {
-          select: {
-            enrollments: true
-          }
         }
+      },
+      where: {
+        id: Number.parseInt(id)
       }
     });
 
@@ -218,31 +210,31 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '获取课程详情成功',
       data: {
         ...course,
         enrollmentCount: course._count.enrollments
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取课程详情成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取课程详情失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '获取课程详情失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '获取课程详情失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -320,20 +312,20 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const {
-      courseName,
-      courseCode,
       categoryId,
-      instructor,
+      courseCode,
+      courseName,
       description,
-      objectives,
-      outline,
       duration,
-      price,
-      originalPrice,
-      maxStudents,
-      startDate,
       endDate,
+      instructor,
       location,
+      maxStudents,
+      objectives,
+      originalPrice,
+      outline,
+      price,
+      startDate,
       tags
     } = req.body;
 
@@ -357,20 +349,20 @@ router.post('/', async (req, res) => {
 
     const course = await prisma.course.create({
       data: {
-        courseName,
-        courseCode,
         categoryId,
-        instructor,
+        courseCode,
+        courseName,
         description,
-        objectives,
-        outline,
         duration,
-        price,
-        originalPrice,
-        maxStudents,
-        startDate: new Date(startDate),
         endDate: new Date(endDate),
+        instructor,
         location,
+        maxStudents,
+        objectives,
+        originalPrice,
+        outline,
+        price,
+        startDate: new Date(startDate),
         tags
       },
       include: {
@@ -382,28 +374,28 @@ router.post('/', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '课程创建成功',
       data: course,
-      timestamp: Date.now(),
-      path: req.path
+      message: '课程创建成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('创建课程失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '创建课程失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '创建课程失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -417,7 +409,7 @@ router.put('/:id', async (req, res) => {
 
     // 检查课程是否存在
     const existingCourse = await prisma.course.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     if (!existingCourse) {
@@ -444,39 +436,39 @@ router.put('/:id', async (req, res) => {
     }
 
     const course = await prisma.course.update({
-      where: { id: parseInt(id) },
       data: updateData,
       include: {
         category: true
-      }
+      },
+      where: { id: Number.parseInt(id) }
     });
 
     logger.info(`课程更新成功: ${course.courseName}`);
 
     res.json({
       code: 0,
-      message: '课程更新成功',
       data: course,
-      timestamp: Date.now(),
-      path: req.path
+      message: '课程更新成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('更新课程失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '更新课程失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '更新课程失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -489,14 +481,14 @@ router.delete('/:id', async (req, res) => {
 
     // 检查课程是否存在
     const course = await prisma.course.findUnique({
-      where: { id: parseInt(id) },
       include: {
         _count: {
           select: {
             enrollments: true
           }
         }
-      }
+      },
+      where: { id: Number.parseInt(id) }
     });
 
     if (!course) {
@@ -509,35 +501,35 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.course.delete({
-      where: { id: parseInt(id) }
+      where: { id: Number.parseInt(id) }
     });
 
     logger.info(`课程删除成功: ${course.courseName}`);
 
     res.json({
       code: 0,
-      message: '课程删除成功',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '课程删除成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('删除课程失败:', error);
     if (error instanceof ApiError) {
       res.status(error.statusCode).json({
         code: error.statusCode,
-        message: error.message,
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
       });
     } else {
       res.status(500).json({
         code: 500,
-        message: '删除课程失败',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '删除课程失败',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
   }
@@ -547,41 +539,337 @@ router.delete('/:id', async (req, res) => {
 router.get('/categories/list', async (req, res) => {
   try {
     const categories = await prisma.courseCategory.findMany({
-      where: { status: 1 },
-      orderBy: { sort: 'asc' },
       include: {
         _count: {
           select: {
             courses: true
           }
         }
-      }
+      },
+      orderBy: { sort: 'asc' },
+      where: { status: 1 }
     });
 
     res.json({
       code: 0,
-      message: '获取课程分类成功',
-      data: categories.map(cat => ({
+      data: categories.map((cat: any) => ({
+        code: cat.code,
+        courseCount: cat._count.courses,
+        description: cat.description,
         id: cat.id,
         name: cat.name,
-        code: cat.code,
-        description: cat.description,
-        courseCount: cat._count.courses,
         sort: cat.sort,
         status: cat.status
       })),
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取课程分类成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取课程分类失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取课程分类失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取课程分类失败',
+      path: req.path,
+      timestamp: Date.now()
     });
+  }
+});
+
+/**
+ * @swagger
+ * /api/courses/categories:
+ *   post:
+ *     summary: 创建课程分类
+ *     tags: [课程管理]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: 分类名称
+ *               description:
+ *                 type: string
+ *                 description: 分类描述
+ *               status:
+ *                 type: integer
+ *                 description: 状态 (0-禁用, 1-启用)
+ *               sort:
+ *                 type: integer
+ *                 description: 排序
+ *     responses:
+ *       200:
+ *         description: 创建成功
+ *       400:
+ *         description: 参数错误
+ */
+// 创建课程分类
+router.post('/categories', async (req, res) => {
+  try {
+    const { description, name, sort = 0, status = 1 } = req.body;
+
+    if (!name || name.trim() === '') {
+      throw new ApiError(400, '分类名称不能为空');
+    }
+
+    // 检查分类名称是否已存在
+    const existingCategory = await prisma.courseCategory.findFirst({
+      where: { name: name.trim() }
+    });
+
+    if (existingCategory) {
+      throw new ApiError(400, '分类名称已存在');
+    }
+
+    // 生成分类编码
+    const code = `CAT_${Date.now()}`;
+
+    const category = await prisma.courseCategory.create({
+      data: {
+        code,
+        description: description?.trim() || '',
+        name: name.trim(),
+        sort,
+        status
+      }
+    });
+
+    logger.info(`课程分类创建成功: ${name}`);
+
+    res.json({
+      code: 0,
+      data: category,
+      message: '课程分类创建成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('创建课程分类失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '创建课程分类失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+  }
+});
+
+/**
+ * @swagger
+ * /api/courses/categories/{id}:
+ *   put:
+ *     summary: 更新课程分类
+ *     tags: [课程管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 分类ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: 分类名称
+ *               description:
+ *                 type: string
+ *                 description: 分类描述
+ *               status:
+ *                 type: integer
+ *                 description: 状态 (0-禁用, 1-启用)
+ *               sort:
+ *                 type: integer
+ *                 description: 排序
+ *     responses:
+ *       200:
+ *         description: 更新成功
+ *       400:
+ *         description: 参数错误
+ *       404:
+ *         description: 分类不存在
+ */
+// 更新课程分类
+router.put('/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { description, name, sort, status } = req.body;
+
+    const categoryId = Number.parseInt(id);
+    if (isNaN(categoryId)) {
+      throw new ApiError(400, '无效的分类ID');
+    }
+
+    // 检查分类是否存在
+    const existingCategory = await prisma.courseCategory.findUnique({
+      where: { id: categoryId }
+    });
+
+    if (!existingCategory) {
+      throw new ApiError(404, '课程分类不存在');
+    }
+
+    // 如果更新名称，检查是否与其他分类重名
+    if (name && name.trim() !== existingCategory.name) {
+      const duplicateCategory = await prisma.courseCategory.findFirst({
+        where: {
+          id: { not: categoryId },
+          name: name.trim()
+        }
+      });
+
+      if (duplicateCategory) {
+        throw new ApiError(400, '分类名称已存在');
+      }
+    }
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name.trim();
+    if (description !== undefined) updateData.description = description?.trim() || '';
+    if (status !== undefined) updateData.status = status;
+    if (sort !== undefined) updateData.sort = sort;
+
+    const category = await prisma.courseCategory.update({
+      data: updateData,
+      where: { id: categoryId }
+    });
+
+    logger.info(`课程分类更新成功: ${category.name}`);
+
+    res.json({
+      code: 0,
+      data: category,
+      message: '课程分类更新成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('更新课程分类失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '更新课程分类失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+  }
+});
+
+/**
+ * @swagger
+ * /api/courses/categories/{id}:
+ *   delete:
+ *     summary: 删除课程分类
+ *     tags: [课程管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 分类ID
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ *       400:
+ *         description: 分类下有课程，无法删除
+ *       404:
+ *         description: 分类不存在
+ */
+// 删除课程分类
+router.delete('/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const categoryId = Number.parseInt(id);
+    if (isNaN(categoryId)) {
+      throw new ApiError(400, '无效的分类ID');
+    }
+
+    // 检查分类是否存在
+    const existingCategory = await prisma.courseCategory.findUnique({
+      include: {
+        _count: {
+          select: { courses: true }
+        }
+      },
+      where: { id: categoryId }
+    });
+
+    if (!existingCategory) {
+      throw new ApiError(404, '课程分类不存在');
+    }
+
+    // 检查是否有关联的课程
+    if (existingCategory._count.courses > 0) {
+      throw new ApiError(400, '该分类下还有课程，无法删除');
+    }
+
+    await prisma.courseCategory.delete({
+      where: { id: categoryId }
+    });
+
+    logger.info(`课程分类删除成功: ${existingCategory.name}`);
+
+    res.json({
+      code: 0,
+      data: null,
+      message: '课程分类删除成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('删除课程分类失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '删除课程分类失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
   }
 });
 
@@ -617,28 +905,28 @@ router.get('/statistics/overview', async (req, res) => {
 
     res.json({
       code: 0,
-      message: '获取课程统计成功',
       data: {
-        totalCourses,
+        categoryStats: categoryStats.map((cat: any) => ({
+          count: cat._count.courses,
+          name: cat.name
+        })),
         publishedCourses,
-        totalEnrollments,
         recentEnrollments,
-        categoryStats: categoryStats.map(cat => ({
-          name: cat.name,
-          count: cat._count.courses
-        }))
+        totalCourses,
+        totalEnrollments
       },
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取课程统计成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error: any) {
     logger.error('获取课程统计失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取课程统计失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取课程统计失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
@@ -651,68 +939,68 @@ router.get('/class', async (req, res) => {
     if (!classId) {
       return res.status(400).json({
         code: 400,
-        message: '缺少班级ID参数',
         data: null,
-        timestamp: Date.now(),
-        path: req.path
+        message: '缺少班级ID参数',
+        path: req.path,
+        timestamp: Date.now()
       });
     }
 
-    const page = parseInt(current as string);
-    const pageSize = parseInt(size as string);
+    const page = Number.parseInt(current as string);
+    const pageSize = Number.parseInt(size as string);
     const skip = (page - 1) * pageSize;
 
     // 查询该班级关联的课程
     const [courses, total] = await Promise.all([
       prisma.course.findMany({
-        where: {
-          // 这里可以根据实际业务逻辑调整查询条件
-          // 暂时返回所有课程作为示例
-        },
         include: {
           category: true
         },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: pageSize
+        take: pageSize,
+        where: {
+          // 这里可以根据实际业务逻辑调整查询条件
+          // 暂时返回所有课程作为示例
+        }
       }),
       prisma.course.count()
     ]);
 
     const result = {
-      records: courses.map(course => ({
-        id: course.id,
-        courseName: course.courseName,
+      current: page,
+      pages: Math.ceil(total / pageSize),
+      records: courses.map((course: any) => ({
+        category: course.category,
         courseCode: course.courseCode,
-        instructor: course.instructor,
+        courseName: course.courseName,
         duration: course.duration,
+        endDate: course.endDate?.toISOString().split('T')[0],
+        id: course.id,
+        instructor: course.instructor,
         price: course.price,
         startDate: course.startDate?.toISOString().split('T')[0],
-        endDate: course.endDate?.toISOString().split('T')[0],
-        status: course.status,
-        category: course.category
+        status: course.status
       })),
-      total,
-      current: page,
       size: pageSize,
-      pages: Math.ceil(total / pageSize)
+      total
     };
 
     res.json({
       code: 0,
-      message: '获取班级课程列表成功',
       data: result,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取班级课程列表成功',
+      path: req.path,
+      timestamp: Date.now()
     });
   } catch (error) {
     logger.error('获取班级课程列表失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取班级课程列表失败',
       data: null,
-      timestamp: Date.now(),
-      path: req.path
+      message: '获取班级课程列表失败',
+      path: req.path,
+      timestamp: Date.now()
     });
   }
 });
