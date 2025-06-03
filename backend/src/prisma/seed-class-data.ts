@@ -21,15 +21,12 @@ async function main() {
   const treasuryClass = await prisma.class.create({
     data: {
       categoryId: 2,
-      categoryName: '管理培训',
       description: '深入学习司库管理体系建设，从现金管理到产业赋能的全面培训课程',
       endDate: new Date('2024-03-17'),
       name: '司库管理体系建设：从现金管理到产业赋能',
       startDate: new Date('2024-03-15'),
-      status: 2,
-      // 已结束
-      studentCount: 0,
-      teacher: '张教授'
+      status: 2, // 已结束
+      studentCount: 0
     }
   });
 
@@ -37,15 +34,12 @@ async function main() {
   const digitalFinanceClass = await prisma.class.create({
     data: {
       categoryId: 1,
-      categoryName: '技术培训',
       description: '智能会计技术应用与财务数字化转型实践',
       endDate: new Date('2024-04-12'),
       name: '智能会计与财务数字化转型',
       startDate: new Date('2024-04-10'),
-      status: 2,
-      // 已结束
-      studentCount: 0,
-      teacher: '李教授'
+      status: 2, // 已结束
+      studentCount: 0
     }
   });
 
@@ -53,15 +47,12 @@ async function main() {
   const riskComplianceClass = await prisma.class.create({
     data: {
       categoryId: 2,
-      categoryName: '管理培训',
       description: '数智化风险合规内控审计法务一体化管理体系建设',
       endDate: new Date('2024-05-22'),
       name: '构建数智化的风险合规内控审计法务五位一体化',
       startDate: new Date('2024-05-20'),
-      status: 1,
-      // 进行中
-      studentCount: 0,
-      teacher: '王教授'
+      status: 1, // 进行中
+      studentCount: 0
     }
   });
 
@@ -69,15 +60,12 @@ async function main() {
   const taxManagementClass = await prisma.class.create({
     data: {
       categoryId: 1,
-      categoryName: '技术培训',
       description: '建筑施工行业税务管理实务与人工智能技术应用',
       endDate: new Date('2024-06-17'),
       name: '建筑施工企业税务管理与人工智能应用',
       startDate: new Date('2024-06-15'),
-      status: 0,
-      // 未开始
-      studentCount: 0,
-      teacher: '赵教授'
+      status: 0, // 未开始
+      studentCount: 0
     }
   });
 
@@ -85,15 +73,12 @@ async function main() {
   const fundManagementClass = await prisma.class.create({
     data: {
       categoryId: 2,
-      categoryName: '管理培训',
       description: '私募基金行业深度研究与专业投资管理实务',
       endDate: new Date('2024-07-12'),
       name: '私募基金行业研究与投资管理',
       startDate: new Date('2024-07-10'),
-      status: 0,
-      // 未开始
-      studentCount: 0,
-      teacher: '陈教授'
+      status: 0, // 未开始
+      studentCount: 0
     }
   });
 

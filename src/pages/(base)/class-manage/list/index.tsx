@@ -14,6 +14,7 @@ import {
 } from '@/service/api/class';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
+import { getEndDateDisabledDate, getStartDateDisabledDate, validateDateRange } from '@/utils/dateUtils';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 /** 班级状态枚举 */
@@ -55,6 +56,10 @@ const ClassList = () => {
 
   // 获取可选课程列表
   const [availableCourses, setAvailableCourses] = useState<any[]>([]);
+
+  // 新增：用于存储表单中的开始日期和结束日期
+  const [formStartDate, setFormStartDate] = useState<Dayjs | null>(null);
+  const [formEndDate, setFormEndDate] = useState<Dayjs | null>(null);
 
   // 获取班级分类数据
   const fetchClassCategories = async () => {
@@ -289,6 +294,9 @@ const ClassList = () => {
   const handleCancel = () => {
     setIsModalOpen(false);
     setEditingClassId(null);
+    setFormStartDate(null);
+    setFormEndDate(null);
+    form.resetFields();
   };
 
   // 表格列定义
@@ -476,6 +484,21 @@ const ClassList = () => {
             labelCol={{ span: 6 }}
             style={{ marginTop: 20 }}
             wrapperCol={{ span: 16 }}
+            onValuesChange={changedValues => {
+              // 监听开始日期和结束日期的变化
+              if (changedValues.startDate) {
+                setFormStartDate(changedValues.startDate);
+                // 如果结束日期早于新的开始日期，清空结束日期
+                if (formEndDate && changedValues.startDate.isAfter(formEndDate)) {
+                  setFormEndDate(null);
+                  form.setFieldValue('endDate', null);
+                  message.warning('结束日期已重置，请重新选择结束日期');
+                }
+              }
+              if (changedValues.endDate) {
+                setFormEndDate(changedValues.endDate);
+              }
+            }}
           >
             <Form.Item
               label="班级名称"
@@ -510,16 +533,40 @@ const ClassList = () => {
             <Form.Item
               label="开始日期"
               name="startDate"
-              rules={[{ message: '请选择开始日期', required: true }]}
+              rules={[
+                { message: '请选择开始日期', required: true },
+                {
+                  validator: (_, value) => {
+                    const { isValid, message: errorMessage } = validateDateRange(value, formEndDate);
+                    return isValid ? Promise.resolve() : Promise.reject(new Error(errorMessage));
+                  }
+                }
+              ]}
             >
-              <DatePicker className="w-full" />
+              <DatePicker
+                className="w-full"
+                disabledDate={getStartDateDisabledDate(formEndDate, false)}
+                placeholder="请选择开始日期"
+              />
             </Form.Item>
             <Form.Item
               label="结束日期"
               name="endDate"
-              rules={[{ message: '请选择结束日期', required: true }]}
+              rules={[
+                { message: '请选择结束日期', required: true },
+                {
+                  validator: (_, value) => {
+                    const { isValid, message: errorMessage } = validateDateRange(formStartDate, value);
+                    return isValid ? Promise.resolve() : Promise.reject(new Error(errorMessage));
+                  }
+                }
+              ]}
             >
-              <DatePicker className="w-full" />
+              <DatePicker
+                className="w-full"
+                disabledDate={getEndDateDisabledDate(formStartDate)}
+                placeholder="请选择结束日期"
+              />
             </Form.Item>
             <Form.Item
               label="班级描述"

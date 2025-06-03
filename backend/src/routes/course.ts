@@ -160,6 +160,93 @@ router.get('/', async (req, res) => {
   }
 });
 
+// 获取班级课程列表
+router.get('/class', async (req, res) => {
+  try {
+    const { classId, current = 1, size = 10 } = req.query;
+
+    if (!classId) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '缺少班级ID参数',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    const page = Number.parseInt(current as string);
+    const pageSize = Number.parseInt(size as string);
+    const skip = (page - 1) * pageSize;
+
+    // 查询班级信息并包含关联的课程
+    const classInfo = await prisma.class.findUnique({
+      include: {
+        course: true
+      },
+      where: { id: Number.parseInt(classId as string) }
+    });
+
+    if (!classInfo) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '班级不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 如果班级有关联课程，返回该课程信息
+    let courses: any[] = [];
+    let total = 0;
+
+    if (classInfo.course) {
+      courses = [classInfo.course];
+      total = 1;
+    }
+
+    const result = {
+      current: page,
+      pages: Math.ceil(total / pageSize),
+      records: courses.map(course => ({
+        courseCode: course.courseCode,
+        courseName: course.courseName,
+        createdAt: course.createdAt.toISOString().replace('T', ' ').substring(0, 19),
+        description: course.description,
+        duration: course.duration,
+        endDate: course.endDate.toISOString().split('T')[0],
+        id: course.id,
+        instructor: course.instructor,
+        location: course.location,
+        price: course.price,
+        startDate: course.startDate.toISOString().split('T')[0],
+        status: course.status,
+        updatedAt: course.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
+      })),
+      size: pageSize,
+      total
+    };
+
+    res.json({
+      code: 0,
+      data: result,
+      message: '获取班级课程列表成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    logger.error('获取班级课程列表失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '获取班级课程列表失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
 /**
  * @swagger
  * /api/courses/{id}:
@@ -925,80 +1012,6 @@ router.get('/statistics/overview', async (req, res) => {
       code: 500,
       data: null,
       message: '获取课程统计失败',
-      path: req.path,
-      timestamp: Date.now()
-    });
-  }
-});
-
-// 获取班级课程列表
-router.get('/class', async (req, res) => {
-  try {
-    const { classId, current = 1, size = 10 } = req.query;
-
-    if (!classId) {
-      return res.status(400).json({
-        code: 400,
-        data: null,
-        message: '缺少班级ID参数',
-        path: req.path,
-        timestamp: Date.now()
-      });
-    }
-
-    const page = Number.parseInt(current as string);
-    const pageSize = Number.parseInt(size as string);
-    const skip = (page - 1) * pageSize;
-
-    // 查询该班级关联的课程
-    const [courses, total] = await Promise.all([
-      prisma.course.findMany({
-        include: {
-          category: true
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: pageSize,
-        where: {
-          // 这里可以根据实际业务逻辑调整查询条件
-          // 暂时返回所有课程作为示例
-        }
-      }),
-      prisma.course.count()
-    ]);
-
-    const result = {
-      current: page,
-      pages: Math.ceil(total / pageSize),
-      records: courses.map((course: any) => ({
-        category: course.category,
-        courseCode: course.courseCode,
-        courseName: course.courseName,
-        duration: course.duration,
-        endDate: course.endDate?.toISOString().split('T')[0],
-        id: course.id,
-        instructor: course.instructor,
-        price: course.price,
-        startDate: course.startDate?.toISOString().split('T')[0],
-        status: course.status
-      })),
-      size: pageSize,
-      total
-    };
-
-    res.json({
-      code: 0,
-      data: result,
-      message: '获取班级课程列表成功',
-      path: req.path,
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    logger.error('获取班级课程列表失败:', error);
-    res.status(500).json({
-      code: 500,
-      data: null,
-      message: '获取班级课程列表失败',
       path: req.path,
       timestamp: Date.now()
     });

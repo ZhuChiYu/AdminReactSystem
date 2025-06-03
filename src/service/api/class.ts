@@ -133,6 +133,19 @@ export const classService = {
     await apiClient.delete(`/classes/${id}`);
   },
 
+  /** 下载学员导入模板 */
+  async downloadStudentTemplate(): Promise<Blob> {
+    try {
+      const response = await apiClient.get('/classes/students/template', {
+        responseType: 'blob'
+      });
+      return response;
+    } catch (error) {
+      console.error('下载模板失败:', error);
+      throw error;
+    }
+  },
+
   /** 获取班级分类列表 */
   async getClassCategories(): Promise<ClassCategory[]> {
     try {
@@ -216,6 +229,25 @@ export const classService = {
     }
   },
 
+  /** 批量导入学员 */
+  async importStudentsBatch(classId: number, file: File): Promise<any> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('classId', classId.toString());
+
+      const response = await apiClient.post('/classes/students/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response;
+    } catch (error) {
+      console.error('批量导入学员失败:', error);
+      throw error;
+    }
+  },
+
   /** 更新班级分类 */
   async updateCategory(id: number, data: UpdateCategoryRequest): Promise<ClassCategory> {
     try {
@@ -231,5 +263,34 @@ export const classService = {
   async updateClass(id: number, params: UpdateClassParams): Promise<ClassDetail> {
     const response = await apiClient.put<ClassDetail>(`/classes/${id}`, params);
     return response;
+  },
+
+  /** 更新学员信息 */
+  async updateStudent(studentId: number, data: any): Promise<any> {
+    try {
+      const response = await apiClient.put(`/classes/students/${studentId}`, data);
+      return response;
+    } catch (error) {
+      console.error('更新学员信息失败:', error);
+      throw error;
+    }
+  },
+
+  /** 上传学员头像 */
+  async uploadStudentAvatar(studentId: number, file: File): Promise<any> {
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await apiClient.post(`/classes/students/${studentId}/avatar`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response;
+    } catch (error) {
+      console.error('上传学员头像失败:', error);
+      throw error;
+    }
   }
 };

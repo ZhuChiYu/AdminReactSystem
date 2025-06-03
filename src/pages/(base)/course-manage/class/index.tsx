@@ -1,10 +1,12 @@
 import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import type { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { classService } from '@/service/api';
+import { classService } from '@/service/api/class';
 import type { ClassApi } from '@/service/api/types';
+import { getEndDateDisabledDate, getStartDateDisabledDate, validateDateRange } from '@/utils/dateUtils';
 
 interface ClassItem {
   categoryId: number;
@@ -43,6 +45,10 @@ const ClassList = () => {
   const [filteredList, setFilteredList] = useState<ClassItem[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
+
+  // 新增：用于存储表单中的开始日期和结束日期
+  const [formStartDate, setFormStartDate] = useState<Dayjs | null>(null);
+  const [formEndDate, setFormEndDate] = useState<Dayjs | null>(null);
 
   // 获取班级列表
   const fetchClasses = async () => {
@@ -105,6 +111,8 @@ const ClassList = () => {
   // 关闭弹窗
   const handleCancel = () => {
     setIsModalVisible(false);
+    setFormStartDate(null);
+    setFormEndDate(null);
     form.resetFields();
   };
 
@@ -115,9 +123,9 @@ const ClassList = () => {
 
       const classData = {
         categoryId: values.categoryId,
-        className: values.name,
         description: values.description,
         endDate: values.endDate,
+        name: values.name,
         startDate: values.startDate,
         status: ClassStatus.NOT_STARTED,
         teacher: values.teacher
@@ -126,6 +134,8 @@ const ClassList = () => {
       await classService.createClass(classData);
       message.success('班级创建成功');
       setIsModalVisible(false);
+      setFormStartDate(null);
+      setFormEndDate(null);
       form.resetFields();
       fetchClasses(); // 重新获取列表
     } catch (error) {
@@ -314,6 +324,21 @@ const ClassList = () => {
         <Form
           form={form}
           layout="vertical"
+          onValuesChange={changedValues => {
+            // 监听开始日期和结束日期的变化
+            if (changedValues.startDate) {
+              setFormStartDate(changedValues.startDate);
+              // 如果结束日期早于新的开始日期，清空结束日期
+              if (formEndDate && changedValues.startDate.isAfter(formEndDate)) {
+                setFormEndDate(null);
+                form.setFieldValue('endDate', null);
+                message.warning('结束日期已重置，请重新选择结束日期');
+              }
+            }
+            if (changedValues.endDate) {
+              setFormEndDate(changedValues.endDate);
+            }
+          }}
         >
           <Form.Item
             label="班级名称"
@@ -346,17 +371,41 @@ const ClassList = () => {
           <Form.Item
             label="开始日期"
             name="startDate"
-            rules={[{ message: '请选择开始日期', required: true }]}
+            rules={[
+              { message: '请选择开始日期', required: true },
+              {
+                validator: (_, value) => {
+                  const { isValid, message: errorMessage } = validateDateRange(value, formEndDate);
+                  return isValid ? Promise.resolve() : Promise.reject(new Error(errorMessage));
+                }
+              }
+            ]}
           >
-            <Input type="date" />
+            <DatePicker
+              disabledDate={getStartDateDisabledDate(formEndDate, false)}
+              placeholder="请选择开始日期"
+              style={{ width: '100%' }}
+            />
           </Form.Item>
 
           <Form.Item
             label="结束日期"
             name="endDate"
-            rules={[{ message: '请选择结束日期', required: true }]}
+            rules={[
+              { message: '请选择结束日期', required: true },
+              {
+                validator: (_, value) => {
+                  const { isValid, message: errorMessage } = validateDateRange(formStartDate, value);
+                  return isValid ? Promise.resolve() : Promise.reject(new Error(errorMessage));
+                }
+              }
+            ]}
           >
-            <Input type="date" />
+            <DatePicker
+              disabledDate={getEndDateDisabledDate(formStartDate)}
+              placeholder="请选择结束日期"
+              style={{ width: '100%' }}
+            />
           </Form.Item>
 
           <Form.Item

@@ -48,7 +48,8 @@ class ClassController {
                 name: true,
                 phone: true,
                 position: true,
-                status: true
+                status: true,
+                trainingFee: true
               }
             }
           },
@@ -65,15 +66,20 @@ class ClassController {
       // 格式化返回数据
       const formattedClasses = classes.map((classItem: any) => {
         const studentCount = classItem.students ? classItem.students.length : 0;
-        const coursePrice = classItem.course?.price || 0;
+
+        // 计算所有学员的培训费总和
+        const totalTrainingFee = classItem.students.reduce((sum: number, student: any) => {
+          const fee = student.trainingFee ? Number(student.trainingFee) : 0;
+          return sum + fee;
+        }, 0);
 
         return {
           categoryId: classItem.categoryId,
           categoryName: classItem.category?.name || '',
           courseId: classItem.courseId,
           courseName: classItem.course?.courseName || '',
-          coursePrice: coursePrice,
-          trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
+          coursePrice: classItem.course?.price || 0,
+          trainingFee: totalTrainingFee.toFixed(2),
           createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
           description: classItem.description,
           endDate: classItem.endDate.toISOString().split('T')[0],
@@ -125,15 +131,20 @@ class ClassController {
 
       // 格式化返回数据
       const studentCount = classItem.students ? classItem.students.length : 0;
-      const coursePrice = classItem.course?.price || 0;
+
+      // 计算所有学员的培训费总和
+      const totalTrainingFee = classItem.students.reduce((sum: number, student: any) => {
+        const fee = student.trainingFee ? Number(student.trainingFee) : 0;
+        return sum + fee;
+      }, 0);
 
       const formattedClass = {
         categoryId: classItem.categoryId,
         categoryName: classItem.category?.name || '',
         courseId: classItem.courseId,
         courseName: classItem.course?.courseName || '',
-        coursePrice: coursePrice,
-        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
+        coursePrice: classItem.course?.price || 0,
+        trainingFee: totalTrainingFee.toFixed(2),
         createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
         description: classItem.description,
         endDate: classItem.endDate.toISOString().split('T')[0],
@@ -144,15 +155,18 @@ class ClassController {
         studentCount: studentCount,
         students: classItem.students.map((student: any) => ({
           attendanceRate: student.attendanceRate,
+          avatar: student.avatar,
           company: student.company,
           createdAt: student.createdAt.toISOString().replace('T', ' ').substring(0, 19),
           email: student.email,
+          gender: student.gender,
           id: student.id,
           joinDate: student.joinDate.toISOString().split('T')[0],
           name: student.name,
           phone: student.phone,
           position: student.position,
-          status: student.status
+          status: student.status,
+          trainingFee: student.trainingFee ? student.trainingFee.toString() : null
         })),
         updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       };
