@@ -10,7 +10,7 @@ class AttachmentService {
     const response = await apiClient.get<PageResponse<AttachmentApi.AttachmentListItem>>(`${this.baseURL}`, {
       params
     });
-    return response.data;
+    return response;
   }
 
   /** 上传附件 */
@@ -40,13 +40,13 @@ class AttachmentService {
         }
       }
     );
-    return response.data;
+    return response;
   }
 
   /** 删除附件 */
   async deleteAttachment(attachmentId: number) {
     const response = await apiClient.delete<ApiResponse>(`${this.baseURL}/${attachmentId}`);
-    return response.data;
+    return response;
   }
 
   /** 获取附件详情 */
@@ -54,7 +54,7 @@ class AttachmentService {
     const response = await apiClient.get<ApiResponse<AttachmentApi.AttachmentListItem>>(
       `${this.baseURL}/${attachmentId}`
     );
-    return response.data;
+    return response;
   }
 
   /** 下载附件 */
@@ -62,7 +62,7 @@ class AttachmentService {
     const response = await apiClient.get(`${this.baseURL}/${attachmentId}/download`, {
       responseType: 'blob'
     });
-    return response.data;
+    return response;
   }
 
   /** 批量删除附件 */
@@ -70,7 +70,7 @@ class AttachmentService {
     const response = await apiClient.delete<ApiResponse>(`${this.baseURL}/batch`, {
       data: { attachmentIds }
     });
-    return response.data;
+    return response;
   }
 
   /** 更新附件信息 */
@@ -79,7 +79,7 @@ class AttachmentService {
       `${this.baseURL}/${attachmentId}`,
       data
     );
-    return response.data;
+    return response;
   }
 
   /** 获取课程的附件统计 */
@@ -91,7 +91,7 @@ class AttachmentService {
         totalSize: number;
       }>
     >(`${this.baseURL}/course/${courseId}/stats`);
-    return response.data;
+    return response;
   }
 }
 
