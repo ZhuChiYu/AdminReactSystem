@@ -15,6 +15,7 @@ import {
   Descriptions,
   Form,
   Input,
+  InputNumber,
   List,
   Modal,
   Progress,
@@ -32,12 +33,9 @@ import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import UserAvatar from '@/components/UserAvatar';
+import UserAvatar from '@/components/common/UserAvatar';
 import { attachmentService, classService, courseService, notificationService } from '@/service/api';
 import type { AttachmentApi, NotificationApi } from '@/service/api/types';
-import type { UserPermission } from '@/store/permissionStore';
-import usePermissionStore, { PermissionType } from '@/store/permissionStore';
-import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -58,8 +56,12 @@ const ClassDetail = () => {
 
   // 编辑学员信息弹窗状态
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [currentStudent, setCurrentStudent] = useState<any>(null);
+  const [editFormStudent, setEditFormStudent] = useState<any>(null);
   const [editForm] = Form.useForm();
+
+  // 头像上传状态
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFileList, setAvatarFileList] = useState<any[]>([]);
 
   // 添加学员弹窗状态
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -87,19 +89,26 @@ const ClassDetail = () => {
   const [announceUploading, setAnnounceUploading] = useState(false);
   const [announceUploadProgress, setAnnounceUploadProgress] = useState(0);
 
-  // 添加用于权限管理的状态
-  const [staffList, setStaffList] = useState<any[]>([]);
-  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
-  const [currentStaff, setCurrentStaff] = useState<any>(null);
-  const [permissionForm] = Form.useForm();
-  const [permissionType, setPermissionType] = useState<string | null>(null);
+  // 批量导入学员相关状态
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importFileList, setImportFileList] = useState<any[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
-  const { hasPermission } = usePermissionStore();
-  const currentUserId = getCurrentUserId();
-  const isUserSuperAdmin = isSuperAdmin();
+  // 搜索相关状态
+  const [searchText, setSearchText] = useState('');
+  const [filteredStudentList, setFilteredStudentList] = useState<any[]>([]);
+
+  // 计算总培训费
+  const calculateTotalTrainingFee = () => {
+    return studentList.reduce((total, student) => {
+      const fee = student.trainingFee ? Number.parseFloat(student.trainingFee) : 0;
+      return total + fee;
+    }, 0);
+  };
 
   // 获取班级数据
-  const fetchClassData = async () => {
+  const fetchClassInfo = async () => {
     if (!classId) return;
 
     setLoading(true);
@@ -130,19 +139,16 @@ const ClassDetail = () => {
 
       const formattedStudents = studentsResponse.records.map((student: any) => ({
         attendance: student.attendanceRate || 0,
-        avatar:
-          student.avatar ||
-          `https://xsgames.co/randomusers/avatar.php?g=${student.gender === '女' ? 'female' : 'male'}&id=${student.id}`,
+        avatar: student.avatar || null,
         company: student.company || '',
         email: student.email || '',
         gender: student.gender || '',
         id: student.id,
-        joinDate: student.enrollmentDate || '',
-        landline: student.landline || '',
+        joinDate: student.joinDate || '',
         name: student.name,
         phone: student.phone || '',
         position: student.position || '',
-        studentId: student.studentId || ''
+        trainingFee: student.trainingFee || null
       }));
 
       setStudentList(formattedStudents);
@@ -188,13 +194,6 @@ const ClassDetail = () => {
 
       setAnnounceList(formattedAnnouncements);
 
-      // 获取教职工列表
-      const staffResponse = await classService.getClassStaffList({
-        classId: Number.parseInt(classId, 10)
-      });
-
-      setStaffList(staffResponse || []);
-
       // 获取课程附件
       const courseAttachmentsResponse = await attachmentService.getAttachmentList({
         courseId: Number.parseInt(classId, 10),
@@ -202,7 +201,7 @@ const ClassDetail = () => {
         size: 1000
       });
 
-      const formattedCourseAttachments = courseAttachmentsResponse.records.map(
+      const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
         (attachment: AttachmentApi.AttachmentListItem) => ({
           fileName: attachment.fileName,
           fileSize: attachment.fileSize,
@@ -223,7 +222,7 @@ const ClassDetail = () => {
   };
 
   useEffect(() => {
-    fetchClassData();
+    fetchClassInfo();
   }, [classId]);
 
   // 获取状态标签颜色
@@ -300,7 +299,7 @@ const ClassDetail = () => {
 
   // 处理编辑学员
   const handleEditStudent = (student: any) => {
-    setCurrentStudent(student);
+    setEditFormStudent(student);
     editForm.setFieldsValue(student);
     setEditModalVisible(true);
   };
@@ -320,26 +319,140 @@ const ClassDetail = () => {
   // 保存编辑学员信息
   const handleSaveEdit = async () => {
     try {
+      setLoading(true);
       const values = await editForm.validateFields();
+
+      // 合并表单数据和当前头像信息
+      const updateData = {
+        ...values,
+        // 确保包含当前的头像信息
+        avatar: editFormStudent?.avatar || null
+      };
+
+      console.log('保存学员信息，数据:', {
+        currentAvatar: editFormStudent?.avatar,
+        studentId: editFormStudent.id,
+        updateData
+      });
+
+      // 调用后端API更新学员信息
+      const updatedStudent = await classService.updateStudent(editFormStudent.id, updateData);
+
+      console.log('学员信息更新成功，返回数据:', updatedStudent);
+
+      // 更新本地学员列表
       setStudentList(prevList =>
-        prevList.map(student => (student.id === currentStudent.id ? { ...student, ...values } : student))
+        prevList.map(student => (student.id === editFormStudent.id ? { ...student, ...updatedStudent } : student))
       );
+
       setEditModalVisible(false);
       message.success('学员信息更新成功');
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('更新学员信息失败:', error);
+      message.error('更新学员信息失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 验证上传文件
+  const validateUploadFile = (file: File) => {
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+      message.error('只能上传图片文件！');
+      return false;
+    }
+
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error('图片大小不能超过 2MB！');
+      return false;
+    }
+
+    return true;
+  };
+
+  // 处理上传错误
+  const handleUploadError = (error: any) => {
+    console.error('头像上传失败，详细错误信息:', error);
+    console.error('错误堆栈:', error.stack);
+
+    let errorMessage = '头像上传失败';
+
+    if (error?.response?.status === 500) {
+      errorMessage = '服务器内部错误，请联系管理员';
+    } else if (error?.response?.status === 404) {
+      errorMessage = '学员不存在';
+    } else if (error?.response?.status === 400) {
+      errorMessage = error?.response?.data?.message || '请求参数错误';
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+
+    message.error(errorMessage);
+  };
+
+  // 处理头像上传
+  const handleAvatarUpload = async (file: File) => {
+    if (!validateUploadFile(file)) {
+      return false;
+    }
+
+    try {
+      setAvatarUploading(true);
+
+      console.log('开始上传头像:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        studentId: editFormStudent.id
+      });
+
+      const result = await classService.uploadStudentAvatar(editFormStudent.id, file);
+
+      console.log('头像上传成功，完整返回数据:', result);
+
+      // 提取头像URL
+      let avatarUrl = result.data?.avatar || result.avatar;
+
+      // 确保URL是完整的
+      if (avatarUrl && !avatarUrl.startsWith('http')) {
+        avatarUrl = `http://localhost:3001${avatarUrl}`;
+      }
+
+      console.log('处理后的头像URL:', avatarUrl);
+
+      // 更新编辑表单中的头像字段
+      setEditFormStudent((prev: any) => ({
+        ...prev,
+        avatar: avatarUrl
+      }));
+
+      // 更新本地学员列表中的头像
+      setStudentList(prevList =>
+        prevList.map(student => (student.id === editFormStudent.id ? { ...student, avatar: avatarUrl } : student))
+      );
+
+      console.log('头像更新完成，新的editFormStudent:', {
+        avatar: avatarUrl,
+        id: editFormStudent.id,
+        name: editFormStudent.name
+      });
+
+      message.success('头像上传成功');
+      return false; // 阻止Upload组件的默认上传行为
+    } catch (error: any) {
+      handleUploadError(error);
+      return false;
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
   // 学员列表表格列配置
   const studentColumns = [
     {
-      dataIndex: 'id',
-      key: 'id',
-      title: 'ID',
-      width: 50
-    },
-    {
+      align: 'center' as const,
       dataIndex: 'name',
       key: 'name',
       render: (text: string, record: any) => (
@@ -348,7 +461,6 @@ const ClassDetail = () => {
             avatar={record.avatar}
             gender={record.gender}
             size={40}
-            userId={record.id}
           />
           {text}
         </Space>
@@ -357,54 +469,60 @@ const ClassDetail = () => {
       width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'gender',
       key: 'gender',
       title: '性别',
       width: 80
     },
     {
+      align: 'center' as const,
       dataIndex: 'company',
       key: 'company',
       title: '单位',
       width: 150
     },
     {
+      align: 'center' as const,
       dataIndex: 'position',
       key: 'position',
       title: '职务',
       width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'phone',
       key: 'phone',
       title: '电话',
       width: 120
     },
     {
-      dataIndex: 'landline',
-      key: 'landline',
-      title: '座机号',
-      width: 120
+      align: 'center' as const,
+      dataIndex: 'trainingFee',
+      key: 'trainingFee',
+      render: (fee: string | null) => (fee ? `¥${fee}` : '-'),
+      title: '培训费',
+      width: 100
     },
     {
+      align: 'center' as const,
       dataIndex: 'email',
       key: 'email',
       title: '邮箱',
       width: 180
     },
     {
+      align: 'center' as const,
       dataIndex: 'joinDate',
       key: 'joinDate',
       title: '加入日期',
       width: 120
     },
     {
+      align: 'center' as const,
+      fixed: 'right' as const,
       key: 'action',
       render: (_: unknown, record: any) => {
-        // 权限判断：超级管理员或有特定权限才显示编辑和删除按钮
-        const canEditStudent =
-          isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_STUDENT, undefined, record.id);
-
         return (
           <Space size="middle">
             <Button
@@ -413,23 +531,19 @@ const ClassDetail = () => {
             >
               详情
             </Button>
-            {canEditStudent && (
-              <Button
-                type="link"
-                onClick={() => handleEditStudent(record)}
-              >
-                编辑
-              </Button>
-            )}
-            {canEditStudent && (
-              <Button
-                danger
-                type="link"
-                onClick={() => handleRemoveStudent(record.id)}
-              >
-                移除
-              </Button>
-            )}
+            <Button
+              type="link"
+              onClick={() => handleEditStudent(record)}
+            >
+              编辑
+            </Button>
+            <Button
+              danger
+              type="link"
+              onClick={() => handleRemoveStudent(record.id)}
+            >
+              移除
+            </Button>
           </Space>
         );
       },
@@ -455,8 +569,8 @@ const ClassDetail = () => {
       // 创建新学员对象
       const newStudent = {
         ...values,
-        // 生成随机学员ID
-        avatar: `https://xsgames.co/randomusers/avatar.php?g=${values.gender === '男' ? 'male' : 'female'}&id=${newId + 10}`,
+        // 不设置avatar，让UserAvatar组件根据gender显示默认头像
+        avatar: null,
         id: newId,
         joinDate: values.joinDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
         studentId: `${Date.now()}`.slice(-10)
@@ -473,6 +587,118 @@ const ClassDetail = () => {
     } catch (error) {
       console.error('表单验证失败:', error);
     }
+  };
+
+  // 显示批量导入弹窗
+  const handleShowImportModal = () => {
+    setImportFileList([]);
+    setImportProgress(0);
+    setImportModalVisible(true);
+  };
+
+  // 下载导入模板
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await classService.downloadStudentTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '学员导入模板.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      message.success('模板下载成功');
+    } catch (error) {
+      message.error('模板下载失败');
+      console.error('下载模板失败:', error);
+    }
+  };
+
+  // 批量导入学员
+  const handleImportStudents = async () => {
+    if (importFileList.length === 0) {
+      message.warning('请选择要导入的文件');
+      return;
+    }
+
+    const file = importFileList[0].originFileObj || importFileList[0];
+
+    try {
+      setImporting(true);
+      setImportProgress(30);
+
+      const result = await classService.importStudentsBatch(Number.parseInt(classId!, 10), file);
+
+      setImportProgress(100);
+
+      // 检查导入结果 - 根据后端实际返回的数据结构
+      if (result && result.importedCount !== undefined) {
+        message.success(`导入成功：${result.importedCount} 条记录`);
+
+        // 重新获取学员列表
+        const studentsResponse = await classService.getClassStudentList({
+          classId: Number.parseInt(classId!, 10),
+          current: 1,
+          size: 1000
+        });
+
+        const formattedStudents = studentsResponse.records.map((student: any) => ({
+          attendance: student.attendanceRate || 0,
+          avatar:
+            student.avatar ||
+            `https://xsgames.co/randomusers/avatar.php?g=${student.gender === '女' ? 'female' : 'male'}&id=${student.id}`,
+          company: student.company || '',
+          email: student.email || '',
+          gender: student.gender || '',
+          id: student.id,
+          joinDate: student.joinDate || student.enrollmentDate || '',
+          landline: student.landline || '',
+          name: student.name,
+          phone: student.phone || '',
+          position: student.position || '',
+          studentId: student.studentId || ''
+        }));
+
+        setStudentList(formattedStudents);
+      } else {
+        message.error(`导入失败：${result?.errorMessage || '未知错误'}`);
+      }
+
+      // 关闭弹窗
+      setImportModalVisible(false);
+      setImportFileList([]);
+      setImportProgress(0);
+    } catch (error) {
+      message.error('导入失败，请检查文件格式');
+      console.error('批量导入失败:', error);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // 文件上传前的验证
+  const beforeUpload = (file: File) => {
+    const isExcel =
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.type === 'application/vnd.ms-excel';
+    if (!isExcel) {
+      message.error('只能上传 Excel 文件！');
+      return false;
+    }
+
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      message.error('文件大小不能超过 5MB！');
+      return false;
+    }
+
+    return false; // 阻止自动上传
+  };
+
+  // 文件列表变化处理
+  const handleFileChange = ({ fileList: newFileList }: any) => {
+    setImportFileList(newFileList);
   };
 
   // 查看课程详情
@@ -528,75 +754,76 @@ const ClassDetail = () => {
     setCourseModalVisible(true);
   };
 
-  // 移除课程
-  const handleRemoveCourse = (courseId: number) => {
+  // 删除课程
+  const handleRemoveCourse = async (courseId: number) => {
     Modal.confirm({
-      content: '确定要移除该课程吗？此操作不可恢复。',
-      onOk: () => {
-        // 过滤掉要移除的课程
-        const updatedCourseList = courseList.filter(c => c.id !== courseId);
-        setCourseList(updatedCourseList);
+      content: '确定要删除这门课程吗？',
+      onOk: async () => {
+        try {
+          await courseService.deleteCourse(courseId);
+          message.success('课程删除成功');
 
-        // 显示成功消息
-        message.success('课程已成功移除');
+          // 重新获取课程列表
+          const coursesResponse = await courseService.getClassCourseList({
+            classId: Number.parseInt(classId!, 10),
+            current: 1,
+            size: 1000
+          });
+          setCourseList(coursesResponse.records || []);
+        } catch (error) {
+          console.error('删除课程失败:', error);
+          message.error('删除课程失败');
+        }
       },
-      title: '确认移除'
+      title: '确认删除'
     });
   };
 
-  // 添加新课程
+  // 添加课程
   const handleAddCourse = () => {
-    setCurrentCourse(null);
     courseForm.resetFields();
     setCourseModalVisible(true);
   };
 
-  // 提交课程表单
+  // 保存课程
   const handleSaveCourse = async () => {
     try {
       const values = await courseForm.validateFields();
 
-      // 获取课程状态
-      let courseStatus = 1; // 默认为进行中
-      const startDate = dayjs(values.startDate);
-      const endDate = dayjs(values.endDate);
-      const now = dayjs();
+      // 使用真实的API创建课程
+      const courseData = {
+        // 生成唯一编码
+        categoryId: 1,
+        courseCode: `COURSE_${Date.now()}`,
+        courseName: values.name,
+        description: values.description || '',
+        duration: values.duration || 30,
+        endDate: values.endDate?.format('YYYY-MM-DD') || dayjs().add(30, 'day').format('YYYY-MM-DD'),
+        // 默认分类ID，可以从课程分类API获取
+        instructor: values.teacher,
+        location: values.classroom || '线上',
+        maxStudents: values.maxStudents || 50,
+        originalPrice: values.price || 0,
+        price: values.price || 0,
+        startDate: values.startDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
+      };
 
-      if (startDate.isAfter(now)) {
-        courseStatus = 0; // 未开始
-      } else if (endDate.isBefore(now)) {
-        courseStatus = 2; // 已结束
-      }
+      await courseService.createCourse(courseData);
 
-      if (currentCourse) {
-        // 编辑现有课程
-        const updatedCourseList = courseList.map(item => {
-          if (item.id === currentCourse.id) {
-            return {
-              ...item,
-              ...values,
-              status: courseStatus
-            };
-          }
-          return item;
-        });
-        setCourseList(updatedCourseList);
-        message.success('课程已更新');
-      } else {
-        // 添加新课程
-        const newCourse = {
-          ...values,
-          attachments: [],
-          id: courseList.length + 1,
-          status: courseStatus
-        };
-        setCourseList([...courseList, newCourse]);
-        message.success('课程已添加');
-      }
-
+      message.success('课程添加成功');
       setCourseModalVisible(false);
+      courseForm.resetFields();
+
+      // 重新获取课程列表
+      const coursesResponse = await courseService.getClassCourseList({
+        classId: Number.parseInt(classId!, 10),
+        current: 1,
+        size: 1000
+      });
+      setCourseList(coursesResponse.records || []);
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('添加课程失败:', error);
+      message.error('添加课程失败');
     }
   };
 
@@ -801,11 +1028,58 @@ const ClassDetail = () => {
     }
   };
 
-  // 通知公告相关处理函数
+  // 发布通知
   const handlePublishAnnounce = () => {
-    announceForm.resetFields();
     setCurrentAnnounce(null);
+    announceForm.resetFields();
     setAnnounceModalVisible(true);
+  };
+
+  // 保存通知公告
+  const handleSaveAnnounce = async () => {
+    try {
+      const values = await announceForm.validateFields();
+
+      // 使用真实的API创建通知
+      const notificationData = {
+        content: values.content,
+        // 班级通知类型
+        relatedId: Number.parseInt(classId!, 10),
+        relatedType: 'class',
+        targetUserIds: [],
+        title: values.title,
+        type: 'class_announcement' // 空数组表示发给所有人
+      };
+
+      await notificationService.createNotification(notificationData);
+      message.success('通知发布成功');
+
+      setAnnounceModalVisible(false);
+      announceForm.resetFields();
+
+      // 重新获取通知列表
+      const notificationsResponse = await notificationService.getNotificationList({
+        current: 1,
+        relatedId: Number.parseInt(classId!, 10),
+        relatedType: 'class',
+        size: 1000
+      });
+
+      const formattedAnnouncements = notificationsResponse.records.map(
+        (notification: NotificationApi.NotificationListItem) => ({
+          content: notification.content,
+          id: notification.id,
+          importance: 1,
+          publishDate: notification.createTime,
+          title: notification.title // 默认重要程度
+        })
+      );
+
+      setAnnounceList(formattedAnnouncements);
+    } catch (error) {
+      console.error('发布通知失败:', error);
+      message.error('发布通知失败');
+    }
   };
 
   const handleEditAnnounce = (announce: any) => {
@@ -818,53 +1092,41 @@ const ClassDetail = () => {
     setAnnounceModalVisible(true);
   };
 
-  const handleDeleteAnnounce = (announceId: number) => {
+  // 删除通知
+  const handleDeleteAnnounce = async (announceId: number) => {
     Modal.confirm({
-      content: '确定要删除该通知吗？此操作不可恢复。',
-      onOk: () => {
-        const updatedAnnounceList = announceList.filter(a => a.id !== announceId);
-        setAnnounceList(updatedAnnounceList);
-        message.success('通知已成功删除');
+      content: '确定要删除这条通知吗？',
+      onOk: async () => {
+        try {
+          await notificationService.deleteNotification(announceId);
+          message.success('通知删除成功');
+
+          // 重新获取通知列表
+          const notificationsResponse = await notificationService.getNotificationList({
+            current: 1,
+            relatedId: Number.parseInt(classId!, 10),
+            relatedType: 'class',
+            size: 1000
+          });
+
+          const formattedAnnouncements = notificationsResponse.records.map(
+            (notification: NotificationApi.NotificationListItem) => ({
+              content: notification.content,
+              id: notification.id,
+              importance: 1,
+              publishDate: notification.createTime,
+              title: notification.title // 默认重要程度
+            })
+          );
+
+          setAnnounceList(formattedAnnouncements);
+        } catch (error) {
+          console.error('删除通知失败:', error);
+          message.error('删除通知失败');
+        }
       },
       title: '确认删除'
     });
-  };
-
-  const handleSaveAnnounce = async () => {
-    try {
-      const values = await announceForm.validateFields();
-
-      if (currentAnnounce) {
-        // 编辑现有通知
-        const updatedAnnounceList = announceList.map(item => {
-          if (item.id === currentAnnounce.id) {
-            return {
-              ...item,
-              ...values,
-              publishDate: dayjs().format('YYYY-MM-DD HH:mm:ss')
-            };
-          }
-          return item;
-        });
-        setAnnounceList(updatedAnnounceList);
-        message.success('通知已更新');
-      } else {
-        // 添加新通知
-        const newAnnounce = {
-          ...values,
-          attachments: [],
-          id: announceList.length + 1,
-          publishDate: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          status: 1
-        };
-        setAnnounceList([...announceList, newAnnounce]);
-        message.success('通知已发布');
-      }
-
-      setAnnounceModalVisible(false);
-    } catch (error) {
-      console.error('表单验证失败:', error);
-    }
   };
 
   const handleViewAnnounceDetail = (announce: any) => {
@@ -956,54 +1218,46 @@ const ClassDetail = () => {
     });
   };
 
-  // 处理授权
-  const handleGrantPermission = (staffId: string, staffName: string, permType: string) => {
-    setCurrentStaff({ id: staffId, name: staffName });
-    setPermissionType(permType);
-    setPermissionModalVisible(true);
+  // 处理搜索
+  const handleSearch = (value: string) => {
+    setSearchText(value);
   };
 
-  // 保存权限设置
-  const handleSavePermission = async () => {
-    try {
-      const values = await permissionForm.validateFields();
+  // 按拼音排序学员列表
+  const sortStudentsByPinyin = (students: any[]) => {
+    return students.sort((a, b) => {
+      return a.name.localeCompare(b.name, 'zh-CN', { sensitivity: 'base' });
+    });
+  };
 
-      if (permissionType && currentStaff) {
-        // 获取权限类型
-        const permType = permissionType === 'student' ? PermissionType.EDIT_STUDENT : PermissionType.EDIT_ANNOUNCE;
+  // 过滤和排序学员列表
+  const getFilteredAndSortedStudents = () => {
+    let filtered = studentList;
 
-        // 授予特定班级的权限
-        if (classInfo && classInfo.id) {
-          // 设置授权期限
-          const expiryDate = values.expiry ? values.expiry.format('YYYY-MM-DD HH:mm:ss') : undefined;
-
-          // 创建带有到期时间的权限对象
-          const permission: UserPermission = {
-            classId: classInfo.id,
-            expiryTime: expiryDate,
-            grantedBy: currentUserId,
-            permissionType: permType,
-            userId: currentStaff.id
-          };
-
-          // 添加权限
-          usePermissionStore.getState().addPermission(permission);
-
-          message.success(
-            `已成功授予 ${currentStaff.name} ${permissionType === 'student' ? '编辑学员' : '编辑通知'} 权限`
-          );
-        }
-      }
-
-      setPermissionModalVisible(false);
-    } catch (error) {
-      console.error('表单验证失败:', error);
+    // 如果有搜索文本，进行过滤
+    if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase();
+      filtered = studentList.filter(
+        student =>
+          student.name.toLowerCase().includes(searchLower) || student.company.toLowerCase().includes(searchLower)
+      );
     }
+
+    // 按拼音排序
+    return sortStudentsByPinyin(filtered);
   };
+
+  // 更新过滤后的学员列表
+  useEffect(() => {
+    const filteredAndSorted = getFilteredAndSortedStudents();
+    setFilteredStudentList(filteredAndSorted);
+  }, [studentList, searchText]);
 
   // 渲染主要信息区域
   const renderBasicInfo = () => {
     if (!classInfo) return null;
+
+    const totalTrainingFee = calculateTotalTrainingFee();
 
     return (
       <Card
@@ -1034,7 +1288,8 @@ const ClassDetail = () => {
             <Tag color={getStatusColor(classInfo.status)}>{getStatusText(classInfo.status)}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="培训费">
-            {classInfo.trainingFee ? `¥${Number(classInfo.trainingFee).toFixed(2)}` : '¥0.00'}
+            <span className="text-blue-600 font-semibold">¥{totalTrainingFee.toFixed(2)}</span>
+            <span className="ml-2 text-sm text-gray-500">(共{studentList.length}名学员)</span>
           </Descriptions.Item>
           <Descriptions.Item label="开始日期">{classInfo.startDate}</Descriptions.Item>
           <Descriptions.Item label="结束日期">{classInfo.endDate}</Descriptions.Item>
@@ -1059,6 +1314,19 @@ const ClassDetail = () => {
         extra={
           <Space>
             <Button
+              icon={<DownloadOutlined />}
+              onClick={handleDownloadTemplate}
+            >
+              下载模板
+            </Button>
+            <Button
+              icon={<UploadOutlined />}
+              type="default"
+              onClick={handleShowImportModal}
+            >
+              批量导入
+            </Button>
+            <Button
               type="primary"
               onClick={handleShowAddModal}
             >
@@ -1068,13 +1336,92 @@ const ClassDetail = () => {
           </Space>
         }
       >
+        {/* 搜索框 */}
+        <div className="mb-4">
+          <Input.Search
+            allowClear
+            enterButton="搜索"
+            placeholder="请输入姓名或单位进行搜索"
+            size="large"
+            style={{ maxWidth: 400 }}
+            onChange={e => handleSearch(e.target.value)}
+            onSearch={handleSearch}
+          />
+        </div>
+
         <Table
           columns={studentColumns}
-          dataSource={studentList}
+          dataSource={filteredStudentList}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1300 }}
+          scroll={{ x: 1200 }}
+          pagination={{
+            pageSize: 20,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
+          }}
         />
+
+        {/* 批量导入弹窗 */}
+        <Modal
+          confirmLoading={importing}
+          open={importModalVisible}
+          title="批量导入学员"
+          width={600}
+          onOk={handleImportStudents}
+          onCancel={() => {
+            setImportModalVisible(false);
+            setImportFileList([]);
+            setImportProgress(0);
+          }}
+        >
+          <div style={{ padding: '20px 0' }}>
+            <Space
+              direction="vertical"
+              size="large"
+              style={{ width: '100%' }}
+            >
+              <div>
+                <Typography.Title level={5}>导入说明：</Typography.Title>
+                <Typography.Text type="secondary">
+                  1. 请先下载模板文件，按照模板格式填写学员信息
+                  <br />
+                  2. 支持 .xlsx 和 .xls 格式的Excel文件
+                  <br />
+                  3. 文件大小不能超过 5MB
+                  <br />
+                  4. 必填字段：姓名、性别、单位、电话
+                </Typography.Text>
+              </div>
+
+              <Upload.Dragger
+                accept=".xlsx,.xls"
+                beforeUpload={beforeUpload}
+                fileList={importFileList}
+                multiple={false}
+                name="file"
+                onChange={handleFileChange}
+              >
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                <p className="ant-upload-hint">支持单个文件上传，仅支持 .xlsx 和 .xls 格式</p>
+              </Upload.Dragger>
+
+              {importing && (
+                <div>
+                  <Typography.Text>导入进度：</Typography.Text>
+                  <Progress
+                    percent={importProgress}
+                    status="active"
+                  />
+                </div>
+              )}
+            </Space>
+          </div>
+        </Modal>
 
         {/* 添加学员弹窗 */}
         <Modal
@@ -1153,6 +1500,7 @@ const ClassDetail = () => {
           confirmLoading={loading}
           open={editModalVisible}
           title="编辑学员信息"
+          width={600}
           onCancel={() => setEditModalVisible(false)}
           onOk={handleSaveEdit}
         >
@@ -1162,6 +1510,31 @@ const ClassDetail = () => {
             style={{ marginTop: 20 }}
             wrapperCol={{ span: 16 }}
           >
+            {/* 头像上传 */}
+            <Form.Item label="头像">
+              <div className="flex items-center space-x-4">
+                <UserAvatar
+                  avatar={editFormStudent?.avatar}
+                  gender={editFormStudent?.gender}
+                  size={80}
+                />
+                <Upload
+                  accept="image/*"
+                  beforeUpload={handleAvatarUpload}
+                  fileList={avatarFileList}
+                  showUploadList={false}
+                  onChange={({ fileList: uploadFileList }) => setAvatarFileList(uploadFileList)}
+                >
+                  <Button
+                    icon={<UploadOutlined />}
+                    loading={avatarUploading}
+                  >
+                    {avatarUploading ? '上传中...' : '更换头像'}
+                  </Button>
+                </Upload>
+              </div>
+            </Form.Item>
+
             <Form.Item
               label="姓名"
               name="name"
@@ -1200,14 +1573,21 @@ const ClassDetail = () => {
               <Input placeholder="请输入电话" />
             </Form.Item>
             <Form.Item
-              label="座机号"
-              name="landline"
+              label="培训费"
+              name="trainingFee"
             >
-              <Input placeholder="请输入座机号" />
+              <InputNumber
+                addonBefore="¥"
+                min={0}
+                placeholder="请输入培训费"
+                precision={2}
+                style={{ width: '100%' }}
+              />
             </Form.Item>
             <Form.Item
               label="邮箱"
               name="email"
+              rules={[{ message: '请输入有效的邮箱地址', type: 'email' }]}
             >
               <Input placeholder="请输入邮箱" />
             </Form.Item>
@@ -1273,8 +1653,6 @@ const ClassDetail = () => {
     {
       key: 'action',
       render: (_: unknown, record: any) => {
-        const canEdit =
-          isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, classInfo?.id);
         return (
           <Space size="middle">
             <Button
@@ -1283,23 +1661,19 @@ const ClassDetail = () => {
             >
               详情
             </Button>
-            {canEdit && (
-              <Button
-                type="link"
-                onClick={() => handleEditCourse(record)}
-              >
-                编辑
-              </Button>
-            )}
-            {isUserSuperAdmin && (
-              <Button
-                danger
-                type="link"
-                onClick={() => handleRemoveCourse(record.id)}
-              >
-                移除
-              </Button>
-            )}
+            <Button
+              type="link"
+              onClick={() => handleEditCourse(record)}
+            >
+              编辑
+            </Button>
+            <Button
+              danger
+              type="link"
+              onClick={() => handleRemoveCourse(record.id)}
+            >
+              移除
+            </Button>
           </Space>
         );
       },
@@ -1310,21 +1684,17 @@ const ClassDetail = () => {
 
   // 渲染课程列表
   const renderCourseList = () => {
-    const canEdit =
-      isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_CLASS, undefined, classInfo?.id);
     return (
       <Card
         title="班级课程"
         variant="borderless"
         extra={
-          canEdit && (
-            <Button
-              type="primary"
-              onClick={handleAddCourse}
-            >
-              添加课程
-            </Button>
-          )
+          <Button
+            type="primary"
+            onClick={handleAddCourse}
+          >
+            添加课程
+          </Button>
         }
       >
         <Table
@@ -1530,6 +1900,15 @@ const ClassDetail = () => {
               <Input placeholder="请输入课程名称" />
             </Form.Item>
             <Form.Item
+              label="课程描述"
+              name="description"
+            >
+              <Input.TextArea
+                placeholder="请输入课程描述"
+                rows={3}
+              />
+            </Form.Item>
+            <Form.Item
               label="授课教师"
               name="teacher"
               rules={[{ message: '请输入授课教师', required: true }]}
@@ -1544,11 +1923,42 @@ const ClassDetail = () => {
               <Input placeholder="请输入上课地点" />
             </Form.Item>
             <Form.Item
-              label="上课时间"
-              name="schedule"
-              rules={[{ message: '请输入上课时间', required: true }]}
+              label="课程时长"
+              name="duration"
+              rules={[{ message: '请输入课程时长', required: true }]}
             >
-              <Input placeholder="如：周一、周三 9:00-10:30" />
+              <InputNumber
+                addonAfter="天"
+                max={365}
+                min={1}
+                placeholder="请输入课程时长"
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="课程价格"
+              name="price"
+              rules={[{ message: '请输入课程价格', required: true }]}
+            >
+              <InputNumber
+                addonBefore="¥"
+                min={0}
+                placeholder="请输入课程价格"
+                precision={2}
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="最大学员数"
+              name="maxStudents"
+              rules={[{ message: '请输入最大学员数', required: true }]}
+            >
+              <InputNumber
+                max={1000}
+                min={1}
+                placeholder="请输入最大学员数"
+                style={{ width: '100%' }}
+              />
             </Form.Item>
             <Form.Item
               label="开始日期"
@@ -1777,22 +2187,17 @@ const ClassDetail = () => {
 
   // 渲染通知公告
   const renderAnnouncements = () => {
-    const canEditAnnounce =
-      isUserSuperAdmin || hasPermission(currentUserId, PermissionType.EDIT_ANNOUNCE, undefined, classInfo?.id);
-
     return (
       <Card
         title="通知公告"
         variant="borderless"
         extra={
-          canEditAnnounce && (
-            <Button
-              type="primary"
-              onClick={handlePublishAnnounce}
-            >
-              发布通知
-            </Button>
-          )
+          <Button
+            type="primary"
+            onClick={handlePublishAnnounce}
+          >
+            发布通知
+          </Button>
         }
       >
         <List
@@ -1809,25 +2214,21 @@ const ClassDetail = () => {
                 >
                   查看
                 </Button>,
-                canEditAnnounce && (
-                  <Button
-                    key="list-edit"
-                    type="link"
-                    onClick={() => handleEditAnnounce(item)}
-                  >
-                    编辑
-                  </Button>
-                ),
-                canEditAnnounce && (
-                  <Button
-                    danger
-                    key="list-delete"
-                    type="link"
-                    onClick={() => handleDeleteAnnounce(item.id)}
-                  >
-                    删除
-                  </Button>
-                )
+                <Button
+                  key="list-edit"
+                  type="link"
+                  onClick={() => handleEditAnnounce(item)}
+                >
+                  编辑
+                </Button>,
+                <Button
+                  danger
+                  key="list-delete"
+                  type="link"
+                  onClick={() => handleDeleteAnnounce(item.id)}
+                >
+                  删除
+                </Button>
               ]}
             >
               <List.Item.Meta
@@ -2217,116 +2618,6 @@ const ClassDetail = () => {
     );
   };
 
-  // 渲染权限管理
-  const renderPermissions = () => {
-    if (!isUserSuperAdmin) {
-      return (
-        <div className="h-64 flex items-center justify-center">
-          <Typography.Text className="text-lg text-gray-500">您没有查看此页面的权限</Typography.Text>
-        </div>
-      );
-    }
-
-    const columns = [
-      {
-        dataIndex: 'name',
-        key: 'name',
-        title: '姓名',
-        width: 150
-      },
-      {
-        dataIndex: 'role',
-        key: 'role',
-        title: '角色',
-        width: 150
-      },
-      {
-        dataIndex: 'department',
-        key: 'department',
-        title: '部门',
-        width: 200
-      },
-      {
-        key: 'action',
-        render: (_: unknown, record: any) => (
-          <Space size="middle">
-            <Button
-              size="small"
-              type="primary"
-              onClick={() => handleGrantPermission(record.id, record.name, 'student')}
-            >
-              授予编辑学员权限
-            </Button>
-            <Button
-              size="small"
-              type="primary"
-              onClick={() => handleGrantPermission(record.id, record.name, 'announce')}
-            >
-              授予编辑通知权限
-            </Button>
-          </Space>
-        ),
-        title: '操作',
-        width: 350
-      }
-    ];
-
-    return (
-      <Card
-        title="权限管理"
-        variant="borderless"
-      >
-        <Typography.Paragraph className="mb-4">在此管理员工和管理员对当前班级的特殊权限。</Typography.Paragraph>
-
-        <Table
-          columns={columns}
-          dataSource={staffList}
-          rowKey="id"
-        />
-
-        <Modal
-          open={permissionModalVisible}
-          title={`授予 ${currentStaff?.name || ''} ${permissionType === 'student' ? '编辑学员' : '编辑通知'} 权限`}
-          onCancel={() => setPermissionModalVisible(false)}
-          onOk={handleSavePermission}
-        >
-          <Form
-            form={permissionForm}
-            labelCol={{ span: 6 }}
-            style={{ marginTop: 20 }}
-            wrapperCol={{ span: 16 }}
-          >
-            <Form.Item label="权限类型">
-              <Input
-                disabled
-                value={permissionType === 'student' ? '编辑学员权限' : '编辑通知权限'}
-              />
-            </Form.Item>
-            <Form.Item
-              label="权限到期时间"
-              name="expiry"
-            >
-              <DatePicker
-                showTime
-                placeholder="不设置则永久有效"
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="备注"
-              name="remark"
-            >
-              <Input.TextArea
-                placeholder="可选备注信息"
-                rows={4}
-              />
-            </Form.Item>
-          </Form>
-        </Modal>
-      </Card>
-    );
-  };
-
   if (!classInfo && !loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -2363,11 +2654,6 @@ const ClassDetail = () => {
             children: renderAnnouncements(),
             key: 'announcements',
             label: '通知公告'
-          },
-          {
-            children: renderPermissions(),
-            key: 'permissions',
-            label: '权限管理'
           }
         ]}
       />
