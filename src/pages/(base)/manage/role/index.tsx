@@ -18,8 +18,37 @@ const Role = () => {
 
   const { scrollConfig, tableWrapperRef } = useTableScroll();
 
+  // 创建适配器函数来包装角色列表API
+  const fetchRoleListAdapter = async (params?: Api.SystemManage.RoleSearchParams) => {
+    try {
+      const response = await fetchGetRoleList(params);
+      console.log('角色列表适配器收到数据:', response);
+
+      // 如果response已经是解包后的格式，需要重新包装为{data: response}格式
+      if (response && typeof response === 'object' && 'records' in response) {
+        return {
+          data: response
+        };
+      }
+
+      // 如果response已经是{data: {...}}格式，直接返回
+      return response;
+    } catch (error) {
+      console.error('角色列表适配器错误:', error);
+      return {
+        data: {
+          current: params?.current || 1,
+          pages: 0,
+          records: [],
+          size: params?.size || 10,
+          total: 0
+        }
+      };
+    }
+  };
+
   const { columnChecks, data, run, searchProps, setColumnChecks, tableProps } = useTable({
-    apiFn: fetchGetRoleList,
+    apiFn: fetchRoleListAdapter,
     apiParams: {
       current: 1,
       roleCode: undefined,
@@ -51,7 +80,7 @@ const Role = () => {
       },
       {
         align: 'center',
-        dataIndex: 'roleDesc',
+        dataIndex: 'remark', // 使用API返回的实际字段名
         key: 'roleDesc',
         minWidth: 120,
         title: t('page.manage.role.roleDesc')
@@ -60,7 +89,7 @@ const Role = () => {
         align: 'center',
         dataIndex: 'status',
         key: 'status',
-        render: (_, record) => {
+        render: (_, record: any) => {
           if (record.status === null) {
             return null;
           }
@@ -74,40 +103,46 @@ const Role = () => {
         align: 'center',
         fixed: 'right' as const,
         key: 'operate',
-        render: (_, record) => (
-          <div className="flex-center gap-8px">
-            <AButton
-              ghost
-              size="small"
-              type="primary"
-              onClick={() => edit(record.id)}
-            >
-              {t('common.edit')}
-            </AButton>
-            <AButton
-              size="small"
-              onClick={() => nav(`/manage/role/${record.id}/${record.roleName}/${record.status}`)}
-            >
-              详情
-            </AButton>
-            <APopconfirm
-              title={t('common.confirmDelete')}
-              onConfirm={() => handleDelete(record.id)}
-            >
+        render: (_, record: any) => {
+          const isSuperAdmin = record.roleCode === 'super_admin';
+
+          return (
+            <div className="flex-center gap-8px">
               <AButton
-                danger
+                ghost
                 size="small"
+                type="primary"
+                onClick={() => edit(record.id)}
               >
-                {t('common.delete')}
+                {t('common.edit')}
               </AButton>
-            </APopconfirm>
-          </div>
-        ),
+              <AButton
+                size="small"
+                onClick={() => nav(`/manage/role/${record.id}/${record.roleName}/${record.status}`)}
+              >
+                详情
+              </AButton>
+              <APopconfirm
+                title={isSuperAdmin ? '超级管理员角色不允许删除' : t('common.confirmDelete')}
+                onConfirm={isSuperAdmin ? undefined : () => handleDelete(record.id)}
+              >
+                <AButton
+                  danger
+                  disabled={isSuperAdmin}
+                  size="small"
+                  title={isSuperAdmin ? '超级管理员角色不允许删除' : ''}
+                >
+                  {t('common.delete')}
+                </AButton>
+              </APopconfirm>
+            </div>
+          );
+        },
         title: t('common.operate'),
         width: 195
       }
     ]
-  });
+  } as any);
 
   const {
     checkedRowKeys,
@@ -118,7 +153,7 @@ const Role = () => {
     onBatchDeleted,
     onDeleted,
     rowSelection
-  } = useTableOperate(data, run, async (res, type) => {
+  } = useTableOperate(data as any[], run, async (res, type) => {
     if (type === 'add') {
       // add request 调用新增的接口
       console.log(res);
@@ -129,15 +164,30 @@ const Role = () => {
   });
 
   async function handleBatchDelete() {
+    // 检查是否包含超级管理员角色
+    const selectedRoles = (data as any[]).filter(item => checkedRowKeys.includes(item.id));
+    const hasSuperAdmin = selectedRoles.some(role => role.roleCode === 'super_admin');
+
+    if (hasSuperAdmin) {
+      window.$message?.error('选中的角色中包含超级管理员，无法删除');
+      return;
+    }
+
     // request
     console.log(checkedRowKeys);
     onBatchDeleted();
   }
 
   function handleDelete(id: number) {
+    // 找到要删除的角色
+    const roleToDelete = (data as any[]).find(item => item.id === id);
+    if (roleToDelete?.roleCode === 'super_admin') {
+      window.$message?.error('超级管理员角色不允许删除');
+      return;
+    }
+
     // request
     console.log(id);
-
     onDeleted();
   }
 
@@ -150,7 +200,6 @@ const Role = () => {
       <ACollapse
         className="card-wrapper"
         defaultActiveKey={isMobile ? undefined : '1'}
-        variant="borderless"
         items={[
           {
             children: <RoleSearch {...searchProps} />,
@@ -164,7 +213,6 @@ const Role = () => {
         className="flex-col-stretch sm:flex-1-hidden card-wrapper"
         ref={tableWrapperRef}
         title={t('page.manage.role.title')}
-        variant="borderless"
         extra={
           <TableHeaderOperation
             add={handleAdd}

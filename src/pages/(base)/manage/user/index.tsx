@@ -4,7 +4,7 @@ import { Suspense, lazy, useState } from 'react';
 import { enableStatusRecord, userGenderRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
 import { TableHeaderOperation, useTable, useTableOperate, useTableScroll } from '@/features/table';
-import { type EmployeeApi, employeeService } from '@/service/api';
+import { employeeService } from '@/service/api';
 
 import UserSearch from './modules/UserSearch';
 
@@ -19,6 +19,7 @@ const UserManage = () => {
   const { t } = useTranslation();
   const [passwordVisible, setPasswordVisible] = useState<Record<number, boolean>>({});
   const [importLoading, setImportLoading] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
 
   const { scrollConfig, tableWrapperRef } = useTableScroll();
 
@@ -107,6 +108,13 @@ const UserManage = () => {
             createTime: record.createdAt,
             index: (response.current - 1) * response.size + index + 1,
             password: '123456',
+            // 为表单编辑准备单个角色代码
+            roleCode:
+              record.roles && record.roles.length > 0 && record.roles[0].code !== 'no_role'
+                ? record.roles[0].code
+                : undefined,
+            // 保持原始角色数组结构供表格使用
+            roles: record.roles,
             status: (record.status === 'active'
               ? '1'
               : record.status === 'inactive'
@@ -190,6 +198,20 @@ const UserManage = () => {
           key: 'nickName',
           minWidth: 100,
           title: '姓名'
+        },
+        {
+          align: 'center',
+          dataIndex: 'roles',
+          key: 'roles',
+          minWidth: 120,
+          render: (_, record: any) => {
+            const roles = record.roles || [];
+            if (roles.length === 0) {
+              return '未分配角色';
+            }
+            return roles.map((role: any) => role.name).join(', ');
+          },
+          title: '员工角色'
         },
         {
           align: 'center',
@@ -299,7 +321,10 @@ const UserManage = () => {
           align: 'center',
           fixed: 'right' as const,
           key: 'operate',
-          render: (_, record: any) => (
+          render: (_, record: any) => {
+            const isSuperAdmin = record.roles?.some((role: any) => role.code === 'super_admin');
+
+            return (
             <div className="flex-center gap-8px">
               <AButton
                 ghost
@@ -316,18 +341,20 @@ const UserManage = () => {
                 详情
               </AButton>
               <APopconfirm
-                title={t('common.confirmDelete')}
-                onConfirm={() => handleDelete(record.id)}
+                  title={isSuperAdmin ? '超级管理员不能删除' : t('common.confirmDelete')}
+                  onConfirm={() => !isSuperAdmin && handleDelete(record.id)}
               >
                 <AButton
                   danger
+                    disabled={isSuperAdmin}
                   size="small"
                 >
                   {t('common.delete')}
                 </AButton>
               </APopconfirm>
             </div>
-          ),
+            );
+          },
           title: t('common.operate'),
           width: 195
         }
@@ -343,25 +370,106 @@ const UserManage = () => {
         console.log(res);
       } else {
         // edit request 调用编辑的接口
-        console.log(res);
+        try {
+          console.log('编辑数据调试:', res);
+          console.log('编辑用户ID:', editingUserId);
+
+          // 使用保存的编辑用户ID
+          if (!editingUserId) {
+            window.$message?.error('用户ID缺失，无法更新');
+            console.error('编辑失败：用户ID缺失', { res, editingUserId });
+            return;
+          }
+
+          // 转换前端表单数据为后端API格式
+          const updateData = {
+            // 处理角色数据
+            address: res.address,
+            bankCard: res.bankCard,
+            email: res.email || res.userEmail,
+            gender: res.userGender === 1 ? 'male' : res.userGender === 2 ? 'female' : undefined,
+            idCard: res.idCard,
+            nickName: res.nickName,
+            phone: res.userPhone,
+            roles:
+              typeof res.roles === 'string' && res.roles
+                ? [res.roles] // 转换为数组格式
+                : Array.isArray(res.roles) && res.roles.length > 0 && res.roles[0].code
+                  ? [res.roles[0].code] // 提取第一个角色的code并转换为数组
+                  : undefined,
+            status: res.status === '1' ? 'active' : res.status === '2' ? 'inactive' : undefined,
+            tim: res.tim,
+            userName: res.userName,
+            wechat: res.wechat
+          };
+
+          console.log('更新用户数据:', { id: editingUserId, updateData });
+          await employeeService.updateEmployee(editingUserId, updateData);
+        } catch (error: any) {
+          console.error('更新用户失败:', error);
+          window.$message?.error('更新用户失败');
+          throw error; // 重新抛出错误，让表格组件知道操作失败
+        }
       }
     });
 
   async function handleBatchDelete() {
-    // request
-    console.log(checkedRowKeys);
+    try {
+      if (checkedRowKeys.length === 0) {
+        window.$message?.warning('请选择要删除的员工');
+        return;
+      }
+
+      const result = await employeeService.batchDeleteEmployees(checkedRowKeys as number[]);
+
+      if (result.skippedSuperAdmins && result.skippedSuperAdmins.length > 0) {
+        window.$message?.warning(
+          `删除完成！共删除 ${result.deletedCount} 个员工，跳过 ${result.skippedSuperAdmins.length} 个超级管理员`
+        );
+      } else {
+        window.$message?.success(`批量删除成功！共删除 ${result.deletedCount} 个员工`);
+      }
+
     onBatchDeleted();
+      run(); // 刷新表格数据
+    } catch (error) {
+      console.error('批量删除失败:', error);
+      window.$message?.error('批量删除失败');
+    }
   }
 
-  function handleDelete(id: number) {
-    // request
-    console.log(id);
-
+  async function handleDelete(id: number) {
+    try {
+      await employeeService.deleteEmployee(id);
+      window.$message?.success('删除成功');
     onDeleted();
+      run(); // 刷新表格数据
+    } catch (error: any) {
+      console.error('删除失败:', error);
+      if (error?.response?.status === 403) {
+        window.$message?.error('不允许删除超级管理员');
+      } else {
+        window.$message?.error('删除失败');
+      }
+    }
   }
 
   function edit(id: number) {
+    // 自定义数据处理：将 roleCode 映射到 roles 字段
+    const findItem = data.find(item => item.id === id);
+    if (findItem) {
+      const formData = {
+        ...findItem,
+        id: findItem.id, // 确保id字段被保留
+        roles: findItem.roleCode // 将 roleCode 映射到 roles 字段供表单使用
+      };
+      console.log('编辑表单数据:', formData);
+      setEditingUserId(id);
+      handleEdit(formData);
+    } else {
+    setEditingUserId(id);
     handleEdit(id);
+    }
   }
   return (
     <div className="h-full min-h-600px flex-col-stretch gap-16px overflow-auto p-16px">
@@ -425,9 +533,18 @@ const UserManage = () => {
       >
         <div style={{ flex: 1, overflow: 'auto' }}>
           <ATable
-            rowSelection={rowSelection}
             scroll={{ x: 'max-content' }}
             size="small"
+            rowClassName={(record: any) => {
+              return record.roles?.some((role: any) => role.code === 'super_admin') ? 'super-admin-row' : '';
+            }}
+            rowSelection={{
+              ...rowSelection,
+              getCheckboxProps: (record: any) => ({
+                disabled: record.roles?.some((role: any) => role.code === 'super_admin'),
+                name: record.userName
+              })
+            }}
             {...tableProps}
             pagination={{
               ...tableProps.pagination,

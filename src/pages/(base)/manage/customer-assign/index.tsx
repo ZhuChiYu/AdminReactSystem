@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { type CustomerApi, type EmployeeApi, customerService, employeeService } from '@/service/api';
-import { getCurrentUserId, isAdminOrSuperAdmin } from '@/utils/auth';
+import { isAdminOrSuperAdmin } from '@/utils/auth';
+import { localStg } from '@/utils/storage';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 角色中文名称映射
@@ -34,7 +35,12 @@ interface CustomerAssignment {
 const CustomerAssignManagement = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
-  const currentUserId = getCurrentUserId();
+
+  // 直接从localStorage获取用户信息和ID
+  const userInfo = localStg.get('userInfo');
+  const currentUserId = userInfo?.userId || '';
+  console.log('🔍 用户信息:', userInfo);
+  console.log('🔍 用户ID:', currentUserId);
 
   // 状态管理
   const [assignments, setAssignments] = useState<CustomerAssignment[]>([]);
@@ -60,16 +66,22 @@ const CustomerAssignManagement = () => {
       try {
         setLoading(true);
 
-        // 获取客户列表
-        const customerResponse = await customerService.getCustomerList({ current: 1, size: 1000 });
+        // 获取客户列表（所有数据）
+        const customerResponse = await customerService.getCustomerList({
+          current: 1,
+          scope: 'all',
+          size: 1000 // 显示所有客户数据
+        });
         setCustomers(customerResponse.records);
 
         // 获取员工列表
         const employeeResponse = await employeeService.getEmployeeList({ current: 1, size: 1000 });
         setEmployees(employeeResponse.records);
 
-        // TODO: 获取分配记录 - 这里暂时使用空数组，等后端API实现
-        setAssignments([]);
+        // 获取客户分配记录
+        const assignmentResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
+        console.log('🔍 初始加载分配数据:', assignmentResponse);
+        setAssignments(assignmentResponse.records);
       } catch (error) {
         console.error('获取数据失败:', error);
         message.error('获取数据失败');
@@ -88,7 +100,7 @@ const CustomerAssignManagement = () => {
       return employees;
     }
     // 如果是管理员，只能看到自己管理的员工
-    // TODO: 这里需要根据实际的管理关系来过滤
+    // 这里需要根据实际的管理关系来过滤
     return employees.filter(emp => emp.id !== Number(currentUserId));
   };
 
@@ -99,47 +111,34 @@ const CustomerAssignManagement = () => {
   };
 
   // 分配客户给员工
-  const handleAssignCustomers = async () => {
+  const handleAssign = async () => {
+    if (selectedCustomers.length === 0 || !selectedEmployee) {
+      message.warning('请选择客户和员工');
+      return;
+    }
+
     try {
       setLoading(true);
 
-      if (!selectedEmployee || selectedCustomers.length === 0) {
-        message.error('请选择员工和客户');
-        return;
-      }
-
-      const employee = employees.find(e => e.id === selectedEmployee);
-
-      // TODO: 调用后端API进行分配
-      // await customerService.assignCustomers({
-      //   employeeId: selectedEmployee,
-      //   customerIds: selectedCustomers,
-      //   remark
-      // });
-
-      // 临时创建分配记录用于展示
-      const newAssignments = selectedCustomers.map(customerId => {
-        const customer = customers.find(c => c.id === customerId);
-        return {
-          assignedById: Number(currentUserId),
-          assignedByName: '当前管理员',
-          assignedTime: new Date().toISOString().split('T')[0],
-          assignedToId: selectedEmployee,
-          assignedToName: employee?.nickName || '',
-          customerId,
-          customerName: customer?.customerName || '',
-          id: Date.now() + customerId,
-          remark
-        };
+      // 调用后端API进行分配
+      await customerService.assignCustomers({
+        assignedToId: selectedEmployee,
+        customerIds: selectedCustomers,
+        remark
       });
 
-      setAssignments(prev => [...prev, ...newAssignments]);
-      setIsModalVisible(false);
-      form.resetFields();
+      message.success('分配成功');
+
+      // 重新获取分配数据
+      const assignmentResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
+      console.log('🔍 分配成功后重新加载数据:', assignmentResponse);
+      setAssignments(assignmentResponse.records);
+
+      // 清空选择
       setSelectedCustomers([]);
       setSelectedEmployee(undefined);
       setRemark('');
-      message.success('分配成功');
+      setIsModalVisible(false);
     } catch (error) {
       console.error('分配失败:', error);
       message.error('分配失败');
@@ -149,27 +148,41 @@ const CustomerAssignManagement = () => {
   };
 
   // 取消分配
-  const handleUnassign = async (assignmentId: number) => {
+  const handleRemoveAssignment = async (assignmentId: number) => {
     try {
-      // TODO: 调用后端API取消分配
-      // await customerService.unassignCustomer(assignmentId);
+      setLoading(true);
 
-      setAssignments(prev => prev.filter(a => a.id !== assignmentId));
+      // 调用后端API取消分配
+      await customerService.removeCustomerAssignment(assignmentId);
+
       message.success('取消分配成功');
+
+      // 重新获取分配数据
+      const assignmentResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
+      setAssignments(assignmentResponse.records);
     } catch (error) {
       console.error('取消分配失败:', error);
       message.error('取消分配失败');
+    } finally {
+      setLoading(false);
     }
   };
 
   // 过滤当前用户相关的分配记录
   const getFilteredAssignments = () => {
-    if (Number(currentUserId) === 1) {
-      // 超级管理员可以看到所有分配记录
+    console.log('🔍 当前用户ID:', currentUserId);
+    console.log('🔍 用户信息调试:', userInfo);
+    console.log('🔍 所有分配数据:', assignments);
+
+    // 超级管理员（admin用户，ID通常为1）可以看到所有分配记录
+    if (userInfo?.userName === 'admin' || Number(currentUserId) === 1) {
+      console.log('🔍 超级管理员，返回所有数据:', assignments);
       return assignments;
     }
     // 管理员只能看到自己分配的记录
-    return assignments.filter(a => a.assignedById === Number(currentUserId));
+    const filtered = assignments.filter(a => a.assignedById === Number(currentUserId));
+    console.log('🔍 管理员，过滤后数据:', filtered);
+    return filtered;
   };
 
   // 获取员工的角色中文名称
@@ -231,7 +244,7 @@ const CustomerAssignManagement = () => {
               onClick={() => {
                 Modal.confirm({
                   content: `确定要取消客户 ${record.customerName} 的分配吗？`,
-                  onOk: () => handleUnassign(record.id),
+                  onOk: () => handleRemoveAssignment(record.id),
                   title: '确认取消分配'
                 });
               }}
@@ -274,7 +287,7 @@ const CustomerAssignManagement = () => {
         open={isModalVisible}
         title="分配客户给员工"
         width={600}
-        onOk={handleAssignCustomers}
+        onOk={handleAssign}
         onCancel={() => {
           setIsModalVisible(false);
           form.resetFields();

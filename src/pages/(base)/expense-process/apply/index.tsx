@@ -17,7 +17,6 @@ import {
   Modal,
   Select,
   Space,
-  Steps,
   Table,
   Tag,
   Typography,
@@ -26,7 +25,7 @@ import {
 } from 'antd';
 import type { UploadFile, UploadProps } from 'antd';
 import type dayjs from 'dayjs';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { expenseService, notificationService } from '@/service/api';
@@ -35,7 +34,6 @@ import { isSuperAdmin } from '@/utils/auth';
 const { Text, Title } = Typography;
 const { TextArea } = Input;
 const { RangePicker } = DatePicker;
-const { Step } = Steps;
 
 interface ExpenseItem {
   amount: number;
@@ -68,14 +66,6 @@ const departments = [
   { label: '行政部', value: 'admin' }
 ];
 
-const approvers = [
-  { label: '张经理', value: 'manager1' },
-  { label: '李经理', value: 'manager2' },
-  { label: '王总监', value: 'director1' },
-  { label: '赵总监', value: 'director2' },
-  { label: '财务主管', value: 'finance_manager' }
-];
-
 const Component: React.FC = () => {
   const [form] = Form.useForm();
   const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
@@ -83,32 +73,70 @@ const Component: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const isUserSuperAdmin = isSuperAdmin();
 
+  // 初始化表单默认值
+  useEffect(() => {
+    // 从localStorage或用户信息中获取当前用户名
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    const currentUser = userInfo.nickName || userInfo.userName || '当前用户';
+
+    form.setFieldsValue({
+      applicant: currentUser,
+      department: 'admin'
+    });
+  }, [form]);
+
   // 添加报销项目
   const handleAddItem = () => {
-    form.validateFields().then(values => {
-      const newItem: ExpenseItem = {
-        amount: values.itemAmount,
-        date: values.itemDate,
-        description: values.itemDescription,
-        itemName: values.itemName,
-        itemType: values.itemType,
-        key: Date.now().toString()
-      };
+    form
+      .validateFields(['itemName', 'itemType', 'itemAmount', 'itemDate', 'itemDescription'])
+      .then(values => {
+        // 检查必填字段
+        if (!values.itemName) {
+          message.error('请输入项目名称');
+          return;
+        }
+        if (!values.itemType) {
+          message.error('请选择报销类型');
+          return;
+        }
+        if (!values.itemAmount) {
+          message.error('请输入报销金额');
+          return;
+        }
+        if (!values.itemDate) {
+          message.error('请选择报销日期');
+          return;
+        }
 
-      setExpenseItems([...expenseItems, newItem]);
+        const newItem: ExpenseItem = {
+          amount: values.itemAmount,
+          date: values.itemDate,
+          description: values.itemDescription || '',
+          itemName: values.itemName,
+          itemType: values.itemType,
+          key: Date.now().toString()
+        };
 
-      // 清空表单项目部分
-      form.setFieldsValue({
-        itemAmount: undefined,
-        itemDate: null,
-        itemDescription: '',
-        itemName: '',
-        itemType: undefined
+        setExpenseItems([...expenseItems, newItem]);
+
+        // 清空表单项目部分
+        form.setFieldsValue({
+          itemAmount: undefined,
+          itemDate: null,
+          itemDescription: '',
+          itemName: '',
+          itemType: undefined
+        });
+
+        message.success('报销项目添加成功');
+      })
+      .catch(error => {
+        console.error('表单验证失败:', error);
       });
-    });
   };
 
   // 删除报销项目
@@ -141,15 +169,84 @@ const Component: React.FC = () => {
   };
 
   // 保存草稿
-  const handleSaveDraft = () => {
-    const draftData = {
-      ...form.getFieldsValue(),
-      invoices: fileList,
-      items: expenseItems
-    };
-    console.log('保存草稿:', draftData);
-    // 实际应用中，这里可以调用API保存到后端
-    message.success('草稿保存成功');
+  const handleSaveDraft = async () => {
+    try {
+      const values = form.getFieldsValue();
+
+      // 检查基本信息
+      if (!values.title) {
+        message.error('请填写报销标题');
+        return;
+      }
+
+      if (expenseItems.length === 0) {
+        message.error('请至少添加一个报销项目');
+        return;
+      }
+
+      setSaving(true);
+
+      const draftData = {
+        applicationReason: values.title,
+        expensePeriodEnd: values.dateRange?.[1]?.format('YYYY-MM-DD'),
+        expensePeriodStart: values.dateRange?.[0]?.format('YYYY-MM-DD'),
+        expenseType: expenseItems.length > 0 ? expenseItems[0].itemType : '其他',
+        // 草稿状态特殊标记
+        isDraft: true,
+        items: expenseItems.map(item => ({
+          amount: item.amount,
+          description: item.description,
+          expenseDate: item.date.format('YYYY-MM-DD'),
+          itemName: item.itemName,
+          itemType: item.itemType
+        })),
+        remark: values.remarks || ''
+      };
+
+      // 保存到localStorage作为草稿
+      const drafts = JSON.parse(localStorage.getItem('expenseDrafts') || '[]');
+      const newDraft = {
+        id: Date.now(),
+        ...draftData,
+        createdAt: new Date().toISOString(),
+        title: values.title,
+        totalAmount: expenseItems.reduce((sum, item) => sum + item.amount, 0)
+      };
+      drafts.push(newDraft);
+      localStorage.setItem('expenseDrafts', JSON.stringify(drafts));
+
+      message.success('草稿保存成功');
+    } catch (error) {
+      console.error('保存草稿失败:', error);
+      message.error('保存草稿失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 重置表单
+  const handleReset = () => {
+    Modal.confirm({
+      cancelText: '取消',
+      content: '确定要重置表单吗？所有填写的内容将被清空。',
+      okText: '确认',
+      onOk: () => {
+        form.resetFields();
+        setExpenseItems([]);
+        setFileList([]);
+
+        // 重新设置默认值
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        const currentUser = userInfo.nickName || userInfo.userName || '当前用户';
+        form.setFieldsValue({
+          applicant: currentUser,
+          department: 'admin'
+        });
+
+        message.success('表单重置成功');
+      },
+      title: '确认重置'
+    });
   };
 
   // 提交申请
@@ -182,13 +279,15 @@ const Component: React.FC = () => {
       const response = await expenseService.createExpense(expenseData);
 
       // 发送通知给管理员
-      await notificationService.createNotification({
-        content: `${values.applicant || '员工'}提交了新的报销申请: ${values.title}，请尽快审核`,
-        relatedId: response.id,
-        relatedType: 'expense_application',
-        title: '新报销申请待审核',
-        type: 'expense'
-      });
+      if (response) {
+        await notificationService.createNotification({
+          content: `${values.applicant || '员工'}提交了新的报销申请: ${values.title}，请尽快审核`,
+          relatedId: response.id,
+          relatedType: 'expense_application',
+          title: '新报销申请待审核',
+          type: 'expense'
+        });
+      }
 
       message.success('报销申请提交成功');
 
@@ -425,48 +524,6 @@ const Component: React.FC = () => {
             </Upload>
           </Form.Item>
 
-          <Divider orientation="left">审批流程</Divider>
-
-          <div className="mb-4">
-            <Steps
-              current={-1}
-              size="small"
-            >
-              <Step
-                description="填写报销信息"
-                title="提交申请"
-              />
-              <Step
-                description="部门主管审批"
-                title="部门审批"
-              />
-              <Step
-                description="财务部门审核"
-                title="财务审核"
-              />
-              <Step
-                description="总经理最终审批"
-                title="总经理审批"
-              />
-              <Step
-                description="财务部门支付"
-                title="财务打款"
-              />
-            </Steps>
-          </div>
-
-          <Form.Item
-            label="审批人"
-            name="approvers"
-            rules={[{ message: '请选择审批人', required: true }]}
-          >
-            <Select
-              mode="multiple"
-              options={approvers}
-              placeholder="请选择审批人"
-            />
-          </Form.Item>
-
           <Form.Item
             label="备注说明"
             name="remarks"
@@ -489,6 +546,7 @@ const Component: React.FC = () => {
               </Button>
               <Button
                 icon={<SaveOutlined />}
+                loading={saving}
                 onClick={handleSaveDraft}
               >
                 保存草稿
@@ -499,7 +557,7 @@ const Component: React.FC = () => {
               >
                 预览
               </Button>
-              <Button htmlType="reset">重置</Button>
+              <Button onClick={handleReset}>重置</Button>
             </Space>
           </Form.Item>
         </Form>
@@ -570,23 +628,11 @@ const Component: React.FC = () => {
 
             <Divider orientation="left">发票凭证</Divider>
             <div className="mb-4">
-              {previewData.invoices.length > 0 ? (
+              {previewData.invoices && previewData.invoices.length > 0 ? (
                 previewData.invoices.map((file: any) => <Tag key={file.uid || file.name}>{file.name}</Tag>)
               ) : (
                 <Text type="secondary">未上传发票/凭证</Text>
               )}
-            </div>
-
-            <Divider orientation="left">审批人</Divider>
-            <div>
-              {previewData.approvers?.map((id: string) => (
-                <Tag
-                  color="green"
-                  key={id}
-                >
-                  {approvers.find(a => a.value === id)?.label}
-                </Tag>
-              ))}
             </div>
 
             {previewData.remarks && (

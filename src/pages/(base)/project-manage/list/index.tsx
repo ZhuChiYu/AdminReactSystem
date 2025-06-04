@@ -4,18 +4,82 @@ import type { RangePickerProps } from 'antd/es/date-picker';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 
-import type { CustomerInfo, TaskRecord } from '@/store/customerStore';
-import useCustomerStore, { FollowUpStatus, TaskFollowUpStatus, TaskType } from '@/store/customerStore';
+import type { CustomerApi } from '@/service/api';
+import { customerService } from '@/service/api';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 // 暂时注释掉未使用的导入
 // import { getCurrentUserId, getCurrentUserName, isAdmin } from '@/utils/auth';
 
+/** 跟进状态枚举 */
+export enum FollowUpStatus {
+  ARRIVED = 'arrived',
+  CONSULT = 'consult',
+  EARLY_25 = 'early_25',
+  EFFECTIVE_VISIT = 'effective_visit',
+  NEW_DEVELOP = 'new_develop',
+  NOT_ARRIVED = 'not_arrived',
+  REGISTERED = 'registered',
+  REJECTED = 'rejected',
+  VIP = 'vip',
+  WECHAT_ADDED = 'wechat_added'
+}
+
+/** 跟进状态中文映射 */
+const followUpStatusNames = {
+  [FollowUpStatus.ARRIVED]: '已到访',
+  [FollowUpStatus.CONSULT]: '咨询中',
+  [FollowUpStatus.EARLY_25]: '提前25%',
+  [FollowUpStatus.EFFECTIVE_VISIT]: '有效回访',
+  [FollowUpStatus.NEW_DEVELOP]: '新开发',
+  [FollowUpStatus.NOT_ARRIVED]: '未到访',
+  [FollowUpStatus.REGISTERED]: '已报名',
+  [FollowUpStatus.REJECTED]: '已拒绝',
+  [FollowUpStatus.VIP]: 'VIP客户',
+  [FollowUpStatus.WECHAT_ADDED]: '已加微信'
+};
+
+/** 跟进状态颜色映射 */
+const followUpStatusColors = {
+  [FollowUpStatus.ARRIVED]: 'success',
+  [FollowUpStatus.CONSULT]: 'blue',
+  [FollowUpStatus.EARLY_25]: 'orange',
+  [FollowUpStatus.EFFECTIVE_VISIT]: 'cyan',
+  [FollowUpStatus.NEW_DEVELOP]: 'purple',
+  [FollowUpStatus.NOT_ARRIVED]: 'default',
+  [FollowUpStatus.REGISTERED]: 'green',
+  [FollowUpStatus.REJECTED]: 'red',
+  [FollowUpStatus.VIP]: 'gold',
+  [FollowUpStatus.WECHAT_ADDED]: 'lime'
+};
+
+/** 客户来源中文映射 */
+const customerSourceNames = {
+  import: '导入',
+  manual: '手动录入',
+  offline: '线下获取',
+  online: '线上获取',
+  phone: '电话',
+  referral: '推荐',
+  visit: '拜访',
+  wechat: '微信'
+};
+
+/** 任务类型枚举 */
+enum TaskType {
+  CONSULT = 'consult', // 咨询任务
+  // 开发任务
+  FOLLOW_UP = 'effective_visit', // 开发任务
+  // 咨询任务
+  DEVELOP = 'new_develop', // 回访任务
+  REGISTER = 'registered' // 报名任务
+}
+
 /** 任务类型名称 */
 const taskTypeNames = {
-  [TaskType.CONSULT]: '咨询',
-  [TaskType.REGISTER]: '报名',
-  [TaskType.DEVELOP]: '开发',
-  [TaskType.FOLLOW_UP]: '回访'
+  [TaskType.CONSULT]: '咨询任务',
+  [TaskType.REGISTER]: '报名任务',
+  [TaskType.DEVELOP]: '开发任务',
+  [TaskType.FOLLOW_UP]: '回访任务'
 };
 
 /** 任务类型颜色 */
@@ -38,19 +102,41 @@ const periodNames = {
   [StatisticsPeriod.MONTH]: '月统计'
 };
 
+/** 任务跟进状态枚举 */
+enum TaskFollowUpStatus {
+  COMPLETED = 'completed',
+  IN_PROGRESS = 'in_progress',
+  NOT_STARTED = 'not_started'
+}
+
 /** 跟进状态名称 */
-const followUpStatusNames = {
+const taskFollowUpStatusNames = {
   [TaskFollowUpStatus.NOT_STARTED]: '未开始',
   [TaskFollowUpStatus.IN_PROGRESS]: '进行中',
   [TaskFollowUpStatus.COMPLETED]: '已完成'
 };
 
 /** 跟进状态颜色 */
-const followUpStatusColors = {
+const taskFollowUpStatusColors = {
   [TaskFollowUpStatus.NOT_STARTED]: 'default',
   [TaskFollowUpStatus.IN_PROGRESS]: 'processing',
   [TaskFollowUpStatus.COMPLETED]: 'success'
 };
+
+/** 任务记录接口 */
+interface TaskRecord {
+  completedCount: number;
+  customers: CustomerApi.CustomerListItem[];
+  description: string;
+  dueDate: string;
+  followUpStatus: TaskFollowUpStatus;
+  id: number;
+  name: string;
+  remark?: string;
+  targetCount: number;
+  totalCount: number;
+  type: TaskType;
+}
 
 /** 任务管理组件 */
 const TaskManagement = () => {
@@ -58,26 +144,26 @@ const TaskManagement = () => {
   const [isTargetModalVisible, setIsTargetModalVisible] = useState(false);
   const [isRemarkModalVisible, setIsRemarkModalVisible] = useState(false);
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
-  const [selectedTaskCustomers, setSelectedTaskCustomers] = useState<CustomerInfo[]>([]);
+  const [isFollowUpModalVisible, setIsFollowUpModalVisible] = useState(false);
+  const [selectedTaskCustomers, setSelectedTaskCustomers] = useState<CustomerApi.CustomerListItem[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerApi.CustomerListItem | null>(null);
   const [customerModalTitle, setCustomerModalTitle] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState<StatisticsPeriod>(StatisticsPeriod.WEEK);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
   const [remark, setRemark] = useState('');
+  const [taskTargets, setTaskTargets] = useState<Record<TaskType, number>>({
+    [TaskType.CONSULT]: 50,
+    [TaskType.DEVELOP]: 50,
+    [TaskType.FOLLOW_UP]: 50,
+    [TaskType.REGISTER]: 50
+  });
   const [form] = Form.useForm();
   const [targetForm] = Form.useForm();
+  const [followUpForm] = Form.useForm();
 
-  // 从状态管理器获取任务和客户数据
-  const { addCustomer, calculateTaskCounts, customers, getCustomersByTaskId, tasks } = useCustomerStore();
-
-  const [filteredTasks, setFilteredTasks] = useState<TaskRecord[]>(tasks);
-
-  // 模拟当前用户信息
-  const currentUser = {
-    department: '销售部',
-    id: 1,
-    isAdmin: true,
-    name: '张三'
-  };
+  // 任务数据
+  const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<TaskRecord[]>([]);
 
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
@@ -87,153 +173,221 @@ const TaskManagement = () => {
     type: ''
   });
 
+  // 根据客户数据生成任务统计
+  const generateTasksFromCustomers = (
+    customerList: CustomerApi.CustomerListItem[],
+    currentTargets?: Record<TaskType, number>
+  ) => {
+    const currentDate = dayjs();
+    const weekEnd = currentDate.endOf('week');
+
+    // 使用传入的目标或当前状态中的目标
+    const targets = currentTargets || taskTargets;
+
+    // 按状态分组客户
+    const consultCustomers = customerList.filter(c => c.followStatus === FollowUpStatus.CONSULT);
+    const developCustomers = customerList.filter(c => c.followStatus === FollowUpStatus.NEW_DEVELOP);
+    const followUpCustomers = customerList.filter(c => c.followStatus === FollowUpStatus.EFFECTIVE_VISIT);
+    const registerCustomers = customerList.filter(c => c.followStatus === FollowUpStatus.REGISTERED);
+
+    const generatedTasks: TaskRecord[] = [
+      {
+        completedCount: 0,
+        customers: consultCustomers,
+        description: '处理新客户咨询课程情况',
+        dueDate: weekEnd.format('YYYY-MM-DD'),
+        followUpStatus: TaskFollowUpStatus.IN_PROGRESS,
+        id: 1,
+        name: '咨询任务',
+        targetCount: targets[TaskType.CONSULT],
+        totalCount: consultCustomers.length,
+        type: TaskType.CONSULT
+      },
+      {
+        completedCount: 0,
+        customers: developCustomers,
+        description: '开发新课程计划',
+        dueDate: weekEnd.format('YYYY-MM-DD'),
+        followUpStatus: TaskFollowUpStatus.IN_PROGRESS,
+        id: 2,
+        name: '开发任务',
+        targetCount: targets[TaskType.DEVELOP],
+        totalCount: developCustomers.length,
+        type: TaskType.DEVELOP
+      },
+      {
+        completedCount: 0,
+        customers: followUpCustomers,
+        description: '进行客户回访和跟进',
+        dueDate: weekEnd.format('YYYY-MM-DD'),
+        followUpStatus: TaskFollowUpStatus.IN_PROGRESS,
+        id: 3,
+        name: '回访任务',
+        targetCount: targets[TaskType.FOLLOW_UP],
+        totalCount: followUpCustomers.length,
+        type: TaskType.FOLLOW_UP
+      },
+      {
+        completedCount: 0,
+        customers: registerCustomers,
+        description: '培训课程报名审核',
+        dueDate: weekEnd.format('YYYY-MM-DD'),
+        followUpStatus: TaskFollowUpStatus.IN_PROGRESS,
+        id: 4,
+        name: '报名任务',
+        targetCount: targets[TaskType.REGISTER],
+        totalCount: registerCustomers.length,
+        type: TaskType.REGISTER
+      }
+    ];
+
+    setTasks(generatedTasks);
+    setFilteredTasks(generatedTasks);
+  };
+
+  // 获取客户数据
+  const fetchCustomerData = async (currentTargets?: Record<TaskType, number>) => {
+    try {
+      console.log('🔄 开始获取客户数据...');
+
+      // 获取当前用户管理的所有客户数据
+      const customerData = await customerService.getCustomerList({
+        current: 1,
+        scope: 'own', // 只获取当前用户管理的客户
+        size: 1000
+      });
+
+      console.log('📋 客户列表数据:', customerData);
+
+      // 转换数据格式以匹配前端类型
+      const formattedCustomers = customerData.records.map(customer => ({
+        ...customer,
+        canViewEmail: true,
+        canViewMobile: true,
+        canViewPhone: true,
+        canViewRealName: true,
+        // 兼容性映射
+        createTime: customer.createdAt,
+        customerLevel: customer.level,
+        employee: customer.assignedTo,
+        followContent: customer.remark || '暂无跟进内容',
+        updateTime: customer.updatedAt
+      }));
+
+      // 根据客户数据生成任务统计，传入最新的目标数据
+      generateTasksFromCustomers(formattedCustomers, currentTargets);
+    } catch (error) {
+      console.error('❌ 获取客户数据失败:', error);
+      message.error('获取数据失败');
+    }
+  };
+
+  // 修改客户跟进状态
+  const updateCustomerFollowStatus = async (customerId: number, newStatus: FollowUpStatus) => {
+    try {
+      // 这里应该调用后端API更新客户跟进状态
+      // 暂时模拟API调用
+      console.log('🔄 更新客户跟进状态:', { customerId, newStatus });
+
+      // 模拟API调用成功
+      message.success('跟进状态更新成功');
+
+      // 重新获取客户数据以更新统计
+      await fetchCustomerData();
+
+      // 关闭弹窗
+      setIsFollowUpModalVisible(false);
+      setSelectedCustomer(null);
+      followUpForm.resetFields();
+    } catch (error) {
+      console.error('❌ 更新跟进状态失败:', error);
+      message.error('更新失败，请重试');
+    }
+  };
+
+  // 加载任务目标数据
+  const loadTaskTargets = async () => {
+    try {
+      // 实际调用后端API加载目标数据
+      // const targetData = await taskService.getTaskTargets();
+
+      // 暂时使用本地存储模拟持久化
+      const savedTargets = localStorage.getItem('taskTargets');
+      if (savedTargets) {
+        const parsedTargets = JSON.parse(savedTargets);
+        setTaskTargets(parsedTargets);
+        return parsedTargets;
+      }
+
+      return taskTargets;
+    } catch (error) {
+      console.error('❌ 加载目标数据失败:', error);
+      return taskTargets;
+    }
+  };
+
+  // 保存任务目标
+  const saveTaskTarget = async (taskType: TaskType, targetCount: number) => {
+    try {
+      console.log('🔄 保存任务目标:', { period: selectedPeriod, targetCount, taskType });
+
+      // 更新目标状态
+      const newTargets = { ...taskTargets, [taskType]: targetCount };
+      setTaskTargets(newTargets);
+
+      // 实际调用后端API保存目标
+      // await taskService.saveTaskTarget({
+      //   type: taskType,
+      //   period: selectedPeriod,
+      //   target: targetCount
+      // });
+
+      // 暂时使用本地存储模拟持久化
+      localStorage.setItem('taskTargets', JSON.stringify(newTargets));
+
+      message.success('目标设置成功');
+
+      // 立即重新生成任务数据以反映新的目标
+      await fetchCustomerData(newTargets);
+
+      setIsTargetModalVisible(false);
+      targetForm.resetFields();
+    } catch (error) {
+      console.error('❌ 保存目标失败:', error);
+      message.error('保存失败，请重试');
+    }
+  };
+
+  // 初始化数据
+  useEffect(() => {
+    const initializeData = async () => {
+      // 先加载目标数据
+      const currentTargets = await loadTaskTargets();
+      // 再获取客户数据并生成任务
+      await fetchCustomerData(currentTargets);
+    };
+
+    initializeData();
+  }, []);
+
   // 当任务数据变化时更新列表
   useEffect(() => {
     setFilteredTasks(tasks);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
 
-  // 如果没有客户数据，添加一些示例数据
-  useEffect(() => {
-    if (customers.length === 0) {
-      // 示例数据 - 各种跟进状态的客户
-      const sampleCustomers: CustomerInfo[] = [
-        // 咨询任务相关客户
-        {
-          company: '上海民用航空电源系统有限公司',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '客户咨询了企业培训方案',
-          followStatus: FollowUpStatus.CONSULT,
-          id: 1,
-          mobile: '13801234567',
-          name: '李经理',
-          phone: '021-12345678',
-          position: '培训主管',
-          source: '网站'
-        },
-        {
-          company: '北京智慧科技有限公司',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '已添加客户微信',
-          followStatus: FollowUpStatus.WECHAT_ADDED,
-          id: 2,
-          mobile: '13902345678',
-          name: '王总',
-          phone: '010-23456789',
-          position: '总经理',
-          source: '展会'
-        },
-        // 开发任务相关客户
-        {
-          company: '广州数字科技有限公司',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '新客户需要定制开发方案',
-          followStatus: FollowUpStatus.NEW_DEVELOP,
-          id: 3,
-          mobile: '13903456789',
-          name: '张经理',
-          phone: '020-34567890',
-          position: '技术总监',
-          source: '转介绍'
-        },
-        {
-          company: '深圳创新企业管理咨询有限公司',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '早25客户，需高优先级跟进',
-          followStatus: FollowUpStatus.EARLY_25,
-          id: 4,
-          mobile: '13904567890',
-          name: '刘总',
-          phone: '0755-45678901',
-          position: '人力总监',
-          source: '老客户'
-        },
-        // 回访任务相关客户
-        {
-          company: '武汉科教发展有限公司',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '有效回访，客户对课程很满意',
-          followStatus: FollowUpStatus.EFFECTIVE_VISIT,
-          id: 5,
-          mobile: '13905678901',
-          name: '陈总',
-          phone: '027-56789012',
-          position: '副总裁',
-          source: '广告'
-        },
-        {
-          company: '成都企业培训中心',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '大客户，需提供VIP服务',
-          followStatus: FollowUpStatus.VIP,
-          id: 6,
-          mobile: '13906789012',
-          name: '赵总',
-          phone: '028-67890123',
-          position: 'CEO',
-          source: '展会'
-        },
-        // 报名任务相关客户
-        {
-          company: '杭州信息技术有限公司',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '客户已报名网络安全培训课程',
-          followStatus: FollowUpStatus.REGISTERED,
-          id: 7,
-          mobile: '13907890123',
-          name: '钱经理',
-          phone: '0571-78901234',
-          position: '安全主管',
-          source: '广告'
-        },
-        {
-          company: '南京教育科技有限公司',
-          createTime: new Date().toLocaleString(),
-          employeeId: '1',
-          employeeName: '张三',
-          followContent: '客户已实地到访并确认培训计划',
-          followStatus: FollowUpStatus.ARRIVED,
-          id: 8,
-          mobile: '13908901234',
-          name: '孙总',
-          phone: '025-89012345',
-          position: '培训经理',
-          source: '网站'
-        }
-      ];
-
-      // 添加示例客户数据
-      sampleCustomers.forEach(customer => {
-        addCustomer(customer);
-      });
-    }
-  }, [addCustomer, customers.length]);
-
-  // 初始化时计算任务数据
-  useEffect(() => {
-    calculateTaskCounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // 模拟当前用户信息
+  const currentUser = {
+    department: '销售部',
+    id: 1,
+    isAdmin: true,
+    name: '张三'
+  };
 
   // 获取统计数据
   const getStatistics = (data: TaskRecord[], type: TaskType) => {
     const now = dayjs();
     const filtered = data.filter(task => {
-      const taskTime = dayjs(task.eventTime);
+      const taskTime = dayjs(task.dueDate);
       if (selectedPeriod === StatisticsPeriod.WEEK) {
         return taskTime.isSame(now, 'week');
       }
@@ -241,55 +395,56 @@ const TaskManagement = () => {
     });
 
     const typeRecords = filtered.filter(task => task.type === type);
-    const totalCount = typeRecords.reduce((sum, task) => sum + task.count, 0);
+    const totalCount = typeRecords.reduce((sum, task) => sum + task.totalCount, 0);
     const completedCount = typeRecords
       .filter(task => task.followUpStatus === TaskFollowUpStatus.COMPLETED)
-      .reduce((sum, task) => sum + task.count, 0);
-    const target = typeRecords[0]?.target || 0;
+      .reduce((sum, task) => sum + task.completedCount, 0);
+
+    // 直接从任务记录中获取目标值，确保使用最新的目标
+    const target = typeRecords.length > 0 ? typeRecords[0].targetCount : taskTargets[type];
 
     return {
       completedCount,
       count: totalCount,
-      progress: target ? Math.min(100, (completedCount / target) * 100) : 0,
+      progress: target && target > 0 ? (totalCount / target) * 100 : 0,
       target
     };
   };
 
-  // 处理搜索
+  // 搜索功能
   const handleSearch = () => {
-    const { followUpStatus, keyword, timeRange, type } = searchParams;
-    let filtered = [...tasks];
+    let filtered = tasks;
 
-    if (keyword) {
+    // 关键词搜索
+    if (searchParams.keyword) {
       filtered = filtered.filter(
-        task =>
-          task.name.toLowerCase().includes(keyword.toLowerCase()) ||
-          task.description.toLowerCase().includes(keyword.toLowerCase()) ||
-          task.projectName.toLowerCase().includes(keyword.toLowerCase()) ||
-          task.remark?.toLowerCase().includes(keyword.toLowerCase())
+        task => task.name.includes(searchParams.keyword) || task.description.includes(searchParams.keyword)
       );
     }
 
-    if (timeRange) {
-      const [start, end] = timeRange;
+    // 类型筛选
+    if (searchParams.type) {
+      filtered = filtered.filter(task => task.type === searchParams.type);
+    }
+
+    // 跟进状态筛选
+    if (searchParams.followUpStatus) {
+      filtered = filtered.filter(task => task.followUpStatus === searchParams.followUpStatus);
+    }
+
+    // 时间范围筛选
+    if (searchParams.timeRange && searchParams.timeRange.length === 2) {
+      const [start, end] = searchParams.timeRange;
       filtered = filtered.filter(task => {
-        const taskTime = dayjs(task.eventTime);
-        return taskTime.isAfter(start) && taskTime.isBefore(end);
+        const dueDate = dayjs(task.dueDate);
+        return dueDate.isAfter(start) && dueDate.isBefore(end);
       });
-    }
-
-    if (type) {
-      filtered = filtered.filter(task => task.type === type);
-    }
-
-    if (followUpStatus) {
-      filtered = filtered.filter(task => task.followUpStatus === followUpStatus);
     }
 
     setFilteredTasks(filtered);
   };
 
-  // 重置搜索条件
+  // 重置搜索
   const resetSearch = () => {
     setSearchParams({
       followUpStatus: '',
@@ -300,112 +455,112 @@ const TaskManagement = () => {
     setFilteredTasks(tasks);
   };
 
-  // 打开添加事项弹窗
+  // 打开新增弹窗
   const openAddModal = () => {
     form.resetFields();
     setIsModalVisible(true);
   };
 
-  // 打开目标设置弹窗
+  // 打开设置目标弹窗
   const openTargetModal = () => {
-    targetForm.resetFields();
     setIsTargetModalVisible(true);
   };
 
-  // 打开备注设置弹窗
+  // 打开备注弹窗
   const openRemarkModal = (task: TaskRecord) => {
-    if (!currentUser.isAdmin) {
-      message.warning('只有管理员可以设置备注');
-      return;
-    }
     setSelectedTask(task);
     setRemark(task.remark || '');
     setIsRemarkModalVisible(true);
   };
 
-  // 关闭弹窗
+  // 查看客户列表
+  const handleCountClick = (task: TaskRecord) => {
+    setCustomerModalTitle(`${task.name} - 客户列表`);
+    setSelectedTaskCustomers(task.customers);
+    setIsCustomerModalVisible(true);
+  };
+
+  // 打开跟进状态修改弹窗
+  const handleEditFollowUpStatus = (customer: CustomerApi.CustomerListItem) => {
+    setSelectedCustomer(customer);
+    followUpForm.setFieldsValue({
+      followStatus: customer.followStatus
+    });
+    setIsFollowUpModalVisible(true);
+  };
+
+  // 取消弹窗
   const handleCancel = () => {
     setIsModalVisible(false);
   };
 
-  // 关闭目标设置弹窗
   const handleTargetCancel = () => {
     setIsTargetModalVisible(false);
   };
 
-  // 关闭备注设置弹窗
   const handleRemarkCancel = () => {
     setIsRemarkModalVisible(false);
     setSelectedTask(null);
     setRemark('');
   };
 
-  // 提交添加事项
+  const handleFollowUpCancel = () => {
+    setIsFollowUpModalVisible(false);
+    setSelectedCustomer(null);
+    followUpForm.resetFields();
+  };
+
+  // 提交新增任务
   const handleSubmit = () => {
-    form.validateFields().then(values => {
-      const { count, description, eventTime, followUpStatus, name, projectName, type } = values;
-
-      // 添加新事项
-      const newTask: TaskRecord = {
-        count: Number(count),
-        createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-        description,
-        employeeId: currentUser.id,
-        employeeName: currentUser.name,
-        eventTime: eventTime.format('YYYY-MM-DD HH:mm:ss'),
-        followUpStatus,
-        id: tasks.length + 1,
-        name,
-        projectName,
-        target: tasks.find((t: TaskRecord) => t.type === type)?.target || 0,
-        type
-      };
-
-      // 这里应该调用状态管理器的方法来添加任务
-      // 暂时只是更新本地状态
-      message.success('添加成功');
-      setIsModalVisible(false);
-    });
+    form
+      .validateFields()
+      .then(() => {
+        message.success('新增任务成功');
+        setIsModalVisible(false);
+        form.resetFields();
+      })
+      .catch(info => {
+        console.log('Validate Failed:', info);
+      });
   };
 
   // 提交目标设置
   const handleTargetSubmit = () => {
-    targetForm.validateFields().then(values => {
-      const { target, type } = values;
-
-      // 这里应该调用状态管理器的方法来更新目标
-      // 暂时只是显示成功消息
-      message.success('目标设置成功');
-      setIsTargetModalVisible(false);
-    });
+    targetForm
+      .validateFields()
+      .then(async values => {
+        await saveTaskTarget(values.type, values.targetCount);
+      })
+      .catch(info => {
+        console.log('Validate Failed:', info);
+      });
   };
 
-  // 提交备注设置
+  // 提交跟进状态修改
+  const handleFollowUpSubmit = () => {
+    followUpForm
+      .validateFields()
+      .then(async values => {
+        if (selectedCustomer) {
+          await updateCustomerFollowStatus(selectedCustomer.id, values.followStatus);
+        }
+      })
+      .catch(info => {
+        console.log('Validate Failed:', info);
+      });
+  };
+
+  // 提交备注
   const handleRemarkSubmit = () => {
-    if (!selectedTask) return;
-
-    // 这里应该调用状态管理器的方法来更新备注
-    // 暂时只是显示成功消息
-    message.success('备注设置成功');
-    setIsRemarkModalVisible(false);
-    setSelectedTask(null);
-    setRemark('');
-  };
-
-  // 处理点击数量跳转
-  const handleCountClick = (task: TaskRecord) => {
-    // 设置弹窗标题，显示员工姓名
-    setCustomerModalTitle(`${task.employeeName}的客户资料`);
-    const taskCustomers = getCustomersByTaskId(task.id);
-    setSelectedTaskCustomers(taskCustomers);
-    setIsCustomerModalVisible(true);
-  };
-
-  // 更新跟进状态
-  const handleFollowUpStatusChange = (taskId: number, followUpStatus: TaskFollowUpStatus) => {
-    // 这里应该调用状态管理器的方法来更新任务状态
-    // 暂时只是显示成功消息
-    message.success('状态更新成功');
+    if (selectedTask) {
+      // 更新任务备注
+      const updatedTasks = tasks.map(task => (task.id === selectedTask.id ? { ...task, remark } : task));
+      setTasks(updatedTasks);
+      message.success('备注修改成功');
+      setIsRemarkModalVisible(false);
+      setSelectedTask(null);
+      setRemark('');
+    }
   };
 
   // 表格列定义
@@ -423,14 +578,7 @@ const TaskManagement = () => {
       ...getCenterColumnConfig(),
       render: (type: TaskType) => <Tag color={taskTypeColors[type]}>{taskTypeNames[type]}</Tag>,
       title: '类型',
-      width: 100
-    },
-    {
-      dataIndex: 'projectName',
-      key: 'projectName',
-      ...getCenterColumnConfig(),
-      title: '培训项目',
-      width: 180
+      width: 120
     },
     {
       dataIndex: 'name',
@@ -448,8 +596,8 @@ const TaskManagement = () => {
       width: 200
     },
     {
-      dataIndex: 'count',
-      key: 'count',
+      dataIndex: 'totalCount',
+      key: 'totalCount',
       ...getCenterColumnConfig(),
       render: (count: number, record: TaskRecord) => (
         <Button
@@ -463,8 +611,8 @@ const TaskManagement = () => {
       width: 80
     },
     {
-      dataIndex: 'target',
-      key: 'target',
+      dataIndex: 'targetCount',
+      key: 'targetCount',
       ...getCenterColumnConfig(),
       title: '目标',
       width: 80
@@ -473,15 +621,18 @@ const TaskManagement = () => {
       key: 'progress',
       ...getCenterColumnConfig(),
       render: (_: any, record: TaskRecord) => {
-        const { count, target } = record;
-        const progress = target ? Math.min(100, (count / target) * 100) : 0;
+        const { targetCount, totalCount } = record;
+        const progress = targetCount && targetCount > 0 ? (totalCount / targetCount) * 100 : 0;
+        const displayProgress = Math.floor(progress);
+        const status = progress >= 100 ? 'success' : 'normal';
+
         return (
           <div>
             <Progress
-              percent={Math.floor(progress)}
-              status={record.followUpStatus === TaskFollowUpStatus.COMPLETED ? 'success' : 'normal'}
+              percent={displayProgress}
+              status={status}
             />
-            <div className="text-xs text-gray-500">{`${count}/${target}`}</div>
+            <div className="text-xs text-gray-500">{`${totalCount}/${targetCount}`}</div>
           </div>
         );
       },
@@ -493,16 +644,16 @@ const TaskManagement = () => {
       key: 'followUpStatus',
       ...getCenterColumnConfig(),
       render: (status: TaskFollowUpStatus) => (
-        <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>
+        <Tag color={taskFollowUpStatusColors[status]}>{taskFollowUpStatusNames[status]}</Tag>
       ),
       title: '跟进状态',
       width: 100
     },
     {
-      dataIndex: 'eventTime',
-      key: 'eventTime',
+      dataIndex: 'dueDate',
+      key: 'dueDate',
       ...getCenterColumnConfig(),
-      title: '事件时间',
+      title: '截止时间',
       width: 180
     },
     {
@@ -511,7 +662,7 @@ const TaskManagement = () => {
       key: 'remark',
       ...getCenterColumnConfig(),
       render: (text: string, record: TaskRecord) => (
-        <div className="flex items-center">
+        <div className="flex items-center justify-center">
           <span
             className="mr-2 truncate"
             style={{ maxWidth: '150px' }}
@@ -531,46 +682,6 @@ const TaskManagement = () => {
       ),
       title: '备注',
       width: 200
-    },
-    {
-      key: 'action',
-      ...getActionColumnConfig(150),
-      render: (_: unknown, record: TaskRecord) => (
-        <Space size="small">
-          {record.followUpStatus !== TaskFollowUpStatus.COMPLETED && (
-            <Button
-              size="small"
-              type="link"
-              onClick={() => handleFollowUpStatusChange(record.id, TaskFollowUpStatus.COMPLETED)}
-            >
-              完成
-            </Button>
-          )}
-          {record.followUpStatus === TaskFollowUpStatus.NOT_STARTED && (
-            <Button
-              size="small"
-              type="link"
-              onClick={() => handleFollowUpStatusChange(record.id, TaskFollowUpStatus.IN_PROGRESS)}
-            >
-              进行中
-            </Button>
-          )}
-          <Button
-            size="small"
-            type="link"
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            size="small"
-            type="link"
-          >
-            删除
-          </Button>
-        </Space>
-      ),
-      title: '操作'
     }
   ];
 
@@ -591,8 +702,8 @@ const TaskManagement = () => {
       width: 200
     },
     {
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'customerName',
+      key: 'customerName',
       ...getCenterColumnConfig(),
       title: '姓名',
       width: 100
@@ -622,6 +733,7 @@ const TaskManagement = () => {
       dataIndex: 'source',
       key: 'source',
       ...getCenterColumnConfig(),
+      render: (source: string) => customerSourceNames[source as keyof typeof customerSourceNames] || source,
       title: '来源',
       width: 100
     },
@@ -636,18 +748,10 @@ const TaskManagement = () => {
       dataIndex: 'followStatus',
       key: 'followStatus',
       ...getCenterColumnConfig(),
-      render: (status: string) => {
-        let color = 'default';
-        if (status === '已加微信') {
-          color = 'success';
-        } else if (status === '已联系') {
-          color = 'processing';
-        } else if (status === '待跟进') {
-          color = 'warning';
-        } else if (status === '已报名') {
-          color = 'blue';
-        }
-        return <Tag color={color}>{status}</Tag>;
+      render: (status: FollowUpStatus) => {
+        const statusText = followUpStatusNames[status] || status;
+        const color = followUpStatusColors[status] || 'default';
+        return <Tag color={color}>{statusText}</Tag>;
       },
       title: '状态',
       width: 100
@@ -662,10 +766,11 @@ const TaskManagement = () => {
     {
       key: 'action',
       ...getActionColumnConfig(120),
-      render: () => (
+      render: (_: unknown, record: CustomerApi.CustomerListItem) => (
         <Button
           size="small"
           type="link"
+          onClick={() => handleEditFollowUpStatus(record)}
         >
           修改跟进状态
         </Button>
@@ -791,7 +896,7 @@ const TaskManagement = () => {
             style={{ width: 120 }}
             value={searchParams.followUpStatus}
             options={Object.values(TaskFollowUpStatus).map(status => ({
-              label: followUpStatusNames[status],
+              label: taskFollowUpStatusNames[status],
               value: status
             }))}
             onChange={value => setSearchParams({ ...searchParams, followUpStatus: value })}
@@ -852,7 +957,7 @@ const TaskManagement = () => {
             </Form.Item>
             <Form.Item
               label="培训项目"
-              name="projectName"
+              name="name"
               rules={[{ message: '请输入培训项目名称', required: true }]}
             >
               <Input placeholder="请输入培训项目名称" />
@@ -893,19 +998,19 @@ const TaskManagement = () => {
               <Select
                 placeholder="请选择跟进状态"
                 options={Object.values(TaskFollowUpStatus).map(status => ({
-                  label: followUpStatusNames[status],
+                  label: taskFollowUpStatusNames[status],
                   value: status
                 }))}
               />
             </Form.Item>
             <Form.Item
-              label="事件时间"
-              name="eventTime"
-              rules={[{ message: '请选择事件时间', required: true }]}
+              label="截止时间"
+              name="dueDate"
+              rules={[{ message: '请选择截止时间', required: true }]}
             >
               <DatePicker
                 showTime
-                placeholder="请选择事件时间"
+                placeholder="请选择截止时间"
                 style={{ width: '100%' }}
               />
             </Form.Item>
@@ -938,7 +1043,7 @@ const TaskManagement = () => {
             </Form.Item>
             <Form.Item
               label="目标数量"
-              name="target"
+              name="targetCount"
               rules={[{ message: '请输入目标数量', required: true }]}
             >
               <Input
@@ -986,6 +1091,39 @@ const TaskManagement = () => {
             rowKey="id"
             {...getFullTableConfig(10)}
           />
+        </Modal>
+
+        {/* 跟进状态修改弹窗 */}
+        <Modal
+          open={isFollowUpModalVisible}
+          title="修改跟进状态"
+          onCancel={handleFollowUpCancel}
+          onOk={handleFollowUpSubmit}
+        >
+          <Form
+            form={followUpForm}
+            labelCol={{ span: 6 }}
+            wrapperCol={{ span: 16 }}
+          >
+            <Form.Item label="客户信息">
+              <span>
+                {selectedCustomer?.customerName} - {selectedCustomer?.company}
+              </span>
+            </Form.Item>
+            <Form.Item
+              label="跟进状态"
+              name="followStatus"
+              rules={[{ message: '请选择跟进状态', required: true }]}
+            >
+              <Select
+                placeholder="请选择跟进状态"
+                options={Object.values(FollowUpStatus).map(status => ({
+                  label: followUpStatusNames[status],
+                  value: status
+                }))}
+              />
+            </Form.Item>
+          </Form>
         </Modal>
       </Card>
     </div>

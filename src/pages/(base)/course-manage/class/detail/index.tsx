@@ -3,7 +3,7 @@ import { Avatar, Button, Card, Descriptions, List, Space, Table, Tabs, Tag, mess
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import UserAvatar from '@/components/UserAvatar';
+import UserAvatar from '@/components/common/UserAvatar';
 import { classService, courseService, notificationService } from '@/service/api';
 import type { ClassApi, NotificationApi } from '@/service/api/types';
 

@@ -83,28 +83,30 @@ const CustomerFollow = () => {
   const [filteredRecords, setFilteredRecords] = useState<CustomerApi.CustomerListItem[]>([]);
   const [selectedFollowStatus, setSelectedFollowStatus] = useState<string>('all');
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerApi.CustomerListItem | null>(null);
   const [form] = Form.useForm();
-  // 用户角色状态，可以在开发环境下切换测试
-  const [userRole, setUserRole] = useState<'admin' | 'user'>('admin');
-
-  // 切换用户角色（仅供开发测试使用）
-  const toggleUserRole = () => {
-    setUserRole(prev => (prev === 'admin' ? 'user' : 'admin'));
-  };
+  const [editForm] = Form.useForm();
 
   // 获取跟进数据
   const fetchFollowData = async () => {
     setLoading(true);
     try {
-      // 获取统计数据
-      const statisticsData = await customerService.getCustomerStatistics();
+      console.log('🔄 开始获取跟进数据...');
+
+      // 获取统计数据，客户跟进页面只显示自己的数据
+      const statisticsData = await customerService.getCustomerStatistics({ scope: 'own' });
+      console.log('📊 统计数据:', statisticsData);
       setStatistics(statisticsData);
 
-      // 获取客户列表数据
+      // 获取客户列表数据，客户跟进页面只显示自己的数据
       const customerData = await customerService.getCustomerList({
         current: 1,
-        size: 100 // 获取更多数据用于演示
+        // 获取更多数据用于演示
+        scope: 'own',
+        size: 100 // 只显示自己创建的客户数据
       });
+      console.log('📋 客户列表原始数据:', customerData);
 
       // 转换数据格式以匹配前端类型
       const formattedRecords = customerData.records.map(customer => ({
@@ -121,11 +123,14 @@ const CustomerFollow = () => {
         updateTime: customer.updatedAt
       }));
 
+      console.log('✅ 格式化后的记录:', formattedRecords);
+      console.log(`📈 总共${formattedRecords.length}条记录`);
+
       setFollowRecords(formattedRecords);
       setFilteredRecords(formattedRecords);
     } catch (error) {
+      console.error('❌ 获取跟进数据失败:', error);
       message.error('获取数据失败');
-      console.error('获取跟进数据失败:', error);
     } finally {
       setLoading(false);
     }
@@ -151,36 +156,107 @@ const CustomerFollow = () => {
   const handleFormSubmit = async () => {
     try {
       const values = await form.validateFields();
-      console.log('提交跟进记录:', values);
+      console.log('📝 提交跟进记录:', values);
 
-      // 这里调用API添加跟进记录
-      // await customerService.addFollowRecord(customerId, values);
+      // 创建客户数据
+      const customerData = {
+        company: values.company,
+        customerName: values.customerName,
+        email: values.email || '',
+        followStatus: values.followStatus || 'new_develop',
+        industry: 'other',
+        level: 1,
+        mobile: values.mobile || '',
+        phone: values.phone || '',
+        position: values.position || '',
+        remark: values.followContent || '',
+        source: 'manual'
+      };
+
+      console.log('🚀 准备创建客户:', customerData);
+      const result = await customerService.createCustomer(customerData);
+      console.log('✅ 客户创建成功:', result);
 
       message.success('添加跟进记录成功');
       setIsModalVisible(false);
       form.resetFields();
+
+      console.log('🔄 重新获取数据...');
       fetchFollowData(); // 重新获取数据
     } catch (error) {
-      console.error('添加跟进记录失败:', error);
+      console.error('❌ 添加跟进记录失败:', error);
+      message.error('添加跟进记录失败');
     }
   };
 
   // 编辑记录
   const handleEdit = (record: CustomerApi.CustomerListItem) => {
     console.log('编辑记录:', record);
-    // 实现编辑功能
+    setEditingCustomer(record);
+    editForm.setFieldsValue({
+      company: record.company,
+      customerName: record.customerName,
+      followContent: record.remark || '',
+      followStatus: record.followStatus,
+      mobile: record.mobile,
+      phone: record.phone,
+      position: record.position
+    });
+    setIsEditModalVisible(true);
+  };
+
+  // 提交编辑
+  const handleEditSubmit = async () => {
+    try {
+      const values = await editForm.validateFields();
+
+      if (!editingCustomer) {
+        message.error('编辑数据异常');
+        return;
+      }
+
+      console.log('🔄 提交编辑数据:', values);
+
+      const updateData = {
+        company: values.company,
+        customerName: values.customerName,
+        followStatus: values.followStatus,
+        mobile: values.mobile,
+        phone: values.phone,
+        position: values.position,
+        remark: values.followContent
+      };
+
+      await customerService.updateCustomer(editingCustomer.id, updateData);
+
+      message.success('编辑成功');
+      setIsEditModalVisible(false);
+      setEditingCustomer(null);
+      editForm.resetFields();
+
+      console.log('🔄 重新获取数据...');
+      fetchFollowData(); // 重新获取数据
+    } catch (error) {
+      console.error('❌ 编辑失败:', error);
+      message.error('编辑失败');
+    }
   };
 
   // 删除记录
-  const handleDelete = (_id: number) => {
+  const handleDelete = (id: number) => {
     Modal.confirm({
-      content: '确定要删除这条跟进记录吗？',
+      cancelText: '取消',
+      content: '确定要删除这条跟进记录吗？删除后无法恢复。',
+      okText: '确认删除',
+      okType: 'danger',
       onOk: async () => {
         try {
-          // await customerService.deleteCustomer(id);
+          console.log('🗑️ 删除客户:', id);
+          await customerService.deleteCustomer(id);
           message.success('删除成功');
-          fetchFollowData();
-        } catch {
+          fetchFollowData(); // 重新获取数据
+        } catch (error) {
+          console.error('❌ 删除失败:', error);
           message.error('删除失败');
         }
       },
@@ -290,17 +366,15 @@ const CustomerFollow = () => {
           >
             编辑
           </Button>
-          {userRole === 'admin' && (
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              size="small"
-              type="link"
-              onClick={() => handleDelete(record.id)}
-            >
-              删除
-            </Button>
-          )}
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            size="small"
+            type="link"
+            onClick={() => handleDelete(record.id)}
+          >
+            删除
+          </Button>
         </Space>
       ),
       title: '操作'
@@ -314,17 +388,6 @@ const CustomerFollow = () => {
 
   return (
     <div className="customer-follow">
-      {/* 开发测试：角色切换按钮 */}
-      <div style={{ marginBottom: 16, textAlign: 'right' }}>
-        <Button
-          size="small"
-          type="dashed"
-          onClick={toggleUserRole}
-        >
-          当前角色: {userRole === 'admin' ? '管理员' : '普通用户'} (点击切换)
-        </Button>
-      </div>
-
       {/* 统计卡片 */}
       <Row
         gutter={[16, 16]}
@@ -474,6 +537,106 @@ const CustomerFollow = () => {
             <Input.TextArea
               placeholder="请输入跟进内容"
               rows={3}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 编辑客户弹窗 */}
+      <Modal
+        cancelText="取消"
+        okText="保存"
+        open={isEditModalVisible}
+        title="编辑客户信息"
+        width={600}
+        onOk={handleEditSubmit}
+        onCancel={() => {
+          setIsEditModalVisible(false);
+          setEditingCustomer(null);
+          editForm.resetFields();
+        }}
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          requiredMark={false}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="客户姓名"
+                name="customerName"
+                rules={[{ message: '请输入客户姓名', required: true }]}
+              >
+                <Input placeholder="请输入客户姓名" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="公司名称"
+                name="company"
+                rules={[{ message: '请输入公司名称', required: true }]}
+              >
+                <Input placeholder="请输入公司名称" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="职位"
+                name="position"
+              >
+                <Input placeholder="请输入职位" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="跟进状态"
+                name="followStatus"
+                rules={[{ message: '请选择跟进状态', required: true }]}
+              >
+                <Select placeholder="请选择跟进状态">
+                  {followUpStatusOptions.slice(1).map(option => (
+                    <Select.Option
+                      key={option.value}
+                      value={option.value}
+                    >
+                      {option.label}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="电话"
+                name="phone"
+              >
+                <Input placeholder="请输入电话" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="手机"
+                name="mobile"
+              >
+                <Input placeholder="请输入手机号" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            label="跟进内容"
+            name="followContent"
+          >
+            <Input.TextArea
+              placeholder="请输入跟进内容"
+              rows={4}
             />
           </Form.Item>
         </Form>

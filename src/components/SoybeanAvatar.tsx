@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { useSelector } from 'react-redux';
 
-import UserAvatar from '@/components/UserAvatar';
+import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo } from '@/features/auth/authStore';
 
 interface SoybeanAvatarProps extends React.ComponentProps<'div'> {

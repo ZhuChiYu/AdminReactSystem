@@ -70,7 +70,7 @@ const followUpStatusColors: Record<FollowUpStatus, string> = {
 interface CustomerImportItem {
   company: string;
   createTime: string;
-  followStatus: number;
+  followStatus: FollowUpStatus;
   followUp: string;
   id: number;
   mobile: string;
@@ -114,48 +114,116 @@ const CustomerImport = () => {
     setUploading(true);
 
     try {
-      // 这里应该调用文件解析API
-      const formData = new FormData();
-      formData.append('file', fileList[0].originFileObj as File);
+      const file = fileList[0].originFileObj as File;
 
-      // 模拟API调用 - 实际应该调用后端解析Excel的接口
-      // const response = await customerService.previewImportFile(formData);
+      // 动态导入xlsx库
+      const XLSX = await import('xlsx');
 
-      // 临时使用模拟数据展示功能
-      setTimeout(() => {
-        const mockData: CustomerImportItem[] = [
-          {
-            company: '上海民用航空电源系统有限公司',
-            createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.WECHAT_ADDED,
-            followUp: '发计划数智化简章微信15802910233',
-            id: 1,
-            mobile: '',
-            name: '马芳',
-            phone: '029-81112543',
-            position: '财务负责培训'
-          },
-          {
-            company: '中国电力工程顾问集团中南电力设计院有限公司',
-            createTime: new Date().toLocaleString(),
-            followStatus: FollowUpStatus.EARLY_25,
-            followUp: '看看课微信18229295812',
-            id: 2,
-            mobile: '',
-            name: '万娜',
-            phone: '027-65263855',
-            position: '财务负责培训'
+      // 使用FileReader读取文件
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const data = e.target?.result;
+          if (!data) {
+            message.error('文件读取失败');
+            setUploading(false);
+            return;
           }
-        ];
 
-        setPreviewData(mockData);
+          // 使用xlsx库解析Excel
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+
+          // 转换为JSON数据
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          if (jsonData.length <= 1) {
+            message.warning('Excel文件中没有数据行');
+            setUploading(false);
+            return;
+          }
+
+          // 跳过标题行，处理数据
+          const dataRows = jsonData.slice(1);
+          const previewItems: CustomerImportItem[] = [];
+
+          dataRows.forEach((row: any[], index: number) => {
+            if (row && !row.every(cell => !cell || cell.toString().trim() === '')) {
+              // Excel列顺序：A=姓名, B=单位, C=职务, D=电话, E=手机, F=跟进, G=状态
+              const item: CustomerImportItem = {
+                // A列：姓名
+                company: row[1]?.toString().trim() || '',
+                // G列：状态
+                createTime: new Date().toLocaleString(), // F列：跟进
+                followStatus: mapStatusToEnum(row[6]?.toString().trim() || 'consult'), // E列：手机
+                followUp: row[5]?.toString().trim() || '暂无跟进内容',
+                id: index + 1, // D列：电话
+                mobile: row[4]?.toString().trim() || '',
+                name: row[0]?.toString().trim() || '', // C列：职务
+                phone: row[3]?.toString().trim() || '', // B列：单位
+                position: row[2]?.toString().trim() || ''
+              };
+
+              if (item.name || item.company) {
+                // 至少有姓名或公司
+                previewItems.push(item);
+              }
+            }
+          });
+
+          setPreviewData(previewItems);
+          setUploading(false);
+          message.success(`预览成功，共${previewItems.length}条记录`);
+        } catch (error) {
+          console.error('Excel解析失败:', error);
+          message.error('Excel文件格式不正确或数据有误');
+          setUploading(false);
+        }
+      };
+
+      reader.onerror = () => {
+        message.error('文件读取失败');
         setUploading(false);
-        message.success('数据预览成功');
-      }, 1500);
+      };
+
+      reader.readAsBinaryString(file);
     } catch (error) {
+      console.error('预览失败:', error);
       message.error('预览失败');
       setUploading(false);
     }
+  };
+
+  /** 将字符串状态映射为枚举值 */
+  const mapStatusToEnum = (status: string): FollowUpStatus => {
+    const statusMap: Record<string, FollowUpStatus> = {
+      arrived: FollowUpStatus.ARRIVED,
+      // 英文状态映射
+      consult: FollowUpStatus.CONSULT,
+      early_25: FollowUpStatus.EARLY_25,
+      effective_visit: FollowUpStatus.EFFECTIVE_VISIT,
+      new_develop: FollowUpStatus.NEW_DEVELOP,
+      not_arrived: FollowUpStatus.NOT_ARRIVED,
+      registered: FollowUpStatus.REGISTERED,
+      rejected: FollowUpStatus.REJECTED,
+      vip: FollowUpStatus.VIP,
+      wechat_added: FollowUpStatus.WECHAT_ADDED,
+      // 中文状态映射
+      咨询: FollowUpStatus.CONSULT,
+      大客户: FollowUpStatus.VIP,
+      已加微信: FollowUpStatus.WECHAT_ADDED,
+      已实到: FollowUpStatus.ARRIVED,
+      已报名: FollowUpStatus.REGISTERED,
+      新开发: FollowUpStatus.NEW_DEVELOP,
+      早25: FollowUpStatus.EARLY_25,
+      早25客户: FollowUpStatus.EARLY_25,
+      有效回访: FollowUpStatus.EFFECTIVE_VISIT,
+      未实到: FollowUpStatus.NOT_ARRIVED,
+      未通过: FollowUpStatus.REJECTED
+    };
+
+    return statusMap[status] || FollowUpStatus.CONSULT;
   };
 
   /** 导入Excel文件 */
@@ -172,16 +240,53 @@ const CustomerImport = () => {
       formData.append('file', fileList[0].originFileObj as File);
 
       // 调用实际的导入API
-      await customerService.importCustomers(formData);
+      const result = await customerService.importCustomers(formData);
 
       setUploading(false);
-      message.success('导入成功');
+
+      // 显示导入结果
+      if (result.successCount > 0) {
+        message.success(`导入成功！成功导入 ${result.successCount} 条记录，失败 ${result.failureCount} 条`);
+      } else {
+        message.warning(`导入完成，但没有成功记录。失败 ${result.failureCount} 条`);
+      }
+
+      // 如果有错误信息，显示详细错误
+      if (result.errors && result.errors.length > 0) {
+        Modal.info({
+          content: (
+            <div>
+              <p>成功：{result.successCount} 条</p>
+              <p>失败：{result.failureCount} 条</p>
+              {result.errors.length > 0 && (
+                <div>
+                  <p>错误详情：</p>
+                  <ul style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {result.errors.map((error, index) => (
+                      <li
+                        key={index}
+                        style={{ color: 'red', fontSize: '12px' }}
+                      >
+                        {error}
+                      </li>
+                    ))}
+                  </ul>
+                  {result.hasMoreErrors && <p style={{ color: 'orange' }}>还有更多错误未显示...</p>}
+                </div>
+              )}
+            </div>
+          ),
+          title: '导入详情',
+          width: 600
+        });
+      }
 
       // 清空文件列表和预览数据
       setFileList([]);
       setPreviewData([]);
     } catch (error) {
-      message.error('导入失败');
+      console.error('导入失败:', error);
+      message.error('导入失败，请检查文件格式是否正确');
       setUploading(false);
     }
   };

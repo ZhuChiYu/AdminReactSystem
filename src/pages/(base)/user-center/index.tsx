@@ -1,11 +1,11 @@
-import { LockOutlined, MailOutlined, PhoneOutlined, SaveOutlined, UserOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Divider, Form, Input, Row, Tabs, Tag, message } from 'antd';
+import { EditOutlined, LockOutlined, MailOutlined, PhoneOutlined, SaveOutlined, UserOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Divider, Form, Input, Modal, Row, Tabs, Tag, Upload, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import UserAvatar from '@/components/UserAvatar';
+import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
-import { authService, userService } from '@/service/api';
+import { authService, avatarService, userService } from '@/service/api';
 import { UserRole, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
 
@@ -30,6 +30,9 @@ const UserCenter = () => {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentUserData, setCurrentUserData] = useState<ExtendedUserInfo>(userInfo);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [avatarKey, setAvatarKey] = useState(Date.now()); // 添加头像刷新key
 
   // 判断当前用户权限
   const isUserAdmin = isAdmin();
@@ -148,42 +151,35 @@ const UserCenter = () => {
   // 头像更新回调
   const handleAvatarChange = async (newAvatarUrl: string) => {
     try {
+      // 添加时间戳避免缓存问题
+      const timestamp = Date.now();
+      const avatarUrlWithTimestamp = `${newAvatarUrl}?t=${timestamp}`;
+
       // 立即更新前端显示
-      const updatedUserInfo = { ...currentUserData, avatar: newAvatarUrl };
+      const updatedUserInfo = { ...currentUserData, avatar: avatarUrlWithTimestamp };
       setCurrentUserData(updatedUserInfo);
 
       // 更新Redux状态和本地存储
       dispatch(
         setUserInfo({
-          avatar: updatedUserInfo.avatar,
-          buttons: updatedUserInfo.buttons,
-          department: updatedUserInfo.department,
-          email: updatedUserInfo.email,
-          gender: updatedUserInfo.gender,
-          nickName: updatedUserInfo.nickName,
-          phone: updatedUserInfo.phone,
-          position: updatedUserInfo.position,
-          roles: updatedUserInfo.roles,
-          userId: updatedUserInfo.userId,
-          userName: updatedUserInfo.userName
+          ...updatedUserInfo,
+          avatar: avatarUrlWithTimestamp
         })
       );
+
       localStg.set('userInfo', {
-        avatar: updatedUserInfo.avatar,
-        buttons: updatedUserInfo.buttons,
-        department: updatedUserInfo.department,
-        email: updatedUserInfo.email,
-        gender: updatedUserInfo.gender,
-        nickName: updatedUserInfo.nickName,
-        phone: updatedUserInfo.phone,
-        position: updatedUserInfo.position,
-        roles: updatedUserInfo.roles,
-        userId: updatedUserInfo.userId,
-        userName: updatedUserInfo.userName
+        ...updatedUserInfo,
+        avatar: avatarUrlWithTimestamp
       });
 
-      // 重新加载最新的用户信息以确保数据同步
-      await loadUserInfo();
+      // 强制刷新头像组件
+      setAvatarKey(timestamp);
+
+      console.log('🔍 头像更新完成:', {
+        newUrl: newAvatarUrl,
+        reduxState: updatedUserInfo,
+        withTimestamp: avatarUrlWithTimestamp
+      });
 
       message.success('头像更新成功');
     } catch (error) {
@@ -192,6 +188,81 @@ const UserCenter = () => {
       // 发生错误时重新加载用户信息
       await loadUserInfo();
     }
+  };
+
+  // 打开头像上传弹窗
+  const handleAvatarEdit = () => {
+    setAvatarModalVisible(true);
+  };
+
+  // 关闭头像上传弹窗
+  const handleAvatarModalCancel = () => {
+    setAvatarModalVisible(false);
+  };
+
+  // 处理头像文件上传
+  const handleAvatarUpload = async (file: File) => {
+    if (!file) {
+      message.error('请选择头像文件');
+      return false;
+    }
+
+    // 验证文件类型
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      message.error('只能上传 JPG、PNG、GIF 格式的图片');
+      return false;
+    }
+
+    // 验证文件大小 (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      message.error('图片大小不能超过 2MB');
+      return false;
+    }
+
+    try {
+      setUploading(true);
+
+      // 获取用户ID - 多种方式尝试
+      let userId: number | undefined;
+
+      // 首先尝试从currentUserData获取
+      if (currentUserData.userId) {
+        userId = Number.parseInt(currentUserData.userId, 10);
+      }
+
+      // 如果没有，尝试从localStorage获取
+      if (!userId) {
+        const storedUserInfo = localStg.get('userInfo');
+        if (storedUserInfo?.userId) {
+          userId = Number.parseInt(storedUserInfo.userId, 10);
+        }
+      }
+
+      // 如果还是没有，使用默认值（通常超级管理员是1）
+      if (!userId || Number.isNaN(userId)) {
+        console.warn('无法获取用户ID，使用默认值');
+        userId = 1;
+      }
+
+      console.log('🔍 头像上传使用的用户ID:', userId);
+
+      const response = await avatarService.uploadAvatar(file, userId);
+      if (response && response.url) {
+        await handleAvatarChange(response.url);
+        setAvatarModalVisible(false);
+        message.success('头像上传成功');
+      } else {
+        message.error('头像上传失败');
+      }
+    } catch (error) {
+      console.error('头像上传失败:', error);
+      message.error('头像上传失败');
+    } finally {
+      setUploading(false);
+    }
+
+    return false; // 阻止默认上传行为
   };
 
   // 转换性别格式
@@ -366,17 +437,23 @@ const UserCenter = () => {
                       <div className="overflow-hidden rounded-full">
                         <UserAvatar
                           avatar={currentUserData.avatar}
-                          editable={true}
                           gender={convertGender(currentUserData.gender)}
+                          key={avatarKey}
                           size={120}
-                          userId={Number.parseInt(currentUserData.userId, 10)}
-                          onAvatarChange={handleAvatarChange}
                         />
                       </div>
                     </div>
                   </div>
                   {/* 在线状态指示器 */}
                   <div className="absolute bottom-2 right-2 h-6 w-6 border-2 border-white rounded-full bg-green-500" />
+                  {/* 头像编辑按钮 */}
+                  <div
+                    className="absolute bottom-0 right-0 h-8 w-8 flex cursor-pointer items-center justify-center border-2 border-white rounded-full bg-blue-500 transition-colors hover:bg-blue-600"
+                    title="编辑头像"
+                    onClick={handleAvatarEdit}
+                  >
+                    <EditOutlined className="text-sm text-white" />
+                  </div>
                 </div>
                 <h3 className="text-xl text-gray-800 font-bold dark:text-white">{currentUserData.userName}</h3>
                 <p className="text-sm text-gray-500">ID: {currentUserData.userId || '未设置'}</p>
@@ -450,6 +527,40 @@ const UserCenter = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* 头像上传弹窗 */}
+      <Modal
+        footer={null}
+        open={avatarModalVisible}
+        title="更换头像"
+        width={400}
+        onCancel={handleAvatarModalCancel}
+      >
+        <div className="text-center">
+          <div className="mb-4">
+            <UserAvatar
+              avatar={currentUserData.avatar}
+              gender={convertGender(currentUserData.gender)}
+              key={avatarKey}
+              size={120}
+            />
+          </div>
+          <Upload
+            accept="image/*"
+            beforeUpload={handleAvatarUpload}
+            showUploadList={false}
+          >
+            <Button
+              loading={uploading}
+              style={{ width: '200px' }}
+              type="primary"
+            >
+              选择新头像
+            </Button>
+          </Upload>
+          <p className="mt-2 text-sm text-gray-500">支持 JPG、PNG、GIF 格式，文件大小不超过 2MB</p>
+        </div>
+      </Modal>
     </div>
   );
 };

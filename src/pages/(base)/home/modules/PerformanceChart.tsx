@@ -3,56 +3,178 @@ import type { TabsProps } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { useEcharts } from '@/hooks/common/echarts';
+import { type CustomerApi, customerService } from '@/service/api';
+import { isSuperAdmin } from '@/utils/auth';
+import { localStg } from '@/utils/storage';
+
+// 客户跟进状态枚举 - 根据实际数据更新
+enum FollowUpStatus {
+  ARRIVED = 'arrived',           // 已实到
+  CONSULT = 'consult',          // 咨询中
+  EFFECTIVE_VISIT = 'effective_visit', // 有效回访
+  NEW_DEVELOP = 'new_develop',   // 新开发
+  NOT_ARRIVED = 'not_arrived',   // 未实到
+  REGISTERED = 'registered',     // 已报名
+  WECHAT_ADDED = 'wechat_added', // 已加微信
+  EARLY_25 = 'early_25'         // 25日前
+}
+
+// 跟进状态中文映射
+const followUpStatusNames = {
+  [FollowUpStatus.ARRIVED]: '已实到',
+  [FollowUpStatus.CONSULT]: '咨询中',
+  [FollowUpStatus.EFFECTIVE_VISIT]: '有效回访',
+  [FollowUpStatus.NEW_DEVELOP]: '新开发',
+  [FollowUpStatus.NOT_ARRIVED]: '未实到',
+  [FollowUpStatus.REGISTERED]: '已报名',
+  [FollowUpStatus.WECHAT_ADDED]: '已加微信',
+  [FollowUpStatus.EARLY_25]: '早25'
+};
+
+// 跟进状态颜色映射
+const followUpStatusColors = [
+  '#5B8FF9',
+  '#5AD8A6',
+  '#5D7092',
+  '#F6BD16',
+  '#E8684A',
+  '#6DC8EC',
+  '#9270CA',
+  '#FF9D4D',
+  '#269A99',
+  '#FF99C3'
+];
 
 const PerformanceChart = () => {
-  const [activeTab, setActiveTab] = useState<string>('month');
+  const [activeTab, setActiveTab] = useState<string>('clientSource');
+  const [customerData, setCustomerData] = useState<CustomerApi.CustomerListItem[]>([]);
+
+  // 获取用户信息
+  const userInfo = localStg.get('userInfo');
+  const isAdmin = isSuperAdmin() || userInfo?.userName === 'admin';
+
+  // 获取客户数据
+  const fetchCustomerData = async () => {
+    try {
+      // 根据用户角色决定获取数据的范围
+      const scope = isAdmin ? 'all' : 'own';
+
+      const response = await customerService.getCustomerList({
+        current: 1,
+        scope,
+        // 获取所有数据用于统计
+        size: 1000
+      });
+
+      console.log('🔍 客户数据详情:', response.records);
+
+      // 打印所有不同的 followStatus 值
+      const statusValues = [...new Set(response.records.map(customer => customer.followStatus))];
+      console.log('🔍 所有跟进状态值:', statusValues);
+
+      setCustomerData(response.records);
+    } catch (error) {
+      console.error('获取客户数据失败:', error);
+    }
+  };
+
+  // 统计客户跟进状态
+  const getCustomerStatistics = () => {
+    const stats = customerData.reduce(
+      (acc, customer) => {
+        const status = customer.followStatus || 'unknown';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    console.log('🔍 统计结果:', stats);
+
+    const result = Object.entries(stats).map(([status, count], index) => {
+      // 获取状态的中文名称，如果未定义则使用原状态值
+      const displayName = followUpStatusNames[status as keyof typeof followUpStatusNames] || status;
+
+      return {
+        itemStyle: {
+          color: followUpStatusColors[index % followUpStatusColors.length]
+        },
+        name: displayName,
+        value: count
+      };
+    });
+
+    console.log('🔍 图表数据:', result);
+    console.log('🔍 客户数据总数:', customerData.length);
+
+    return result;
+  };
 
   // 客户统计图
-  const { domRef: clientSourceRef, updateOptions: updateClientSourceChart } = useEcharts(() => ({
-    legend: {
-      data: ['已实到', '咨询', '早25客户', '有效回访', '新开发', '未实到', '已报名', '未通过', '大客户', '已加微信'],
-      orient: 'vertical',
-      right: 10,
-      top: 'center'
-    },
-    series: [
-      {
-        avoidLabelOverlap: false,
-        data: [
-          { name: '已实到', value: 20 },
-          { name: '咨询', value: 49 },
-          { name: '早25客户', value: 13 },
-          { name: '有效回访', value: 40 },
-          { name: '新开发', value: 37 },
-          { name: '未实到', value: 10 },
-          { name: '已报名', value: 36 },
-          { name: '未通过', value: 28 },
-          { name: '大客户', value: 29 },
-          { name: '已加微信', value: 46 }
-        ],
-        emphasis: {
-          label: {
-            fontSize: '14',
-            fontWeight: 'bold',
-            show: true
-          }
-        },
-        label: {
-          show: false
-        },
-        labelLine: {
-          show: false
-        },
-        name: '客户统计',
-        radius: ['50%', '70%'],
-        type: 'pie'
-      }
-    ],
-    tooltip: {
-      formatter: '{b}: {c} ({d}%)',
-      trigger: 'item'
+  const { domRef: clientSourceRef, updateOptions: updateClientSourceChart } = useEcharts(() => {
+    console.log('🔍 useEcharts 初始化回调执行，customerData.length:', customerData.length);
+
+    if (customerData.length === 0) {
+      return {
+        title: {
+          left: 'center',
+          text: '暂无数据',
+          textStyle: {
+            fontSize: 16,
+            fontWeight: 'bold'
+          },
+          top: 20
+        }
+      };
     }
-  }));
+
+    const statisticsData = getCustomerStatistics();
+    const legendData = statisticsData.map(item => item.name);
+
+    return {
+      legend: {
+        data: legendData,
+        orient: 'vertical' as const,
+        right: 10,
+        top: 'center'
+      },
+      series: [
+        {
+          avoidLabelOverlap: false,
+          data: statisticsData,
+          emphasis: {
+            label: {
+              fontSize: '14',
+              fontWeight: 'bold' as const,
+              show: true
+            }
+          },
+          label: {
+            show: false
+          },
+          labelLine: {
+            show: false
+          },
+          name: isAdmin ? '全部客户统计' : '我的客户统计',
+          radius: ['50%', '70%'],
+          type: 'pie' as const
+        }
+      ],
+      title: {
+        left: 'center',
+        text: isAdmin ? '全部客户统计' : '我的客户统计',
+        textStyle: {
+          fontSize: 16,
+          fontWeight: 'bold' as const
+        },
+        top: 20
+      },
+      tooltip: {
+        formatter: '{b}: {c} ({d}%)',
+        trigger: 'item' as const
+      }
+    };
+  });
 
   // 业绩趋势图 - 月度
   const { domRef: monthPerformanceRef, updateOptions: updateMonthChart } = useEcharts(() => ({
@@ -228,9 +350,73 @@ const PerformanceChart = () => {
   }));
 
   useEffect(() => {
+    // 初始化数据加载
+    fetchCustomerData();
+  }, []);
+
+  useEffect(() => {
+    console.log('🔍 useEffect 触发，activeTab:', activeTab, 'customerData.length:', customerData.length);
+
     switch (activeTab) {
       case 'clientSource':
-        updateClientSourceChart();
+        if (customerData.length > 0) {
+          console.log('🔍 准备更新客户统计图表');
+
+          // 使用 updateOptions 重新生成图表配置
+          updateClientSourceChart(() => {
+            const statisticsData = getCustomerStatistics();
+            const legendData = statisticsData.map(item => item.name);
+
+            const chartOptions = {
+              legend: {
+                data: legendData,
+                orient: 'vertical' as const,
+                right: 10,
+                top: 'center'
+              },
+              series: [
+                {
+                  avoidLabelOverlap: false,
+                  data: statisticsData,
+                  emphasis: {
+                    label: {
+                      fontSize: '14',
+                      fontWeight: 'bold' as const,
+                      show: true
+                    }
+                  },
+                  label: {
+                    show: false
+                  },
+                  labelLine: {
+                    show: false
+                  },
+                  name: isAdmin ? '全部客户统计' : '我的客户统计',
+                  radius: ['50%', '70%'],
+                  type: 'pie' as const
+                }
+              ],
+              title: {
+                left: 'center',
+                text: isAdmin ? '全部客户统计' : '我的客户统计',
+                textStyle: {
+                  fontSize: 16,
+                  fontWeight: 'bold' as const
+                },
+                top: 20
+              },
+              tooltip: {
+                formatter: '{b}: {c} ({d}%)',
+                trigger: 'item' as const
+              }
+            };
+
+            console.log('🔍 图表更新配置:', chartOptions);
+            return chartOptions;
+          });
+        } else {
+          console.log('🔍 客户数据为空，跳过图表更新');
+        }
         break;
       case 'month':
         updateMonthChart();
@@ -244,7 +430,7 @@ const PerformanceChart = () => {
       default:
         break;
     }
-  }, [activeTab, updateClientSourceChart, updateMonthChart, updateQuarterChart, updateYearChart]);
+  }, [activeTab, customerData, updateClientSourceChart, updateMonthChart, updateQuarterChart, updateYearChart, isAdmin]);
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);

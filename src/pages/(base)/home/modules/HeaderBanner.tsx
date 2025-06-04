@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { useEffect, useState } from 'react';
 
-import UserAvatar from '@/components/UserAvatar';
+import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo } from '@/features/auth/authStore';
 import { useAppSelector } from '@/hooks/business/useStore';
 import 'dayjs/locale/zh-cn';
@@ -57,8 +57,7 @@ const HeaderBanner = () => {
           <UserAvatar
             avatar={userInfo.avatar}
             gender={convertGender(userInfo.gender)}
-            size={72}
-            userId={Number.parseInt(userInfo.userId, 10)}
+            size={40}
           />
         </div>
         <div className="pl-12px">

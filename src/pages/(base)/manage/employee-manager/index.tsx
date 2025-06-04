@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { type EmployeeApi, employeeService } from '@/service/api';
-import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
+import { isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 角色中文名称映射
@@ -33,7 +33,6 @@ interface EmployeeManagerRelation {
 const EmployeeManagerManagement = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
-  const currentUserId = getCurrentUserId();
 
   // 状态管理
   const [relations, setRelations] = useState<EmployeeManagerRelation[]>([]);
@@ -43,6 +42,7 @@ const EmployeeManagerManagement = () => {
   const [loading, setLoading] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [selectedManager, setSelectedManager] = useState<number | undefined>();
+  const [assignRemark, setAssignRemark] = useState('');
 
   // 检查权限
   useEffect(() => {
@@ -66,12 +66,13 @@ const EmployeeManagerManagement = () => {
 
         // 过滤出管理员角色的员工
         const managerList = allEmployees.filter(emp =>
-          emp.roles?.some(role => role.code === 'admin' || role.code === 'manager')
+          emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
         );
         setManagers(managerList);
 
-        // TODO: 获取员工-管理员关系记录 - 这里暂时使用空数组，等后端API实现
-        setRelations([]);
+        // 获取员工-管理员关系记录
+        const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
+        setRelations(relationsResponse.records);
       } catch (error) {
         console.error('获取数据失败:', error);
         message.error('获取数据失败');
@@ -95,44 +96,34 @@ const EmployeeManagerManagement = () => {
   };
 
   // 分配员工给管理员
-  const handleAssignEmployees = async () => {
+  const handleAssign = async () => {
+    if (selectedEmployees.length === 0 || !selectedManager) {
+      message.warning('请选择员工和管理员');
+      return;
+    }
+
     try {
       setLoading(true);
 
-      if (!selectedManager || selectedEmployees.length === 0) {
-        message.error('请选择管理员和员工');
-        return;
-      }
-
-      const manager = managers.find(m => m.id === selectedManager);
-
-      // TODO: 调用后端API进行分配
-      // await employeeService.assignEmployeesToManager({
-      //   managerId: selectedManager,
-      //   employeeIds: selectedEmployees
-      // });
-
-      // 临时创建关系记录用于展示
-      const newRelations = selectedEmployees.map(employeeId => {
-        const employee = employees.find(e => e.id === employeeId);
-        return {
-          assignedById: Number(currentUserId),
-          assignedByName: '超级管理员',
-          assignedTime: new Date().toISOString().split('T')[0],
-          employeeId,
-          employeeName: employee?.nickName || '',
-          id: Date.now() + employeeId,
-          managerId: selectedManager,
-          managerName: manager?.nickName || ''
-        };
+      // 调用后端API进行分配
+      await employeeService.assignEmployeesToManager({
+        employeeIds: selectedEmployees,
+        managerId: selectedManager,
+        remark: assignRemark
       });
 
-      setRelations(prev => [...prev, ...newRelations]);
-      setIsModalVisible(false);
-      form.resetFields();
+      message.success('分配成功');
+
+      // 重新获取关系数据
+      const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
+      setRelations(relationsResponse.records);
+
+      // 清空选择
       setSelectedEmployees([]);
       setSelectedManager(undefined);
-      message.success('分配成功');
+      setAssignRemark('');
+      setIsModalVisible(false);
+      form.resetFields();
     } catch (error) {
       console.error('分配失败:', error);
       message.error('分配失败');
@@ -142,16 +133,23 @@ const EmployeeManagerManagement = () => {
   };
 
   // 取消分配
-  const handleUnassign = async (relationId: number) => {
+  const handleRemoveAssignment = async (relationId: number) => {
     try {
-      // TODO: 调用后端API取消分配
-      // await employeeService.unassignEmployeeFromManager(relationId);
+      setLoading(true);
 
-      setRelations(prev => prev.filter(r => r.id !== relationId));
+      // 调用后端API取消分配
+      await employeeService.removeEmployeeManagerRelation(relationId);
+
       message.success('取消分配成功');
+
+      // 重新获取关系数据
+      const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
+      setRelations(relationsResponse.records);
     } catch (error) {
       console.error('取消分配失败:', error);
       message.error('取消分配失败');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -206,7 +204,7 @@ const EmployeeManagerManagement = () => {
             onClick={() => {
               Modal.confirm({
                 content: `确定要取消员工 ${record.employeeName} 与管理员 ${record.managerName} 的关系吗？`,
-                onOk: () => handleUnassign(record.id),
+                onOk: () => handleRemoveAssignment(record.id),
                 title: '确认取消分配'
               });
             }}
@@ -248,12 +246,13 @@ const EmployeeManagerManagement = () => {
         open={isModalVisible}
         title="分配员工给管理员"
         width={600}
-        onOk={handleAssignEmployees}
+        onOk={handleAssign}
         onCancel={() => {
           setIsModalVisible(false);
           form.resetFields();
           setSelectedEmployees([]);
           setSelectedManager(undefined);
+          setAssignRemark('');
         }}
       >
         <Form
@@ -325,6 +324,18 @@ const EmployeeManagerManagement = () => {
                 </Select.Option>
               ))}
             </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="备注"
+            name="remark"
+            rules={[{ message: '请输入备注', required: true }]}
+          >
+            <input
+              type="text"
+              value={assignRemark}
+              onChange={e => setAssignRemark(e.target.value)}
+            />
           </Form.Item>
 
           <Form.Item>

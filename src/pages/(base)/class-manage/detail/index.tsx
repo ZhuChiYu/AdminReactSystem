@@ -13,6 +13,7 @@ import {
   Card,
   DatePicker,
   Descriptions,
+  Empty,
   Form,
   Input,
   InputNumber,
@@ -36,6 +37,52 @@ import { useNavigate, useParams } from 'react-router-dom';
 import UserAvatar from '@/components/common/UserAvatar';
 import { attachmentService, classService, courseService, notificationService } from '@/service/api';
 import type { AttachmentApi, NotificationApi } from '@/service/api/types';
+
+const { Text } = Typography;
+
+// 时间格式化工具函数
+const formatUploadTime = (uploadTime: string): string => {
+  const now = new Date();
+  const uploadTimeDate = new Date(uploadTime);
+  const diffMs = now.getTime() - uploadTimeDate.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) {
+    return '刚才';
+  } else if (diffMins < 60) {
+    return `${diffMins}分钟前`;
+  } else if (diffHours < 24) {
+    return `${diffHours}小时前`;
+  } else if (diffDays < 7) {
+    return `${diffDays}天前`;
+  }
+  // 超过7天显示具体日期
+  return uploadTimeDate.toLocaleString('zh-CN', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
+
+// 文件大小格式化工具函数
+const formatFileSize = (sizeInBytes: number): string => {
+  if (!sizeInBytes || sizeInBytes === 0) return '0 B';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = sizeInBytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size.toFixed(2)} ${units[unitIndex]}`;
+};
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -194,25 +241,44 @@ const ClassDetail = () => {
 
       setAnnounceList(formattedAnnouncements);
 
-      // 获取课程附件
-      const courseAttachmentsResponse = await attachmentService.getAttachmentList({
-        courseId: Number.parseInt(classId, 10),
-        current: 1,
-        size: 1000
-      });
+      // 获取课程附件 - 使用班级关联的实际课程ID
+      if (classResponse.courseId) {
+        const courseAttachmentsResponse = await attachmentService.getAttachmentList({
+          courseId: classResponse.courseId,
+          current: 1,
+          size: 1000
+        });
 
-      const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
-        (attachment: AttachmentApi.AttachmentListItem) => ({
-          fileName: attachment.fileName,
-          fileSize: attachment.fileSize,
-          fileType: attachment.fileType,
-          id: attachment.id,
-          uploader: attachment.uploader?.name || '未知',
-          uploadTime: attachment.uploadTime
-        })
-      );
+        console.log('课程附件API响应 (课程ID:', classResponse.courseId, '):', courseAttachmentsResponse);
 
-      setCourseAttachments(formattedCourseAttachments);
+        // API客户端自动提取data字段，这里得到的是PageResponse.data的内容
+        const attachmentRecords = (courseAttachmentsResponse as any)?.records || [];
+        console.log('提取的附件记录:', attachmentRecords);
+
+        if (Array.isArray(attachmentRecords)) {
+          const formattedCourseAttachments = attachmentRecords.map((attachment: AttachmentApi.AttachmentListItem) => {
+            console.log('格式化附件:', attachment);
+            return {
+              id: attachment.id,
+              name: attachment.originalName || attachment.fileName, // 优先使用原始文件名
+              size: attachment.fileSize,
+              type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+              uploader: attachment.uploader?.name || '未知',
+              uploadTime: attachment.uploadTime,
+              url: attachment.downloadUrl || '#'
+            };
+          });
+
+          console.log('格式化后的附件列表:', formattedCourseAttachments);
+          setCourseAttachments(formattedCourseAttachments);
+        } else {
+          console.warn('附件列表数据格式不正确:', courseAttachmentsResponse);
+          setCourseAttachments([]);
+        }
+      } else {
+        console.log('班级暂无关联课程，无法获取课程附件');
+        setCourseAttachments([]);
+      }
     } catch (error) {
       message.error('获取班级数据失败');
       console.error('获取班级数据失败:', error);
@@ -713,10 +779,11 @@ const ClassDetail = () => {
         size: 1000
       });
 
-      const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
+      // 修正数据路径 - API客户端已经自动提取data字段
+      const formattedCourseAttachments = ((courseAttachmentsResponse as any)?.records || []).map(
         (attachment: AttachmentApi.AttachmentListItem) => ({
           id: attachment.id,
-          name: attachment.fileName,
+          name: attachment.originalName || attachment.fileName, // 优先使用原始文件名
           size: attachment.fileSize,
           type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
           uploader: attachment.uploader?.name || '未知',
@@ -779,8 +846,31 @@ const ClassDetail = () => {
 
   // 添加课程
   const handleAddCourse = () => {
-    courseForm.resetFields();
-    setCourseModalVisible(true);
+    // 如果班级已有课程，提醒用户将会替换现有课程
+    if (courseList.length > 0) {
+      Modal.confirm({
+        cancelText: '取消',
+        content: (
+          <div>
+            <p>
+              当前班级已有课程：<strong>{courseList[0]?.name}</strong>
+            </p>
+            <p>
+              添加新课程将会<span style={{ color: '#ff4d4f' }}>替换</span>现有课程，确定要继续吗？
+            </p>
+          </div>
+        ),
+        okText: '确定替换',
+        onOk: () => {
+          courseForm.resetFields();
+          setCourseModalVisible(true);
+        },
+        title: '确认添加课程'
+      });
+    } else {
+      courseForm.resetFields();
+      setCourseModalVisible(true);
+    }
   };
 
   // 保存课程
@@ -815,28 +905,11 @@ const ClassDetail = () => {
       courseForm.resetFields();
       setCurrentCourse(null);
 
-      // 重新获取课程列表，使用与fetchClassInfo相同的格式化逻辑
-      const coursesResponse = await courseService.getClassCourseList({
-        classId: Number.parseInt(classId!, 10),
-        current: 1,
-        size: 1000
-      });
-
-      const formattedCourses = coursesResponse.records.map((course: any) => ({
-        classroom: course.classroom || course.location || '',
-        endDate: course.endDate || '',
-        id: course.id,
-        name: course.courseName,
-        schedule: course.schedule || '',
-        startDate: course.startDate || '',
-        status: course.status || 1,
-        teacher: course.instructor || ''
-      }));
-
-      setCourseList(formattedCourses);
+      // 重新获取所有班级数据，确保课程列表更新
+      await fetchClassInfo();
     } catch (error) {
-      console.error('添加课程失败:', error);
       message.error('添加课程失败');
+      console.error('添加课程失败:', error);
     }
   };
 
@@ -927,12 +1000,15 @@ const ClassDetail = () => {
         setUploadProgress(Math.floor(((index + 1) / fileList.length) * 80)); // 进度到80%
 
         try {
-          const result = await attachmentService.uploadAttachment({
+          const uploadData = {
             courseId: currentCourse?.id || 0,
-            // 使用courseId而不是relatedId
             description: '课程附件',
             file: file.originFileObj || file
-          });
+          };
+          console.log('上传文件数据:', uploadData);
+
+          const result = await attachmentService.uploadAttachment(uploadData);
+          console.log(`文件 ${file.name} 上传结果:`, result);
           return result;
         } catch (error) {
           console.error(`上传文件 ${file.name} 失败:`, error);
@@ -945,27 +1021,12 @@ const ClassDetail = () => {
 
       message.success(`成功上传了 ${fileList.length} 个文件`);
 
-      // 重新获取课程附件列表
+      // 重新获取课程附件列表并刷新整个班级信息
+      await fetchClassInfo(); // 重新获取完整的班级数据，包括附件列表
+
+      // 如果当前有打开的课程详情，也需要刷新该课程的附件列表
       if (currentCourse?.id) {
-        const courseAttachmentsResponse = await attachmentService.getAttachmentList({
-          courseId: currentCourse.id,
-          current: 1,
-          size: 1000
-        });
-
-        const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
-          (attachment: AttachmentApi.AttachmentListItem) => ({
-            id: attachment.id,
-            name: attachment.fileName,
-            size: attachment.fileSize,
-            type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
-            uploader: attachment.uploader?.name || '未知',
-            uploadTime: attachment.uploadTime,
-            url: attachment.downloadUrl || '#' // 使用downloadUrl字段
-          })
-        );
-
-        setCourseAttachments(formattedCourseAttachments);
+        await handleViewCourseDetail(currentCourse);
       }
 
       // 延迟一会儿显示上传完成状态
@@ -1000,10 +1061,11 @@ const ClassDetail = () => {
               size: 1000
             });
 
-            const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
+            // 修正数据路径
+            const formattedCourseAttachments = ((courseAttachmentsResponse as any)?.records || []).map(
               (attachment: AttachmentApi.AttachmentListItem) => ({
                 id: attachment.id,
-                name: attachment.fileName,
+                name: attachment.originalName || attachment.fileName, // 优先使用原始文件名
                 size: attachment.fileSize,
                 type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
                 uploader: attachment.uploader?.name || '未知',
@@ -1024,18 +1086,31 @@ const ClassDetail = () => {
   };
 
   // 处理附件下载
-  const handleDownloadAttachment = (attachment: any) => {
-    console.log('下载附件:', attachment);
-    message.success(`开始下载: ${attachment.name}`);
+  const handleDownloadAttachment = async (attachment: any) => {
+    if (!currentAnnounce?.id) {
+      message.error('通知ID无效');
+      return;
+    }
 
-    // 如果有真实URL，可以这样处理下载
-    if (attachment.url) {
+    try {
+      // 使用通知服务的下载方法
+      const response = await notificationService.downloadNotificationAttachment(currentAnnounce.id, attachment.id);
+
+      // 创建下载链接
+      const url = window.URL.createObjectURL(new Blob([response]));
       const link = document.createElement('a');
-      link.href = attachment.url;
-      link.download = attachment.name;
+      link.href = url;
+      link.download = attachment.name || 'download';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log(`成功下载通知附件: ${attachment.name}`, attachment);
+      message.success(`下载成功: ${attachment.name}`);
+    } catch (error) {
+      console.error('下载通知附件失败:', error);
+      message.error('下载失败，请重试');
     }
   };
 
@@ -1051,45 +1126,56 @@ const ClassDetail = () => {
     try {
       const values = await announceForm.validateFields();
 
-      // 使用真实的API创建通知
-      const notificationData = {
+      const announceData = {
         content: values.content,
-        // 班级通知类型
         relatedId: Number.parseInt(classId!, 10),
         relatedType: 'class',
-        targetUserIds: [],
         title: values.title,
-        type: 'class_announcement' // 空数组表示发给所有人
+        type: 'class_announcement'
       };
 
-      // 只支持创建新通知，暂不支持编辑
-      await notificationService.createNotification(notificationData);
-      message.success('通知发布成功');
+      if (currentAnnounce) {
+        // 编辑模式 - 这里暂时只更新本地状态，实际项目中应该调用更新API
+        const updatedAnnounce = {
+          ...currentAnnounce,
+          ...values,
+          importance: values.importance || 0,
+          publishDate: new Date().toLocaleString()
+        };
+
+        setAnnounceList(prev => prev.map(item => (item.id === currentAnnounce.id ? updatedAnnounce : item)));
+        message.success('通知已更新');
+      } else {
+        // 新建模式 - 调用API创建通知
+        const result = await notificationService.createNotification(announceData);
+        console.log('创建通知成功:', result);
+
+        // 重新获取通知列表
+        const announcementsResponse = await notificationService.getNotificationList({
+          current: 1,
+          relatedId: Number.parseInt(classId!, 10),
+          size: 1000,
+          type: 'class_announcement'
+        });
+
+        const formattedAnnouncements = announcementsResponse.records.map(
+          (announcement: NotificationApi.NotificationListItem) => ({
+            content: announcement.content,
+            id: announcement.id,
+            importance: values.importance || 0,
+            publishDate: announcement.createTime,
+            status: 1,
+            title: announcement.title
+          })
+        );
+
+        setAnnounceList(formattedAnnouncements);
+        message.success('通知发布成功');
+      }
 
       setAnnounceModalVisible(false);
-      announceForm.resetFields();
       setCurrentAnnounce(null);
-
-      // 重新获取通知列表
-      const notificationsResponse = await notificationService.getNotificationList({
-        current: 1,
-        relatedId: Number.parseInt(classId!, 10),
-        relatedType: 'class',
-        size: 1000
-      });
-
-      const formattedAnnouncements = notificationsResponse.records.map(
-        (notification: NotificationApi.NotificationListItem) => ({
-          content: notification.content,
-          id: notification.id,
-          importance: values.importance || 0,
-          // 使用表单中的重要程度值
-          publishDate: notification.createTime,
-          title: notification.title
-        })
-      );
-
-      setAnnounceList(formattedAnnouncements);
+      announceForm.resetFields();
     } catch (error) {
       console.error('保存通知失败:', error);
       message.error('保存通知失败');
@@ -1147,26 +1233,22 @@ const ClassDetail = () => {
     setCurrentAnnounce(announce);
 
     try {
-      // 使用真实的API获取通知附件数据
-      // 假设通知附件也使用类似的API，根据通知ID获取附件
-      const announceAttachmentsResponse = await attachmentService.getAttachmentList({
-        // 这里可能需要修改为notificationId或者其他字段，根据实际API设计
-        courseId: announce.id, // 临时使用，可能需要修改
+      // 使用专门的通知附件API获取附件列表
+      const announceAttachmentsResponse = await notificationService.getNotificationAttachments(announce.id, {
         current: 1,
         size: 1000
       });
 
-      const formattedAnnounceAttachments = (announceAttachmentsResponse.data?.records || []).map(
-        (attachment: AttachmentApi.AttachmentListItem) => ({
+      const formattedAnnounceAttachments =
+        announceAttachmentsResponse.records?.map((attachment: NotificationApi.NotificationAttachmentListItem) => ({
           id: attachment.id,
-          name: attachment.fileName,
+          name: attachment.originalName || attachment.fileName, // 优先使用原始文件名
           size: attachment.fileSize,
           type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
           uploader: attachment.uploader?.name || '未知',
           uploadTime: attachment.uploadTime,
           url: attachment.downloadUrl || '#'
-        })
-      );
+        })) || [];
 
       setAnnounceAttachments(formattedAnnounceAttachments);
     } catch (error) {
@@ -1191,21 +1273,27 @@ const ClassDetail = () => {
       return;
     }
 
+    if (!currentAnnounce?.id) {
+      message.error('通知ID无效');
+      return;
+    }
+
     setAnnounceUploading(true);
     setAnnounceUploadProgress(0);
 
     try {
-      // 使用真实的API上传通知附件
+      // 使用专门的通知附件上传API
       const uploadPromises = announceFileList.map(async (file, index) => {
         setAnnounceUploadProgress(Math.floor(((index + 1) / announceFileList.length) * 80));
 
         try {
-          const result = await attachmentService.uploadAttachment({
-            courseId: currentAnnounce?.id || 0,
-            // 这里可能需要修改为notificationId
-            description: '通知附件',
-            file: file.originFileObj || file
+          const result = await notificationService.uploadNotificationAttachment({
+            description: `通知附件 - ${currentAnnounce.title}`,
+            file: file.originFileObj || file,
+            notificationId: currentAnnounce.id
           });
+
+          console.log(`通知附件上传成功: ${file.name}`, result);
           return result;
         } catch (error) {
           console.error(`上传文件 ${file.name} 失败:`, error);
@@ -1219,27 +1307,23 @@ const ClassDetail = () => {
       message.success(`成功上传了 ${announceFileList.length} 个文件`);
 
       // 重新获取通知附件列表
-      if (currentAnnounce?.id) {
-        const announceAttachmentsResponse = await attachmentService.getAttachmentList({
-          courseId: currentAnnounce.id, // 可能需要修改为notificationId
-          current: 1,
-          size: 1000
-        });
+      const announceAttachmentsResponse = await notificationService.getNotificationAttachments(currentAnnounce.id, {
+        current: 1,
+        size: 1000
+      });
 
-        const formattedAnnounceAttachments = (announceAttachmentsResponse.data?.records || []).map(
-          (attachment: AttachmentApi.AttachmentListItem) => ({
-            id: attachment.id,
-            name: attachment.fileName,
-            size: attachment.fileSize,
-            type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
-            uploader: attachment.uploader?.name || '未知',
-            uploadTime: attachment.uploadTime,
-            url: attachment.downloadUrl || '#'
-          })
-        );
+      const formattedAnnounceAttachments =
+        announceAttachmentsResponse.records?.map((attachment: NotificationApi.NotificationAttachmentListItem) => ({
+          id: attachment.id,
+          name: attachment.originalName || attachment.fileName, // 优先使用原始文件名
+          size: attachment.fileSize,
+          type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+          uploader: attachment.uploader?.name || '未知',
+          uploadTime: attachment.uploadTime,
+          url: attachment.downloadUrl || '#'
+        })) || [];
 
-        setAnnounceAttachments(formattedAnnounceAttachments);
-      }
+      setAnnounceAttachments(formattedAnnounceAttachments);
 
       // 延迟关闭模态框
       setTimeout(() => {
@@ -1261,31 +1345,32 @@ const ClassDetail = () => {
       content: '确定要删除该附件吗？此操作不可恢复。',
       onOk: async () => {
         try {
-          await attachmentService.deleteAttachment(attachmentId);
+          if (!currentAnnounce?.id) {
+            message.error('通知ID无效');
+            return;
+          }
+
+          await notificationService.deleteNotificationAttachment(currentAnnounce.id, attachmentId);
           message.success('附件已成功删除');
 
           // 重新获取通知附件列表
-          if (currentAnnounce?.id) {
-            const announceAttachmentsResponse = await attachmentService.getAttachmentList({
-              courseId: currentAnnounce.id, // 可能需要修改为notificationId
-              current: 1,
-              size: 1000
-            });
+          const announceAttachmentsResponse = await notificationService.getNotificationAttachments(currentAnnounce.id, {
+            current: 1,
+            size: 1000
+          });
 
-            const formattedAnnounceAttachments = (announceAttachmentsResponse.data?.records || []).map(
-              (attachment: AttachmentApi.AttachmentListItem) => ({
-                id: attachment.id,
-                name: attachment.fileName,
-                size: attachment.fileSize,
-                type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
-                uploader: attachment.uploader?.name || '未知',
-                uploadTime: attachment.uploadTime,
-                url: attachment.downloadUrl || '#'
-              })
-            );
+          const formattedAnnounceAttachments =
+            announceAttachmentsResponse.records?.map((attachment: NotificationApi.NotificationAttachmentListItem) => ({
+              id: attachment.id,
+              name: attachment.originalName || attachment.fileName, // 优先使用原始文件名
+              size: attachment.fileSize,
+              type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+              uploader: attachment.uploader?.name || '未知',
+              uploadTime: attachment.uploadTime,
+              url: attachment.downloadUrl || '#'
+            })) || [];
 
-            setAnnounceAttachments(formattedAnnounceAttachments);
-          }
+          setAnnounceAttachments(formattedAnnounceAttachments);
         } catch (error) {
           console.error('删除通知附件失败:', error);
           message.error('删除附件失败');
@@ -1677,48 +1762,56 @@ const ClassDetail = () => {
   // 课程列表表格列配置
   const courseColumns = [
     {
+      align: 'center' as const,
       dataIndex: 'id',
       key: 'id',
       title: 'ID',
       width: 50
     },
     {
+      align: 'center' as const,
       dataIndex: 'name',
       key: 'name',
       title: '课程名称',
       width: 150
     },
     {
+      align: 'center' as const,
       dataIndex: 'teacher',
       key: 'teacher',
       title: '任课老师',
       width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'schedule',
       key: 'schedule',
       title: '上课时间',
       width: 200
     },
     {
+      align: 'center' as const,
       dataIndex: 'classroom',
       key: 'classroom',
       title: '教室',
       width: 100
     },
     {
+      align: 'center' as const,
       dataIndex: 'startDate',
       key: 'startDate',
       title: '开始日期',
       width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'endDate',
       key: 'endDate',
       title: '结束日期',
       width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'status',
       key: 'status',
       render: (status: number) => (
@@ -1728,6 +1821,8 @@ const ClassDetail = () => {
       width: 100
     },
     {
+      align: 'center' as const,
+      fixed: 'right' as const,
       key: 'action',
       render: (_: unknown, record: any) => {
         return (
@@ -1763,24 +1858,41 @@ const ClassDetail = () => {
   const renderCourseList = () => {
     return (
       <Card
-        title="班级课程"
         variant="borderless"
         extra={
           <Button
             type="primary"
             onClick={handleAddCourse}
           >
-            添加课程
+            {courseList.length > 0 ? '更换课程' : '添加课程'}
           </Button>
         }
+        title={
+          <div className="flex items-center gap-2">
+            <span>班级课程</span>
+            <Text
+              style={{ fontSize: '14px', fontWeight: 'normal' }}
+              type="secondary"
+            >
+              （每个班级只能关联一个课程）
+            </Text>
+          </div>
+        }
       >
-        <Table
-          columns={courseColumns}
-          dataSource={courseList}
-          loading={loading}
-          rowKey="id"
-          scroll={{ x: 1200 }}
-        />
+        {courseList.length === 0 ? (
+          <Empty
+            description="暂无关联课程"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        ) : (
+          <Table
+            columns={courseColumns}
+            dataSource={courseList}
+            loading={loading}
+            rowKey="id"
+            scroll={{ x: 1200 }}
+          />
+        )}
 
         {/* 课程详情模态框 */}
         <Modal
@@ -1915,12 +2027,14 @@ const ClassDetail = () => {
                     {
                       dataIndex: 'size',
                       key: 'size',
+                      render: (size: number) => formatFileSize(size),
                       title: '大小',
                       width: 100
                     },
                     {
                       dataIndex: 'uploadTime',
                       key: 'uploadTime',
+                      render: (uploadTime: string) => formatUploadTime(uploadTime),
                       title: '上传时间',
                       width: 180
                     },
@@ -2380,9 +2494,14 @@ const ClassDetail = () => {
                   dataSource={announceAttachments}
                   pagination={false}
                   rowKey="id"
+                  scroll={{ x: 600 }}
+                  size="small"
                   columns={[
                     {
                       dataIndex: 'name',
+                      ellipsis: {
+                        showTitle: true
+                      },
                       key: 'name',
                       render: (text, record) => {
                         // 根据文件类型显示不同的图标
@@ -2448,35 +2567,38 @@ const ClassDetail = () => {
                         return (
                           <Space>
                             {icon}
-                            <span>{text}</span>
+                            <span title={text}>{text}</span>
                           </Space>
                         );
                       },
-                      title: '文件名'
-                    },
-                    {
-                      dataIndex: 'type',
-                      key: 'type',
-                      render: text => (text ? text.toUpperCase() : ''),
-                      title: '类型',
-                      width: 100
+                      title: '文件名',
+                      width: 200
                     },
                     {
                       dataIndex: 'size',
                       key: 'size',
+                      render: (size: number) => formatFileSize(size),
                       title: '大小',
                       width: 100
                     },
                     {
                       dataIndex: 'uploadTime',
                       key: 'uploadTime',
+                      render: (uploadTime: string) => formatUploadTime(uploadTime),
                       title: '上传时间',
-                      width: 180
+                      width: 120
                     },
                     {
+                      dataIndex: 'uploader',
+                      key: 'uploader',
+                      title: '上传者',
+                      width: 100
+                    },
+                    {
+                      fixed: 'right',
                       key: 'action',
                       render: (_, record: any) => (
-                        <Space>
+                        <Space size="small">
                           <Button
                             icon={<DownloadOutlined />}
                             size="small"
@@ -2496,7 +2618,7 @@ const ClassDetail = () => {
                         </Space>
                       ),
                       title: '操作',
-                      width: 180
+                      width: 120
                     }
                   ]}
                 />
@@ -2550,12 +2672,12 @@ const ClassDetail = () => {
           </Form>
         </Modal>
 
-        {/* 附件上传模态框 */}
+        {/* 附件上传模态框 - 优化UI布局 */}
         <Modal
           footer={null}
           open={announceUploadModalVisible}
-          title="上传附件"
-          width={600}
+          title="上传通知附件"
+          width={800}
           onCancel={() => {
             if (!announceUploading) {
               setAnnounceUploadModalVisible(false);
@@ -2569,6 +2691,12 @@ const ClassDetail = () => {
                   multiple
                   fileList={[]}
                   beforeUpload={file => {
+                    // 文件大小检查
+                    const isLt10M = file.size / 1024 / 1024 < 10;
+                    if (!isLt10M) {
+                      message.error('文件大小不能超过 10MB!');
+                      return false;
+                    }
                     setAnnounceFileList(prev => [...prev, file]);
                     return false;
                   }}
@@ -2595,9 +2723,7 @@ const ClassDetail = () => {
                           (总大小:{' '}
                           {(() => {
                             const totalSize = announceFileList.reduce((total, file) => total + file.size, 0);
-                            return totalSize < 1024 * 1024
-                              ? `${(totalSize / 1024).toFixed(2)} KB`
-                              : `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+                            return formatFileSize(totalSize);
                           })()}
                           )
                         </Typography.Text>
@@ -2605,20 +2731,63 @@ const ClassDetail = () => {
                     </Typography.Text>
                     <Table
                       pagination={false}
+                      scroll={{ x: 'max-content' }}
                       size="small"
                       columns={[
-                        { dataIndex: 'name', ellipsis: true, title: '文件名' },
-                        { dataIndex: 'type', title: '类型', width: 80 },
-                        { dataIndex: 'size', title: '大小', width: 100 }
+                        {
+                          dataIndex: 'name',
+                          ellipsis: true,
+                          title: '文件名',
+                          width: '40%'
+                        },
+                        {
+                          dataIndex: 'type',
+                          render: (_, record) => {
+                            const ext = record.name?.split('.')?.pop()?.toUpperCase();
+                            return ext || '未知';
+                          },
+                          title: '类型',
+                          width: 80
+                        },
+                        {
+                          dataIndex: 'size',
+                          render: (size: number) => formatFileSize(size),
+                          title: '大小',
+                          width: 100
+                        },
+                        {
+                          dataIndex: 'lastModified',
+                          render: (lastModified: number) => {
+                            return lastModified ? new Date(lastModified).toLocaleString() : '未知时间';
+                          },
+                          title: '修改时间',
+                          width: 140
+                        },
+                        {
+                          fixed: 'right',
+                          key: 'action',
+                          render: (_, record: any) => (
+                            <Button
+                              danger
+                              size="small"
+                              onClick={() => {
+                                setAnnounceFileList(files => files.filter(f => f.uid !== record.uid));
+                              }}
+                            >
+                              移除
+                            </Button>
+                          ),
+                          title: '操作',
+                          width: 80
+                        }
                       ]}
                       dataSource={announceFileList.map((file, index) => ({
                         key: file.uid || index,
+                        lastModified: file.lastModified,
                         name: file.name,
-                        size:
-                          file.size < 1024 * 1024
-                            ? `${(file.size / 1024).toFixed(2)} KB`
-                            : `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-                        type: file.name?.split('.')?.pop()?.toUpperCase() || '未知'
+                        size: file.size,
+                        type: file.type,
+                        uid: file.uid
                       }))}
                     />
                   </div>
@@ -2630,10 +2799,11 @@ const ClassDetail = () => {
                   <Button onClick={() => setAnnounceUploadModalVisible(false)}>取消</Button>
                   <Button
                     disabled={announceFileList.length === 0}
+                    loading={announceUploading}
                     type="primary"
                     onClick={handleAnnounceFileUpload}
                   >
-                    开始上传
+                    开始上传 ({announceFileList.length} 个文件)
                   </Button>
                 </Space>
               </div>

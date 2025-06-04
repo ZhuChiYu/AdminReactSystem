@@ -1,6 +1,8 @@
 import { UserOutlined } from '@ant-design/icons';
 import { Avatar } from 'antd';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
+import { getServiceBaseURL } from '@/utils/service';
 
 interface UserAvatarProps {
   avatar?: string | null;
@@ -10,6 +12,13 @@ interface UserAvatarProps {
 }
 
 const UserAvatar: React.FC<UserAvatarProps> = ({ avatar, className, gender, size = 40 }) => {
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  // 获取后端服务器基础URL
+  const isHttpProxy = import.meta.env.DEV && import.meta.env.VITE_HTTP_PROXY === 'Y';
+  const { baseURL } = getServiceBaseURL(import.meta.env, isHttpProxy);
+
   const getDefaultAvatar = () => {
     if (gender === '女' || gender === 'female') {
       return '/avatars/female-default.svg';
@@ -20,41 +29,65 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ avatar, className, gender, size
   };
 
   // 处理头像URL，添加时间戳避免缓存问题
-  const getAvatarSrc = () => {
-    if (!avatar) {
+  const processAvatarUrl = (avatarUrl?: string | null) => {
+    if (!avatarUrl) {
       return getDefaultAvatar();
     }
 
-    // 如果是上传的头像，添加时间戳避免缓存
-    if (avatar.includes('/uploads/avatars/')) {
-      const separator = avatar.includes('?') ? '&' : '?';
-      return `${avatar}${separator}t=${Date.now()}`;
+    let processedUrl = avatarUrl;
+
+    // 如果是相对路径，添加后端服务器的基础URL
+    if (avatarUrl.startsWith('/uploads/')) {
+      // 移除baseURL中的/api后缀（如果存在）
+      const cleanBaseURL = baseURL.replace('/api', '');
+      processedUrl = `${cleanBaseURL}${avatarUrl}`;
     }
 
-    return avatar;
+    // 添加时间戳避免缓存
+    const separator = processedUrl.includes('?') ? '&' : '?';
+    return `${processedUrl}${separator}t=${Date.now()}`;
   };
 
-  const avatarSrc = getAvatarSrc();
-
   useEffect(() => {
-    console.log('UserAvatar渲染:', {
+    const newAvatarSrc = processAvatarUrl(avatar);
+    setAvatarSrc(newAvatarSrc);
+    setImageError(false);
+
+    console.log('UserAvatar组件更新:', {
       avatar,
-      avatarSrc,
+      baseURL,
+      cleanBaseURL: baseURL.replace('/api', ''),
       defaultAvatar: getDefaultAvatar(),
       gender,
-      isDefault: !avatar
+      processedSrc: newAvatarSrc,
+      size
     });
-  }, [avatar, gender, avatarSrc]);
+  }, [avatar, gender, size, baseURL]);
+
+  const handleImageError = () => {
+    console.log('头像加载失败，使用默认头像:', avatarSrc);
+    setImageError(true);
+    setAvatarSrc(getDefaultAvatar());
+    return false; // 阻止默认错误处理
+  };
+
+  const finalAvatarSrc = imageError ? getDefaultAvatar() : avatarSrc;
 
   return (
     <Avatar
-      className={className}
-      icon={!avatarSrc && <UserOutlined />}
+      className={`${className || ''} flex items-center justify-center`}
+      icon={!finalAvatarSrc && <UserOutlined />}
       size={size}
-      src={avatarSrc}
+      src={finalAvatarSrc}
       style={{
-        backgroundColor: !avatarSrc ? '#87d068' : undefined
+        alignItems: 'center',
+        backgroundColor: !finalAvatarSrc ? '#87d068' : undefined,
+        display: 'flex',
+        justifyContent: 'center',
+        objectFit: 'cover',
+        overflow: 'hidden'
       }}
+      onError={handleImageError}
     />
   );
 };

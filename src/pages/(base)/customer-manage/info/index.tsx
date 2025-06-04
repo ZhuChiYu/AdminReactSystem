@@ -1,12 +1,11 @@
 import { UserAddOutlined } from '@ant-design/icons';
-import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
+import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { customerService } from '@/service/api';
 import type { CustomerApi } from '@/service/api/types';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
-import { getCurrentUserId, getCurrentUserName, isAdmin, isSuperAdmin } from '@/utils/auth';
-import { localStg } from '@/utils/storage';
+import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 定义本地的跟进状态枚举和映射
@@ -24,7 +23,7 @@ export enum FollowUpStatus {
 }
 
 /** 跟进状态名称 */
-const followUpStatusNames = {
+const followUpStatusNames: Record<string, string> = {
   [FollowUpStatus.WECHAT_ADDED]: '已加微信',
   [FollowUpStatus.REJECTED]: '未通过',
   [FollowUpStatus.EARLY_25]: '早25客户',
@@ -78,7 +77,6 @@ const CustomerManagement = () => {
 
   // 获取当前用户信息
   const currentUserId = getCurrentUserId();
-  const currentUserName = getCurrentUserName();
 
   // 判断当前用户是否为超级管理员或管理员
   const isUserSuperAdmin = isSuperAdmin();
@@ -101,7 +99,8 @@ const CustomerManagement = () => {
         current: pagination.current,
         customerName: searchParams.customerName || undefined,
         followStatus: searchParams.followStatus || undefined,
-        size: pagination.pageSize
+        scope: 'all',
+        size: pagination.pageSize // 客户资料管理页面显示所有数据
       };
 
       const response = await customerService.getCustomerList(params);
@@ -129,14 +128,16 @@ const CustomerManagement = () => {
     // 超级管理员可以修改所有客户信息
     if (isUserSuperAdmin) return true;
 
+    const currentUserIdNum = Number(currentUserId);
+
     // 检查是否有特定客户的编辑权限
-    const hasCustomerEditPermission = hasPermission(currentUserId, PermissionType.EDIT_CUSTOMER, customer.id);
+    const hasCustomerEditPermission = hasPermission(currentUserIdNum, PermissionType.EDIT_CUSTOMER, customer.id);
 
     // 检查是否有全局编辑权限
-    const hasGlobalEditPermission = hasPermission(currentUserId, PermissionType.EDIT_CUSTOMER);
+    const hasGlobalEditPermission = hasPermission(currentUserIdNum, PermissionType.EDIT_CUSTOMER);
 
     // 管理员是否可以修改自己分配的客户
-    const isAssignedByCurrentAdmin = isUserAdmin && customer.assignedToId === currentUserId;
+    const isAssignedByCurrentAdmin = isUserAdmin && customer.assignedTo?.id === currentUserIdNum;
 
     return hasCustomerEditPermission || hasGlobalEditPermission || isAssignedByCurrentAdmin;
   };
@@ -146,14 +147,20 @@ const CustomerManagement = () => {
     // 超级管理员可以查看所有客户信息
     if (isUserSuperAdmin) return true;
 
+    const currentUserIdNum = Number(currentUserId);
+
     // 检查是否有特定客户的查看手机号权限
-    const hasCustomerMobilePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_MOBILE, customer.id);
+    const hasCustomerMobilePermission = hasPermission(
+      currentUserIdNum,
+      PermissionType.VIEW_CUSTOMER_MOBILE,
+      customer.id
+    );
 
     // 检查是否有全局查看手机号权限
-    const hasGlobalMobilePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_MOBILE);
+    const hasGlobalMobilePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_MOBILE);
 
     // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.assignedToId === currentUserId;
+    const isOwnCustomer = customer.assignedTo?.id === currentUserIdNum;
 
     return hasCustomerMobilePermission || hasGlobalMobilePermission || isOwnCustomer;
   };
@@ -163,14 +170,16 @@ const CustomerManagement = () => {
     // 超级管理员可以查看所有客户信息
     if (isUserSuperAdmin) return true;
 
+    const currentUserIdNum = Number(currentUserId);
+
     // 检查是否有特定客户的查看电话权限
-    const hasCustomerPhonePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_PHONE, customer.id);
+    const hasCustomerPhonePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_PHONE, customer.id);
 
     // 检查是否有全局查看电话权限
-    const hasGlobalPhonePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_PHONE);
+    const hasGlobalPhonePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_PHONE);
 
     // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.assignedToId === currentUserId;
+    const isOwnCustomer = customer.assignedTo?.id === currentUserIdNum;
 
     return hasCustomerPhonePermission || hasGlobalPhonePermission || isOwnCustomer;
   };
@@ -180,14 +189,16 @@ const CustomerManagement = () => {
     // 超级管理员可以查看所有客户信息
     if (isUserSuperAdmin) return true;
 
+    const currentUserIdNum = Number(currentUserId);
+
     // 检查是否有特定客户的查看姓名权限
-    const hasCustomerNamePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_NAME, customer.id);
+    const hasCustomerNamePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_NAME, customer.id);
 
     // 检查是否有全局查看姓名权限
-    const hasGlobalNamePermission = hasPermission(currentUserId, PermissionType.VIEW_CUSTOMER_NAME);
+    const hasGlobalNamePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_NAME);
 
     // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.assignedToId === currentUserId;
+    const isOwnCustomer = customer.assignedTo?.id === currentUserIdNum;
 
     return hasCustomerNamePermission || hasGlobalNamePermission || isOwnCustomer;
   };
@@ -305,11 +316,15 @@ const CustomerManagement = () => {
 
   // 表格分页处理
   const handleTableChange = (page: number, pageSize?: number) => {
-    setPagination({
+    console.log('🔍 分页变化:', { current: pagination.current, oldPageSize: pagination.pageSize, page, pageSize });
+
+    const newPageSize = pageSize || pagination.pageSize;
+
+    setPagination(prev => ({
+      ...prev,
       current: page,
-      pageSize: pageSize || pagination.pageSize,
-      total: pagination.total
-    });
+      pageSize: newPageSize
+    }));
   };
 
   // 表格列配置

@@ -1,19 +1,35 @@
 import {
   CalendarOutlined,
   CheckCircleOutlined,
+  CheckOutlined,
   CloseCircleOutlined,
   DollarOutlined,
   EyeOutlined,
   FileTextOutlined,
+  SyncOutlined,
   UserOutlined
 } from '@ant-design/icons';
-import { Badge, Button, Card, Descriptions, Form, Input, Modal, Radio, Space, Table, Tag, Typography } from 'antd';
+import {
+  Badge,
+  Button,
+  Card,
+  Descriptions,
+  Form,
+  Input,
+  Modal,
+  Radio,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  message
+} from 'antd';
 import React, { useEffect, useState } from 'react';
 
 import { expenseService } from '@/service/api';
 import type { ExpenseApi } from '@/service/api/types';
 import { isSuperAdmin } from '@/utils/auth';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -53,27 +69,19 @@ const Component: React.FC = () => {
         status: 0 // 只获取待审批的申请
       });
 
-      console.log('收到响应:', response);
-
-      // expenseService.getExpenseList 直接返回的是 PageResponse 中的 data 部分
-      // 所以这里 response 就是 { records: [], total: number, current: number, size: number, pages: number }
       if (!response) {
-        console.log('响应数据为空，设置为空数组');
         setExpenseData([]);
         return;
       }
 
-      console.log('✅ 业务成功响应，返回data:', response);
-
-      // 检查 records 是否存在
-      if (!response.records || !Array.isArray(response.records)) {
-        console.log('records 数据不存在或格式错误，设置为空数组');
+      // 检查 records 是否存在（由于expenseService已经解包了data部分）
+      if (!(response as any).records || !Array.isArray((response as any).records)) {
         setExpenseData([]);
         return;
       }
 
       // 转换API数据格式
-      const formattedExpenses: ExpenseItem[] = response.records.map((expense: ExpenseApi.ExpenseListItem) => ({
+      const formattedExpenses: ExpenseItem[] = (response as any).records.map((expense: ExpenseApi.ExpenseListItem) => ({
         amount: expense.amount || 0,
         applicant: expense.applicant?.name || '未知用户',
         applicationDate: expense.applicationTime || '',
@@ -90,7 +98,6 @@ const Component: React.FC = () => {
       setExpenseData(formattedExpenses);
     } catch (error) {
       console.error('获取费用申请列表失败:', error);
-      // 设置空数组，避免页面崩溃，不显示错误提示
       setExpenseData([]);
     } finally {
       setLoading(false);
@@ -98,8 +105,22 @@ const Component: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchExpenses();
-  }, []);
+    // 只有超级管理员才获取数据
+    if (isUserSuperAdmin) {
+      fetchExpenses();
+    }
+  }, [isUserSuperAdmin]);
+
+  // 如果不是超级管理员，显示提示信息
+  if (!isUserSuperAdmin) {
+    return (
+      <Card>
+        <div style={{ padding: '50px', textAlign: 'center' }}>
+          <Text type="secondary">您没有权限访问此页面，只有超级管理员可以审批报销申请。</Text>
+        </div>
+      </Card>
+    );
+  }
 
   const showApprovalModal = (record: ExpenseItem) => {
     setCurrentExpense(record);
@@ -117,19 +138,32 @@ const Component: React.FC = () => {
       const values = await form.validateFields();
 
       if (currentExpense) {
+        // 修正状态值：1表示通过，2表示拒绝
+        const approvalStatus = values.approval === 1 ? 1 : 2;
+
         await expenseService.approveExpense(currentExpense.id, {
           remark: values.comment,
-          status: values.approval
+          status: approvalStatus
         });
 
-        window.$message?.success('审批完成');
+        message.success('审批完成');
         setVisible(false);
         fetchExpenses(); // 重新获取列表
       }
     } catch (error) {
-      window.$message?.error('审批失败');
+      message.error('审批失败');
       console.error('费用审批失败:', error);
     }
+  };
+
+  // 查看详情
+  const handleView = (record: ExpenseItem) => {
+    showDetailModal(record);
+  };
+
+  // 审批点击
+  const handleApproveClick = (record: ExpenseItem) => {
+    showApprovalModal(record);
   };
 
   const columns = [
@@ -157,22 +191,39 @@ const Component: React.FC = () => {
       dataIndex: 'expenseType',
       key: 'expenseType',
       ...getCenterColumnConfig(),
+      render: (type: string) => {
+        const typeMap: Record<string, string> = {
+          accommodation: '住宿费',
+          communication: '通讯费',
+          entertainment: '招待费',
+          medical: '医疗费',
+          office: '办公费',
+          transportation: '交通费',
+          travel: '差旅费'
+        };
+        return typeMap[type] || type;
+      },
       title: '费用类型'
     },
     {
       dataIndex: 'amount',
       key: 'amount',
       ...getCenterColumnConfig(),
-      render: (amount: number) => <Text style={{ color: '#f50' }}>{amount.toFixed(2)}</Text>,
-      title: '金额(元)',
-      width: 120
+      render: (amount: number) => `¥${amount.toFixed(2)}`,
+      title: '费用金额'
     },
     {
       dataIndex: 'applicationDate',
       key: 'applicationDate',
       ...getCenterColumnConfig(),
-      title: '申请时间',
-      width: 150
+      render: (date: string) => {
+        try {
+          return new Date(date).toLocaleDateString('zh-CN');
+        } catch {
+          return date || '-';
+        }
+      },
+      title: '申请日期'
     },
     {
       dataIndex: 'status',
@@ -193,55 +244,52 @@ const Component: React.FC = () => {
               text="已通过"
             />
           );
+        } else if (status === 2) {
+          return (
+            <Badge
+              status="error"
+              text="已拒绝"
+            />
+          );
         }
         return (
           <Badge
-            status="error"
-            text="已拒绝"
+            status="default"
+            text="未知状态"
           />
         );
       },
       title: '状态'
     },
     {
-      key: 'action',
-      ...getActionColumnConfig(120),
-      render: (_: any, record: ExpenseItem) => (
+      fixed: 'right' as const,
+      key: 'actions',
+      render: (record: ExpenseItem) => (
         <Space>
           <Button
             icon={<EyeOutlined />}
             size="small"
             type="link"
-            onClick={() => showDetailModal(record)}
+            onClick={() => handleView(record)}
           >
-            详情
+            查看
           </Button>
           {record.status === 0 && (
             <Button
+              icon={<CheckOutlined />}
               size="small"
-              type="primary"
-              onClick={() => showApprovalModal(record)}
+              type="link"
+              onClick={() => handleApproveClick(record)}
             >
               审批
             </Button>
           )}
         </Space>
       ),
-      title: '操作'
+      title: '操作',
+      width: 150
     }
   ];
-
-  if (!isUserSuperAdmin) {
-    return (
-      <div className="p-4">
-        <Card>
-          <div className="h-64 flex items-center justify-center">
-            <Typography.Text className="text-lg text-gray-500">您没有权限访问此页面</Typography.Text>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="p-4">
@@ -249,11 +297,24 @@ const Component: React.FC = () => {
         <div className="mb-4">
           <Title level={4}>费用审批</Title>
         </div>
+        <div style={{ marginBottom: 16 }}>
+          <Space>
+            <Button
+              icon={<SyncOutlined />}
+              onClick={fetchExpenses}
+            >
+              刷新
+            </Button>
+          </Space>
+        </div>
         <Table<ExpenseItem>
           columns={columns}
           dataSource={expenseData}
           loading={loading}
           rowKey="id"
+          locale={{
+            emptyText: expenseData.length === 0 && !loading ? '暂无待审批的申请' : undefined
+          }}
           {...getFullTableConfig(10)}
         />
       </Card>
@@ -301,7 +362,19 @@ const Component: React.FC = () => {
               >
                 <Space>
                   <CalendarOutlined />
-                  {currentExpense.applicationDate}
+                  {(() => {
+                    try {
+                      return new Date(currentExpense.applicationDate).toLocaleDateString('zh-CN', {
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      });
+                    } catch {
+                      return currentExpense.applicationDate || '-';
+                    }
+                  })()}
                 </Space>
               </Descriptions.Item>
               <Descriptions.Item
@@ -330,7 +403,7 @@ const Component: React.FC = () => {
                     <CheckCircleOutlined style={{ color: '#52c41a' }} />
                     &nbsp;同意
                   </Radio>
-                  <Radio value={-1}>
+                  <Radio value={2}>
                     <CloseCircleOutlined style={{ color: '#f5222d' }} />
                     &nbsp;拒绝
                   </Radio>
@@ -391,7 +464,19 @@ const Component: React.FC = () => {
               <Descriptions.Item label="申请时间">
                 <Space>
                   <CalendarOutlined />
-                  {currentExpense.applicationDate}
+                  {(() => {
+                    try {
+                      return new Date(currentExpense.applicationDate).toLocaleDateString('zh-CN', {
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      });
+                    } catch {
+                      return currentExpense.applicationDate || '-';
+                    }
+                  })()}
                 </Space>
               </Descriptions.Item>
               <Descriptions.Item
@@ -416,7 +501,7 @@ const Component: React.FC = () => {
                     text="已通过"
                   />
                 )}
-                {currentExpense.status === -1 && (
+                {currentExpense.status === 2 && (
                   <Badge
                     status="error"
                     text="已拒绝"
@@ -433,7 +518,19 @@ const Component: React.FC = () => {
                 >
                   <Space>
                     <CalendarOutlined />
-                    {currentExpense.approvalDate}
+                    {(() => {
+                      try {
+                        return new Date(currentExpense.approvalDate).toLocaleDateString('zh-CN', {
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        });
+                      } catch {
+                        return currentExpense.approvalDate || '-';
+                      }
+                    })()}
                   </Space>
                 </Descriptions.Item>
               )}
