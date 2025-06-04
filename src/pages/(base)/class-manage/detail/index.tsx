@@ -1051,11 +1051,13 @@ const ClassDetail = () => {
         type: 'class_announcement' // 空数组表示发给所有人
       };
 
+      // 只支持创建新通知，暂不支持编辑
       await notificationService.createNotification(notificationData);
       message.success('通知发布成功');
 
       setAnnounceModalVisible(false);
       announceForm.resetFields();
+      setCurrentAnnounce(null);
 
       // 重新获取通知列表
       const notificationsResponse = await notificationService.getNotificationList({
@@ -1069,16 +1071,17 @@ const ClassDetail = () => {
         (notification: NotificationApi.NotificationListItem) => ({
           content: notification.content,
           id: notification.id,
-          importance: 1,
+          importance: values.importance || 0,
+          // 使用表单中的重要程度值
           publishDate: notification.createTime,
-          title: notification.title // 默认重要程度
+          title: notification.title
         })
       );
 
       setAnnounceList(formattedAnnouncements);
     } catch (error) {
-      console.error('发布通知失败:', error);
-      message.error('发布通知失败');
+      console.error('保存通知失败:', error);
+      message.error('保存通知失败');
     }
   };
 
