@@ -8,6 +8,7 @@ export function getToken() {
 /** Get user info */
 export function getUserInfo() {
   const emptyInfo: Api.Auth.UserInfo = {
+    avatar: '',
     buttons: [],
     roles: [],
     userId: '',
@@ -18,6 +19,11 @@ export function getUserInfo() {
   // fix new property: buttons, this will be removed in the next version `1.1.0`
   if (!userInfo.buttons) {
     userInfo.buttons = [];
+  }
+
+  // ensure avatar field exists
+  if (!userInfo.avatar) {
+    userInfo.avatar = '';
   }
 
   return userInfo;

@@ -1,17 +1,42 @@
 import type { MenuProps } from 'antd';
+import { Button as AButton, Dropdown as ADropdown } from 'antd';
+import { memo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useDispatch } from 'react-redux';
 
-import UserAvatarComponent from '@/components/UserAvatar';
-import { selectToken, selectUserInfo } from '@/features/auth/authStore';
+import SvgIcon from '@/components/SvgIcon';
+import UserAvatarComponent from '@/components/common/UserAvatar';
+import { selectToken, selectUserInfo, setUserInfo } from '@/features/auth/authStore';
 import { useRouter } from '@/features/router';
+import { useAppSelector } from '@/hooks/business/useStore';
+import { getServiceBaseURL } from '@/utils/service';
+import { localStg } from '@/utils/storage';
 
 const UserAvatar = memo(() => {
   const token = useAppSelector(selectToken);
+  const userInfo = useAppSelector(selectUserInfo);
+  const dispatch = useDispatch();
+
+  const { navigate } = useRouter();
 
   const { t } = useTranslation();
 
-  const userInfo = useAppSelector(selectUserInfo);
+  // 获取后端服务器基础URL
+  const isHttpProxy = import.meta.env.DEV && import.meta.env.VITE_HTTP_PROXY === 'Y';
+  const { baseURL } = getServiceBaseURL(import.meta.env, isHttpProxy);
 
-  const { navigate } = useRouter();
+  // 刷新用户信息从localStorage
+  useEffect(() => {
+    const storedUserInfo = localStg.get('userInfo');
+    if (storedUserInfo && (storedUserInfo.avatar !== userInfo.avatar || !userInfo.avatar)) {
+      console.log('🔍 顶部导航栏刷新用户信息:', {
+        avatarChanged: storedUserInfo.avatar !== userInfo.avatar,
+        current: userInfo,
+        stored: storedUserInfo
+      });
+      dispatch(setUserInfo(storedUserInfo));
+    }
+  }, [userInfo.avatar, dispatch]);
 
   function logout() {
     window?.$modal?.confirm({
@@ -73,25 +98,55 @@ const UserAvatar = memo(() => {
     return undefined;
   };
 
+  // 处理头像URL，确保包含基础URL
+  const getAvatarUrl = (avatar?: string) => {
+    if (!avatar) return '';
+
+    // 如果已经是完整URL，直接返回
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return avatar;
+    }
+
+    // 如果是相对路径，添加后端服务器的基础URL
+    if (avatar.startsWith('/uploads/')) {
+      // 移除baseURL中的/api后缀（如果存在）
+      const cleanBaseURL = baseURL.replace('/api', '');
+      return `${cleanBaseURL}${avatar}`;
+    }
+
+    return avatar;
+  };
+
+  console.log('🔍 顶部导航栏 UserAvatar 渲染:', {
+    avatar: userInfo.avatar,
+    baseURL,
+    processedAvatar: getAvatarUrl(userInfo.avatar),
+    userInfo
+  });
+
   return token ? (
     <ADropdown
       menu={{ items, onClick }}
       placement="bottomRight"
       trigger={['click']}
     >
-      <div className="flex cursor-pointer items-center px-12px">
-        <UserAvatarComponent
-          avatar={userInfo.avatar}
-          gender={convertGender(userInfo.gender)}
-          size={32}
-          userId={Number.parseInt(userInfo.userId, 10)}
-        />
+      <div className="h-full flex cursor-pointer items-center justify-center px-12px">
+        <div className="flex items-center justify-center">
+          <UserAvatarComponent
+            avatar={getAvatarUrl(userInfo.avatar)}
+            gender={convertGender(userInfo.gender)}
+            key={`${userInfo.avatar}-${Date.now()}`}
+            size={32}
+          />
+        </div>
         <span className="ml-8px text-16px font-medium">{userInfo.userName}</span>
       </div>
     </ADropdown>
   ) : (
-    <AButton onClick={loginOrRegister}>{t('page.login.common.loginOrRegister')}</AButton>
+    <AButton onClick={loginOrRegister}>登录</AButton>
   );
 });
+
+UserAvatar.displayName = 'UserAvatar';
 
 export default UserAvatar;

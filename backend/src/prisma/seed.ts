@@ -124,6 +124,17 @@ async function main() {
       update: {},
       where: { code: 'system:user:import' }
     }),
+    prisma.permission.upsert({
+      create: {
+        code: 'system:user:manage',
+        name: '用户管理',
+        sort: 6,
+        status: 1,
+        type: 'api'
+      },
+      update: {},
+      where: { code: 'system:user:manage' }
+    }),
     // 客户管理权限
     prisma.permission.upsert({
       create: {
@@ -168,6 +179,17 @@ async function main() {
       },
       update: {},
       where: { code: 'customer:delete' }
+    }),
+    prisma.permission.upsert({
+      create: {
+        code: 'customer:assign',
+        name: '客户分配',
+        sort: 14,
+        status: 1,
+        type: 'api'
+      },
+      update: {},
+      where: { code: 'customer:assign' }
     }),
     // 课程管理权限
     prisma.permission.upsert({
