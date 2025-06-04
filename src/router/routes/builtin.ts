@@ -223,6 +223,17 @@ export const BaseChildrenRoutes = [
         id: 'expense_approve',
         lazy: () => import('@/pages/(base)/expense-process/approve').then(convert),
         path: '/expense-process/approve'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_expense-process_history',
+          icon: 'mdi:file-clock-outline',
+          order: 3,
+          title: '申请历史'
+        },
+        id: 'expense_history',
+        lazy: () => import('@/pages/(base)/expense-process/history').then(convert),
+        path: '/expense-process/history'
       }
     ],
     handle: {

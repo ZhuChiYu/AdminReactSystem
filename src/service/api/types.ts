@@ -178,7 +178,8 @@ export namespace CustomerApi {
     industry?: string;
     mobile?: string;
     phone?: string;
-    source?: string;
+    scope?: 'all' | 'own';
+    source?: string; // 数据范围: all-所有数据, own-自己的数据
   }
 
   export interface CustomerListItem {
@@ -672,6 +673,19 @@ export namespace EmployeeApi {
     roles?: string[];
     status?: string;
   }
+
+  /** 员工-管理员关系 */
+  export interface EmployeeManagerRelation {
+    assignedById: number;
+    assignedByName: string;
+    assignedTime: string;
+    employeeId: number;
+    employeeName: string;
+    id: number;
+    managerId: number;
+    managerName: string;
+    remark?: string;
+  }
 }
 
 // 通知相关类型
@@ -708,6 +722,32 @@ export namespace NotificationApi {
 
   export interface MarkReadRequest {
     notificationIds: number[];
+  }
+
+  // 通知附件相关类型
+  export interface NotificationAttachmentQueryParams extends PageParams {
+    notificationId: number;
+  }
+
+  export interface NotificationAttachmentListItem {
+    downloadUrl: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    id: number;
+    notificationId: number;
+    originalName?: string;
+    uploader?: {
+      id: number;
+      name: string;
+    };
+    uploadTime: string;
+  }
+
+  export interface UploadNotificationAttachmentRequest {
+    description?: string;
+    file: File;
+    notificationId: number;
   }
 }
 

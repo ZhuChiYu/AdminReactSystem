@@ -3,18 +3,19 @@ import type { PageResponse, UserApi } from './types';
 
 /** get role list */
 export function fetchGetRoleList(params?: Api.SystemManage.RoleSearchParams) {
-  try {
-    return apiClient.get('/system/roles', { params });
-  } catch (error) {
+  return apiClient.get('/system/roles', { params }).catch(error => {
     console.error('获取角色列表失败:', error);
+    // 返回一个符合API格式的空响应
     return {
-      current: params?.current || 1,
-      pages: 0,
-      records: [],
-      size: params?.size || 10,
-      total: 0
+      data: {
+        current: params?.current || 1,
+        pages: 0,
+        records: [],
+        size: params?.size || 10,
+        total: 0
+      }
     };
-  }
+  });
 }
 
 /**
@@ -26,34 +27,40 @@ export function fetchGetAllRoles() {
   // 返回所有启用的角色
   const allRoles: Api.SystemManage.AllRole[] = [
     {
-      id: 1,
+      roleCode: 'super_admin',
+      roleName: '超级管理员'
+    },
+    {
+      roleCode: 'admin',
+      roleName: '管理员'
+    },
+    {
       roleCode: 'consultant',
       roleName: '顾问'
     },
     {
-      id: 2,
-      roleCode: 'marketing_manager',
-      roleName: '经理（市场部）'
-    },
-    {
-      id: 3,
       roleCode: 'hr_specialist',
       roleName: '人力专员'
     },
     {
-      id: 4,
       roleCode: 'hr_bp',
       roleName: '人力BP'
     },
     {
-      id: 5,
       roleCode: 'sales_manager',
       roleName: '销售经理'
     },
     {
-      id: 6,
       roleCode: 'sales_director',
       roleName: '销售总监'
+    },
+    {
+      roleCode: 'marketing_manager',
+      roleName: '市场经理'
+    },
+    {
+      roleCode: 'employee',
+      roleName: '普通员工'
     }
   ];
 
@@ -72,18 +79,18 @@ export function fetchGetAllRoles() {
 
 /** get user list */
 export function fetchGetUserList(params?: Api.SystemManage.UserSearchParams) {
-  try {
-    return apiClient.get('/system/users', { params });
-  } catch (error) {
+  return apiClient.get('/system/users', { params }).catch(error => {
     console.error('获取用户列表失败:', error);
     return {
-      current: params?.current || 1,
-      pages: 0,
-      records: [],
-      size: params?.size || 10,
-      total: 0
+      data: {
+        current: params?.current || 1,
+        pages: 0,
+        records: [],
+        size: params?.size || 10,
+        total: 0
+      }
     };
-  }
+  });
 }
 
 /** get menu list */
@@ -108,10 +115,7 @@ export function fetchGetAllPages() {
 
 /** get menu tree */
 export function fetchGetMenuTree() {
-  return request<Api.SystemManage.MenuTree[]>({
-    method: 'get',
-    url: '/systemManage/getMenuTree'
-  });
+  return apiClient.get('/systemManage/getMenuTree');
 }
 
 /** get user detail */

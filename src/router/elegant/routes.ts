@@ -269,7 +269,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
               i18nKey: 'route.(base)_expense-process',
               title: '报销流程',
               icon: 'mdi:file-document-edit-outline',
-              order: 5
+              order: 6
             },
             children: [
               {
@@ -293,6 +293,12 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   icon: 'mdi:file-check-outline',
                   order: 2
                 }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/expense-process/history/index.tsx', null, null],
+                name: '(base)_expense-process_history',
+                path: '/expense-process/history',
+                handle: { i18nKey: 'route.(base)_expense-process_history', title: '(base)_expense-process_history' }
               }
             ]
           },
@@ -630,36 +636,34 @@ export const generatedRoutes: ElegantConstRoute[] = [
             matchedFiles: [null, null, null, null],
             name: '(base)_project-manage',
             path: '/project-manage',
-            handle: { i18nKey: 'route.(base)_project-manage', title: '(base)_project-manage' },
+            handle: {
+              i18nKey: 'route.(base)_project-manage',
+              title: '(base)_project-manage',
+              hideInMenu: false,
+              icon: 'mdi:clipboard-text-multiple-outline',
+              order: 5
+            },
             children: [
               {
                 matchedFiles: [null, '/src/pages/(base)/project-manage/list/index.tsx', null, null],
                 name: '(base)_project-manage_list',
                 path: '/project-manage/list',
-                handle: { i18nKey: 'route.(base)_project-manage_list', title: '(base)_project-manage_list' }
-              },
-              {
-                matchedFiles: [null, '/src/pages/(base)/project-manage/monthly-task/index.tsx', null, null],
-                name: '(base)_project-manage_monthly-task',
-                path: '/project-manage/monthly-task',
                 handle: {
-                  i18nKey: 'route.(base)_project-manage_monthly-task',
-                  title: '(base)_project-manage_monthly-task'
+                  i18nKey: 'route.(base)_project-manage_list',
+                  title: '(base)_project-manage_list',
+                  icon: 'mdi:format-list-bulleted',
+                  order: 1
                 }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/project-manage/task/index.tsx', null, null],
                 name: '(base)_project-manage_task',
                 path: '/project-manage/task',
-                handle: { i18nKey: 'route.(base)_project-manage_task', title: '(base)_project-manage_task' }
-              },
-              {
-                matchedFiles: [null, '/src/pages/(base)/project-manage/weekly-task/index.tsx', null, null],
-                name: '(base)_project-manage_weekly-task',
-                path: '/project-manage/weekly-task',
                 handle: {
-                  i18nKey: 'route.(base)_project-manage_weekly-task',
-                  title: '(base)_project-manage_weekly-task'
+                  i18nKey: 'route.(base)_project-manage_task',
+                  title: '(base)_project-manage_task',
+                  icon: 'mdi:clipboard-check-outline',
+                  order: 2
                 }
               }
             ]
@@ -729,18 +733,6 @@ export const generatedRoutes: ElegantConstRoute[] = [
             path: '/login',
             handle: { i18nKey: 'route.(blank)_login', title: '(blank)_login', constant: true },
             children: [
-              {
-                matchedFiles: [null, '/src/pages/(blank)/login/code-login/index.tsx', null, null],
-                name: '(blank)_login_code-login',
-                path: '/login/code-login',
-                handle: { i18nKey: 'route.(blank)_login_code-login', title: '(blank)_login_code-login', constant: true }
-              },
-              {
-                matchedFiles: [null, '/src/pages/(blank)/login/register/index.tsx', null, null],
-                name: '(blank)_login_register',
-                path: '/login/register',
-                handle: { i18nKey: 'route.(blank)_login_register', title: '(blank)_login_register', constant: true }
-              },
               {
                 matchedFiles: [null, '/src/pages/(blank)/login/reset-pwd/index.tsx', null, null],
                 name: '(blank)_login_reset-pwd',

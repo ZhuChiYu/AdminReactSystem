@@ -53,6 +53,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_expense-process": "/expense-process";
     "(base)_expense-process_apply": "/expense-process/apply";
     "(base)_expense-process_approve": "/expense-process/approve";
+    "(base)_expense-process_history": "/expense-process/history";
     "(base)_finance-dashboard": "/finance-dashboard";
     "(base)_function": "/function";
     "(base)_function_event-bus": "/function/event-bus";
@@ -88,17 +89,13 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_multi-menu_second_child_home": "/multi-menu/second/child/home";
     "(base)_project-manage": "/project-manage";
     "(base)_project-manage_list": "/project-manage/list";
-    "(base)_project-manage_monthly-task": "/project-manage/monthly-task";
     "(base)_project-manage_task": "/project-manage/task";
-    "(base)_project-manage_weekly-task": "/project-manage/weekly-task";
     "(base)_projects": "/projects";
     "(base)_projects_[pid]": "/projects/:pid";
     "(base)_projects_[pid]_edit": "/projects/:pid/edit";
     "(base)_projects_[pid]_edit_[id]": "/projects/:pid/edit/:id";
     "(base)_user-center": "/user-center";
     "(blank)_login": "/login";
-    "(blank)_login_code-login": "/login/code-login";
-    "(blank)_login_register": "/login/register";
     "(blank)_login_reset-pwd": "/login/reset-pwd";
     "(blank)_login-out": "/login-out";
     "403": "/403";
@@ -199,6 +196,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_employee-manage_list"
     | "(base)_expense-process_apply"
     | "(base)_expense-process_approve"
+    | "(base)_expense-process_history"
     | "(base)_finance-dashboard"
     | "(base)_function_event-bus"
     | "(base)_function_hide-child"
@@ -233,9 +231,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_multi-menu_second_child"
     | "(base)_multi-menu_second"
     | "(base)_project-manage_list"
-    | "(base)_project-manage_monthly-task"
     | "(base)_project-manage_task"
-    | "(base)_project-manage_weekly-task"
     | "(base)_projects_[pid]_edit_[id]"
     | "(base)_projects_[pid]_edit"
     | "(base)_projects_[pid]"
@@ -243,10 +239,8 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_user-center"
     | "(blank)"
     | "(blank)_login-out"
-    | "(blank)_login_code-login"
     | "(blank)_login"
     | "(blank)_login"
-    | "(blank)_login_register"
     | "(blank)_login_reset-pwd"
     | "403"
     | "404"

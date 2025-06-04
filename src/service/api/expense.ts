@@ -10,37 +10,37 @@ class ExpenseService {
     const response = await apiClient.get<PageResponse<ExpenseApi.ExpenseListItem>>(`${this.baseURL}/list`, {
       params
     });
-    return response.data;
+    return response;
   }
 
   /** 创建费用申请 */
-  async createExpense(data: ExpenseApi.CreateExpenseRequest) {
+  async createExpense(data: ExpenseApi.CreateExpenseApplicationRequest) {
     const response = await apiClient.post<ApiResponse<ExpenseApi.ExpenseListItem>>(`${this.baseURL}/create`, data);
-    return response.data;
+    return response;
   }
 
   /** 审批费用申请 */
   async approveExpense(expenseId: number, data: ExpenseApi.ApproveExpenseRequest) {
     const response = await apiClient.put<ApiResponse>(`${this.baseURL}/${expenseId}/approve`, data);
-    return response.data;
+    return response;
   }
 
   /** 获取费用详情 */
   async getExpenseDetail(expenseId: number) {
     const response = await apiClient.get<ApiResponse<ExpenseApi.ExpenseListItem>>(`${this.baseURL}/${expenseId}`);
-    return response.data;
+    return response;
   }
 
   /** 更新费用申请 */
   async updateExpense(expenseId: number, data: Partial<ExpenseApi.CreateExpenseRequest>) {
     const response = await apiClient.put<ApiResponse<ExpenseApi.ExpenseListItem>>(`${this.baseURL}/${expenseId}`, data);
-    return response.data;
+    return response;
   }
 
   /** 删除费用申请 */
   async deleteExpense(expenseId: number) {
     const response = await apiClient.delete<ApiResponse>(`${this.baseURL}/${expenseId}`);
-    return response.data;
+    return response;
   }
 
   /** 批量审批费用申请 */
@@ -49,7 +49,7 @@ class ExpenseService {
       expenseIds,
       ...data
     });
-    return response.data;
+    return response;
   }
 
   /** 获取费用统计 */
@@ -68,7 +68,7 @@ class ExpenseService {
     >(`${this.baseURL}/statistics`, {
       params
     });
-    return response.data;
+    return response;
   }
 }
 
