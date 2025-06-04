@@ -61,8 +61,9 @@ export default defineConfig(configEnv => {
           },
           manualChunks: {
             animate: ['motion'],
-            antd: ['antd', '@ant-design/v5-patch-for-react-19'],
-            axios: ['axios'],
+            antd: ['antd', '@ant-design/v5-patch-for-react-19', '@ant-design/icons'],
+            axios: ['axios', 'classnames', 'lodash-es'],
+            dndKit: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
             il8n: ['react-i18next', 'i18next'],
             react: ['react', 'react-dom', 'react-error-boundary'],
             reactRouter: ['react-router-dom'],

@@ -75,12 +75,12 @@ class AuthController {
       throw new Error('JWT密钥未配置');
     }
 
-    const token = jwt.sign(tokenPayload, jwtSecret, {
-      expiresIn: config.jwt.expiresIn
+    const token = jwt.sign(tokenPayload, jwtSecret as jwt.Secret, {
+      expiresIn: config.jwt.expiresIn as jwt.SignOptions['expiresIn']
     });
 
-    const refreshToken = jwt.sign(tokenPayload, jwtRefreshSecret, {
-      expiresIn: config.jwt.refreshExpiresIn
+    const refreshToken = jwt.sign(tokenPayload, jwtRefreshSecret as jwt.Secret, {
+      expiresIn: config.jwt.refreshExpiresIn as jwt.SignOptions['expiresIn']
     });
 
     // 计算过期时间
@@ -208,7 +208,9 @@ class AuthController {
         throw new Error('JWT密钥未配置');
       }
 
-      const newToken = jwt.sign({ userId, userName }, jwtSecret, { expiresIn: config.jwt.expiresIn });
+      const newToken = jwt.sign({ userId, userName }, jwtSecret as jwt.Secret, {
+        expiresIn: config.jwt.expiresIn as jwt.SignOptions['expiresIn']
+      });
 
       const tokenDecoded = jwt.decode(newToken) as any;
       const expires = tokenDecoded.exp * 1000;

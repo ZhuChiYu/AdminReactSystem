@@ -16,7 +16,6 @@ README.md
 
 # 构建产物
 dist/
-build/
 .next/
 
 # 测试文件
@@ -49,7 +48,6 @@ tmp/
 Thumbs.db
 
 # 部署相关（不需要在容器中）
-deploy/
 docker-compose.yml
 Dockerfile
 

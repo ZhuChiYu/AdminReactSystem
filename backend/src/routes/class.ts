@@ -1352,9 +1352,13 @@ router.post('/students/:id/avatar', avatarUpload.single('avatar'), async (req, r
 
   } catch (error) {
     logger.error('上传学员头像失败，详细错误信息:');
-    logger.error('错误类型:', error.constructor.name);
-    logger.error('错误消息:', error.message);
-    logger.error('错误堆栈:', error.stack);
+    if (error instanceof Error) {
+      logger.error('错误类型:', error.constructor.name);
+      logger.error('错误消息:', error.message);
+      logger.error('错误堆栈:', error.stack);
+    } else {
+      logger.error('未知错误:', error);
+    }
     logger.error('请求信息:', {
       method: req.method,
       url: req.url,

@@ -7,19 +7,43 @@ WORKDIR /app
 # 安装pnpm
 RUN npm install -g pnpm
 
-# 复制前端相关文件
+# 复制package.json和lockfile
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/ ./packages/
+
+# 首先安装所有依赖
+RUN pnpm install --frozen-lockfile
+
+# 安装额外的必要依赖
+RUN pnpm add -w \
+    @ant-design/icons \
+    axios \
+    classnames \
+    @iconify/utils \
+    @iconify/json \
+    @types/classnames \
+    lodash-es \
+    @types/lodash-es \
+    @dnd-kit/core@6.3.1 \
+    @dnd-kit/sortable@10.0.0 \
+    @dnd-kit/utilities@3.2.2
+
+# 复制源代码和配置文件
 COPY src/ ./src/
 COPY public/ ./public/
+COPY build/ ./build/
 COPY index.html ./
 COPY vite.config.ts ./
 COPY tsconfig.json ./
 COPY uno.config.ts ./
 COPY eslint.config.js ./
 
-# 安装依赖并构建前端
-RUN pnpm install --frozen-lockfile
+# 设置构建环境变量
+ENV VITE_ICON_PREFIX=icon
+ENV VITE_ICON_LOCAL_PREFIX=icon-local
+ENV VITE_APP_TITLE=一品华信管理系统
+
+# 构建前端
 RUN pnpm run build
 
 # 后端构建阶段
@@ -30,8 +54,8 @@ WORKDIR /app/backend
 # 复制后端package.json和相关文件
 COPY backend/package.json backend/package-lock.json ./
 
-# 安装后端依赖
-RUN npm ci --only=production
+# 安装所有依赖，包括开发依赖
+RUN npm ci
 
 # 复制后端源码
 COPY backend/ ./
