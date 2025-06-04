@@ -39,19 +39,8 @@ class UserController {
     const pageSize = Number(size);
     const skip = (page - 1) * pageSize;
 
-    // 构建查询条件
-    const where: any = {
-      // 包含所有角色，不排除任何角色
-      userRoles: {
-        some: {
-          role: {
-            roleCode: {
-              in: ['super_admin', 'admin', 'employee', 'consultant', 'sales_manager', 'hr_specialist']
-            }
-          }
-        }
-      }
-    };
+    // 构建查询条件 - 显示所有用户，包括没有角色的用户
+    const where: any = {};
 
     if (userName) {
       where.userName = {
@@ -68,7 +57,14 @@ class UserController {
     }
 
     if (status) {
-      where.status = status as string;
+      // 转换状态值：字符串转换为整数
+      if (status === 'active' || status === '1') {
+        where.status = 1;
+      } else if (status === 'inactive' || status === '0') {
+        where.status = 0;
+      } else {
+        where.status = Number.parseInt(status as string);
+      }
     }
 
     try {
@@ -108,15 +104,18 @@ class UserController {
             }
           : null,
         email: employee.email,
-        gender: employee.gender,
+        gender: employee.gender === 1 ? 'male' : employee.gender === 2 ? 'female' : null,
         id: employee.id,
         idCard: employee.idCard,
         nickName: employee.nickName,
         phone: employee.phone,
         position: employee.position,
-        roleNames: employee.userRoles.map(ur => ur.role.roleName),
-        roles: employee.userRoles.map(ur => ur.role.roleCode),
-        status: employee.status,
+        roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
+        roles: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ({
+          code: ur.role.roleCode,
+          name: ur.role.roleName
+        })) : [{ code: 'no_role', name: '未分配角色' }],
+        status: employee.status === 1 ? 'active' : employee.status === 0 ? 'inactive' : 'active',
         tim: employee.tim,
         updatedAt: employee.updatedAt,
         userName: employee.userName,
@@ -180,32 +179,39 @@ class UserController {
 
         // 定义字段映射
         const fieldMapping: { [key: string]: string } = {
-          TIM号: 'tim',
-          合同年限: 'contractYears',
-          合同开始时间: 'contractStartDate',
-          合同结束时间: 'contractEndDate',
-          姓名: 'nickName',
-          家庭住址: 'address',
-          工作微信号: 'wechat',
-          性别: 'gender',
-          手机号: 'phone',
-          状态: 'status',
-          用户名: 'userName',
-          职位: 'position',
-          身份证号: 'idCard',
-          邮箱: 'email',
-          银行卡号: 'bankCard'
+          'TIM号': 'tim',
+          '合同年限': 'contractYears',
+          '合同开始时间': 'contractStartDate',
+          '合同结束时间': 'contractEndDate',
+          '姓名': 'nickName',
+          '姓名*': 'nickName',          // 支持带*的必需字段
+          '家庭住址': 'address',
+          '工作微信号': 'wechat',
+          '性别': 'gender',
+          '手机号': 'phone',
+          '状态': 'status',
+          '用户名': 'userName',
+          '用户名*': 'userName',        // 支持带*的必需字段
+          '职位': 'position',
+          '身份证号': 'idCard',
+          '邮箱': 'email',
+          '银行卡号': 'bankCard'
         };
 
         // 验证必需字段
-        const requiredFields = ['用户名', '姓名', '邮箱'];
-        const missingFields = requiredFields.filter(field => !headers.includes(field));
+        const requiredFields = ['用户名*', '姓名*'];  // 带*标记的必需字段
+        const hasRequiredFields = requiredFields.every(field =>
+          headers.includes(field) || headers.includes(field.replace('*', ''))
+        );
 
-        if (missingFields.length > 0) {
+        if (!hasRequiredFields) {
+          const missingFields = requiredFields.filter(field =>
+            !headers.includes(field) && !headers.includes(field.replace('*', ''))
+          );
           return res.status(400).json({
             code: 400,
             data: null,
-            message: `Excel文件缺少必需字段: ${missingFields.join(', ')}`
+            message: `Excel文件缺少必需字段: ${missingFields.join(', ')} (标有*号的字段为必需)`
           });
         }
 
@@ -228,10 +234,10 @@ class UserController {
             });
 
             // 验证必需字段
-            if (!userData.userName || !userData.nickName || !userData.email) {
+            if (!userData.userName || !userData.nickName) {
               errorList.push({
                 data: userData,
-                error: '缺少必需字段：用户名、姓名或邮箱',
+                error: '缺少必需字段：用户名或姓名',
                 row: rowIndex
               });
               continue;
@@ -239,8 +245,15 @@ class UserController {
 
             // 数据类型转换和验证
             if (userData.gender) {
-              userData.gender =
-                userData.gender === '男' ? 'male' : userData.gender === '女' ? 'female' : userData.gender;
+              if (userData.gender === '男' || userData.gender === 'male') {
+                userData.gender = 1;
+              } else if (userData.gender === '女' || userData.gender === 'female') {
+                userData.gender = 2;
+              } else {
+                userData.gender = 0; // 未知
+              }
+            } else {
+              userData.gender = 0; // 默认未知
             }
 
             if (userData.contractYears) {
@@ -255,11 +268,20 @@ class UserController {
               userData.contractEndDate = new Date(userData.contractEndDate);
             }
 
+            // 确保phone和tim字段为字符串类型
+            if (userData.phone) {
+              userData.phone = String(userData.phone);
+            }
+
+            if (userData.tim) {
+              userData.tim = String(userData.tim);
+            }
+
             if (userData.status) {
               userData.status =
-                userData.status === '启用' ? 'active' : userData.status === '禁用' ? 'inactive' : userData.status;
+                userData.status === '启用' ? 1 : userData.status === '禁用' ? 0 : 1;
             } else {
-              userData.status = 'active'; // 默认启用
+              userData.status = 1; // 默认启用 (1=active, 0=inactive)
             }
 
             // 检查用户名是否已存在
@@ -277,22 +299,29 @@ class UserController {
             }
 
             // 检查邮箱是否已存在
-            const existingEmail = await prisma.user.findUnique({
-              where: { email: userData.email }
-            });
-
-            if (existingEmail) {
-              errorList.push({
-                data: userData,
-                error: `邮箱 ${userData.email} 已存在`,
-                row: rowIndex
+            if (userData.email) {
+              const existingEmail = await prisma.user.findUnique({
+                where: { email: userData.email }
               });
-              continue;
+
+              if (existingEmail) {
+                errorList.push({
+                  data: userData,
+                  error: `邮箱 ${userData.email} 已存在`,
+                  row: rowIndex
+                });
+                continue;
+              }
             }
 
             // 生成默认密码
             const defaultPassword = '123456';
             const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+            // 处理邮箱字段 - 如果没有邮箱，生成一个默认邮箱
+            if (!userData.email) {
+              userData.email = `${userData.userName}@company.com`;
+            }
 
             // 创建用户
             const newUser = await prisma.user.create({
@@ -304,18 +333,24 @@ class UserController {
               }
             });
 
-            // 分配默认角色（员工角色）
+            // 分配默认角色（可选）
             const employeeRole = await prisma.role.findUnique({
-              where: { code: 'employee' }
+              where: { roleCode: 'employee' }
             });
 
+            // 角色分配改为可选，失败也不影响用户创建
             if (employeeRole) {
-              await prisma.userRole.create({
-                data: {
-                  roleCode: employeeRole.code,
-                  userId: newUser.id
-                }
-              });
+              try {
+                await prisma.userRole.create({
+                  data: {
+                    roleId: employeeRole.id,
+                    userId: newUser.id
+                  }
+                });
+              } catch (roleError) {
+                // 角色分配失败不影响用户创建
+                console.log('角色分配失败，但用户创建成功');
+              }
             }
 
             successList.push({
@@ -339,7 +374,7 @@ class UserController {
         fs.unlinkSync(filePath);
 
         res.json({
-          code: 200,
+          code: 0,
           data: {
             errorList,
             failed: errorList.length,
@@ -366,27 +401,241 @@ class UserController {
     }
   }
 
+  // 调试：检查导入的用户状态
+  async debugImportedUsers(req: Request, res: Response) {
+    try {
+      const importedUsernames = ['luojingwen', 'longjianzhen', 'wangxu'];
+
+      const users = await prisma.user.findMany({
+        where: {
+          userName: {
+            in: importedUsernames
+          }
+        },
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        }
+      });
+
+      const result = users.map(user => ({
+        id: user.id,
+        userName: user.userName,
+        nickName: user.nickName,
+        email: user.email,
+        status: user.status,
+        gender: user.gender,
+        roles: user.userRoles.map(ur => ({
+          id: ur.role.id,
+          code: ur.role.roleCode,
+          name: ur.role.roleName
+        })),
+        hasRoles: user.userRoles.length > 0,
+        createdAt: user.createdAt
+      }));
+
+      res.json({
+        code: 0,
+        data: {
+          foundUsers: result.length,
+          users: result,
+          missingUsers: importedUsernames.filter(username =>
+            !result.some(user => user.userName === username)
+          )
+        },
+        message: '调试信息获取成功'
+      });
+
+    } catch (error) {
+      console.error('调试导入用户失败:', error);
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '调试失败'
+      });
+    }
+  }
+
+  // 修复没有角色的用户
+  async fixUsersWithoutRoles(req: Request, res: Response) {
+    try {
+      // 查找所有没有角色的用户
+      const usersWithoutRoles = await prisma.user.findMany({
+        where: {
+          userRoles: {
+            none: {}
+          }
+        },
+        include: {
+          userRoles: true
+        }
+      });
+
+      console.log(`找到 ${usersWithoutRoles.length} 个没有角色的用户`);
+
+      // 获取默认角色
+      const defaultRole = await prisma.role.findFirst({
+        where: {
+          roleCode: {
+            in: ['employee', 'consultant', 'hr_specialist']
+          }
+        }
+      });
+
+      if (!defaultRole) {
+        return res.status(400).json({
+          code: 400,
+          data: null,
+          message: '未找到可分配的角色'
+        });
+      }
+
+      const results = [];
+      for (const user of usersWithoutRoles) {
+        const userRole = await prisma.userRole.create({
+          data: {
+            userId: user.id,
+            roleId: defaultRole.id
+          }
+        });
+
+        results.push({
+          userId: user.id,
+          userName: user.userName,
+          nickName: user.nickName,
+          assignedRole: defaultRole.roleCode
+        });
+      }
+
+      res.json({
+        code: 0,
+        data: {
+          fixedUsersCount: results.length,
+          assignedRole: defaultRole.roleCode,
+          users: results
+        },
+        message: '角色分配修复完成'
+      });
+
+    } catch (error) {
+      console.error('修复用户角色失败:', error);
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '修复失败'
+      });
+    }
+  }
+
+  // 为用户分配角色
+  async assignRoleToUser(req: Request, res: Response) {
+    try {
+      const { userId, roleCode } = req.body;
+
+      if (!userId || !roleCode) {
+        return res.status(400).json({
+          code: 400,
+          data: null,
+          message: '用户ID和角色代码不能为空'
+        });
+      }
+
+      // 检查用户是否存在
+      const user = await prisma.user.findUnique({
+        where: { id: Number(userId) }
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          code: 404,
+          data: null,
+          message: '用户不存在'
+        });
+      }
+
+      // 检查角色是否存在
+      const role = await prisma.role.findUnique({
+        where: { roleCode }
+      });
+
+      if (!role) {
+        return res.status(404).json({
+          code: 404,
+          data: null,
+          message: '角色不存在'
+        });
+      }
+
+      // 检查是否已经分配了该角色
+      const existingUserRole = await prisma.userRole.findFirst({
+        where: {
+          userId: Number(userId),
+          roleId: role.id
+        }
+      });
+
+      if (existingUserRole) {
+        return res.status(400).json({
+          code: 400,
+          data: null,
+          message: '用户已拥有该角色'
+        });
+      }
+
+      // 分配角色
+      const userRole = await prisma.userRole.create({
+        data: {
+          userId: Number(userId),
+          roleId: role.id
+        }
+      });
+
+      res.json({
+        code: 0,
+        data: {
+          userId: user.id,
+          userName: user.userName,
+          nickName: user.nickName,
+          roleCode: role.roleCode,
+          roleName: role.roleName
+        },
+        message: '角色分配成功'
+      });
+
+    } catch (error) {
+      console.error('分配角色失败:', error);
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '分配角色失败'
+      });
+    }
+  }
+
   // 下载导入模板
   async downloadTemplate(req: Request, res: Response) {
     try {
       // 创建模板数据
       const templateData = [
         [
-          '用户名',
-          '姓名',
-          '邮箱',
-          '手机号',
-          '性别',
-          '职位',
-          '家庭住址',
-          '银行卡号',
-          '身份证号',
-          '工作微信号',
-          'TIM号',
-          '合同年限',
-          '合同开始时间',
-          '合同结束时间',
-          '状态'
+          '用户名*',        // 必需
+          '姓名*',          // 必需
+          '邮箱',           // 可选
+          '手机号',         // 可选
+          '性别',           // 可选
+          '职位',           // 可选
+          '家庭住址',       // 可选
+          '银行卡号',       // 可选
+          '身份证号',       // 可选
+          '工作微信号',     // 可选
+          'TIM号',         // 可选
+          '合同年限',       // 可选
+          '合同开始时间',   // 可选
+          '合同结束时间',   // 可选
+          '状态'           // 可选
         ],
         [
           'zhangsan',
@@ -408,18 +657,18 @@ class UserController {
         [
           'lisi',
           '李四',
-          'lisi@example.com',
-          '13800138001',
+          '', // 空邮箱示例
+          '',  // 空手机示例
           '女',
-          '后端开发工程师',
-          '上海市浦东新区',
-          '6222000000000001',
-          '110101199002021234',
-          'lisi_work',
-          'lisi_tim',
-          '5',
-          '2024-01-01',
-          '2029-01-01',
+          '',  // 空职位示例
+          '',  // 空地址示例
+          '',  // 空银行卡示例
+          '',  // 空身份证示例
+          '',  // 空微信示例
+          '',  // 空TIM示例
+          '',  // 空合同年限示例
+          '',  // 空合同开始时间示例
+          '',  // 空合同结束时间示例
           '启用'
         ]
       ];
@@ -469,7 +718,22 @@ class UserController {
   async updateProfile(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { avatar, department, email, phone, userName } = req.body;
+      const {
+        avatar,
+        department,
+        email,
+        phone,
+        userName,
+        nickName,
+        gender,
+        status,
+        roles,
+        address,
+        bankCard,
+        idCard,
+        wechat,
+        tim
+      } = req.body;
 
       // 检查用户是否存在
       const existingUser = await prisma.user.findUnique({
@@ -523,19 +787,40 @@ class UserController {
       }
 
       // 根据权限设置可修改的字段
-      if (userName) {
-        // 所有用户都可以修改用户名
-        updateData.userName = userName;
-      }
-
+      if (userName) updateData.userName = userName;
+      if (nickName) updateData.nickName = nickName;
       if (email) updateData.email = email;
       if (phone) updateData.phone = phone;
-      if (avatar !== undefined) updateData.avatar = avatar; // 允许设置为空字符串
+      if (avatar !== undefined) updateData.avatar = avatar;
+      if (address !== undefined) updateData.address = address;
+      if (bankCard !== undefined) updateData.bankCard = bankCard;
+      if (idCard !== undefined) updateData.idCard = idCard;
+      if (wechat !== undefined) updateData.wechat = wechat;
+      if (tim !== undefined) updateData.tim = tim;
+
+      // 处理性别转换
+      if (gender !== undefined) {
+        if (gender === 'male' || gender === 1) {
+          updateData.gender = 1;
+        } else if (gender === 'female' || gender === 2) {
+          updateData.gender = 2;
+        } else {
+          updateData.gender = 0; // 未知
+        }
+      }
+
+      // 处理状态转换
+      if (status !== undefined) {
+        if (status === 'active' || status === '1' || status === 1) {
+          updateData.status = 1;
+        } else if (status === 'inactive' || status === '0' || status === 0) {
+          updateData.status = 0;
+        }
+      }
 
       // 部门信息只有超级管理员可以修改
-      if (department && req.user.roles.includes('super_admin')) {
-        // 这里可以扩展为更新部门关联
-        updateData.position = department; // 暂时使用position字段存储部门信息
+      if (department && req.user && req.user.roles.includes('super_admin')) {
+        updateData.position = department;
       }
 
       updateData.updatedAt = new Date();
@@ -553,6 +838,66 @@ class UserController {
         },
         where: { id: Number.parseInt(id) }
       });
+
+      // 处理角色更新（只有管理员可以修改角色）
+      if (roles && req.user && (req.user.roles.includes('super_admin') || req.user.roles.includes('admin'))) {
+        // 删除现有角色
+        await prisma.userRole.deleteMany({
+          where: { userId: Number.parseInt(id) }
+        });
+
+        // 分配新角色（roles 可以是字符串或字符串数组）
+        if (roles) {
+          let roleCodeToAssign: string | undefined;
+
+          if (typeof roles === 'string' && roles.trim() !== '') {
+            roleCodeToAssign = roles;
+          } else if (Array.isArray(roles) && roles.length > 0) {
+            roleCodeToAssign = roles[0]; // 取第一个角色
+          }
+
+          if (roleCodeToAssign) {
+            const roleToAssign = await prisma.role.findUnique({
+              where: { roleCode: roleCodeToAssign }
+            });
+
+            if (roleToAssign) {
+              await prisma.userRole.create({
+                data: {
+                  userId: Number.parseInt(id),
+                  roleId: roleToAssign.id
+                }
+              });
+            }
+          }
+        }
+
+        // 重新获取用户信息（包含更新后的角色）
+        const userWithUpdatedRoles = await prisma.user.findUnique({
+          where: { id: Number.parseInt(id) },
+          include: {
+            department: true,
+            userRoles: {
+              include: {
+                role: true
+              }
+            }
+          }
+        });
+
+        if (userWithUpdatedRoles) {
+          // 返回更新后的用户信息（排除敏感信息）
+          const { password: _, ...userWithoutPassword } = userWithUpdatedRoles;
+
+          logger.info(`用户资料更新成功: ${userWithUpdatedRoles.userName}`, {
+            updatedBy: req.user?.id,
+            updatedFields: [...Object.keys(updateData), 'roles'],
+            userId: userWithUpdatedRoles.id
+          });
+
+          return res.json(createSuccessResponse(userWithoutPassword, '个人资料更新成功', req.path));
+        }
+      }
 
       // 返回更新后的用户信息（排除敏感信息）
       const { password: _, ...userWithoutPassword } = updatedUser;
@@ -609,7 +954,7 @@ class UserController {
       }
 
       // 如果是用户修改自己的密码，需要验证旧密码
-      if (req.user.id === Number.parseInt(id)) {
+      if (req.user && req.user.id === Number.parseInt(id)) {
         const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
         if (!isOldPasswordValid) {
           return res.status(400).json(createErrorResponse(400, '旧密码错误', null, req.path));
@@ -637,6 +982,371 @@ class UserController {
     } catch (error: any) {
       logger.error('修改用户密码失败:', error);
       res.status(500).json(createErrorResponse(500, '修改用户密码失败', null, req.path));
+    }
+  }
+
+  /** 删除用户 */
+  async deleteUser(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = Number.parseInt(id);
+
+      if (!userId) {
+        return res.status(400).json(createErrorResponse(400, '用户ID无效', null, req.path));
+      }
+
+      // 检查用户是否存在
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        }
+      });
+
+      if (!user) {
+        return res.status(404).json(createErrorResponse(404, '用户不存在', null, req.path));
+      }
+
+      // 检查是否为超级管理员，不允许删除
+      const isSuperAdmin = user.userRoles.some(ur => ur.role.roleCode === 'super_admin');
+      if (isSuperAdmin) {
+        return res.status(403).json(createErrorResponse(403, '不允许删除超级管理员', null, req.path));
+      }
+
+      // 检查权限：只有超级管理员或管理员可以删除用户
+      if (req.user && !req.user.roles.includes('super_admin') && !req.user.roles.includes('admin')) {
+        return res.status(403).json(createErrorResponse(403, '没有权限删除用户', null, req.path));
+      }
+
+      // 删除用户的角色关联
+      await prisma.userRole.deleteMany({
+        where: { userId }
+      });
+
+      // 删除用户
+      await prisma.user.delete({
+        where: { id: userId }
+      });
+
+      logger.info(`用户删除成功: ${user.userName}`, {
+        deletedBy: req.user?.id,
+        deletedUserId: userId
+      });
+
+      res.json(createSuccessResponse({
+        deletedUserId: userId,
+        deletedUserName: user.userName,
+        deletedNickName: user.nickName
+      }, '用户删除成功', req.path));
+
+    } catch (error: any) {
+      logger.error('删除用户失败:', error);
+      res.status(500).json(createErrorResponse(500, '删除用户失败', null, req.path));
+    }
+  }
+
+  /** 批量删除用户 */
+  async batchDeleteUsers(req: Request, res: Response) {
+    try {
+      const { userIds } = req.body;
+
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json(createErrorResponse(400, '用户ID列表不能为空', null, req.path));
+      }
+
+      // 检查权限：只有超级管理员或管理员可以批量删除用户
+      if (req.user && !req.user.roles.includes('super_admin') && !req.user.roles.includes('admin')) {
+        return res.status(403).json(createErrorResponse(403, '没有权限批量删除用户', null, req.path));
+      }
+
+      const parsedUserIds = userIds.map(id => Number.parseInt(id)).filter(id => !isNaN(id));
+
+      if (parsedUserIds.length === 0) {
+        return res.status(400).json(createErrorResponse(400, '无效的用户ID列表', null, req.path));
+      }
+
+      // 查找要删除的用户，检查是否包含超级管理员
+      const usersToDelete = await prisma.user.findMany({
+        where: {
+          id: { in: parsedUserIds }
+        },
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        }
+      });
+
+      // 过滤掉超级管理员
+      const superAdmins = usersToDelete.filter(user =>
+        user.userRoles.some(ur => ur.role.roleCode === 'super_admin')
+      );
+
+      const deletableUsers = usersToDelete.filter(user =>
+        !user.userRoles.some(ur => ur.role.roleCode === 'super_admin')
+      );
+
+      if (superAdmins.length > 0) {
+        const superAdminNames = superAdmins.map(user => user.nickName).join(', ');
+
+        if (deletableUsers.length === 0) {
+          return res.status(403).json(createErrorResponse(403, `不允许删除超级管理员：${superAdminNames}`, null, req.path));
+        }
+      }
+
+      const deletableUserIds = deletableUsers.map(user => user.id);
+
+      if (deletableUserIds.length === 0) {
+        return res.status(400).json(createErrorResponse(400, '没有可删除的用户', null, req.path));
+      }
+
+      // 删除用户的角色关联
+      await prisma.userRole.deleteMany({
+        where: {
+          userId: { in: deletableUserIds }
+        }
+      });
+
+      // 批量删除用户
+      const deleteResult = await prisma.user.deleteMany({
+        where: {
+          id: { in: deletableUserIds }
+        }
+      });
+
+      const result = {
+        deletedCount: deleteResult.count,
+        deletedUsers: deletableUsers.map(user => ({
+          id: user.id,
+          userName: user.userName,
+          nickName: user.nickName
+        })),
+        skippedSuperAdmins: superAdmins.map(user => ({
+          id: user.id,
+          userName: user.userName,
+          nickName: user.nickName
+        }))
+      };
+
+      let message = `成功删除 ${deleteResult.count} 个用户`;
+      if (superAdmins.length > 0) {
+        message += `，跳过 ${superAdmins.length} 个超级管理员`;
+      }
+
+      logger.info('批量删除用户成功', {
+        deletedBy: req.user?.id,
+        deletedCount: deleteResult.count,
+        skippedSuperAdmins: superAdmins.length
+      });
+
+      res.json(createSuccessResponse(result, message, req.path));
+
+    } catch (error: any) {
+      logger.error('批量删除用户失败:', error);
+      res.status(500).json(createErrorResponse(500, '批量删除用户失败', null, req.path));
+    }
+  }
+
+  /** 获取员工-管理员关系列表 */
+  async getEmployeeManagerRelations(req: Request, res: Response) {
+    const { current = 1, size = 10 } = req.query;
+
+    const page = Number(current);
+    const pageSize = Number(size);
+    const skip = (page - 1) * pageSize;
+
+    try {
+      // 获取总数
+      const total = await prisma.employeeManagerRelation.count();
+
+      // 获取关系列表
+      const relations = await prisma.employeeManagerRelation.findMany({
+        include: {
+          assignedBy: {
+            select: {
+              id: true,
+              nickName: true
+            }
+          },
+          employee: {
+            select: {
+              id: true,
+              nickName: true
+            }
+          },
+          manager: {
+            select: {
+              id: true,
+              nickName: true
+            }
+          }
+        },
+        orderBy: {
+          assignedTime: 'desc'
+        },
+        skip,
+        take: pageSize
+      });
+
+      // 格式化返回数据
+      const records = relations.map(relation => ({
+        assignedById: relation.assignedById,
+        assignedByName: relation.assignedBy.nickName,
+        assignedTime: relation.assignedTime.toISOString().split('T')[0],
+        employeeId: relation.employeeId,
+        employeeName: relation.employee.nickName,
+        id: relation.id,
+        managerId: relation.managerId,
+        managerName: relation.manager.nickName,
+        remark: relation.remark
+      }));
+
+      const pages = Math.ceil(total / pageSize);
+
+      res.json(
+        createSuccessResponse(
+          {
+            current: page,
+            pages,
+            records,
+            size: pageSize,
+            total
+          },
+          '查询成功',
+          req.path
+        )
+      );
+    } catch (error) {
+      logger.error('获取员工-管理员关系列表失败:', error);
+      res.status(500).json(createErrorResponse(500, '获取关系列表失败', null, req.path));
+    }
+  }
+
+  /** 分配员工给管理员 */
+  async assignEmployeesToManager(req: Request, res: Response) {
+    const { employeeIds, managerId, remark } = req.body;
+    const assignedById = req.user!.id;
+
+    try {
+      // 验证输入
+      if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
+        return res.status(400).json(createErrorResponse(400, '请选择要分配的员工', null, req.path));
+      }
+
+      if (!managerId) {
+        return res.status(400).json(createErrorResponse(400, '请选择管理员', null, req.path));
+      }
+
+      // 验证管理员是否存在且有管理权限
+      const manager = await prisma.user.findFirst({
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        },
+        where: {
+          id: managerId
+        }
+      });
+
+      if (!manager) {
+        return res.status(400).json(createErrorResponse(400, '管理员不存在', null, req.path));
+      }
+
+      // 检查是否有管理权限
+      const hasManagerRole = manager.userRoles.some(ur =>
+        ur.role.roleCode === 'admin' || ur.role.roleCode === 'super_admin'
+      );
+
+      if (!hasManagerRole) {
+        return res.status(400).json(createErrorResponse(400, '用户没有管理权限', null, req.path));
+      }
+
+      // 验证员工是否存在
+      const employees = await prisma.user.findMany({
+        where: {
+          id: {
+            in: employeeIds.map(Number)
+          }
+        }
+      });
+
+      if (employees.length !== employeeIds.length) {
+        return res.status(400).json(createErrorResponse(400, '部分员工不存在', null, req.path));
+      }
+
+      // 检查是否已经存在关系
+      const existingRelations = await prisma.employeeManagerRelation.findMany({
+        where: {
+          employeeId: {
+            in: employeeIds.map(Number)
+          }
+        }
+      });
+
+      if (existingRelations.length > 0) {
+        const existingEmployeeIds = existingRelations.map(r => r.employeeId);
+        const existingEmployees = employees.filter(emp => existingEmployeeIds.includes(emp.id));
+        const names = existingEmployees.map(emp => emp.nickName).join(', ');
+        return res.status(400).json(createErrorResponse(400, `员工 ${names} 已经有管理员，请先取消现有关系`, null, req.path));
+      }
+
+      // 创建关系
+      const relations = await Promise.all(
+        employeeIds.map(employeeId =>
+          prisma.employeeManagerRelation.create({
+            data: {
+              assignedById,
+              employeeId: Number(employeeId),
+              managerId,
+              remark: remark || null
+            }
+          })
+        )
+      );
+
+      res.json(createSuccessResponse(relations, '分配成功', req.path));
+    } catch (error) {
+      logger.error('分配员工给管理员失败:', error);
+      res.status(500).json(createErrorResponse(500, '分配失败', null, req.path));
+    }
+  }
+
+  /** 取消员工管理关系 */
+  async removeEmployeeManagerRelation(req: Request, res: Response) {
+    const { id } = req.params;
+
+    try {
+      // 验证关系是否存在
+      const relation = await prisma.employeeManagerRelation.findUnique({
+        where: {
+          id: Number(id)
+        }
+      });
+
+      if (!relation) {
+        return res.status(404).json(createErrorResponse(404, '关系不存在', null, req.path));
+      }
+
+      // 删除关系
+      await prisma.employeeManagerRelation.delete({
+        where: {
+          id: Number(id)
+        }
+      });
+
+      res.json(createSuccessResponse(null, '取消分配成功', req.path));
+    } catch (error) {
+      logger.error('取消员工管理关系失败:', error);
+      res.status(500).json(createErrorResponse(500, '取消分配失败', null, req.path));
     }
   }
 }

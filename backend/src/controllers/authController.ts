@@ -303,6 +303,26 @@ class AuthController {
 
     res.json(createSuccessResponse(captchaData, '获取成功', req.path));
   }
+
+  // 清除用户缓存（调试用）
+  async clearUserCache(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId } = req.params;
+
+      if (userId) {
+        // 清除特定用户缓存
+        await redisUtils.del(`user:${userId}`);
+        res.json(createSuccessResponse(null, '用户缓存已清除', req.path));
+      } else {
+        // 清除所有用户缓存
+        await redisUtils.delPattern('user:*');
+        res.json(createSuccessResponse(null, '所有用户缓存已清除', req.path));
+      }
+    } catch (error) {
+      logger.error('清除用户缓存失败:', error);
+      res.status(500).json(createErrorResponse(500, '清除缓存失败', null, req.path));
+    }
+  }
 }
 
 export const authController = new AuthController();

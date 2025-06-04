@@ -7,14 +7,27 @@ import { logger } from '@/utils/logger';
 class CustomerController {
   /** 获取客户列表 */
   async getCustomers(req: Request, res: Response) {
-    const { company, current = 1, customerName, followStatus, industry, size = 10, source } = req.query;
+    const { company, current = 1, customerName, followStatus, industry, size = 10, source, scope } = req.query;
 
+    const user = (req as any).user; // 获取当前登录用户
     const page = Number(current);
     const pageSize = Number(size);
     const skip = (page - 1) * pageSize;
 
     // 构建查询条件
     const where: any = {};
+
+    // 权限控制：根据scope参数决定数据范围
+    // scope = 'all' 表示客户资料管理页面，显示所有数据
+    // scope = 'own' 表示客户跟进页面，只显示自己创建的数据
+    // 默认为 'own'
+    const dataScope = scope as string || 'own';
+
+    if (dataScope === 'own' && !user?.roles?.includes('super_admin')) {
+      // 客户跟进页面：普通用户只能查看自己创建的客户
+      where.createdById = user?.id;
+    }
+    // 客户资料管理页面：所有用户都能查看所有数据（scope = 'all'）
 
     if (customerName) {
       where.customerName = {
@@ -102,7 +115,10 @@ class CustomerController {
         remark: customer.remark,
         source: customer.source,
         updatedAt: customer.updatedAt,
-        wechat: customer.wechat
+        wechat: customer.wechat,
+        // 添加权限字段
+        canEdit: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
+        canDelete: user?.roles?.includes('super_admin') || customer.createdById === user?.id
       }));
 
       const pages = Math.ceil(total / pageSize);
@@ -129,8 +145,17 @@ class CustomerController {
   /** 获取客户详情 */
   async getCustomerById(req: Request, res: Response) {
     const { id } = req.params;
+    const user = (req as any).user; // 获取当前登录用户
 
     try {
+      // 构建查询条件，添加权限控制
+      const where: any = { id: Number(id) };
+
+      // 权限控制：超级管理员可以查看所有客户，其他用户只能查看自己创建的客户
+      if (!user?.roles?.includes('super_admin')) {
+        where.createdById = user?.id;
+      }
+
       const customer = await prisma.customer.findUnique({
         include: {
           assignedTo: {
@@ -162,7 +187,7 @@ class CustomerController {
             }
           }
         },
-        where: { id: Number(id) }
+        where
       });
 
       if (!customer) {
@@ -342,13 +367,20 @@ class CustomerController {
     }
 
     try {
-      // 检查客户是否存在
+      // 检查客户是否存在并且用户有权限修改
+      const whereCondition: any = { id: Number(id) };
+
+      // 权限控制：超级管理员可以修改所有客户，其他用户只能修改自己创建的客户
+      if (!req.user.roles?.includes('super_admin')) {
+        whereCondition.createdById = req.user.id;
+      }
+
       const existingCustomer = await prisma.customer.findUnique({
-        where: { id: Number(id) }
+        where: whereCondition
       });
 
       if (!existingCustomer) {
-        throw new NotFoundError('客户不存在');
+        throw new NotFoundError('客户不存在或您没有权限修改此客户');
       }
 
       const customer = await prisma.customer.update({
@@ -444,13 +476,20 @@ class CustomerController {
     }
 
     try {
-      // 检查客户是否存在
+      // 检查客户是否存在并且用户有权限删除
+      const whereCondition: any = { id: Number(id) };
+
+      // 权限控制：超级管理员可以删除所有客户，其他用户只能删除自己创建的客户
+      if (!req.user.roles?.includes('super_admin')) {
+        whereCondition.createdById = req.user.id;
+      }
+
       const existingCustomer = await prisma.customer.findUnique({
-        where: { id: Number(id) }
+        where: whereCondition
       });
 
       if (!existingCustomer) {
-        throw new NotFoundError('客户不存在');
+        throw new NotFoundError('客户不存在或您没有权限删除此客户');
       }
 
       await prisma.customer.delete({
@@ -475,17 +514,33 @@ class CustomerController {
 
   /** 获取客户统计数据 */
   async getCustomerStatistics(req: Request, res: Response) {
+    const { scope } = req.query;
+    const user = (req as any).user; // 获取当前登录用户
+
     try {
+      // 构建查询条件，添加权限控制
+      const where: any = {};
+
+      // 权限控制：根据scope参数决定数据范围
+      const dataScope = scope as string || 'own';
+
+      if (dataScope === 'own' && !user?.roles?.includes('super_admin')) {
+        // 客户跟进页面：普通用户只能查看自己创建的客户统计
+        where.createdById = user?.id;
+      }
+      // 客户资料管理页面：所有用户都能查看所有数据统计（scope = 'all'）
+
       // 获取各个状态的客户数量
       const statistics = await prisma.customer.groupBy({
         _count: {
           followStatus: true
         },
-        by: ['followStatus']
+        by: ['followStatus'],
+        where
       });
 
       // 获取总客户数
-      const totalCount = await prisma.customer.count();
+      const totalCount = await prisma.customer.count({ where });
 
       // 格式化统计数据
       const result: Record<string, number> = {
@@ -513,6 +568,364 @@ class CustomerController {
     } catch (error) {
       logger.error('获取客户统计失败:', error);
       res.status(500).json(createErrorResponse(500, '获取客户统计失败', null, req.path));
+    }
+  }
+
+  /** 导入客户Excel文件 */
+  async importCustomers(req: Request, res: Response) {
+    if (!req.user) {
+      throw new ValidationError('用户未认证');
+    }
+
+    if (!req.file) {
+      throw new ValidationError('请上传Excel文件');
+    }
+
+    try {
+      const xlsx = require('xlsx');
+
+      // 读取上传的文件（multer已将文件保存到磁盘）
+      const workbook = xlsx.readFile(req.file.path);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+
+      // 将Excel数据转换为JSON
+      const excelData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+      if (excelData.length <= 1) {
+        throw new ValidationError('Excel文件无有效数据');
+      }
+
+      // 跳过标题行，处理数据行
+      const dataRows = excelData.slice(1);
+      const customers = [];
+      let successCount = 0;
+      let failureCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i] as any[];
+        if (!row || row.every(cell => !cell || cell.toString().trim() === '')) {
+          continue; // 跳过空行
+        }
+
+        try {
+          // Excel列顺序：A=姓名, B=单位, C=职务, D=电话, E=手机, F=跟进, G=状态
+          const rawStatus = row[6]?.toString().trim() || 'consult';
+
+          // 状态映射：中文 -> 英文枚举
+          const statusMap: Record<string, string> = {
+            '咨询': 'consult',
+            '已加微信': 'wechat_added',
+            '已报名': 'registered',
+            '已实到': 'arrived',
+            '未实到': 'not_arrived',
+            '新开发': 'new_develop',
+            '早25客户': 'early_25',
+            '早25': 'early_25',
+            '有效回访': 'effective_visit',
+            '大客户': 'vip',
+            '未通过': 'rejected'
+          };
+
+          const customerData = {
+            customerName: row[0]?.toString().trim() || '',     // A列：姓名
+            company: row[1]?.toString().trim() || '',          // B列：单位
+            position: row[2]?.toString().trim() || '',         // C列：职务
+            phone: row[3]?.toString().trim() || '',            // D列：电话
+            mobile: row[4]?.toString().trim() || '',           // E列：手机
+            remark: row[5]?.toString().trim() || '',           // F列：跟进内容
+            followStatus: statusMap[rawStatus] || rawStatus || 'consult', // G列：状态
+            industry: 'other',
+            source: 'import',
+            createdById: req.user.id,
+            level: 1,
+            email: ''
+          };
+
+          // 验证必填字段
+          if (!customerData.customerName || !customerData.company) {
+            errors.push(`第${i + 2}行：客户姓名和公司名称不能为空`);
+            failureCount++;
+            continue;
+          }
+
+          // 检查是否已存在相同的客户（根据姓名和公司）
+          const existingCustomer = await prisma.customer.findFirst({
+            where: {
+              customerName: customerData.customerName,
+              company: customerData.company
+            }
+          });
+
+          if (existingCustomer) {
+            errors.push(`第${i + 2}行：客户 ${customerData.customerName}(${customerData.company}) 已存在`);
+            failureCount++;
+            continue;
+          }
+
+          // 创建客户记录
+          await prisma.customer.create({
+            data: customerData
+          });
+
+          customers.push(customerData);
+          successCount++;
+        } catch (error) {
+          errors.push(`第${i + 2}行：${(error as Error).message || '导入失败'}`);
+          failureCount++;
+        }
+      }
+
+      // 删除临时文件
+      const fs = require('fs');
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+
+      logger.info(`用户 ${req.user.userName} 导入客户文件: ${req.file.originalname}`, {
+        userId: req.user.id,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        successCount,
+        failureCount,
+        totalCount: successCount + failureCount
+      });
+
+      const importResult = {
+        successCount,
+        failureCount,
+        totalCount: successCount + failureCount,
+        errors: errors.slice(0, 10), // 最多返回前10个错误
+        hasMoreErrors: errors.length > 10
+      };
+
+      res.json(
+        createSuccessResponse(
+          importResult,
+          `导入完成：成功 ${successCount} 条，失败 ${failureCount} 条`,
+          req.path
+        )
+      );
+    } catch (error) {
+      // 清理临时文件
+      if (req.file && req.file.path) {
+        const fs = require('fs');
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      }
+
+      logger.error('导入客户文件失败:', error);
+      res.status(500).json(createErrorResponse(500, '导入客户文件失败', null, req.path));
+    }
+  }
+
+  /** 获取客户分配列表 */
+  async getCustomerAssignments(req: Request, res: Response) {
+    const { current = 1, size = 10 } = req.query;
+
+    const page = Number(current);
+    const pageSize = Number(size);
+    const skip = (page - 1) * pageSize;
+
+    try {
+      // 获取总数
+      const total = await prisma.customerAssignment.count();
+
+      // 获取分配列表
+      const assignments = await prisma.customerAssignment.findMany({
+        include: {
+          assignedBy: {
+            select: {
+              id: true,
+              nickName: true
+            }
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              nickName: true
+            }
+          },
+          customer: {
+            select: {
+              id: true,
+              customerName: true,
+              company: true
+            }
+          }
+        },
+        orderBy: {
+          assignedTime: 'desc'
+        },
+        skip,
+        take: pageSize
+      });
+
+      // 格式化返回数据
+      const records = assignments.map(assignment => ({
+        assignedById: assignment.assignedById,
+        assignedByName: assignment.assignedBy.nickName,
+        assignedTime: assignment.assignedTime.toISOString().split('T')[0],
+        assignedToId: assignment.assignedToId,
+        assignedToName: assignment.assignedTo.nickName,
+        customerId: assignment.customerId,
+        customerName: assignment.customer.customerName,
+        customerCompany: assignment.customer.company,
+        id: assignment.id,
+        remark: assignment.remark,
+        status: assignment.status
+      }));
+
+      const pages = Math.ceil(total / pageSize);
+
+      res.json(
+        createSuccessResponse(
+          {
+            current: page,
+            pages,
+            records,
+            size: pageSize,
+            total
+          },
+          '查询成功',
+          req.path
+        )
+      );
+    } catch (error) {
+      logger.error('获取客户分配列表失败:', error);
+      res.status(500).json(createErrorResponse(500, '获取分配列表失败', null, req.path));
+    }
+  }
+
+  /** 分配客户给员工 */
+  async assignCustomers(req: Request, res: Response) {
+    const { customerIds, assignedToId, remark } = req.body;
+    const assignedById = (req as any).user!.id;
+
+    try {
+      // 验证输入
+      if (!Array.isArray(customerIds) || customerIds.length === 0) {
+        return res.status(400).json(createErrorResponse(400, '请选择要分配的客户', null, req.path));
+      }
+
+      if (!assignedToId) {
+        return res.status(400).json(createErrorResponse(400, '请选择分配给的员工', null, req.path));
+      }
+
+      // 验证员工是否存在
+      const employee = await prisma.user.findUnique({
+        where: { id: assignedToId }
+      });
+
+      if (!employee) {
+        return res.status(400).json(createErrorResponse(400, '员工不存在', null, req.path));
+      }
+
+      // 验证客户是否存在
+      const customers = await prisma.customer.findMany({
+        where: {
+          id: {
+            in: customerIds.map(Number)
+          }
+        }
+      });
+
+      if (customers.length !== customerIds.length) {
+        return res.status(400).json(createErrorResponse(400, '部分客户不存在', null, req.path));
+      }
+
+      // 检查是否已经存在分配关系
+      const existingAssignments = await prisma.customerAssignment.findMany({
+        where: {
+          customerId: {
+            in: customerIds.map(Number)
+          },
+          assignedToId
+        }
+      });
+
+      if (existingAssignments.length > 0) {
+        const existingCustomerIds = existingAssignments.map(a => a.customerId);
+        const existingCustomers = customers.filter(customer => existingCustomerIds.includes(customer.id));
+        const names = existingCustomers.map(customer => customer.customerName).join(', ');
+        return res.status(400).json(createErrorResponse(400, `客户 ${names} 已经分配给该员工`, null, req.path));
+      }
+
+      // 创建分配关系
+      const assignments = await Promise.all(
+        customerIds.map(customerId =>
+          prisma.customerAssignment.create({
+            data: {
+              assignedById,
+              assignedToId,
+              customerId: Number(customerId),
+              remark: remark || null
+            }
+          })
+        )
+      );
+
+      // 同时更新customer表的assignedToId和assignedTime
+      await Promise.all(
+        customerIds.map(customerId =>
+          prisma.customer.update({
+            where: { id: Number(customerId) },
+            data: {
+              assignedToId,
+              assignedTime: new Date()
+            }
+          })
+        )
+      );
+
+      res.json(createSuccessResponse(assignments, '分配成功', req.path));
+    } catch (error) {
+      logger.error('分配客户给员工失败:', error);
+      res.status(500).json(createErrorResponse(500, '分配失败', null, req.path));
+    }
+  }
+
+  /** 取消客户分配 */
+  async removeCustomerAssignment(req: Request, res: Response) {
+    const { id } = req.params;
+
+    try {
+      // 验证分配关系是否存在
+      const assignment = await prisma.customerAssignment.findUnique({
+        where: {
+          id: Number(id)
+        },
+        include: {
+          customer: true
+        }
+      });
+
+      if (!assignment) {
+        return res.status(404).json(createErrorResponse(404, '分配关系不存在', null, req.path));
+      }
+
+      // 删除分配关系
+      await prisma.customerAssignment.delete({
+        where: {
+          id: Number(id)
+        }
+      });
+
+      // 同时清除customer表的assignedToId和assignedTime
+      await prisma.customer.update({
+        where: { id: assignment.customerId },
+        data: {
+          assignedToId: null,
+          assignedTime: null
+        }
+      });
+
+      res.json(createSuccessResponse(null, '取消分配成功', req.path));
+    } catch (error) {
+      logger.error('取消客户分配失败:', error);
+      res.status(500).json(createErrorResponse(500, '取消分配失败', null, req.path));
     }
   }
 }

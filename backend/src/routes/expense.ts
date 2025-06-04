@@ -183,6 +183,7 @@ router.post('/create', authMiddleware, async (req, res) => {
   try {
     const { applicationReason, expensePeriodEnd, expensePeriodStart, expenseType, items, remark } = req.body;
     const userId = (req as any).user.id;
+    const userName = (req as any).user.userName || (req as any).user.nickName;
 
     // 生成申请编号
     const applicationNo = `EXP${Date.now()}`;
@@ -223,6 +224,53 @@ router.post('/create', authMiddleware, async (req, res) => {
         items: true
       }
     });
+
+    // 获取所有超级管理员并发送通知
+    try {
+      const superAdmins = await prisma.user.findMany({
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        },
+        where: {
+          userRoles: {
+            some: {
+              role: {
+                roleCode: 'super_admin'
+              }
+            }
+          }
+        }
+      });
+
+      // 为每个超级管理员创建通知
+      const notifications = superAdmins.map(admin => ({
+        content: `${userName}提交了新的报销申请：${applicationReason || '无备注'}，申请金额：¥${totalAmount}，请及时审核处理。`,
+        relatedId: application.id,
+        relatedType: 'expense_application',
+        userId: admin.id,
+        title: '新报销申请待审核',
+        type: 'expense',
+        createTime: new Date().toISOString()
+      }));
+
+      if (notifications.length > 0) {
+        await prisma.notification.createMany({
+          data: notifications
+        });
+
+        logger.info(`已为${notifications.length}个超级管理员创建报销申请通知`, {
+          applicationId: application.id,
+          applicationNo: application.applicationNo
+        });
+      }
+    } catch (notificationError) {
+      logger.error('创建审批通知失败:', notificationError);
+      // 不影响主流程，继续执行
+    }
 
     const result = {
       amount: Number(application.totalAmount),
@@ -289,6 +337,33 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
       },
       where: { id: Number(id) }
     });
+
+    // 发送审批结果通知给申请人
+    try {
+      const statusText = Number(status) === 1 ? '通过' : '拒绝';
+      const approverName = (req as any).user.nickName || (req as any).user.userName;
+
+      await prisma.notification.create({
+        data: {
+          userId: updatedApplication.applicantId,
+          title: `报销申请审批${statusText}`,
+          content: `您的报销申请 (编号: ${updatedApplication.applicationNo}) 已被${approverName}${statusText}。${remark ? '审批意见：' + remark : ''}`,
+          type: Number(status) === 1 ? 'success' : 'warning',
+          relatedId: updatedApplication.id,
+          relatedType: 'expense_application',
+          createTime: new Date().toISOString()
+        }
+      });
+
+      logger.info(`已为申请人创建审批结果通知`, {
+        applicationId: updatedApplication.id,
+        applicationNo: updatedApplication.applicationNo,
+        approvalResult: statusText
+      });
+    } catch (notificationError) {
+      logger.error('创建审批结果通知失败:', notificationError);
+      // 不影响主流程，继续执行
+    }
 
     const result = {
       amount: Number(updatedApplication.totalAmount),

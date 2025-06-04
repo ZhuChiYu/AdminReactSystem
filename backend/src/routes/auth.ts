@@ -172,4 +172,7 @@ router.get('/me', authMiddleware, asyncErrorHandler(authController.getCurrentUse
  */
 router.get('/captcha', asyncErrorHandler(authController.getCaptcha));
 
+// 清除用户缓存（调试用）
+router.delete('/cache/:userId?', asyncErrorHandler(authController.clearUserCache));
+
 export default router;

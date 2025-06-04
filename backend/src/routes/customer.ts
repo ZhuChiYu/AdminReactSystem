@@ -1,8 +1,44 @@
 import { Router } from 'express';
+import fs from 'node:fs';
+import multer from 'multer';
+import path from 'node:path';
 
 import { customerController } from '@/controllers/customerController';
 import { permissionMiddleware } from '@/middleware/auth';
 import { asyncErrorHandler } from '@/middleware/errorHandler';
+
+// 确保上传目录存在
+const uploadsDir = 'uploads/customer-imports';
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// 配置multer用于Excel文件上传
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/customer-imports');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `customers-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.xlsx', '.xls'];
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(fileExt)) {
+      cb(null, true);
+    } else {
+      cb(new Error('只允许上传 Excel 文件 (.xlsx, .xls)'));
+    }
+  }
+});
 
 const router = Router();
 
@@ -64,6 +100,106 @@ router.get(
   permissionMiddleware('customer:list'),
   asyncErrorHandler(customerController.getCustomerStatistics)
 );
+
+/**
+ * @swagger
+ * /api/customers/assignments:
+ *   get:
+ *     summary: 获取客户分配列表
+ *     tags: [客户管理]
+ *     parameters:
+ *       - in: query
+ *         name: current
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: 当前页码
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: 每页大小
+ *     responses:
+ *       200:
+ *         description: 查询成功
+ */
+router.get('/assignments', permissionMiddleware('customer:assign'), asyncErrorHandler(customerController.getCustomerAssignments));
+
+/**
+ * @swagger
+ * /api/customers/assignments:
+ *   post:
+ *     summary: 分配客户给员工
+ *     tags: [客户管理]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               customerIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: 客户ID列表
+ *               assignedToId:
+ *                 type: integer
+ *                 description: 分配给的员工ID
+ *               remark:
+ *                 type: string
+ *                 description: 备注
+ *     responses:
+ *       200:
+ *         description: 分配成功
+ */
+router.post('/assignments', permissionMiddleware('customer:assign'), asyncErrorHandler(customerController.assignCustomers));
+
+/**
+ * @swagger
+ * /api/customers/assignments/{id}:
+ *   delete:
+ *     summary: 取消客户分配
+ *     tags: [客户管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 分配ID
+ *     responses:
+ *       200:
+ *         description: 取消成功
+ */
+router.delete('/assignments/:id', permissionMiddleware('customer:assign'), asyncErrorHandler(customerController.removeCustomerAssignment));
+
+/**
+ * @swagger
+ * /api/customers/import:
+ *   post:
+ *     summary: 导入客户Excel文件
+ *     tags: [客户管理]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Excel文件
+ *     responses:
+ *       200:
+ *         description: 导入成功
+ */
+router.post('/import', upload.single('file'), permissionMiddleware('customer:create'), asyncErrorHandler(customerController.importCustomers));
 
 /**
  * @swagger

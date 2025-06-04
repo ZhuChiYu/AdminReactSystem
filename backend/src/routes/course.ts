@@ -182,7 +182,16 @@ router.get('/class', async (req, res) => {
     // 查询班级信息并包含关联的课程
     const classInfo = await prisma.class.findUnique({
       include: {
-        course: true
+        course: {
+          include: {
+            category: true,
+            _count: {
+              select: {
+                enrollments: true
+              }
+            }
+          }
+        }
       },
       where: { id: Number.parseInt(classId as string) }
     });
@@ -400,6 +409,7 @@ router.post('/', async (req, res) => {
   try {
     const {
       categoryId,
+      classId,
       courseCode,
       courseName,
       description,
@@ -434,6 +444,17 @@ router.post('/', async (req, res) => {
       throw new ApiError(400, '课程分类不存在');
     }
 
+    // 如果提供了classId，检查班级是否存在
+    if (classId) {
+      const classExists = await prisma.class.findUnique({
+        where: { id: Number.parseInt(classId.toString()) }
+      });
+
+      if (!classExists) {
+        throw new ApiError(400, '班级不存在');
+      }
+    }
+
     const course = await prisma.course.create({
       data: {
         categoryId,
@@ -456,6 +477,16 @@ router.post('/', async (req, res) => {
         category: true
       }
     });
+
+    // 如果提供了classId，更新班级的courseId
+    if (classId) {
+      await prisma.class.update({
+        where: { id: Number.parseInt(classId.toString()) },
+        data: { courseId: course.id }
+      });
+
+      logger.info(`班级${classId}关联课程成功: ${courseName}`);
+    }
 
     logger.info(`课程创建成功: ${courseName}`);
 

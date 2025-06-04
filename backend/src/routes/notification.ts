@@ -1,9 +1,79 @@
 import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
+import multer from 'multer';
 
 import { prisma } from '@/config/database';
 import { logger } from '@/utils/logger';
+import { createErrorResponse, createSuccessResponse } from '@/utils/response';
 
 const router = express.Router();
+
+// 配置通知附件上传
+const uploadsDir = 'uploads/notification-attachments';
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `notification-attachment-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({
+  fileFilter: (req, file, cb) => {
+    // 允许常见的文档和媒体格式
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'video/mp4',
+      'audio/mpeg',
+      'application/zip',
+      'application/x-rar-compressed'
+    ];
+
+    // 修复中文文件名编码问题
+    if (file.originalname) {
+      try {
+        const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        file.originalname = decoded;
+      } catch (error) {
+        console.warn('文件名编码修复失败:', error);
+      }
+    }
+
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('不支持的文件格式'));
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  },
+  storage
+});
+
+// 获取文件扩展名
+function getFileExtension(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  return ext.substring(1); // 移除点号
+}
 
 // 获取通知列表
 router.get('/', async (req, res) => {
@@ -288,6 +358,229 @@ router.put('/batch-read', async (req, res) => {
       path: req.path,
       timestamp: Date.now()
     });
+  }
+});
+
+// 通知附件相关路由
+
+// 上传通知附件
+router.post('/:id/attachments/upload', upload.single('file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { description } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json(createErrorResponse(400, '请选择要上传的文件', null, req.path));
+    }
+
+    // 检查通知是否存在
+    const notification = await prisma.notification.findUnique({
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!notification) {
+      return res.status(404).json(createErrorResponse(404, '通知不存在', null, req.path));
+    }
+
+    // 获取当前用户ID（从认证中间件）
+    const uploaderId = (req as any).user?.id || 1; // 默认用户ID为1
+
+    // 创建通知附件记录
+    const attachment = await prisma.notificationAttachment.create({
+      data: {
+        notificationId: Number.parseInt(id),
+        fileName: req.file.filename,
+        fileSize: req.file.size,
+        fileType: getFileExtension(req.file.originalname),
+        originalName: req.file.originalname,
+        status: 1,
+        uploaderId
+      },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            userName: true
+          }
+        }
+      }
+    });
+
+    const result = {
+      id: attachment.id,
+      notificationId: attachment.notificationId,
+      downloadUrl: `/api/notifications/${id}/attachments/${attachment.id}/download`,
+      fileName: attachment.fileName,
+      fileSize: attachment.fileSize,
+      fileType: attachment.fileType,
+      originalName: attachment.originalName,
+      uploader: attachment.uploader
+        ? {
+            id: attachment.uploader.id,
+            name: attachment.uploader.userName
+          }
+        : null,
+      uploadTime: attachment.uploadTime.toISOString()
+    };
+
+    logger.info(`通知附件上传成功: ${req.file.originalname}, 通知ID: ${id}`);
+
+    res.json(createSuccessResponse(result, '通知附件上传成功', req.path));
+  } catch (error) {
+    logger.error('上传通知附件失败:', error);
+    res.status(500).json(createErrorResponse(500, '上传通知附件失败', null, req.path));
+  }
+});
+
+// 获取通知附件列表
+router.get('/:id/attachments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { current = 1, size = 10 } = req.query;
+
+    const page = Number.parseInt(current as string);
+    const pageSize = Number.parseInt(size as string);
+    const skip = (page - 1) * pageSize;
+
+    const whereClause = {
+      notificationId: Number.parseInt(id),
+      status: 1 // 只显示正常状态的附件
+    };
+
+    const [attachments, total] = await Promise.all([
+      prisma.notificationAttachment.findMany({
+        include: {
+          uploader: {
+            select: {
+              id: true,
+              userName: true
+            }
+          }
+        },
+        orderBy: { uploadTime: 'desc' },
+        skip,
+        take: pageSize,
+        where: whereClause
+      }),
+      prisma.notificationAttachment.count({ where: whereClause })
+    ]);
+
+    const result = {
+      current: page,
+      pages: Math.ceil(total / pageSize),
+      records: attachments.map((attachment: any) => ({
+        id: attachment.id,
+        notificationId: attachment.notificationId,
+        downloadUrl: `/api/notifications/${id}/attachments/${attachment.id}/download`,
+        fileName: attachment.fileName,
+        fileSize: attachment.fileSize,
+        fileType: attachment.fileType,
+        originalName: attachment.originalName,
+        uploader: attachment.uploader
+          ? {
+              id: attachment.uploader.id,
+              name: attachment.uploader.userName
+            }
+          : null,
+        uploadTime: attachment.uploadTime.toISOString()
+      })),
+      size: pageSize,
+      total
+    };
+
+    res.json(createSuccessResponse(result, '获取通知附件列表成功', req.path));
+  } catch (error) {
+    logger.error('获取通知附件列表失败:', error);
+    res.status(500).json(createErrorResponse(500, '获取通知附件列表失败', null, req.path));
+  }
+});
+
+// 下载通知附件
+router.get('/:id/attachments/:attachmentId/download', async (req, res) => {
+  try {
+    const { id, attachmentId } = req.params;
+
+    const attachment = await prisma.notificationAttachment.findFirst({
+      where: {
+        id: Number.parseInt(attachmentId),
+        notificationId: Number.parseInt(id),
+        status: 1
+      }
+    });
+
+    if (!attachment) {
+      return res.status(404).json(createErrorResponse(404, '附件不存在', null, req.path));
+    }
+
+    const filePath = path.join(uploadsDir, attachment.fileName);
+
+    // 检查文件是否存在
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json(createErrorResponse(404, '文件不存在', null, req.path));
+    }
+
+    const originalName = attachment.originalName || attachment.fileName;
+
+    // 设置响应头 - 正确处理中文文件名编码
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`
+    );
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    // 发送文件流
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    // 更新下载次数
+    await prisma.notificationAttachment.update({
+      data: {
+        downloadCount: {
+          increment: 1
+        }
+      },
+      where: { id: Number.parseInt(attachmentId) }
+    });
+
+    logger.info(`通知附件下载: ${originalName}, ID: ${attachmentId}`);
+  } catch (error) {
+    logger.error('下载通知附件失败:', error);
+    res.status(500).json(createErrorResponse(500, '下载通知附件失败', null, req.path));
+  }
+});
+
+// 删除通知附件
+router.delete('/:id/attachments/:attachmentId', async (req, res) => {
+  try {
+    const { id, attachmentId } = req.params;
+
+    const attachment = await prisma.notificationAttachment.findFirst({
+      where: {
+        id: Number.parseInt(attachmentId),
+        notificationId: Number.parseInt(id),
+        status: 1
+      }
+    });
+
+    if (!attachment) {
+      return res.status(404).json(createErrorResponse(404, '附件不存在', null, req.path));
+    }
+
+    // 软删除：将状态设置为2
+    await prisma.notificationAttachment.update({
+      data: {
+        status: 2
+      },
+      where: { id: Number.parseInt(attachmentId) }
+    });
+
+    logger.info(`通知附件删除成功: ${attachment.originalName}, ID: ${attachmentId}`);
+
+    res.json(createSuccessResponse(null, '删除通知附件成功', req.path));
+  } catch (error) {
+    logger.error('删除通知附件失败:', error);
+    res.status(500).json(createErrorResponse(500, '删除通知附件失败', null, req.path));
   }
 });
 
