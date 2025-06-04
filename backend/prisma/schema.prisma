@@ -50,8 +50,16 @@ model User {
   operationLogs OperationLog[]
   assignedTasks Task[] @relation("TaskAssignee")
   uploadedAttachments Attachment[] @relation("AttachmentUploader")
+  uploadedNotificationAttachments NotificationAttachment[] @relation("NotificationAttachmentUploader")
   expenseApplications ExpenseApplication[] @relation("ExpenseApplicant")
   approvedExpenses ExpenseApplication[] @relation("ExpenseApprover")
+  // 员工-管理员关系
+  managedEmployees EmployeeManagerRelation[] @relation("ManagerRelation")
+  employeeRelations EmployeeManagerRelation[] @relation("EmployeeRelation")
+  assignedRelations EmployeeManagerRelation[] @relation("AssignedByRelation")
+  // 客户分配关系
+  customerAssignments CustomerAssignment[] @relation("CustomerAssignedTo")
+  assignedCustomerRelations CustomerAssignment[] @relation("CustomerAssignedBy")
 
   @@map("users")
 }
@@ -172,6 +180,7 @@ model Customer {
   assignedTo    User?          @relation("AssignedToUser", fields: [assignedToId], references: [id])
   createdBy     User           @relation("CreatedByUser", fields: [createdById], references: [id])
   followRecords FollowRecord[]
+  customerAssignments CustomerAssignment[]
 
   @@map("customers")
 }
@@ -485,7 +494,30 @@ model Notification {
   relatedType String?  @map("related_type") @db.VarChar(50) // 关联类型
   createTime  String   @map("create_time")
 
+  // 关联关系
+  attachments NotificationAttachment[]
+
   @@map("notifications")
+}
+
+// 通知附件表
+model NotificationAttachment {
+  id           Int      @id @default(autoincrement())
+  notificationId Int    @map("notification_id")
+  fileName     String   @map("file_name") @db.VarChar(255)
+  originalName String?  @map("original_name") @db.VarChar(255)
+  fileType     String   @map("file_type") @db.VarChar(50)
+  fileSize     Int      @map("file_size")
+  uploaderId   Int      @map("uploader_id")
+  uploadTime   DateTime @default(now()) @map("upload_time")
+  downloadCount Int     @default(0) @map("download_count")
+  status       Int      @default(1) // 1-正常, 2-删除
+
+  // 关联关系
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  uploader     User         @relation("NotificationAttachmentUploader", fields: [uploaderId], references: [id])
+
+  @@map("notification_attachments")
 }
 
 // 任务表
@@ -555,4 +587,42 @@ model ExpenseItem {
   application ExpenseApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@map("expense_items")
+}
+
+// 员工-管理员关系表
+model EmployeeManagerRelation {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int      @map("employee_id")
+  managerId    Int      @map("manager_id")
+  assignedById Int      @map("assigned_by_id")
+  assignedTime DateTime @default(now()) @map("assigned_time")
+  status       Int      @default(1) // 0-无效, 1-有效
+  remark       String?  @db.Text
+
+  // 关联关系
+  employee   User @relation("EmployeeRelation", fields: [employeeId], references: [id], onDelete: Cascade)
+  manager    User @relation("ManagerRelation", fields: [managerId], references: [id], onDelete: Cascade)
+  assignedBy User @relation("AssignedByRelation", fields: [assignedById], references: [id])
+
+  @@unique([employeeId, managerId])
+  @@map("employee_manager_relations")
+}
+
+// 客户分配表
+model CustomerAssignment {
+  id             Int      @id @default(autoincrement())
+  customerId     Int      @map("customer_id")
+  assignedToId   Int      @map("assigned_to_id")
+  assignedById   Int      @map("assigned_by_id")
+  assignedTime   DateTime @default(now()) @map("assigned_time")
+  status         Int      @default(1) // 0-无效, 1-有效
+  remark         String?  @db.Text
+
+  // 关联关系
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  assignedTo   User     @relation("CustomerAssignedTo", fields: [assignedToId], references: [id])
+  assignedBy   User     @relation("CustomerAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([customerId, assignedToId])
+  @@map("customer_assignments")
 }
