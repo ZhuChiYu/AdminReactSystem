@@ -702,38 +702,36 @@ const ClassDetail = () => {
   };
 
   // 查看课程详情
-  const handleViewCourseDetail = (course: any) => {
+  const handleViewCourseDetail = async (course: any) => {
     setCurrentCourse(course);
 
-    // 模拟加载课程附件数据
-    const mockAttachments = [
-      {
-        id: 1,
-        name: '课程大纲.pdf',
-        size: '2.5MB',
-        type: 'pdf',
-        uploadTime: '2024-03-01 10:30:00',
-        url: 'https://example.com/syllabus.pdf'
-      },
-      {
-        id: 2,
-        name: '课程资料.zip',
-        size: '15MB',
-        type: 'zip',
-        uploadTime: '2024-03-02 14:20:00',
-        url: 'https://example.com/materials.zip'
-      },
-      {
-        id: 3,
-        name: '课程PPT.pptx',
-        size: '5.8MB',
-        type: 'pptx',
-        uploadTime: '2024-03-03 16:45:00',
-        url: 'https://example.com/slides.pptx'
-      }
-    ];
+    try {
+      // 使用真实的API获取课程附件数据
+      const courseAttachmentsResponse = await attachmentService.getAttachmentList({
+        courseId: course.id,
+        current: 1,
+        size: 1000
+      });
 
-    setCourseAttachments(mockAttachments);
+      const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
+        (attachment: AttachmentApi.AttachmentListItem) => ({
+          id: attachment.id,
+          name: attachment.fileName,
+          size: attachment.fileSize,
+          type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+          uploader: attachment.uploader?.name || '未知',
+          uploadTime: attachment.uploadTime,
+          url: attachment.downloadUrl || '#' // 使用downloadUrl字段
+        })
+      );
+
+      setCourseAttachments(formattedCourseAttachments);
+    } catch (error) {
+      console.error('获取课程附件失败:', error);
+      // 如果获取附件失败，设置为空数组
+      setCourseAttachments([]);
+    }
+
     setCourseDetailVisible(true);
   };
 
@@ -794,6 +792,8 @@ const ClassDetail = () => {
       const courseData = {
         // 生成唯一编码
         categoryId: 1,
+        // 关联到当前班级
+        classId: Number.parseInt(classId!, 10),
         courseCode: `COURSE_${Date.now()}`,
         courseName: values.name,
         description: values.description || '',
@@ -813,14 +813,27 @@ const ClassDetail = () => {
       message.success('课程添加成功');
       setCourseModalVisible(false);
       courseForm.resetFields();
+      setCurrentCourse(null);
 
-      // 重新获取课程列表
+      // 重新获取课程列表，使用与fetchClassInfo相同的格式化逻辑
       const coursesResponse = await courseService.getClassCourseList({
         classId: Number.parseInt(classId!, 10),
         current: 1,
         size: 1000
       });
-      setCourseList(coursesResponse.records || []);
+
+      const formattedCourses = coursesResponse.records.map((course: any) => ({
+        classroom: course.classroom || course.location || '',
+        endDate: course.endDate || '',
+        id: course.id,
+        name: course.courseName,
+        schedule: course.schedule || '',
+        startDate: course.startDate || '',
+        status: course.status || 1,
+        teacher: course.instructor || ''
+      }));
+
+      setCourseList(formattedCourses);
     } catch (error) {
       console.error('添加课程失败:', error);
       message.error('添加课程失败');
@@ -899,7 +912,7 @@ const ClassDetail = () => {
   };
 
   // 处理文件上传完成
-  const handleFileUpload = () => {
+  const handleFileUpload = async () => {
     if (fileList.length === 0) {
       message.error('请先选择要上传的文件');
       return;
@@ -908,105 +921,103 @@ const ClassDetail = () => {
     setUploading(true);
     setUploadProgress(0);
 
-    // 计算总文件大小，以便显示
-    const totalSize = fileList.reduce((total, file) => total + file.size, 0);
-    const totalSizeText =
-      totalSize < 1024 * 1024 ? `${(totalSize / 1024).toFixed(2)} KB` : `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+    try {
+      // 使用真实的API上传文件
+      const uploadPromises = fileList.map(async (file, index) => {
+        setUploadProgress(Math.floor(((index + 1) / fileList.length) * 80)); // 进度到80%
 
-    // 显示上传开始消息
-    message.loading({
-      content: `开始上传 ${fileList.length} 个文件 (总大小: ${totalSizeText})`,
-      duration: 1,
-      key: 'uploadMessage'
-    });
+        try {
+          const result = await attachmentService.uploadAttachment({
+            courseId: currentCourse?.id || 0,
+            // 使用courseId而不是relatedId
+            description: '课程附件',
+            file: file.originFileObj || file
+          });
+          return result;
+        } catch (error) {
+          console.error(`上传文件 ${file.name} 失败:`, error);
+          throw error;
+        }
+      });
 
-    // 模拟上传文件
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-      progress += Math.floor(Math.random() * 3) + 1;
-      if (progress >= 100) {
-        clearInterval(progressInterval);
-        progress = 100;
-      }
-      setUploadProgress(progress);
-
-      // 更新上传消息
-      if (progress < 100) {
-        message.loading({
-          content: `正在上传: ${progress}%`,
-          duration: 0,
-          key: 'uploadMessage'
-        });
-      }
-    }, 100);
-
-    // 模拟上传完成
-    setTimeout(() => {
-      clearInterval(progressInterval);
+      await Promise.all(uploadPromises);
       setUploadProgress(100);
 
-      // 更新上传完成消息
-      message.success({
-        content: `上传完成!`,
-        duration: 2,
-        key: 'uploadMessage'
-      });
+      message.success(`成功上传了 ${fileList.length} 个文件`);
 
-      // 处理所有文件并添加到附件列表
-      const newAttachments = fileList.map(file => {
-        // 获取文件扩展名
-        const fileExtension =
-          file.name && typeof file.name === 'string' ? file.name.split('.').pop()?.toLowerCase() || '' : '';
+      // 重新获取课程附件列表
+      if (currentCourse?.id) {
+        const courseAttachmentsResponse = await attachmentService.getAttachmentList({
+          courseId: currentCourse.id,
+          current: 1,
+          size: 1000
+        });
 
-        // 计算文件大小
-        let fileSize;
-        if (file.size < 1024 * 1024) {
-          fileSize = `${(file.size / 1024).toFixed(2)} KB`;
-        } else {
-          fileSize = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-        }
+        const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
+          (attachment: AttachmentApi.AttachmentListItem) => ({
+            id: attachment.id,
+            name: attachment.fileName,
+            size: attachment.fileSize,
+            type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+            uploader: attachment.uploader?.name || '未知',
+            uploadTime: attachment.uploadTime,
+            url: attachment.downloadUrl || '#' // 使用downloadUrl字段
+          })
+        );
 
-        // 生成随机ID
-        const fileId = Math.random().toString(36).substring(2);
-
-        return {
-          id: fileId,
-          name: file.name,
-          size: fileSize,
-          type: fileExtension,
-          uploadTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          url: URL.createObjectURL(file.originFileObj)
-        };
-      });
-
-      // 添加到课程附件列表
-      setCourseAttachments(prev => [...prev, ...newAttachments]);
+        setCourseAttachments(formattedCourseAttachments);
+      }
 
       // 延迟一会儿显示上传完成状态
       setTimeout(() => {
-        // 关闭模态框并重置状态
         setUploading(false);
         setUploadModalVisible(false);
         setFileList([]);
         setUploadProgress(0);
-
-        // 显示最终成功消息
-        message.success({
-          content: `成功上传了 ${newAttachments.length} 个文件`,
-          duration: 3
-        });
-      }, 1500);
-    }, 1500);
+      }, 1000);
+    } catch (error) {
+      console.error('文件上传失败:', error);
+      message.error('文件上传失败，请重试');
+      setUploading(false);
+      setUploadProgress(0);
+    }
   };
 
   // 处理附件删除
-  const handleDeleteAttachment = (attachmentId: number) => {
+  const handleDeleteAttachment = async (attachmentId: number) => {
     Modal.confirm({
       content: '确定要删除这个附件吗？',
-      onOk: () => {
-        const updatedAttachments = courseAttachments.filter(attachment => attachment.id !== attachmentId);
-        setCourseAttachments(updatedAttachments);
-        message.success('附件已删除');
+      onOk: async () => {
+        try {
+          await attachmentService.deleteAttachment(attachmentId);
+          message.success('附件已删除');
+
+          // 重新获取课程附件列表
+          if (currentCourse?.id) {
+            const courseAttachmentsResponse = await attachmentService.getAttachmentList({
+              courseId: currentCourse.id,
+              current: 1,
+              size: 1000
+            });
+
+            const formattedCourseAttachments = (courseAttachmentsResponse.data?.records || []).map(
+              (attachment: AttachmentApi.AttachmentListItem) => ({
+                id: attachment.id,
+                name: attachment.fileName,
+                size: attachment.fileSize,
+                type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+                uploader: attachment.uploader?.name || '未知',
+                uploadTime: attachment.uploadTime,
+                url: attachment.downloadUrl || '#'
+              })
+            );
+
+            setCourseAttachments(formattedCourseAttachments);
+          }
+        } catch (error) {
+          console.error('删除附件失败:', error);
+          message.error('删除附件失败');
+        }
       },
       title: '确认删除'
     });
@@ -1132,32 +1143,39 @@ const ClassDetail = () => {
     });
   };
 
-  const handleViewAnnounceDetail = (announce: any) => {
+  const handleViewAnnounceDetail = async (announce: any) => {
     setCurrentAnnounce(announce);
 
-    // 模拟获取附件列表
-    setTimeout(() => {
-      const mockAttachments = [
-        {
-          id: 1,
-          name: '通知附件1.pdf',
-          size: '528.45 KB',
-          type: 'pdf',
-          uploadTime: '2024-05-15 10:00:05',
-          url: '#'
-        },
-        {
-          id: 2,
-          name: '重要说明.docx',
-          size: '125.32 KB',
-          type: 'docx',
-          uploadTime: '2024-05-15 10:01:22',
-          url: '#'
-        }
-      ];
-      setAnnounceAttachments(mockAttachments);
-      setAnnounceDetailVisible(true);
-    }, 500);
+    try {
+      // 使用真实的API获取通知附件数据
+      // 假设通知附件也使用类似的API，根据通知ID获取附件
+      const announceAttachmentsResponse = await attachmentService.getAttachmentList({
+        // 这里可能需要修改为notificationId或者其他字段，根据实际API设计
+        courseId: announce.id, // 临时使用，可能需要修改
+        current: 1,
+        size: 1000
+      });
+
+      const formattedAnnounceAttachments = (announceAttachmentsResponse.data?.records || []).map(
+        (attachment: AttachmentApi.AttachmentListItem) => ({
+          id: attachment.id,
+          name: attachment.fileName,
+          size: attachment.fileSize,
+          type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+          uploader: attachment.uploader?.name || '未知',
+          uploadTime: attachment.uploadTime,
+          url: attachment.downloadUrl || '#'
+        })
+      );
+
+      setAnnounceAttachments(formattedAnnounceAttachments);
+    } catch (error) {
+      console.error('获取通知附件失败:', error);
+      // 如果获取附件失败，设置为空数组
+      setAnnounceAttachments([]);
+    }
+
+    setAnnounceDetailVisible(true);
   };
 
   const handleUploadAnnounceFile = () => {
@@ -1167,55 +1185,111 @@ const ClassDetail = () => {
     setAnnounceUploadModalVisible(true);
   };
 
-  const handleAnnounceFileUpload = () => {
+  const handleAnnounceFileUpload = async () => {
+    if (announceFileList.length === 0) {
+      message.error('请先选择要上传的文件');
+      return;
+    }
+
     setAnnounceUploading(true);
+    setAnnounceUploadProgress(0);
 
-    // 模拟上传进度
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 5;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
+    try {
+      // 使用真实的API上传通知附件
+      const uploadPromises = announceFileList.map(async (file, index) => {
+        setAnnounceUploadProgress(Math.floor(((index + 1) / announceFileList.length) * 80));
 
-        // 模拟上传延迟
-        setTimeout(() => {
-          // 生成上传的附件
-          const newAttachments = announceFileList.map((file, index) => {
-            return {
-              id: announceAttachments.length + index + 1,
-              name: file.name,
-              size:
-                file.size < 1024 * 1024
-                  ? `${(file.size / 1024).toFixed(2)} KB`
-                  : `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-              type: file.name.split('.').pop(),
-              uploadTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-              url: '#'
-            };
+        try {
+          const result = await attachmentService.uploadAttachment({
+            courseId: currentAnnounce?.id || 0,
+            // 这里可能需要修改为notificationId
+            description: '通知附件',
+            file: file.originFileObj || file
           });
+          return result;
+        } catch (error) {
+          console.error(`上传文件 ${file.name} 失败:`, error);
+          throw error;
+        }
+      });
 
-          setAnnounceAttachments([...announceAttachments, ...newAttachments]);
-          message.success(`成功上传 ${announceFileList.length} 个文件`);
+      await Promise.all(uploadPromises);
+      setAnnounceUploadProgress(100);
 
-          // 延迟关闭模态框
-          setTimeout(() => {
-            setAnnounceUploadModalVisible(false);
-            setAnnounceFileList([]);
-          }, 1000);
-        }, 1000);
+      message.success(`成功上传了 ${announceFileList.length} 个文件`);
+
+      // 重新获取通知附件列表
+      if (currentAnnounce?.id) {
+        const announceAttachmentsResponse = await attachmentService.getAttachmentList({
+          courseId: currentAnnounce.id, // 可能需要修改为notificationId
+          current: 1,
+          size: 1000
+        });
+
+        const formattedAnnounceAttachments = (announceAttachmentsResponse.data?.records || []).map(
+          (attachment: AttachmentApi.AttachmentListItem) => ({
+            id: attachment.id,
+            name: attachment.fileName,
+            size: attachment.fileSize,
+            type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+            uploader: attachment.uploader?.name || '未知',
+            uploadTime: attachment.uploadTime,
+            url: attachment.downloadUrl || '#'
+          })
+        );
+
+        setAnnounceAttachments(formattedAnnounceAttachments);
       }
-      setAnnounceUploadProgress(progress);
-    }, 200);
+
+      // 延迟关闭模态框
+      setTimeout(() => {
+        setAnnounceUploading(false);
+        setAnnounceUploadModalVisible(false);
+        setAnnounceFileList([]);
+        setAnnounceUploadProgress(0);
+      }, 1000);
+    } catch (error) {
+      console.error('通知附件上传失败:', error);
+      message.error('文件上传失败，请重试');
+      setAnnounceUploading(false);
+      setAnnounceUploadProgress(0);
+    }
   };
 
-  const handleDeleteAnnounceAttachment = (attachmentId: number) => {
+  const handleDeleteAnnounceAttachment = async (attachmentId: number) => {
     Modal.confirm({
       content: '确定要删除该附件吗？此操作不可恢复。',
-      onOk: () => {
-        const updatedAttachments = announceAttachments.filter(a => a.id !== attachmentId);
-        setAnnounceAttachments(updatedAttachments);
-        message.success('附件已成功删除');
+      onOk: async () => {
+        try {
+          await attachmentService.deleteAttachment(attachmentId);
+          message.success('附件已成功删除');
+
+          // 重新获取通知附件列表
+          if (currentAnnounce?.id) {
+            const announceAttachmentsResponse = await attachmentService.getAttachmentList({
+              courseId: currentAnnounce.id, // 可能需要修改为notificationId
+              current: 1,
+              size: 1000
+            });
+
+            const formattedAnnounceAttachments = (announceAttachmentsResponse.data?.records || []).map(
+              (attachment: AttachmentApi.AttachmentListItem) => ({
+                id: attachment.id,
+                name: attachment.fileName,
+                size: attachment.fileSize,
+                type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
+                uploader: attachment.uploader?.name || '未知',
+                uploadTime: attachment.uploadTime,
+                url: attachment.downloadUrl || '#'
+              })
+            );
+
+            setAnnounceAttachments(formattedAnnounceAttachments);
+          }
+        } catch (error) {
+          console.error('删除通知附件失败:', error);
+          message.error('删除附件失败');
+        }
       },
       title: '确认删除'
     });
