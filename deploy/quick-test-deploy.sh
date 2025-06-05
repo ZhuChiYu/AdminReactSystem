@@ -28,13 +28,13 @@ fi
 echo "🗄️ 启动数据库服务..."
 sudo systemctl start docker || true
 
-# 启动PostgreSQL
+# 启动PostgreSQL (使用项目默认的数据库名)
 docker run -d \
     --name test-postgres \
     --restart unless-stopped \
-    -e POSTGRES_DB=admin_system \
-    -e POSTGRES_USER=postgres \
-    -e POSTGRES_PASSWORD=test123456 \
+    -e POSTGRES_DB=soybean_admin \
+    -e POSTGRES_USER=soybean \
+    -e POSTGRES_PASSWORD=soybean123 \
     -p 5432:5432 \
     postgres:14 2>/dev/null || echo "PostgreSQL已运行"
 
@@ -43,7 +43,7 @@ docker run -d \
     --name test-redis \
     --restart unless-stopped \
     -p 6379:6379 \
-    redis:7-alpine redis-server --requirepass test123456 2>/dev/null || echo "Redis已运行"
+    redis:7-alpine redis-server --requirepass redis123 2>/dev/null || echo "Redis已运行"
 
 # 等待数据库启动
 echo "⏳ 等待数据库启动..."
@@ -53,16 +53,60 @@ sleep 5
 echo "⚙️ 配置测试环境..."
 cat > .env << EOF
 NODE_ENV=development
-DATABASE_URL=postgresql://postgres:test123456@localhost:5432/admin_system
-POSTGRES_DB=admin_system
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=test123456
-REDIS_URL=redis://:test123456@localhost:6379
-REDIS_PASSWORD=test123456
+DATABASE_URL=postgresql://soybean:soybean123@localhost:5432/soybean_admin
+POSTGRES_DB=soybean_admin
+POSTGRES_USER=soybean
+POSTGRES_PASSWORD=soybean123
+REDIS_URL=redis://:redis123@localhost:6379
+REDIS_PASSWORD=redis123
 JWT_SECRET=test-jwt-secret-32-chars-for-development
 JWT_REFRESH_SECRET=test-refresh-secret-32-chars-for-dev
 RUN_SEED=true
 VITE_API_BASE_URL=http://localhost:3000/api
+EOF
+
+# 同时为backend目录创建.env文件
+echo "⚙️ 配置后端测试环境..."
+cat > backend/.env << EOF
+# 数据库配置
+DATABASE_URL="postgresql://soybean:soybean123@localhost:5432/soybean_admin"
+
+# Redis配置
+REDIS_URL="redis://:redis123@localhost:6379"
+
+# JWT配置
+JWT_SECRET="test-jwt-secret-32-chars-for-development"
+JWT_REFRESH_SECRET="test-refresh-secret-32-chars-for-dev"
+JWT_EXPIRES_IN="7d"
+JWT_REFRESH_EXPIRES_IN="30d"
+
+# 服务器配置
+NODE_ENV="development"
+PORT=3000
+HOST="0.0.0.0"
+
+# 文件上传配置
+UPLOAD_PATH="./uploads"
+MAX_FILE_SIZE=10485760
+
+# 邮件配置（测试环境可选）
+SMTP_HOST="smtp.qq.com"
+SMTP_PORT=587
+SMTP_USER="test@example.com"
+SMTP_PASS="test-password"
+
+# 日志配置
+LOG_LEVEL="debug"
+LOG_FILE="./logs/app.log"
+
+# 安全配置
+BCRYPT_ROUNDS=10
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=1000
+
+# API文档配置
+API_DOC_ENABLED=true
+API_DOC_PATH="/api-docs"
 EOF
 
 # 安装依赖
