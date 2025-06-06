@@ -201,17 +201,6 @@ export class CustomerService {
     }
   }
 
-  /** 取消客户分配 */
-  async removeCustomerAssignment(assignmentId: number): Promise<any> {
-    try {
-      const response = await apiClient.delete(`/customers/assignments/${assignmentId}`);
-      return response;
-    } catch (error) {
-      console.error('取消客户分配失败:', error);
-      throw error;
-    }
-  }
-
   /** 导出客户数据 */
   async exportCustomers(params?: CustomerApi.CustomerQueryParams): Promise<void> {
     try {
@@ -253,6 +242,34 @@ export class CustomerService {
       return response;
     } catch (error) {
       console.error('导入客户数据失败:', error);
+      throw error;
+    }
+  }
+
+  /** 更新客户分配关系 */
+  async updateCustomerAssignment(
+    id: number,
+    data: { assignedToId: number; customerId: number; remark?: string }
+  ): Promise<any> {
+    try {
+      const response = await apiClient.put('/customers/assignments', {
+        id,
+        ...data
+      });
+      return response;
+    } catch (error) {
+      console.error('更新客户分配关系失败:', error);
+      throw error;
+    }
+  }
+
+  /** 删除客户分配关系 */
+  async removeCustomerAssignment(id: number): Promise<any> {
+    try {
+      const response = await apiClient.delete(`/customers/assignments/${id}`);
+      return response;
+    } catch (error) {
+      console.error('删除客户分配关系失败:', error);
       throw error;
     }
   }

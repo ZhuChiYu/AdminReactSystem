@@ -597,6 +597,7 @@ export namespace EmployeeApi {
   export interface EmployeeQueryParams {
     current?: number;
     department?: string;
+    keyword?: string;
     nickName?: string;
     size?: number;
     status?: string;
@@ -846,4 +847,28 @@ export namespace Api.SystemManage {
       roleType?: 'permission' | 'position';
     } & CommonSearchParams
   >;
+}
+
+/** 角色类型 */
+export interface Role {
+  createTime?: string;
+  id: number;
+  remark?: string;
+  roleCode: string;
+  roleName: string;
+  status: EnableStatus;
+  updateTime?: string;
+}
+
+/** 通用搜索参数 */
+export interface CommonSearchParams {
+  current?: number;
+  keyword?: string;
+  size?: number;
+}
+
+/** 启用状态 */
+export enum EnableStatus {
+  DISABLED = 0,
+  ENABLED = 1
 }

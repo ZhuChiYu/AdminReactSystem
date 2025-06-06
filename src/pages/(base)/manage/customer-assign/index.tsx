@@ -1,4 +1,10 @@
-import { CustomerServiceOutlined, UserSwitchOutlined } from '@ant-design/icons';
+import {
+  CustomerServiceOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  UserOutlined,
+  UserSwitchOutlined
+} from '@ant-design/icons';
 import { Button as AButton, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -50,7 +56,8 @@ const CustomerAssignManagement = () => {
   const [loading, setLoading] = useState(false);
   const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<number | undefined>();
-  const [remark, setRemark] = useState('');
+  const [assignRemark, setAssignRemark] = useState('');
+  const [editingAssignment, setEditingAssignment] = useState<CustomerAssignment | null>(null);
 
   // 检查权限
   useEffect(() => {
@@ -110,9 +117,20 @@ const CustomerAssignManagement = () => {
     return customers.filter(customer => !assignedCustomerIds.includes(customer.id));
   };
 
+  // 获取可选的客户列表
+  const getSelectableCustomers = () => {
+    // 如果是编辑模式，返回所有客户
+    if (editingAssignment) {
+      return customers;
+    }
+
+    // 如果是新增模式，过滤掉已经分配的客户
+    return customers.filter(customer => !assignments.some(assignment => assignment.customerId === customer.id));
+  };
+
   // 分配客户给员工
   const handleAssign = async () => {
-    if (selectedCustomers.length === 0 || !selectedEmployee) {
+    if (!editingAssignment && (selectedCustomers.length === 0 || !selectedEmployee)) {
       message.warning('请选择客户和员工');
       return;
     }
@@ -120,69 +138,73 @@ const CustomerAssignManagement = () => {
     try {
       setLoading(true);
 
-      // 调用后端API进行分配
-      await customerService.assignCustomers({
-        assignedToId: selectedEmployee,
-        customerIds: selectedCustomers,
-        remark
-      });
+      if (editingAssignment) {
+        // 更新现有分配
+        await customerService.updateCustomerAssignment(editingAssignment.id, {
+          customerId: selectedCustomers[0],
+          employeeId: selectedEmployee!,
+          remark: assignRemark
+        });
+        message.success('更新成功');
+      } else {
+        // 新建分配
+        await customerService.assignCustomers({
+          assignedToId: selectedEmployee!,
+          customerIds: selectedCustomers,
+          remark: assignRemark
+        });
+        message.success('分配成功');
+      }
 
-      message.success('分配成功');
-
-      // 重新获取分配数据
-      const assignmentResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
-      console.log('🔍 分配成功后重新加载数据:', assignmentResponse);
-      setAssignments(assignmentResponse.records);
+      // 重新获取分配列表
+      const assignmentsResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
+      setAssignments(assignmentsResponse.records || []);
 
       // 清空选择
       setSelectedCustomers([]);
       setSelectedEmployee(undefined);
-      setRemark('');
+      setAssignRemark('');
       setIsModalVisible(false);
+      setEditingAssignment(null);
+      form.resetFields();
     } catch (error) {
-      console.error('分配失败:', error);
-      message.error('分配失败');
+      console.error('操作失败:', error);
+      message.error('操作失败');
     } finally {
       setLoading(false);
     }
   };
 
-  // 取消分配
-  const handleRemoveAssignment = async (assignmentId: number) => {
+  // 删除分配关系
+  const handleDelete = async (id: number) => {
     try {
       setLoading(true);
+      await customerService.removeCustomerAssignment(id);
+      message.success('删除成功');
 
-      // 调用后端API取消分配
-      await customerService.removeCustomerAssignment(assignmentId);
-
-      message.success('取消分配成功');
-
-      // 重新获取分配数据
-      const assignmentResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
-      setAssignments(assignmentResponse.records);
+      // 重新获取分配列表
+      const assignmentsResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
+      setAssignments(assignmentsResponse.records || []);
     } catch (error) {
-      console.error('取消分配失败:', error);
-      message.error('取消分配失败');
+      console.error('删除失败:', error);
+      message.error('删除失败');
     } finally {
       setLoading(false);
     }
   };
 
-  // 过滤当前用户相关的分配记录
-  const getFilteredAssignments = () => {
-    console.log('🔍 当前用户ID:', currentUserId);
-    console.log('🔍 用户信息调试:', userInfo);
-    console.log('🔍 所有分配数据:', assignments);
-
-    // 超级管理员（admin用户，ID通常为1）可以看到所有分配记录
-    if (userInfo?.userName === 'admin' || Number(currentUserId) === 1) {
-      console.log('🔍 超级管理员，返回所有数据:', assignments);
-      return assignments;
-    }
-    // 管理员只能看到自己分配的记录
-    const filtered = assignments.filter(a => a.assignedById === Number(currentUserId));
-    console.log('🔍 管理员，过滤后数据:', filtered);
-    return filtered;
+  // 打开编辑模态框
+  const handleEdit = (record: CustomerAssignment) => {
+    setEditingAssignment(record);
+    setSelectedCustomers([record.customerId]);
+    setSelectedEmployee(record.assignedToId);
+    setAssignRemark(record.remark || '');
+    form.setFieldsValue({
+      customerIds: [record.customerId],
+      employeeId: record.assignedToId,
+      remark: record.remark
+    });
+    setIsModalVisible(true);
   };
 
   // 获取员工的角色中文名称
@@ -194,67 +216,74 @@ const CustomerAssignManagement = () => {
   // 表格列定义
   const columns = [
     {
+      align: 'center' as const,
       dataIndex: 'customerName',
       key: 'customerName',
-      ...getCenterColumnConfig(),
-      render: (text: string) => (
-        <Space>
-          <CustomerServiceOutlined />
-          {text}
-        </Space>
-      ),
-      title: '客户姓名'
+      title: '客户姓名',
+      width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'assignedToName',
       key: 'assignedToName',
-      ...getCenterColumnConfig(),
-      render: (text: string) => <Tag color="green">{text}</Tag>,
-      title: '分配给员工'
+      title: '分配给员工',
+      width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'assignedByName',
       key: 'assignedByName',
-      ...getCenterColumnConfig(),
-      render: (text: string) => <Tag color="blue">{text}</Tag>,
-      title: '分配人'
+      title: '分配人',
+      width: 120
     },
     {
+      align: 'center' as const,
       dataIndex: 'assignedTime',
       key: 'assignedTime',
-      ...getCenterColumnConfig(),
-      title: '分配时间'
+      title: '分配时间',
+      width: 180
     },
     {
+      align: 'center' as const,
       dataIndex: 'remark',
       key: 'remark',
-      ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
-      title: '备注'
+      title: '备注',
+      width: 200
     },
     {
+      align: 'center' as const,
+      fixed: 'right' as const,
       key: 'action',
-      ...getActionColumnConfig(120),
       render: (_: any, record: CustomerAssignment) => (
         <Space>
-          {(record.assignedById === Number(currentUserId) || Number(currentUserId) === 1) && (
-            <AButton
-              danger
-              size="small"
-              onClick={() => {
-                Modal.confirm({
-                  content: `确定要取消客户 ${record.customerName} 的分配吗？`,
-                  onOk: () => handleRemoveAssignment(record.id),
-                  title: '确认取消分配'
-                });
-              }}
-            >
-              取消分配
-            </AButton>
-          )}
+          <AButton
+            icon={<EditOutlined />}
+            size="small"
+            type="link"
+            onClick={() => handleEdit(record)}
+          >
+            编辑
+          </AButton>
+          <AButton
+            danger
+            icon={<DeleteOutlined />}
+            size="small"
+            type="link"
+            onClick={() => {
+              Modal.confirm({
+                content: `确定要删除 ${record.customerName} 的分配关系吗？`,
+                onOk: () => handleDelete(record.id),
+                title: '确认删除'
+              });
+            }}
+          >
+            删除
+          </AButton>
         </Space>
       ),
-      title: '操作'
+      title: '操作',
+      width: 150
     }
   ];
 
@@ -264,9 +293,16 @@ const CustomerAssignManagement = () => {
         title="客户分配管理"
         extra={
           <AButton
-            icon={<UserSwitchOutlined />}
+            icon={<UserOutlined />}
             type="primary"
-            onClick={() => setIsModalVisible(true)}
+            onClick={() => {
+              setEditingAssignment(null);
+              setSelectedCustomers([]);
+              setSelectedEmployee(undefined);
+              setAssignRemark('');
+              form.resetFields();
+              setIsModalVisible(true);
+            }}
           >
             分配客户
           </AButton>
@@ -274,9 +310,10 @@ const CustomerAssignManagement = () => {
       >
         <Table
           columns={columns}
-          dataSource={getFilteredAssignments()}
+          dataSource={assignments}
           loading={loading}
           rowKey="id"
+          scroll={{ x: 'max-content' }}
           {...getFullTableConfig(10)}
         />
       </Card>
@@ -285,15 +322,16 @@ const CustomerAssignManagement = () => {
       <Modal
         confirmLoading={loading}
         open={isModalVisible}
-        title="分配客户给员工"
+        title={editingAssignment ? '编辑分配关系' : '分配客户给员工'}
         width={600}
         onOk={handleAssign}
         onCancel={() => {
           setIsModalVisible(false);
+          setEditingAssignment(null);
           form.resetFields();
           setSelectedCustomers([]);
           setSelectedEmployee(undefined);
-          setRemark('');
+          setAssignRemark('');
         }}
       >
         <Form
@@ -336,15 +374,15 @@ const CustomerAssignManagement = () => {
           <Form.Item
             label="选择客户"
             name="customerIds"
-            rules={[{ message: '请选择至少一个客户', required: true }]}
+            rules={[{ message: '请选择客户', required: true }]}
           >
             <Select
               showSearch
-              mode="multiple"
+              mode={editingAssignment ? undefined : 'multiple'}
               placeholder="请选择客户"
               value={selectedCustomers}
               filterOption={(input, option) => {
-                const customer = getAvailableCustomers().find(cust => cust.id === option?.value);
+                const customer = getSelectableCustomers().find(c => c.id === option?.value);
                 if (!customer) return false;
 
                 const searchText = input.toLowerCase();
@@ -360,9 +398,9 @@ const CustomerAssignManagement = () => {
                   mobile.includes(searchText)
                 );
               }}
-              onChange={setSelectedCustomers}
+              onChange={value => setSelectedCustomers(Array.isArray(value) ? value : [value])}
             >
-              {getAvailableCustomers().map(customer => (
+              {getSelectableCustomers().map(customer => (
                 <Select.Option
                   key={customer.id}
                   value={customer.id}
@@ -376,12 +414,11 @@ const CustomerAssignManagement = () => {
           <Form.Item
             label="备注"
             name="remark"
+            rules={[{ message: '请输入备注', required: true }]}
           >
-            <Input.TextArea
-              placeholder="请输入分配备注（可选）"
-              rows={3}
-              value={remark}
-              onChange={e => setRemark(e.target.value)}
+            <Input
+              value={assignRemark}
+              onChange={e => setAssignRemark(e.target.value)}
             />
           </Form.Item>
 
@@ -389,10 +426,8 @@ const CustomerAssignManagement = () => {
             <div style={{ background: '#f6f6f6', borderRadius: '4px', padding: '12px' }}>
               <h4>分配说明：</h4>
               <ul>
-                <li>管理员只能将客户分配给自己管理的员工</li>
+                <li>管理员可以为所属员工分配客户</li>
                 <li>员工只能查看分配给自己的客户</li>
-                <li>管理员和员工无法查看不是自己添加的客户的敏感信息</li>
-                <li>超级管理员可以查看所有信息</li>
               </ul>
             </div>
           </Form.Item>

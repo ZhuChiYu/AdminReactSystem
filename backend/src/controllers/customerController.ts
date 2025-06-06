@@ -375,7 +375,7 @@ class CustomerController {
         whereCondition.createdById = req.user.id;
       }
 
-      const existingCustomer = await prisma.customer.findUnique({
+      const existingCustomer = await prisma.customer.findFirst({
         where: whereCondition
       });
 
