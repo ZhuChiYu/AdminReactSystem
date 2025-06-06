@@ -189,6 +189,101 @@ router.get('/users', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/system/users/{id}:
+ *   get:
+ *     summary: 获取用户详情
+ *     tags: [系统管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 用户ID
+ *     responses:
+ *       200:
+ *         description: 查询成功
+ *       404:
+ *         description: 用户不存在
+ */
+// 获取用户详情
+router.get('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      include: {
+        department: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        userRoles: {
+          include: {
+            role: {
+              select: {
+                id: true,
+                roleCode: true,
+                roleName: true,
+                roleType: true
+              }
+            }
+          }
+        }
+      },
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!user) {
+      throw new ApiError(404, '用户不存在');
+    }
+
+    // 转换角色数据结构
+    const roles = user.userRoles.map(ur => ({
+      code: ur.role.roleCode,
+      name: ur.role.roleName,
+      type: ur.role.roleType
+    }));
+
+    // 返回用户信息（排除敏感信息）
+    const { password: _, userRoles: __, ...userInfo } = user;
+    const userData = {
+      ...userInfo,
+      roles
+    };
+
+    res.json({
+      code: 0,
+      data: userData,
+      message: '获取用户详情成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('获取用户详情失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '获取用户详情失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+  }
+});
+
 // 创建用户
 router.post('/users', async (req, res) => {
   try {
@@ -389,6 +484,52 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/system/roles:
+ *   get:
+ *     summary: 获取角色列表
+ *     tags: [系统管理]
+ *     parameters:
+ *       - in: query
+ *         name: current
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: 当前页码
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: 每页大小
+ *       - in: query
+ *         name: roleCode
+ *         schema:
+ *           type: string
+ *         description: 角色代码
+ *       - in: query
+ *         name: roleName
+ *         schema:
+ *           type: string
+ *         description: 角色名
+ *       - in: query
+ *         name: roleType
+ *         schema:
+ *           type: string
+ *         description: 角色类型
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: integer
+ *         description: 角色状态
+ *     responses:
+ *       200:
+ *         description: 查询成功
+ */
 // 获取角色列表
 router.get('/roles', async (req, res) => {
   try {
@@ -477,6 +618,193 @@ router.get('/roles', async (req, res) => {
       path: req.path,
       timestamp: Date.now()
     });
+  }
+});
+
+// 更新角色
+router.put('/roles/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remark, roleCode, roleName, status } = req.body;
+
+    // 检查角色是否存在
+    const existingRole = await prisma.role.findUnique({
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!existingRole) {
+      throw new ApiError(404, '角色不存在');
+    }
+
+    // 如果要更新roleCode，检查新的roleCode是否已存在（排除当前角色）
+    if (roleCode && roleCode !== existingRole.roleCode) {
+      const roleWithSameCode = await prisma.role.findFirst({
+        where: {
+          AND: [
+            { roleCode },
+            { id: { not: Number.parseInt(id) } }
+          ]
+        }
+      });
+
+      if (roleWithSameCode) {
+        throw new ApiError(400, '角色代码已存在');
+      }
+    }
+
+    // 不允许更新超级管理员角色
+    if (existingRole.roleCode === 'super_admin') {
+      throw new ApiError(403, '不允许修改超级管理员角色');
+    }
+
+    const role = await prisma.role.update({
+      data: {
+        remark,
+        roleCode,
+        roleName,
+        status: status !== undefined ? Number(status) : undefined
+      },
+      where: { id: Number.parseInt(id) }
+    });
+
+    logger.info(`角色更新成功: ${roleName}`);
+
+    res.json({
+      code: 0,
+      data: role,
+      message: '角色更新成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('更新角色失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '更新角色失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+  }
+});
+
+// 删除角色
+router.delete('/roles/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 检查角色是否存在
+    const existingRole = await prisma.role.findUnique({
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!existingRole) {
+      throw new ApiError(404, '角色不存在');
+    }
+
+    // 不允许删除超级管理员角色
+    if (existingRole.roleCode === 'super_admin') {
+      throw new ApiError(403, '不允许删除超级管理员角色');
+    }
+
+    // 删除角色（关联的用户角色会自动删除，因为设置了级联删除）
+    await prisma.role.delete({
+      where: { id: Number.parseInt(id) }
+    });
+
+    logger.info(`角色删除成功: ${existingRole.roleName}`);
+
+    res.json({
+      code: 0,
+      data: null,
+      message: '角色删除成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('删除角色失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '删除角色失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+  }
+});
+
+// 批量删除角色
+router.post('/roles/batch-delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, '角色ID列表不能为空');
+    }
+
+    // 检查是否包含超级管理员角色
+    const roles = await prisma.role.findMany({
+      where: { id: { in: ids.map(id => Number(id)) } }
+    });
+
+    const hasSuperAdmin = roles.some(role => role.roleCode === 'super_admin');
+    if (hasSuperAdmin) {
+      throw new ApiError(403, '不允许删除超级管理员角色');
+    }
+
+    // 批量删除角色（关联的用户角色会自动删除，因为设置了级联删除）
+    await prisma.role.deleteMany({
+      where: { id: { in: ids.map(id => Number(id)) } }
+    });
+
+    logger.info(`批量删除角色成功: ${roles.map(r => r.roleName).join(', ')}`);
+
+    res.json({
+      code: 0,
+      data: null,
+      message: '批量删除角色成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('批量删除角色失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '批量删除角色失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
   }
 });
 

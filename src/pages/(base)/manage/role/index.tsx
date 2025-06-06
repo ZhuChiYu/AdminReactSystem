@@ -1,13 +1,34 @@
+import {
+  Button as AButton,
+  Card as ACard,
+  Collapse as ACollapse,
+  Popconfirm as APopconfirm,
+  Table as ATable,
+  Tag as ATag
+} from 'antd';
 import { Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { enableStatusRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
 import { TableHeaderOperation, useTable, useTableOperate, useTableScroll } from '@/features/table';
-import { fetchGetRoleList } from '@/service/api';
+import { useMobile } from '@/hooks/common/mobile';
+import { batchDeleteRoles, createRole, deleteRole, fetchGetRoleList, updateRole } from '@/service/api';
 
 import RoleSearch from './modules/role-search';
 
 const RoleOperateDrawer = lazy(() => import('./modules/role-operate-drawer'));
+
+interface RoleRecord {
+  id: number;
+  index?: number;
+  remark?: string;
+  roleCode: string;
+  roleName: string;
+  roleType?: string;
+  status: Api.Common.EnableStatus;
+}
 
 const Role = () => {
   const { t } = useTranslation();
@@ -60,93 +81,94 @@ const Role = () => {
       size: 10,
       status: undefined
     },
-    columns: () => [
-      {
-        align: 'center',
-        dataIndex: 'index',
-        key: 'index',
-        title: t('common.index'),
-        width: 64
-      },
-      {
-        align: 'center',
-        dataIndex: 'roleName',
-        key: 'roleName',
-        minWidth: 120,
-        title: t('page.manage.role.roleName')
-      },
-      {
-        align: 'center',
-        dataIndex: 'roleCode',
-        key: 'roleCode',
-        minWidth: 120,
-        title: t('page.manage.role.roleCode')
-      },
-      {
-        align: 'center',
-        dataIndex: 'remark', // 使用API返回的实际字段名
-        key: 'roleDesc',
-        minWidth: 120,
-        title: t('page.manage.role.roleDesc')
-      },
-      {
-        align: 'center',
-        dataIndex: 'status',
-        key: 'status',
-        render: (_, record: any) => {
-          if (record.status === null) {
-            return null;
-          }
-          const label = t(enableStatusRecord[record.status]);
-          return <ATag color={ATG_MAP[record.status]}>{label}</ATag>;
+    columns: () =>
+      [
+        {
+          align: 'center',
+          dataIndex: 'index',
+          key: 'index',
+          title: t('common.index'),
+          width: 64
         },
-        title: t('page.manage.role.roleStatus'),
-        width: 100
-      },
-      {
-        align: 'center',
-        fixed: 'right' as const,
-        key: 'operate',
-        render: (_, record: any) => {
-          const isSuperAdmin = record.roleCode === 'super_admin';
+        {
+          align: 'center',
+          dataIndex: 'roleName',
+          key: 'roleName',
+          minWidth: 120,
+          title: t('page.manage.role.roleName')
+        },
+        {
+          align: 'center',
+          dataIndex: 'roleCode',
+          key: 'roleCode',
+          minWidth: 120,
+          title: t('page.manage.role.roleCode')
+        },
+        {
+          align: 'center',
+          dataIndex: 'remark',
+          key: 'roleDesc',
+          minWidth: 120,
+          title: t('page.manage.role.roleDesc')
+        },
+        {
+          align: 'center',
+          dataIndex: 'status',
+          key: 'status',
+          render: (_: unknown, record: RoleRecord) => {
+            if (record.status === null) {
+              return null;
+            }
+            const label = t(enableStatusRecord[record.status]);
+            return <ATag color={ATG_MAP[record.status]}>{label}</ATag>;
+          },
+          title: t('page.manage.role.roleStatus'),
+          width: 100
+        },
+        {
+          align: 'center',
+          fixed: 'right' as const,
+          key: 'operate',
+          render: (_: unknown, record: RoleRecord) => {
+            const isSuperAdmin = record.roleCode === 'super_admin';
 
-          return (
-            <div className="flex-center gap-8px">
-              <AButton
-                ghost
-                size="small"
-                type="primary"
-                onClick={() => edit(record.id)}
-              >
-                {t('common.edit')}
-              </AButton>
-              <AButton
-                size="small"
-                onClick={() => nav(`/manage/role/${record.id}/${record.roleName}/${record.status}`)}
-              >
-                详情
-              </AButton>
-              <APopconfirm
-                title={isSuperAdmin ? '超级管理员角色不允许删除' : t('common.confirmDelete')}
-                onConfirm={isSuperAdmin ? undefined : () => handleDelete(record.id)}
-              >
+            return (
+              <div className="flex-center gap-8px">
                 <AButton
-                  danger
-                  disabled={isSuperAdmin}
+                  ghost
                   size="small"
-                  title={isSuperAdmin ? '超级管理员角色不允许删除' : ''}
+                  type="primary"
+                  onClick={() => edit(record.id)}
                 >
-                  {t('common.delete')}
+                  {t('common.edit')}
                 </AButton>
-              </APopconfirm>
-            </div>
-          );
-        },
-        title: t('common.operate'),
-        width: 195
-      }
-    ]
-  } as any);
+                <AButton
+                  size="small"
+                  onClick={() => nav(`/manage/role/${record.id}/${record.roleName}/${record.status}`)}
+                >
+                  详情
+                </AButton>
+                <APopconfirm
+                  title={isSuperAdmin ? '超级管理员角色不允许删除' : t('common.confirmDelete')}
+                  onConfirm={isSuperAdmin ? undefined : () => handleDelete(record.id)}
+                >
+                  <AButton
+                    danger
+                    disabled={isSuperAdmin}
+                    size="small"
+                    title={isSuperAdmin ? '超级管理员角色不允许删除' : ''}
+                  >
+                    {t('common.delete')}
+                  </AButton>
+                </APopconfirm>
+              </div>
+            );
+          },
+          title: t('common.operate'),
+          width: 195
+        }
+      ] as const
+  });
 
   const {
     checkedRowKeys,
@@ -157,19 +179,43 @@ const Role = () => {
     onBatchDeleted,
     onDeleted,
     rowSelection
-  } = useTableOperate(data as any[], run, async (res, type) => {
+  } = useTableOperate(data as RoleRecord[], run, async (res, type) => {
     if (type === 'add') {
-      // add request 调用新增的接口
-      console.log(res);
+      try {
+        // 调用创建角色API
+        await createRole({
+          remark: res.roleDesc,
+          roleCode: res.roleCode,
+          roleName: res.roleName,
+          status: Number(res.status)
+        });
+        window.$message?.success(t('common.createSuccess'));
+        run(); // 刷新表格数据
+      } catch (error) {
+        console.error('创建角色失败:', error);
+        window.$message?.error(t('common.createFailed'));
+      }
     } else {
-      // edit request 调用编辑的接口
-      console.log(res);
+      // 编辑角色
+      try {
+        await updateRole(editingData!.id, {
+          remark: res.roleDesc,
+          roleCode: res.roleCode,
+          roleName: res.roleName,
+          status: Number(res.status)
+        });
+        window.$message?.success(t('common.updateSuccess'));
+        run(); // 刷新表格数据
+      } catch (error) {
+        console.error('更新角色失败:', error);
+        window.$message?.error(t('common.updateFailed'));
+      }
     }
   });
 
   async function handleBatchDelete() {
     // 检查是否包含超级管理员角色
-    const selectedRoles = (data as any[]).filter(item => checkedRowKeys.includes(item.id));
+    const selectedRoles = (data as RoleRecord[]).filter(item => checkedRowKeys.includes(item.id));
     const hasSuperAdmin = selectedRoles.some(role => role.roleCode === 'super_admin');
 
     if (hasSuperAdmin) {
@@ -177,22 +223,34 @@ const Role = () => {
       return;
     }
 
-    // request
-    console.log(checkedRowKeys);
-    onBatchDeleted();
+    try {
+      await batchDeleteRoles(checkedRowKeys as number[]);
+      window.$message?.success(t('common.batchDeleteSuccess'));
+      run(); // 刷新表格数据
+      onBatchDeleted();
+    } catch (error) {
+      console.error('批量删除角色失败:', error);
+      window.$message?.error(t('common.batchDeleteFailed'));
+    }
   }
 
   async function handleDelete(id: number) {
     // 找到要删除的角色
-    const roleToDelete = (data as any[]).find(item => item.id === id);
+    const roleToDelete = (data as RoleRecord[]).find(item => item.id === id);
     if (roleToDelete?.roleType === 'permission') {
       window.$message?.error('权限角色不允许删除');
       return;
     }
 
-    // request
-    console.log(id);
-    onDeleted();
+    try {
+      await deleteRole(id);
+      window.$message?.success(t('common.deleteSuccess'));
+      run(); // 刷新表格数据
+      onDeleted();
+    } catch (error) {
+      console.error('删除角色失败:', error);
+      window.$message?.error(t('common.deleteFailed'));
+    }
   }
 
   function edit(id: number) {

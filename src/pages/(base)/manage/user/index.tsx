@@ -16,7 +16,8 @@ import { useNavigate } from 'react-router-dom';
 import { enableStatusRecord, userGenderRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
 import { TableHeaderOperation, useTable, useTableOperate, useTableScroll } from '@/features/table';
-import { employeeService } from '@/service/api';
+import { useMobile } from '@/hooks/common/mobile';
+import { apiClient, employeeService } from '@/service/api';
 import { isSuperAdmin } from '@/utils/auth';
 
 import UserSearch from './modules/UserSearch';
@@ -112,173 +113,10 @@ const UserManage = () => {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingPermissionRole, setEditingPermissionRole] = useState<{ currentRole: string; id: number } | null>(null);
 
-  const { scrollConfig, tableWrapperRef } = useTableScroll();
-
-  const nav = useNavigate();
-
+  const { tableWrapperRef } = useTableScroll();
   const isMobile = useMobile();
 
-  const runRef = useRef<() => Promise<void>>();
-
-  // 处理权限角色修改
-  const handlePermissionRoleChange = async (userId: number, newRole: string) => {
-    try {
-      await employeeService.updateEmployeePermissionRole(userId, newRole);
-      message.success('权限角色更新成功');
-      // Refresh the list
-      if (runRef.current) {
-        await runRef.current();
-      }
-    } catch (error) {
-      console.error('更新权限角色失败:', error);
-      message.error('权限角色更新失败');
-    }
-    setEditingPermissionRole(null);
-  };
-
-  const togglePasswordVisibility = (id: number) => {
-    setPasswordVisible(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
-
-  // 下载导入模板
-  const handleDownloadTemplate = async () => {
-    try {
-      const blob = await employeeService.downloadTemplate();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'employee_import_template.xlsx';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      window.$message?.success('模板下载成功');
-    } catch (error) {
-      console.error('下载模板失败:', error);
-      window.$message?.error('下载模板失败');
-    }
-  };
-
-  // 处理文件导入
-  const handleImport = async (file: File) => {
-    setImportLoading(true);
-    try {
-      const result = await employeeService.importEmployees(file);
-
-      // 显示导入结果
-      const { errorList, failed, success, total } = result;
-
-      if (failed === 0) {
-        window.$message?.success(`导入成功！共导入 ${success} 条记录`);
-      } else {
-        const errorMsg = errorList
-          .slice(0, 3)
-          .map(item => `第${item.row}行: ${item.error}`)
-          .join('\n');
-
-        window.$message?.warning(
-          `导入完成！成功 ${success} 条，失败 ${failed} 条。${failed > 0 ? `\n失败原因:\n${errorMsg}` : ''}`
-        );
-      }
-
-      // 刷新表格数据
-      run();
-    } catch (error) {
-      console.error('导入失败:', error);
-      window.$message?.error('导入失败，请检查文件格式');
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  // 创建适配器函数来匹配表格组件的API格式
-  async function fetchEmployeeListAdapter(params: FetchEmployeeListParams) {
-    try {
-      const response = await employeeService.getEmployeeList({
-        current: params.current || 1,
-        department: params.department || undefined,
-        nickName: params.nickName || undefined,
-        size: params.size || 10,
-        status: params.status || undefined,
-        userName: params.userName || undefined
-      });
-
-      return {
-        data: {
-          current: response.current,
-          records: response.records.map((record, index): UserRecord => {
-            let userGender: Api.SystemManage.UserGender | undefined;
-            if (record.gender === 'male') {
-              userGender = 1 as unknown as Api.SystemManage.UserGender;
-            } else if (record.gender === 'female') {
-              userGender = 2 as unknown as Api.SystemManage.UserGender;
-            }
-
-            let status: Api.Common.EnableStatus | null = null;
-            if (record.status === 'active') {
-              status = '1';
-            } else if (record.status === 'inactive') {
-              status = '2';
-            }
-
-            const roles = record.roles.map(
-              role =>
-                ({
-                  // 由于后端API没有返回id，我们设置一个默认值
-                  code: role.code,
-                  id: 0,
-                  name: role.name,
-                  type:
-                    role.code === 'super_admin' || role.code === 'admin' || role.code === 'employee'
-                      ? 'permission'
-                      : 'position'
-                }) as Role
-            );
-
-            return {
-              address: record.address,
-              bankCard: record.bankCard,
-              createBy: 'system',
-              createTime: record.createdAt,
-              email: record.email,
-              id: record.id,
-              idCard: record.idCard,
-              index: (response.current - 1) * response.size + index + 1,
-              nickName: record.nickName,
-              password: '123456',
-              phone: record.phone,
-              roleCode: record.roles?.[0]?.code,
-              roles,
-              status,
-              tim: record.tim,
-              updateBy: 'system',
-              updateTime: record.updatedAt,
-              userEmail: record.email,
-              userGender,
-              userName: record.userName,
-              userPhone: record.phone,
-              wechat: record.wechat
-            };
-          }),
-          size: response.size,
-          total: response.total
-        }
-      };
-    } catch (error) {
-      console.error('获取员工列表失败:', error);
-      return {
-        data: {
-          current: 1,
-          records: [],
-          size: 10,
-          total: 0
-        }
-      };
-    }
-  }
+  const nav = useNavigate();
 
   const { columnChecks, data, run, searchProps, setColumnChecks, tableProps } = useTable<FetchEmployeeListFn>(
     {
@@ -557,8 +395,35 @@ const UserManage = () => {
   const { checkedRowKeys, generalPopupOperation, handleAdd, handleEdit, onBatchDeleted, onDeleted, rowSelection } =
     useTableOperate(data, run, async (res: any, type) => {
       if (type === 'add') {
-        // add request 调用新增的接口
-        console.log(res);
+        try {
+          // 转换前端表单数据为后端API格式
+          const createData = {
+            address: res.address,
+            bankCard: res.bankCard,
+            email: res.email || res.userEmail,
+            gender: getGenderValue(res.userGender),
+            idCard: res.idCard,
+            nickName: res.nickName,
+            password: res.password,
+            phone: res.userPhone,
+            // 合并职位角色和权限角色
+            roles: [res.positionRole, res.permissionRole || 'employee'].filter(Boolean),
+            status: getStatusValue(res.status),
+            tim: res.tim,
+            userName: res.userName,
+            wechat: res.wechat
+          };
+
+          console.log('创建用户数据:', createData);
+          await apiClient.post('/system/users', createData);
+
+          window.$message?.success('创建成功');
+          run(); // 刷新表格数据
+        } catch (error: any) {
+          console.error('创建用户失败:', error);
+          window.$message?.error('创建失败');
+          throw error;
+        }
       } else {
         // edit request 调用编辑的接口
         try {
@@ -580,8 +445,8 @@ const UserManage = () => {
             idCard: res.idCard,
             nickName: res.nickName,
             phone: res.userPhone,
-            // 合并职位角色和权限角色
-            roles: [res.positionRole, res.permissionRole || 'employee'].filter(Boolean),
+            // 合并职位角色和权限角色，确保两个角色都存在
+            roles: [res.positionRole, res.permissionRole].filter(Boolean),
             status: getStatusValue(res.status),
             tim: res.tim,
             userName: res.userName,
@@ -660,15 +525,171 @@ const UserManage = () => {
     }
   }
 
-  // 保存 run 函数的引用
+  const runRef = useRef(run);
+
   useEffect(() => {
     runRef.current = run;
   }, [run]);
 
-  // 初始化加载
-  useEffect(() => {
-    runRef.current?.();
-  }, []);
+  // 处理权限角色修改
+  const handlePermissionRoleChange = async (userId: number, newRole: string) => {
+    try {
+      await employeeService.updateEmployeePermissionRole(userId, newRole);
+      message.success('权限角色更新成功');
+      // Refresh the list
+      if (runRef.current) {
+        await runRef.current();
+      }
+    } catch (error) {
+      console.error('更新权限角色失败:', error);
+      message.error('权限角色更新失败');
+    }
+    setEditingPermissionRole(null);
+  };
+
+  const togglePasswordVisibility = (id: number) => {
+    setPasswordVisible(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // 下载导入模板
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await employeeService.downloadTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'employee_import_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      window.$message?.success('模板下载成功');
+    } catch (error) {
+      console.error('下载模板失败:', error);
+      window.$message?.error('下载模板失败');
+    }
+  };
+
+  // 处理文件导入
+  const handleImport = async (file: File) => {
+    setImportLoading(true);
+    try {
+      const result = await employeeService.importEmployees(file);
+
+      // 显示导入结果
+      const { errorList, failed, success, total } = result;
+
+      if (failed === 0) {
+        window.$message?.success(`导入成功！共导入 ${success} 条记录`);
+      } else {
+        const errorMsg = errorList
+          .slice(0, 3)
+          .map(item => `第${item.row}行: ${item.error}`)
+          .join('\n');
+
+        window.$message?.warning(
+          `导入完成！成功 ${success} 条，失败 ${failed} 条。${failed > 0 ? `\n失败原因:\n${errorMsg}` : ''}`
+        );
+      }
+
+      // 刷新表格数据
+      run();
+    } catch (error) {
+      console.error('导入失败:', error);
+      window.$message?.error('导入失败，请检查文件格式');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // 创建适配器函数来匹配表格组件的API格式
+  async function fetchEmployeeListAdapter(params: FetchEmployeeListParams) {
+    try {
+      const response = await employeeService.getEmployeeList({
+        current: params.current || 1,
+        department: params.department || undefined,
+        nickName: params.nickName || undefined,
+        size: params.size || 10,
+        status: params.status || undefined,
+        userName: params.userName || undefined
+      });
+
+      return {
+        data: {
+          current: response.current,
+          records: response.records.map((record, index): UserRecord => {
+            let userGender: Api.SystemManage.UserGender | undefined;
+            if (record.gender === 'male') {
+              userGender = 1 as unknown as Api.SystemManage.UserGender;
+            } else if (record.gender === 'female') {
+              userGender = 2 as unknown as Api.SystemManage.UserGender;
+            }
+
+            let status: Api.Common.EnableStatus | null = null;
+            if (record.status === 'active') {
+              status = '1';
+            } else if (record.status === 'inactive') {
+              status = '2';
+            }
+
+            const roles = record.roles.map(
+              role =>
+                ({
+                  // 由于后端API没有返回id，我们设置一个默认值
+                  code: role.code,
+                  id: 0,
+                  name: role.name,
+                  type:
+                    role.code === 'super_admin' || role.code === 'admin' || role.code === 'employee'
+                      ? 'permission'
+                      : 'position'
+                }) as Role
+            );
+
+            return {
+              address: record.address,
+              bankCard: record.bankCard,
+              createBy: 'system',
+              createTime: record.createdAt,
+              email: record.email,
+              id: record.id,
+              idCard: record.idCard,
+              index: (response.current - 1) * response.size + index + 1,
+              nickName: record.nickName,
+              password: '123456',
+              phone: record.phone,
+              roleCode: record.roles?.[0]?.code,
+              roles,
+              status,
+              tim: record.tim,
+              updateBy: 'system',
+              updateTime: record.updatedAt,
+              userEmail: record.email,
+              userGender,
+              userName: record.userName,
+              userPhone: record.phone,
+              wechat: record.wechat
+            };
+          }),
+          size: response.size,
+          total: response.total
+        }
+      };
+    } catch (error) {
+      console.error('获取员工列表失败:', error);
+      return {
+        data: {
+          current: 1,
+          records: [],
+          size: 10,
+          total: 0
+        }
+      };
+    }
+  }
 
   return (
     <div className="h-full min-h-600px flex-col-stretch gap-16px overflow-auto p-16px">

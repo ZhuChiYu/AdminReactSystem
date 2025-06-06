@@ -1,34 +1,9 @@
 import { UserOutlined } from '@ant-design/icons';
-import { Button as AButton, Card, Checkbox, Form, Modal, Select, Space, Table, Tag, message } from 'antd';
+import { Button as AButton, Card, Form, Input, Modal, Select, Table, message } from 'antd';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { type EmployeeApi, employeeService } from '@/service/api';
-import { isSuperAdmin } from '@/utils/auth';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
-
-// 角色中文名称映射
-const roleNames = {
-  // 权限角色
-  admin: '管理员',
-  // 职务角色
-  consultant: '顾问',
-  employee: '员工',
-  general_manager: '总经理',
-  hr_bp: '人力BP',
-  hr_specialist: '人力专员',
-  marketing_manager: '市场部经理',
-  sales_director: '销售总监',
-  sales_manager: '销售经理',
-  super_admin: '超级管理员'
-};
-
-// 权限角色选项
-const permissionRoleOptions = [
-  { label: '超级管理员', value: 'super_admin' },
-  { label: '管理员', value: 'admin' },
-  { label: '员工', value: 'employee' }
-];
+import { getFullTableConfig } from '@/utils/table';
 
 interface EmployeeManagerRelation {
   assignedById: number;
@@ -42,7 +17,6 @@ interface EmployeeManagerRelation {
 }
 
 const EmployeeManagerManagement = () => {
-  const navigate = useNavigate();
   const [form] = Form.useForm();
 
   // 状态管理
@@ -54,15 +28,6 @@ const EmployeeManagerManagement = () => {
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [selectedManager, setSelectedManager] = useState<number | undefined>();
   const [assignRemark, setAssignRemark] = useState('');
-  const [editingPermissionRole, setEditingPermissionRole] = useState<{ currentRole: string; id: number } | null>(null);
-
-  // 检查权限
-  useEffect(() => {
-    if (!isSuperAdmin()) {
-      message.error('您没有权限访问此页面');
-      navigate('/home');
-    }
-  }, [navigate]);
 
   // 加载数据
   useEffect(() => {
@@ -77,9 +42,7 @@ const EmployeeManagerManagement = () => {
         setEmployees(allEmployees);
 
         // 过滤出管理员角色的员工
-        const managerList = allEmployees.filter(emp =>
-          emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
-        );
+        const managerList = allEmployees.filter(emp => emp.roles?.some(role => role.code === 'admin'));
         setManagers(managerList);
 
         // 获取员工-管理员关系记录
@@ -96,14 +59,11 @@ const EmployeeManagerManagement = () => {
     fetchData();
   }, []);
 
-  // 获取未分配的员工
+  // 获取未分配的员工（只显示权限角色为"员工"的用户）
   const getUnassignedEmployees = () => {
     const assignedEmployeeIds = relations.map(r => r.employeeId);
     return employees.filter(
-      emp =>
-        !assignedEmployeeIds.includes(emp.id) &&
-        !emp.roles?.some(role => role.code === 'admin') &&
-        !emp.roles?.some(role => role.code === 'super_admin')
+      emp => !assignedEmployeeIds.includes(emp.id) && emp.roles?.some(role => role.code === 'employee')
     );
   };
 
@@ -144,208 +104,30 @@ const EmployeeManagerManagement = () => {
     }
   };
 
-  // 取消分配
-  const handleRemoveAssignment = async (relationId: number) => {
-    try {
-      setLoading(true);
-
-      // 调用后端API取消分配
-      await employeeService.removeEmployeeManagerRelation(relationId);
-
-      message.success('取消分配成功');
-
-      // 重新获取关系数据
-      const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
-      setRelations(relationsResponse.records);
-    } catch (error) {
-      console.error('取消分配失败:', error);
-      message.error('取消分配失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 获取员工的角色中文名称
-  const getEmployeeRoleName = (employee: EmployeeApi.EmployeeListItem) => {
-    const roleCode = employee.roles?.[0]?.code || '';
-    return roleNames[roleCode as keyof typeof roleNames] || roleCode || '未知角色';
-  };
-
-  // 处理权限角色修改
-  const handlePermissionRoleChange = async (employeeId: number, newRole: string) => {
-    try {
-      await employeeService.updateEmployeePermissionRole(employeeId, newRole);
-      message.success('权限角色更新成功');
-      // 刷新列表
-      // TODO: 调用获取列表的方法
-    } catch (error) {
-      message.error('权限角色更新失败');
-    }
-    setEditingPermissionRole(null);
-  };
-
   // 表格列定义
   const columns = [
     {
-      align: 'center',
-      dataIndex: 'index',
-      key: 'index',
-      title: '序号',
-      width: 80
-    },
-    {
-      align: 'center',
-      dataIndex: 'username',
-      key: 'username',
-      title: '用户名',
+      dataIndex: 'employeeName',
+      key: 'employeeName',
+      title: '员工姓名',
       width: 120
     },
     {
-      align: 'center',
-      dataIndex: 'password',
-      key: 'password',
-      render: () => (
-        <Space>
-          ******
-          <AButton
-            size="small"
-            type="link"
-          >
-            查看
-          </AButton>
-        </Space>
-      ),
-      title: '密码',
+      dataIndex: 'managerName',
+      key: 'managerName',
+      title: '管理员姓名',
       width: 120
     },
     {
-      align: 'center',
-      dataIndex: 'nickName',
-      key: 'nickName',
-      title: '姓名',
+      dataIndex: 'assignedByName',
+      key: 'assignedByName',
+      title: '分配人',
       width: 120
     },
     {
-      align: 'center',
-      dataIndex: 'roles',
-      key: 'positionRole',
-      render: (roles: Array<{ code: string; name: string; type: string }>) => {
-        const positionRole = roles.find(role => role.type === 'position');
-        return positionRole ? (
-          <Tag color="blue">{roleNames[positionRole.code as keyof typeof roleNames] || positionRole.code}</Tag>
-        ) : null;
-      },
-      title: '员工角色',
-      width: 120
-    },
-    {
-      align: 'center',
-      dataIndex: 'roles',
-      key: 'permissionRole',
-      render: (roles: Array<{ code: string; name: string; type: string }>, record: any) => {
-        const permissionRole = roles.find(role => role.type === 'permission');
-        const currentRole = permissionRole?.code || 'employee';
-
-        if (editingPermissionRole?.id === record.id) {
-          return (
-            <Select
-              autoFocus
-              defaultValue={currentRole}
-              options={permissionRoleOptions}
-              style={{ width: 120 }}
-              onBlur={() => setEditingPermissionRole(null)}
-              onChange={value => handlePermissionRoleChange(record.id, value)}
-              onClick={e => e.stopPropagation()}
-            />
-          );
-        }
-
-        const roleColor = currentRole === 'super_admin' ? 'gold' : currentRole === 'admin' ? 'green' : 'blue';
-
-        return (
-          <Tag
-            color={roleColor}
-            style={{ cursor: isSuperAdmin() ? 'pointer' : 'default' }}
-            onClick={e => {
-              e.stopPropagation();
-              if (isSuperAdmin()) {
-                setEditingPermissionRole({ currentRole, id: record.id });
-              }
-            }}
-          >
-            {roleNames[currentRole as keyof typeof roleNames] || currentRole}
-          </Tag>
-        );
-      },
-      title: '权限角色',
-      width: 120
-    },
-    {
-      align: 'center',
-      dataIndex: 'gender',
-      key: 'gender',
-      render: (gender: string) => <Tag color={gender === '男' ? 'blue' : 'pink'}>{gender}</Tag>,
-      title: '性别',
-      width: 80
-    },
-    {
-      align: 'center',
-      dataIndex: 'phone',
-      key: 'phone',
-      title: '手机号',
-      width: 120
-    },
-    {
-      align: 'center',
-      dataIndex: 'email',
-      key: 'email',
-      title: '邮箱',
-      width: 200
-    },
-    {
-      align: 'center',
-      dataIndex: 'address',
-      key: 'address',
-      title: '家庭住址',
-      width: 200
-    },
-    {
-      align: 'center',
-      dataIndex: 'bankCardNo',
-      key: 'bankCardNo',
-      title: '银行卡号',
-      width: 180
-    },
-    {
-      align: 'center',
-      fixed: 'right',
-      key: 'action',
-      render: (_: any, record: any) => (
-        <Space>
-          <AButton
-            size="small"
-            type="link"
-          >
-            编辑
-          </AButton>
-          <AButton
-            size="small"
-            type="link"
-          >
-            详情
-          </AButton>
-          {record.username !== 'admin' && (
-            <AButton
-              danger
-              size="small"
-              type="link"
-            >
-              删除
-            </AButton>
-          )}
-        </Space>
-      ),
-      title: '操作',
+      dataIndex: 'assignedTime',
+      key: 'assignedTime',
+      title: '分配时间',
       width: 180
     }
   ];
@@ -402,15 +184,14 @@ const EmployeeManagerManagement = () => {
               placeholder="请选择管理员"
               value={selectedManager}
               filterOption={(input, option) => {
-                const manager = managers.find(mgr => mgr.id === option?.value);
+                const manager = managers.find(m => m.id === option?.value);
                 if (!manager) return false;
 
                 const searchText = input.toLowerCase();
                 const nickName = manager.nickName?.toLowerCase() || '';
                 const userName = manager.userName?.toLowerCase() || '';
-                const roleName = getEmployeeRoleName(manager).toLowerCase();
 
-                return nickName.includes(searchText) || userName.includes(searchText) || roleName.includes(searchText);
+                return nickName.includes(searchText) || userName.includes(searchText);
               }}
               onChange={setSelectedManager}
             >
@@ -419,7 +200,7 @@ const EmployeeManagerManagement = () => {
                   key={manager.id}
                   value={manager.id}
                 >
-                  {manager.nickName} ({getEmployeeRoleName(manager)})
+                  {manager.nickName} ({manager.userName})
                 </Select.Option>
               ))}
             </Select>
@@ -442,9 +223,8 @@ const EmployeeManagerManagement = () => {
                 const searchText = input.toLowerCase();
                 const nickName = employee.nickName?.toLowerCase() || '';
                 const userName = employee.userName?.toLowerCase() || '';
-                const roleName = getEmployeeRoleName(employee).toLowerCase();
 
-                return nickName.includes(searchText) || userName.includes(searchText) || roleName.includes(searchText);
+                return nickName.includes(searchText) || userName.includes(searchText);
               }}
               onChange={setSelectedEmployees}
             >
@@ -453,7 +233,7 @@ const EmployeeManagerManagement = () => {
                   key={employee.id}
                   value={employee.id}
                 >
-                  {employee.nickName} ({getEmployeeRoleName(employee)})
+                  {employee.nickName} ({employee.userName})
                 </Select.Option>
               ))}
             </Select>
@@ -464,8 +244,7 @@ const EmployeeManagerManagement = () => {
             name="remark"
             rules={[{ message: '请输入备注', required: true }]}
           >
-            <input
-              type="text"
+            <Input
               value={assignRemark}
               onChange={e => setAssignRemark(e.target.value)}
             />

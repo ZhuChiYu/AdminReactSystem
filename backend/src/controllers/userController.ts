@@ -843,29 +843,25 @@ class UserController {
           where: { userId: Number.parseInt(id) }
         });
 
-        // 分配新角色（roles 可以是字符串或字符串数组）
-        if (roles) {
-          let roleCodeToAssign: string | undefined;
-
-          if (typeof roles === 'string' && roles.trim() !== '') {
-            roleCodeToAssign = roles;
-          } else if (Array.isArray(roles) && roles.length > 0) {
-            roleCodeToAssign = roles[0]; // 取第一个角色
-          }
-
-          if (roleCodeToAssign) {
-            const roleToAssign = await prisma.role.findUnique({
-              where: { roleCode: roleCodeToAssign }
-            });
-
-            if (roleToAssign) {
-              await prisma.userRole.create({
-                data: {
-                  roleId: roleToAssign.id,
-                  userId: Number.parseInt(id)
-                }
-              });
+        // 分配新角色
+        if (Array.isArray(roles)) {
+          // 获取所有要分配的角色
+          const rolesToAssign = await prisma.role.findMany({
+            where: {
+              roleCode: {
+                in: roles
+              }
             }
+          });
+
+          // 创建用户角色关联
+          if (rolesToAssign.length > 0) {
+            await prisma.userRole.createMany({
+              data: rolesToAssign.map(role => ({
+                roleId: role.id,
+                userId: Number.parseInt(id)
+              }))
+            });
           }
         }
 

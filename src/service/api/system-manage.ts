@@ -18,6 +18,43 @@ export function fetchGetRoleList(params?: Api.SystemManage.RoleSearchParams) {
   });
 }
 
+/** create role */
+export function createRole(data: {
+  remark?: string;
+  roleCode: string;
+  roleName: string;
+  roleType?: string;
+  status: number;
+}) {
+  return apiClient.post('/system/roles', {
+    ...data,
+    roleType: 'position' // 默认创建职务角色
+  });
+}
+
+/** update role */
+export function updateRole(
+  id: number,
+  data: {
+    remark?: string;
+    roleCode: string;
+    roleName: string;
+    status: number;
+  }
+) {
+  return apiClient.put(`/system/roles/${id}`, data);
+}
+
+/** delete role */
+export function deleteRole(id: number) {
+  return apiClient.delete(`/system/roles/${id}`);
+}
+
+/** batch delete roles */
+export function batchDeleteRoles(ids: number[]) {
+  return apiClient.post('/system/roles/batch-delete', { ids });
+}
+
 /**
  * get all roles
  *
