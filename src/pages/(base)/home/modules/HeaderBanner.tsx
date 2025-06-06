@@ -53,11 +53,11 @@ const HeaderBanner = () => {
       variant="borderless"
     >
       <div className="flex-y-center">
-        <div className="size-72px shrink-0 overflow-hidden rd-1/2">
+        <div className="size-72px flex shrink-0 items-center justify-center overflow-hidden rd-1/2">
           <UserAvatar
             avatar={userInfo.avatar}
             gender={convertGender(userInfo.gender)}
-            size={40}
+            size={72}
           />
         </div>
         <div className="pl-12px">
