@@ -249,12 +249,12 @@ router.post('/create', authMiddleware, async (req, res) => {
       // 为每个超级管理员创建通知
       const notifications = superAdmins.map(admin => ({
         content: `${userName}提交了新的报销申请：${applicationReason || '无备注'}，申请金额：¥${totalAmount}，请及时审核处理。`,
+        createTime: new Date().toISOString(),
         relatedId: application.id,
         relatedType: 'expense_application',
-        userId: admin.id,
         title: '新报销申请待审核',
         type: 'expense',
-        createTime: new Date().toISOString()
+        userId: admin.id
       }));
 
       if (notifications.length > 0) {
@@ -345,13 +345,13 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
 
       await prisma.notification.create({
         data: {
-          userId: updatedApplication.applicantId,
-          title: `报销申请审批${statusText}`,
-          content: `您的报销申请 (编号: ${updatedApplication.applicationNo}) 已被${approverName}${statusText}。${remark ? '审批意见：' + remark : ''}`,
-          type: Number(status) === 1 ? 'success' : 'warning',
+          content: `您的报销申请 (编号: ${updatedApplication.applicationNo}) 已被${approverName}${statusText}。${remark ? `审批意见：${remark}` : ''}`,
+          createTime: new Date().toISOString(),
           relatedId: updatedApplication.id,
           relatedType: 'expense_application',
-          createTime: new Date().toISOString()
+          title: `报销申请审批${statusText}`,
+          type: Number(status) === 1 ? 'success' : 'warning',
+          userId: updatedApplication.applicantId
         }
       });
 

@@ -838,3 +838,12 @@ export namespace AttachmentApi {
     totalSize: number;
   }
 }
+
+export namespace Api.SystemManage {
+  /** role search params */
+  type RoleSearchParams = CommonType.RecordNullable<
+    Pick<Role, 'roleCode' | 'roleName' | 'status'> & {
+      roleType?: 'permission' | 'position';
+    } & CommonSearchParams
+  >;
+}

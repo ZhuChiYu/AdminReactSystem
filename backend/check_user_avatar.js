@@ -1,21 +1,22 @@
+const fs = require('node:fs');
+const path = require('node:path');
+
 const { PrismaClient } = require('@prisma/client');
-const fs = require('fs');
-const path = require('path');
 
 const prisma = new PrismaClient();
 
 async function checkUserAvatar() {
   try {
     const user = await prisma.user.findUnique({
-      where: { id: 1 },
       select: {
-        id: true,
-        userName: true,
         avatar: true,
-        nickName: true,
         email: true,
-        phone: true
-      }
+        id: true,
+        nickName: true,
+        phone: true,
+        userName: true
+      },
+      where: { id: 1 }
     });
 
     console.log('=== 用户信息 ===');

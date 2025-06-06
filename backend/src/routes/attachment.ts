@@ -237,10 +237,7 @@ router.get('/:id/download', async (req, res) => {
     const originalName = attachment.originalName || attachment.fileName;
 
     // 设置响应头 - 正确处理中文文件名编码
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`
-    );
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 

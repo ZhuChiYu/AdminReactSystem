@@ -6,12 +6,12 @@ async function checkAdmin() {
   try {
     // 查找用户名为admin的用户
     const adminUser = await prisma.user.findUnique({
-      where: { userName: 'admin' },
       select: {
+        avatar: true,
         id: true,
-        userName: true,
-        avatar: true
-      }
+        userName: true
+      },
+      where: { userName: 'admin' }
     });
 
     if (adminUser) {
@@ -23,12 +23,12 @@ async function checkAdmin() {
 
     // 查找用户名为admin11的用户
     const admin11User = await prisma.user.findUnique({
-      where: { userName: 'admin11' },
       select: {
+        avatar: true,
         id: true,
-        userName: true,
-        avatar: true
-      }
+        userName: true
+      },
+      where: { userName: 'admin11' }
     });
 
     if (admin11User) {
@@ -41,9 +41,9 @@ async function checkAdmin() {
     // 查看所有用户
     const allUsers = await prisma.user.findMany({
       select: {
+        avatar: true,
         id: true,
-        userName: true,
-        avatar: true
+        userName: true
       },
       take: 10
     });

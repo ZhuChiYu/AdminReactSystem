@@ -46,7 +46,7 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'"]
       }
     },
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
   })
 );
 
@@ -164,20 +164,24 @@ if (process.env.API_DOC_ENABLED === 'true') {
 }
 
 // 静态文件服务 - 添加CORS支持
-app.use('/uploads', (req, res, next) => {
-  // 设置CORS头部
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    // 设置CORS头部
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 
-  // 处理预检请求
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
+    // 处理预检请求
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
 
-  next();
-}, express.static(config.uploadPath));
+    next();
+  },
+  express.static(config.uploadPath)
+);
 
 // 404处理
 app.use('*', (req, res) => {

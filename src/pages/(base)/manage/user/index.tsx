@@ -1,18 +1,108 @@
 import { DownloadOutlined, UploadOutlined } from '@ant-design/icons';
-import { Suspense, lazy, useState } from 'react';
+import {
+  Button as AButton,
+  Card as ACard,
+  Collapse as ACollapse,
+  Popconfirm as APopconfirm,
+  Table as ATable,
+  Tag as ATag,
+  Upload as AUpload,
+  Select,
+  message
+} from 'antd';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { enableStatusRecord, userGenderRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
 import { TableHeaderOperation, useTable, useTableOperate, useTableScroll } from '@/features/table';
 import { employeeService } from '@/service/api';
+import { isSuperAdmin } from '@/utils/auth';
 
 import UserSearch from './modules/UserSearch';
 
 const UserOperateDrawer = lazy(() => import('./modules/UserOperateDrawer'));
 
+interface Role {
+  code: string;
+  id: number;
+  name: string;
+  type: 'permission' | 'position';
+}
+
+interface UserRecord {
+  address?: string;
+  bankCard?: string;
+  createBy: string;
+  createTime: string;
+  email?: string;
+  id: number;
+  idCard?: string;
+  index: number;
+  nickName?: string;
+  password: string;
+  phone?: string;
+  roleCode?: string;
+  roles: Role[];
+  status: Api.Common.EnableStatus | null;
+  tim?: string;
+  updateBy: string;
+  updateTime: string;
+  userEmail?: string;
+  userGender?: Api.SystemManage.UserGender;
+  userName: string;
+  userPhone?: string;
+  wechat?: string;
+}
+
+type FetchEmployeeListParams = {
+  current: number;
+  department?: string | null;
+  nickName?: string | null;
+  size: number;
+  status?: Api.Common.EnableStatus | null;
+  userName?: string | null;
+};
+
+type FetchEmployeeListFn = AntDesign.TableApiFn<UserRecord, FetchEmployeeListParams>;
+
 const tagUserGenderMap: Record<Api.SystemManage.UserGender, string> = {
   1: 'processing',
   2: 'error'
+};
+
+// 权限角色选项
+const permissionRoleOptions = [
+  { label: '超级管理员', value: 'super_admin' },
+  { label: '管理员', value: 'admin' },
+  { label: '员工', value: 'employee' }
+];
+
+// Helper functions - moved to the top level
+function getGenderValue(userGender: Api.SystemManage.UserGender | undefined) {
+  if (userGender === '1') return 'male';
+  if (userGender === '2') return 'female';
+  return undefined;
+}
+
+function getStatusValue(status: Api.Common.EnableStatus | null) {
+  if (status === '1') return 'active';
+  if (status === '2') return 'inactive';
+  return undefined;
+}
+
+// 角色中文名称映射
+const roleNames = {
+  admin: '管理员',
+  consultant: '顾问',
+  employee: '员工',
+  general_manager: '总经理',
+  hr_bp: '人力BP',
+  hr_specialist: '人力专员',
+  marketing_manager: '市场部经理',
+  sales_director: '销售总监',
+  sales_manager: '销售经理',
+  super_admin: '超级管理员'
 };
 
 const UserManage = () => {
@@ -20,12 +110,31 @@ const UserManage = () => {
   const [passwordVisible, setPasswordVisible] = useState<Record<number, boolean>>({});
   const [importLoading, setImportLoading] = useState(false);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingPermissionRole, setEditingPermissionRole] = useState<{ currentRole: string; id: number } | null>(null);
 
   const { scrollConfig, tableWrapperRef } = useTableScroll();
 
   const nav = useNavigate();
 
   const isMobile = useMobile();
+
+  const runRef = useRef<() => Promise<void>>();
+
+  // 处理权限角色修改
+  const handlePermissionRoleChange = async (userId: number, newRole: string) => {
+    try {
+      await employeeService.updateEmployeePermissionRole(userId, newRole);
+      message.success('权限角色更新成功');
+      // Refresh the list
+      if (runRef.current) {
+        await runRef.current();
+      }
+    } catch (error) {
+      console.error('更新权限角色失败:', error);
+      message.error('权限角色更新失败');
+    }
+    setEditingPermissionRole(null);
+  };
 
   const togglePasswordVisibility = (id: number) => {
     setPasswordVisible(prev => ({
@@ -86,7 +195,7 @@ const UserManage = () => {
   };
 
   // 创建适配器函数来匹配表格组件的API格式
-  const fetchEmployeeListAdapter = async (params: any) => {
+  async function fetchEmployeeListAdapter(params: FetchEmployeeListParams) {
     try {
       const response = await employeeService.getEmployeeList({
         current: params.current || 1,
@@ -100,50 +209,80 @@ const UserManage = () => {
       return {
         data: {
           current: response.current,
-          records: response.records.map((record, index) => ({
-            ...record,
-            // 默认密码显示
-            // 添加TableData必需的字段
-            createBy: 'system',
-            createTime: record.createdAt,
-            index: (response.current - 1) * response.size + index + 1,
-            password: '123456',
-            // 为表单编辑准备单个角色代码
-            roleCode:
-              record.roles && record.roles.length > 0 && record.roles[0].code !== 'no_role'
-                ? record.roles[0].code
-                : undefined,
-            // 保持原始角色数组结构供表格使用
-            roles: record.roles,
-            status: (record.status === 'active'
-              ? '1'
-              : record.status === 'inactive'
-                ? '2'
-                : null) as Api.Common.EnableStatus | null,
-            updateBy: 'system',
-            updateTime: record.updatedAt,
-            userEmail: record.email,
-            userGender: record.gender === 'male' ? 1 : record.gender === 'female' ? 2 : null,
-            userPhone: record.phone
-          })),
+          records: response.records.map((record, index): UserRecord => {
+            let userGender: Api.SystemManage.UserGender | undefined;
+            if (record.gender === 'male') {
+              userGender = 1 as unknown as Api.SystemManage.UserGender;
+            } else if (record.gender === 'female') {
+              userGender = 2 as unknown as Api.SystemManage.UserGender;
+            }
+
+            let status: Api.Common.EnableStatus | null = null;
+            if (record.status === 'active') {
+              status = '1';
+            } else if (record.status === 'inactive') {
+              status = '2';
+            }
+
+            const roles = record.roles.map(
+              role =>
+                ({
+                  // 由于后端API没有返回id，我们设置一个默认值
+                  code: role.code,
+                  id: 0,
+                  name: role.name,
+                  type:
+                    role.code === 'super_admin' || role.code === 'admin' || role.code === 'employee'
+                      ? 'permission'
+                      : 'position'
+                }) as Role
+            );
+
+            return {
+              address: record.address,
+              bankCard: record.bankCard,
+              createBy: 'system',
+              createTime: record.createdAt,
+              email: record.email,
+              id: record.id,
+              idCard: record.idCard,
+              index: (response.current - 1) * response.size + index + 1,
+              nickName: record.nickName,
+              password: '123456',
+              phone: record.phone,
+              roleCode: record.roles?.[0]?.code,
+              roles,
+              status,
+              tim: record.tim,
+              updateBy: 'system',
+              updateTime: record.updatedAt,
+              userEmail: record.email,
+              userGender,
+              userName: record.userName,
+              userPhone: record.phone,
+              wechat: record.wechat
+            };
+          }),
           size: response.size,
           total: response.total
-        },
-        error: null,
-        response: {} as any
+        }
       };
     } catch (error) {
+      console.error('获取员工列表失败:', error);
       return {
-        data: null,
-        error: error as any,
-        response: {} as any
+        data: {
+          current: 1,
+          records: [],
+          size: 10,
+          total: 0
+        }
       };
     }
-  };
+  }
 
-  const { columnChecks, data, run, searchProps, setColumnChecks, tableProps } = useTable(
+  const { columnChecks, data, run, searchProps, setColumnChecks, tableProps } = useTable<FetchEmployeeListFn>(
     {
-      apiFn: fetchEmployeeListAdapter,
+      apiFn: fetchEmployeeListAdapter as FetchEmployeeListFn,
       apiParams: {
         current: 1,
         department: null,
@@ -151,7 +290,7 @@ const UserManage = () => {
         size: 10,
         status: null,
         userName: null
-      } as any,
+      },
       columns: () => [
         {
           align: 'center',
@@ -202,16 +341,68 @@ const UserManage = () => {
         {
           align: 'center',
           dataIndex: 'roles',
-          key: 'roles',
-          minWidth: 120,
-          render: (_, record: any) => {
-            const roles = record.roles || [];
-            if (roles.length === 0) {
-              return '未分配角色';
-            }
-            return roles.map((role: any) => role.name).join(', ');
+          key: 'positionRole',
+          render: (roles: Array<{ code: string; name: string; type: string }>) => {
+            const positionRole = roles.find(role => role.type === 'position');
+            return positionRole ? (
+              <ATag color="blue">{roleNames[positionRole.code as keyof typeof roleNames] || positionRole.code}</ATag>
+            ) : (
+              <ATag color="default">未分配职位</ATag>
+            );
           },
-          title: '员工角色'
+          title: '职位角色',
+          width: 120
+        },
+        {
+          align: 'center',
+          dataIndex: 'roles',
+          key: 'permissionRole',
+          render: (roles: Array<{ code: string; name: string; type: string }>, record: any) => {
+            const permissionRole = roles.find(role => role.type === 'permission');
+            const currentRole = permissionRole?.code || 'employee';
+
+            if (editingPermissionRole?.id === record.id) {
+              return (
+                <Select
+                  autoFocus
+                  defaultValue={currentRole}
+                  options={permissionRoleOptions}
+                  style={{ width: 120 }}
+                  onBlur={() => setEditingPermissionRole(null)}
+                  onChange={value => handlePermissionRoleChange(record.id, value)}
+                  onClick={e => e.stopPropagation()}
+                />
+              );
+            }
+
+            let roleColor = 'blue';
+            let roleName = '员工';
+
+            if (currentRole === 'super_admin') {
+              roleColor = 'gold';
+              roleName = '超级管理员';
+            } else if (currentRole === 'admin') {
+              roleColor = 'green';
+              roleName = '管理员';
+            }
+
+            return (
+              <ATag
+                color={roleColor}
+                style={{ cursor: isSuperAdmin() ? 'pointer' : 'default' }}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (isSuperAdmin()) {
+                    setEditingPermissionRole({ currentRole, id: record.id });
+                  }
+                }}
+              >
+                {roleName}
+              </ATag>
+            );
+          },
+          title: '权限角色',
+          width: 120
         },
         {
           align: 'center',
@@ -322,37 +513,37 @@ const UserManage = () => {
           fixed: 'right' as const,
           key: 'operate',
           render: (_, record: any) => {
-            const isSuperAdmin = record.roles?.some((role: any) => role.code === 'super_admin');
+            const isUserSuperAdmin = record.roles?.some((role: any) => role.code === 'super_admin');
 
             return (
-            <div className="flex-center gap-8px">
-              <AButton
-                ghost
-                size="small"
-                type="primary"
-                onClick={() => edit(record.id)}
-              >
-                {t('common.edit')}
-              </AButton>
-              <AButton
-                size="small"
-                onClick={() => nav(`/manage/user/${record.id}`)}
-              >
-                详情
-              </AButton>
-              <APopconfirm
-                  title={isSuperAdmin ? '超级管理员不能删除' : t('common.confirmDelete')}
-                  onConfirm={() => !isSuperAdmin && handleDelete(record.id)}
-              >
+              <div className="flex-center gap-8px">
                 <AButton
-                  danger
-                    disabled={isSuperAdmin}
+                  ghost
                   size="small"
+                  type="primary"
+                  onClick={() => edit(record.id)}
                 >
-                  {t('common.delete')}
+                  {t('common.edit')}
                 </AButton>
-              </APopconfirm>
-            </div>
+                <AButton
+                  size="small"
+                  onClick={() => nav(`/manage/user/${record.id}`)}
+                >
+                  详情
+                </AButton>
+                <APopconfirm
+                  title={isUserSuperAdmin ? '超级管理员不能删除' : t('common.confirmDelete')}
+                  onConfirm={() => !isUserSuperAdmin && handleDelete(record.id)}
+                >
+                  <AButton
+                    danger
+                    disabled={isUserSuperAdmin}
+                    size="small"
+                  >
+                    {t('common.delete')}
+                  </AButton>
+                </APopconfirm>
+              </div>
             );
           },
           title: t('common.operate'),
@@ -364,7 +555,7 @@ const UserManage = () => {
   );
 
   const { checkedRowKeys, generalPopupOperation, handleAdd, handleEdit, onBatchDeleted, onDeleted, rowSelection } =
-    useTableOperate(data, run, async (res, type) => {
+    useTableOperate(data, run, async (res: any, type) => {
       if (type === 'add') {
         // add request 调用新增的接口
         console.log(res);
@@ -374,30 +565,24 @@ const UserManage = () => {
           console.log('编辑数据调试:', res);
           console.log('编辑用户ID:', editingUserId);
 
-          // 使用保存的编辑用户ID
           if (!editingUserId) {
             window.$message?.error('用户ID缺失，无法更新');
-            console.error('编辑失败：用户ID缺失', { res, editingUserId });
+            console.error('编辑失败：用户ID缺失', { editingUserId, res });
             return;
           }
 
           // 转换前端表单数据为后端API格式
           const updateData = {
-            // 处理角色数据
             address: res.address,
             bankCard: res.bankCard,
             email: res.email || res.userEmail,
-            gender: res.userGender === 1 ? 'male' : res.userGender === 2 ? 'female' : undefined,
+            gender: getGenderValue(res.userGender),
             idCard: res.idCard,
             nickName: res.nickName,
             phone: res.userPhone,
-            roles:
-              typeof res.roles === 'string' && res.roles
-                ? [res.roles] // 转换为数组格式
-                : Array.isArray(res.roles) && res.roles.length > 0 && res.roles[0].code
-                  ? [res.roles[0].code] // 提取第一个角色的code并转换为数组
-                  : undefined,
-            status: res.status === '1' ? 'active' : res.status === '2' ? 'inactive' : undefined,
+            // 合并职位角色和权限角色
+            roles: [res.positionRole, res.permissionRole || 'employee'].filter(Boolean),
+            status: getStatusValue(res.status),
             tim: res.tim,
             userName: res.userName,
             wechat: res.wechat
@@ -405,10 +590,13 @@ const UserManage = () => {
 
           console.log('更新用户数据:', { id: editingUserId, updateData });
           await employeeService.updateEmployee(editingUserId, updateData);
+
+          window.$message?.success('更新成功');
+          run(); // 刷新表格数据
         } catch (error: any) {
           console.error('更新用户失败:', error);
-          window.$message?.error('更新用户失败');
-          throw error; // 重新抛出错误，让表格组件知道操作失败
+          window.$message?.error('更新失败');
+          throw error;
         }
       }
     });
@@ -430,7 +618,7 @@ const UserManage = () => {
         window.$message?.success(`批量删除成功！共删除 ${result.deletedCount} 个员工`);
       }
 
-    onBatchDeleted();
+      onBatchDeleted();
       run(); // 刷新表格数据
     } catch (error) {
       console.error('批量删除失败:', error);
@@ -442,7 +630,7 @@ const UserManage = () => {
     try {
       await employeeService.deleteEmployee(id);
       window.$message?.success('删除成功');
-    onDeleted();
+      onDeleted();
       run(); // 刷新表格数据
     } catch (error: any) {
       console.error('删除失败:', error);
@@ -455,22 +643,33 @@ const UserManage = () => {
   }
 
   function edit(id: number) {
-    // 自定义数据处理：将 roleCode 映射到 roles 字段
+    // 自定义数据处理：将角色数据分离为职位角色和权限角色
     const findItem = data.find(item => item.id === id);
     if (findItem) {
+      const positionRole = findItem.roles?.find(role => role.type === 'position')?.code;
+      const permissionRole = findItem.roles?.find(role => role.type === 'permission')?.code || 'employee';
+
       const formData = {
         ...findItem,
-        id: findItem.id, // 确保id字段被保留
-        roles: findItem.roleCode // 将 roleCode 映射到 roles 字段供表单使用
+        id: findItem.id,
+        permissionRole,
+        positionRole
       };
-      console.log('编辑表单数据:', formData);
       setEditingUserId(id);
       handleEdit(formData);
-    } else {
-    setEditingUserId(id);
-    handleEdit(id);
     }
   }
+
+  // 保存 run 函数的引用
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
+
+  // 初始化加载
+  useEffect(() => {
+    runRef.current?.();
+  }, []);
+
   return (
     <div className="h-full min-h-600px flex-col-stretch gap-16px overflow-auto p-16px">
       <ACollapse

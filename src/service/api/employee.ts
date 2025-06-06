@@ -174,6 +174,11 @@ export class EmployeeService {
       throw error;
     }
   }
+
+  /** update employee permission role */
+  updateEmployeePermissionRole(userId: number, roleCode: string) {
+    return apiClient.put(`/system/users/${userId}/permission-role`, { roleCode });
+  }
 }
 
 // 导出员工服务实例

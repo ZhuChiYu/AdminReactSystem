@@ -111,10 +111,13 @@ class UserController {
         phone: employee.phone,
         position: employee.position,
         roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
-        roles: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ({
-          code: ur.role.roleCode,
-          name: ur.role.roleName
-        })) : [{ code: 'no_role', name: '未分配角色' }],
+        roles:
+          employee.userRoles.length > 0
+            ? employee.userRoles.map(ur => ({
+                code: ur.role.roleCode,
+                name: ur.role.roleName
+              }))
+            : [{ code: 'no_role', name: '未分配角色' }],
         status: employee.status === 1 ? 'active' : employee.status === 0 ? 'inactive' : 'active',
         tim: employee.tim,
         updatedAt: employee.updatedAt,
@@ -179,34 +182,34 @@ class UserController {
 
         // 定义字段映射
         const fieldMapping: { [key: string]: string } = {
-          'TIM号': 'tim',
-          '合同年限': 'contractYears',
-          '合同开始时间': 'contractStartDate',
-          '合同结束时间': 'contractEndDate',
-          '姓名': 'nickName',
-          '姓名*': 'nickName',          // 支持带*的必需字段
-          '家庭住址': 'address',
-          '工作微信号': 'wechat',
-          '性别': 'gender',
-          '手机号': 'phone',
-          '状态': 'status',
-          '用户名': 'userName',
-          '用户名*': 'userName',        // 支持带*的必需字段
-          '职位': 'position',
-          '身份证号': 'idCard',
-          '邮箱': 'email',
-          '银行卡号': 'bankCard'
+          TIM号: 'tim',
+          合同年限: 'contractYears',
+          合同开始时间: 'contractStartDate',
+          合同结束时间: 'contractEndDate',
+          姓名: 'nickName',
+          '姓名*': 'nickName', // 支持带*的必需字段
+          家庭住址: 'address',
+          工作微信号: 'wechat',
+          性别: 'gender',
+          手机号: 'phone',
+          状态: 'status',
+          用户名: 'userName',
+          '用户名*': 'userName', // 支持带*的必需字段
+          职位: 'position',
+          身份证号: 'idCard',
+          邮箱: 'email',
+          银行卡号: 'bankCard'
         };
 
         // 验证必需字段
-        const requiredFields = ['用户名*', '姓名*'];  // 带*标记的必需字段
-        const hasRequiredFields = requiredFields.every(field =>
-          headers.includes(field) || headers.includes(field.replace('*', ''))
+        const requiredFields = ['用户名*', '姓名*']; // 带*标记的必需字段
+        const hasRequiredFields = requiredFields.every(
+          field => headers.includes(field) || headers.includes(field.replace('*', ''))
         );
 
         if (!hasRequiredFields) {
-          const missingFields = requiredFields.filter(field =>
-            !headers.includes(field) && !headers.includes(field.replace('*', ''))
+          const missingFields = requiredFields.filter(
+            field => !headers.includes(field) && !headers.includes(field.replace('*', ''))
           );
           return res.status(400).json({
             code: 400,
@@ -278,8 +281,7 @@ class UserController {
             }
 
             if (userData.status) {
-              userData.status =
-                userData.status === '启用' ? 1 : userData.status === '禁用' ? 0 : 1;
+              userData.status = userData.status === '启用' ? 1 : userData.status === '禁用' ? 0 : 1;
             } else {
               userData.status = 1; // 默认启用 (1=active, 0=inactive)
             }
@@ -407,48 +409,45 @@ class UserController {
       const importedUsernames = ['luojingwen', 'longjianzhen', 'wangxu'];
 
       const users = await prisma.user.findMany({
-        where: {
-          userName: {
-            in: importedUsernames
-          }
-        },
         include: {
           userRoles: {
             include: {
               role: true
             }
           }
+        },
+        where: {
+          userName: {
+            in: importedUsernames
+          }
         }
       });
 
       const result = users.map(user => ({
-        id: user.id,
-        userName: user.userName,
-        nickName: user.nickName,
+        createdAt: user.createdAt,
         email: user.email,
-        status: user.status,
         gender: user.gender,
+        hasRoles: user.userRoles.length > 0,
+        id: user.id,
+        nickName: user.nickName,
         roles: user.userRoles.map(ur => ({
-          id: ur.role.id,
           code: ur.role.roleCode,
+          id: ur.role.id,
           name: ur.role.roleName
         })),
-        hasRoles: user.userRoles.length > 0,
-        createdAt: user.createdAt
+        status: user.status,
+        userName: user.userName
       }));
 
       res.json({
         code: 0,
         data: {
           foundUsers: result.length,
-          users: result,
-          missingUsers: importedUsernames.filter(username =>
-            !result.some(user => user.userName === username)
-          )
+          missingUsers: importedUsernames.filter(username => !result.some(user => user.userName === username)),
+          users: result
         },
         message: '调试信息获取成功'
       });
-
     } catch (error) {
       console.error('调试导入用户失败:', error);
       res.status(500).json({
@@ -464,13 +463,13 @@ class UserController {
     try {
       // 查找所有没有角色的用户
       const usersWithoutRoles = await prisma.user.findMany({
+        include: {
+          userRoles: true
+        },
         where: {
           userRoles: {
             none: {}
           }
-        },
-        include: {
-          userRoles: true
         }
       });
 
@@ -497,29 +496,28 @@ class UserController {
       for (const user of usersWithoutRoles) {
         const userRole = await prisma.userRole.create({
           data: {
-            userId: user.id,
-            roleId: defaultRole.id
+            roleId: defaultRole.id,
+            userId: user.id
           }
         });
 
         results.push({
-          userId: user.id,
-          userName: user.userName,
+          assignedRole: defaultRole.roleCode,
           nickName: user.nickName,
-          assignedRole: defaultRole.roleCode
+          userId: user.id,
+          userName: user.userName
         });
       }
 
       res.json({
         code: 0,
         data: {
-          fixedUsersCount: results.length,
           assignedRole: defaultRole.roleCode,
+          fixedUsersCount: results.length,
           users: results
         },
         message: '角色分配修复完成'
       });
-
     } catch (error) {
       console.error('修复用户角色失败:', error);
       res.status(500).json({
@@ -533,7 +531,7 @@ class UserController {
   // 为用户分配角色
   async assignRoleToUser(req: Request, res: Response) {
     try {
-      const { userId, roleCode } = req.body;
+      const { roleCode, userId } = req.body;
 
       if (!userId || !roleCode) {
         return res.status(400).json({
@@ -572,8 +570,8 @@ class UserController {
       // 检查是否已经分配了该角色
       const existingUserRole = await prisma.userRole.findFirst({
         where: {
-          userId: Number(userId),
-          roleId: role.id
+          roleId: role.id,
+          userId: Number(userId)
         }
       });
 
@@ -588,23 +586,22 @@ class UserController {
       // 分配角色
       const userRole = await prisma.userRole.create({
         data: {
-          userId: Number(userId),
-          roleId: role.id
+          roleId: role.id,
+          userId: Number(userId)
         }
       });
 
       res.json({
         code: 0,
         data: {
-          userId: user.id,
-          userName: user.userName,
           nickName: user.nickName,
           roleCode: role.roleCode,
-          roleName: role.roleName
+          roleName: role.roleName,
+          userId: user.id,
+          userName: user.userName
         },
         message: '角色分配成功'
       });
-
     } catch (error) {
       console.error('分配角色失败:', error);
       res.status(500).json({
@@ -621,21 +618,21 @@ class UserController {
       // 创建模板数据
       const templateData = [
         [
-          '用户名*',        // 必需
-          '姓名*',          // 必需
-          '邮箱',           // 可选
-          '手机号',         // 可选
-          '性别',           // 可选
-          '职位',           // 可选
-          '家庭住址',       // 可选
-          '银行卡号',       // 可选
-          '身份证号',       // 可选
-          '工作微信号',     // 可选
-          'TIM号',         // 可选
-          '合同年限',       // 可选
-          '合同开始时间',   // 可选
-          '合同结束时间',   // 可选
-          '状态'           // 可选
+          '用户名*', // 必需
+          '姓名*', // 必需
+          '邮箱', // 可选
+          '手机号', // 可选
+          '性别', // 可选
+          '职位', // 可选
+          '家庭住址', // 可选
+          '银行卡号', // 可选
+          '身份证号', // 可选
+          '工作微信号', // 可选
+          'TIM号', // 可选
+          '合同年限', // 可选
+          '合同开始时间', // 可选
+          '合同结束时间', // 可选
+          '状态' // 可选
         ],
         [
           'zhangsan',
@@ -658,17 +655,17 @@ class UserController {
           'lisi',
           '李四',
           '', // 空邮箱示例
-          '',  // 空手机示例
+          '', // 空手机示例
           '女',
-          '',  // 空职位示例
-          '',  // 空地址示例
-          '',  // 空银行卡示例
-          '',  // 空身份证示例
-          '',  // 空微信示例
-          '',  // 空TIM示例
-          '',  // 空合同年限示例
-          '',  // 空合同开始时间示例
-          '',  // 空合同结束时间示例
+          '', // 空职位示例
+          '', // 空地址示例
+          '', // 空银行卡示例
+          '', // 空身份证示例
+          '', // 空微信示例
+          '', // 空TIM示例
+          '', // 空合同年限示例
+          '', // 空合同开始时间示例
+          '', // 空合同结束时间示例
           '启用'
         ]
       ];
@@ -719,20 +716,20 @@ class UserController {
     try {
       const { id } = req.params;
       const {
+        address,
         avatar,
+        bankCard,
         department,
         email,
-        phone,
-        userName,
-        nickName,
         gender,
-        status,
-        roles,
-        address,
-        bankCard,
         idCard,
-        wechat,
-        tim
+        nickName,
+        phone,
+        roles,
+        status,
+        tim,
+        userName,
+        wechat
       } = req.body;
 
       // 检查用户是否存在
@@ -864,8 +861,8 @@ class UserController {
             if (roleToAssign) {
               await prisma.userRole.create({
                 data: {
-                  userId: Number.parseInt(id),
-                  roleId: roleToAssign.id
+                  roleId: roleToAssign.id,
+                  userId: Number.parseInt(id)
                 }
               });
             }
@@ -874,7 +871,6 @@ class UserController {
 
         // 重新获取用户信息（包含更新后的角色）
         const userWithUpdatedRoles = await prisma.user.findUnique({
-          where: { id: Number.parseInt(id) },
           include: {
             department: true,
             userRoles: {
@@ -882,7 +878,8 @@ class UserController {
                 role: true
               }
             }
-          }
+          },
+          where: { id: Number.parseInt(id) }
         });
 
         if (userWithUpdatedRoles) {
@@ -997,14 +994,14 @@ class UserController {
 
       // 检查用户是否存在
       const user = await prisma.user.findUnique({
-        where: { id: userId },
         include: {
           userRoles: {
             include: {
               role: true
             }
           }
-        }
+        },
+        where: { id: userId }
       });
 
       if (!user) {
@@ -1037,12 +1034,17 @@ class UserController {
         deletedUserId: userId
       });
 
-      res.json(createSuccessResponse({
-        deletedUserId: userId,
-        deletedUserName: user.userName,
-        deletedNickName: user.nickName
-      }, '用户删除成功', req.path));
-
+      res.json(
+        createSuccessResponse(
+          {
+            deletedNickName: user.nickName,
+            deletedUserId: userId,
+            deletedUserName: user.userName
+          },
+          '用户删除成功',
+          req.path
+        )
+      );
     } catch (error: any) {
       logger.error('删除用户失败:', error);
       res.status(500).json(createErrorResponse(500, '删除用户失败', null, req.path));
@@ -1071,32 +1073,32 @@ class UserController {
 
       // 查找要删除的用户，检查是否包含超级管理员
       const usersToDelete = await prisma.user.findMany({
-        where: {
-          id: { in: parsedUserIds }
-        },
         include: {
           userRoles: {
             include: {
               role: true
             }
           }
+        },
+        where: {
+          id: { in: parsedUserIds }
         }
       });
 
       // 过滤掉超级管理员
-      const superAdmins = usersToDelete.filter(user =>
-        user.userRoles.some(ur => ur.role.roleCode === 'super_admin')
-      );
+      const superAdmins = usersToDelete.filter(user => user.userRoles.some(ur => ur.role.roleCode === 'super_admin'));
 
-      const deletableUsers = usersToDelete.filter(user =>
-        !user.userRoles.some(ur => ur.role.roleCode === 'super_admin')
+      const deletableUsers = usersToDelete.filter(
+        user => !user.userRoles.some(ur => ur.role.roleCode === 'super_admin')
       );
 
       if (superAdmins.length > 0) {
         const superAdminNames = superAdmins.map(user => user.nickName).join(', ');
 
         if (deletableUsers.length === 0) {
-          return res.status(403).json(createErrorResponse(403, `不允许删除超级管理员：${superAdminNames}`, null, req.path));
+          return res
+            .status(403)
+            .json(createErrorResponse(403, `不允许删除超级管理员：${superAdminNames}`, null, req.path));
         }
       }
 
@@ -1124,13 +1126,13 @@ class UserController {
         deletedCount: deleteResult.count,
         deletedUsers: deletableUsers.map(user => ({
           id: user.id,
-          userName: user.userName,
-          nickName: user.nickName
+          nickName: user.nickName,
+          userName: user.userName
         })),
         skippedSuperAdmins: superAdmins.map(user => ({
           id: user.id,
-          userName: user.userName,
-          nickName: user.nickName
+          nickName: user.nickName,
+          userName: user.userName
         }))
       };
 
@@ -1146,7 +1148,6 @@ class UserController {
       });
 
       res.json(createSuccessResponse(result, message, req.path));
-
     } catch (error: any) {
       logger.error('批量删除用户失败:', error);
       res.status(500).json(createErrorResponse(500, '批量删除用户失败', null, req.path));
@@ -1262,8 +1263,8 @@ class UserController {
       }
 
       // 检查是否有管理权限
-      const hasManagerRole = manager.userRoles.some(ur =>
-        ur.role.roleCode === 'admin' || ur.role.roleCode === 'super_admin'
+      const hasManagerRole = manager.userRoles.some(
+        ur => ur.role.roleCode === 'admin' || ur.role.roleCode === 'super_admin'
       );
 
       if (!hasManagerRole) {
@@ -1296,7 +1297,9 @@ class UserController {
         const existingEmployeeIds = existingRelations.map(r => r.employeeId);
         const existingEmployees = employees.filter(emp => existingEmployeeIds.includes(emp.id));
         const names = existingEmployees.map(emp => emp.nickName).join(', ');
-        return res.status(400).json(createErrorResponse(400, `员工 ${names} 已经有管理员，请先取消现有关系`, null, req.path));
+        return res
+          .status(400)
+          .json(createErrorResponse(400, `员工 ${names} 已经有管理员，请先取消现有关系`, null, req.path));
       }
 
       // 创建关系

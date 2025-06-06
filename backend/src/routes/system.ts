@@ -392,7 +392,7 @@ router.delete('/users/:id', async (req, res) => {
 // 获取角色列表
 router.get('/roles', async (req, res) => {
   try {
-    const { current = 1, roleCode, roleName, size = 10, status } = req.query;
+    const { current = 1, roleCode, roleName, roleType = 'position', size = 10, status } = req.query;
 
     const where: any = {};
 
@@ -412,6 +412,11 @@ router.get('/roles', async (req, res) => {
 
     if (status !== undefined) {
       where.status = Number.parseInt(status as string);
+    }
+
+    // Add roleType filter
+    if (roleType) {
+      where.roleType = roleType;
     }
 
     const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
@@ -443,6 +448,7 @@ router.get('/roles', async (req, res) => {
       remark: role.remark,
       roleCode: role.roleCode,
       roleName: role.roleName,
+      roleType: role.roleType,
       sort: role.sort,
       status: role.status,
       updatedAt: role.updatedAt,
@@ -616,6 +622,86 @@ router.get('/statistics', async (req, res) => {
       path: req.path,
       timestamp: Date.now()
     });
+  }
+});
+
+// 更新员工权限角色
+router.put('/users/:userId/permission-role', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { roleCode } = req.body;
+
+    // 验证角色是否为权限角色
+    const role = await prisma.role.findFirst({
+      where: {
+        roleCode,
+        roleType: 'permission'
+      }
+    });
+
+    if (!role) {
+      throw new ApiError(400, '无效的权限角色');
+    }
+
+    // 查找用户当前的权限角色
+    const currentPermissionRole = await prisma.userRole.findFirst({
+      include: {
+        role: true
+      },
+      where: {
+        role: {
+          roleType: 'permission'
+        },
+        userId: Number(userId)
+      }
+    });
+
+    // 开启事务处理角色更新
+    await prisma.$transaction(async tx => {
+      // 如果存在旧的权限角色，先删除
+      if (currentPermissionRole) {
+        await tx.userRole.delete({
+          where: {
+            id: currentPermissionRole.id
+          }
+        });
+      }
+
+      // 创建新的权限角色关联
+      await tx.userRole.create({
+        data: {
+          roleId: role.id,
+          userId: Number(userId)
+        }
+      });
+    });
+
+    res.json({
+      code: 0,
+      data: null,
+      message: '权限角色更新成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('更新权限角色失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '更新权限角色失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
   }
 });
 

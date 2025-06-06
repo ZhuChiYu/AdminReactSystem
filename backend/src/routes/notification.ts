@@ -1,6 +1,7 @@
-import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
+
+import express from 'express';
 import multer from 'multer';
 
 import { prisma } from '@/config/database';
@@ -388,10 +389,10 @@ router.post('/:id/attachments/upload', upload.single('file'), async (req, res) =
     // 创建通知附件记录
     const attachment = await prisma.notificationAttachment.create({
       data: {
-        notificationId: Number.parseInt(id),
         fileName: req.file.filename,
         fileSize: req.file.size,
         fileType: getFileExtension(req.file.originalname),
+        notificationId: Number.parseInt(id),
         originalName: req.file.originalname,
         status: 1,
         uploaderId
@@ -407,12 +408,12 @@ router.post('/:id/attachments/upload', upload.single('file'), async (req, res) =
     });
 
     const result = {
-      id: attachment.id,
-      notificationId: attachment.notificationId,
       downloadUrl: `/api/notifications/${id}/attachments/${attachment.id}/download`,
       fileName: attachment.fileName,
       fileSize: attachment.fileSize,
       fileType: attachment.fileType,
+      id: attachment.id,
+      notificationId: attachment.notificationId,
       originalName: attachment.originalName,
       uploader: attachment.uploader
         ? {
@@ -469,12 +470,12 @@ router.get('/:id/attachments', async (req, res) => {
       current: page,
       pages: Math.ceil(total / pageSize),
       records: attachments.map((attachment: any) => ({
-        id: attachment.id,
-        notificationId: attachment.notificationId,
         downloadUrl: `/api/notifications/${id}/attachments/${attachment.id}/download`,
         fileName: attachment.fileName,
         fileSize: attachment.fileSize,
         fileType: attachment.fileType,
+        id: attachment.id,
+        notificationId: attachment.notificationId,
         originalName: attachment.originalName,
         uploader: attachment.uploader
           ? {
@@ -498,7 +499,7 @@ router.get('/:id/attachments', async (req, res) => {
 // 下载通知附件
 router.get('/:id/attachments/:attachmentId/download', async (req, res) => {
   try {
-    const { id, attachmentId } = req.params;
+    const { attachmentId, id } = req.params;
 
     const attachment = await prisma.notificationAttachment.findFirst({
       where: {
@@ -522,10 +523,7 @@ router.get('/:id/attachments/:attachmentId/download', async (req, res) => {
     const originalName = attachment.originalName || attachment.fileName;
 
     // 设置响应头 - 正确处理中文文件名编码
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`
-    );
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
@@ -553,7 +551,7 @@ router.get('/:id/attachments/:attachmentId/download', async (req, res) => {
 // 删除通知附件
 router.delete('/:id/attachments/:attachmentId', async (req, res) => {
   try {
-    const { id, attachmentId } = req.params;
+    const { attachmentId, id } = req.params;
 
     const attachment = await prisma.notificationAttachment.findFirst({
       where: {

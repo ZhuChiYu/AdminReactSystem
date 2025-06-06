@@ -21,7 +21,11 @@ const Role = () => {
   // 创建适配器函数来包装角色列表API
   const fetchRoleListAdapter = async (params?: Api.SystemManage.RoleSearchParams) => {
     try {
-      const response = await fetchGetRoleList(params);
+      // 默认只获取职务角色
+      const response = await fetchGetRoleList({
+        ...params,
+        roleType: 'position'
+      });
       console.log('角色列表适配器收到数据:', response);
 
       // 如果response已经是解包后的格式，需要重新包装为{data: response}格式
@@ -178,11 +182,11 @@ const Role = () => {
     onBatchDeleted();
   }
 
-  function handleDelete(id: number) {
+  async function handleDelete(id: number) {
     // 找到要删除的角色
     const roleToDelete = (data as any[]).find(item => item.id === id);
-    if (roleToDelete?.roleCode === 'super_admin') {
-      window.$message?.error('超级管理员角色不允许删除');
+    if (roleToDelete?.roleType === 'permission') {
+      window.$message?.error('权限角色不允许删除');
       return;
     }
 
@@ -212,7 +216,7 @@ const Role = () => {
       <ACard
         className="flex-col-stretch sm:flex-1-hidden card-wrapper"
         ref={tableWrapperRef}
-        title={t('page.manage.role.title')}
+        title="职务角色列表"
         extra={
           <TableHeaderOperation
             add={handleAdd}

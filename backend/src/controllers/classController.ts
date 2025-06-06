@@ -79,7 +79,6 @@ class ClassController {
           courseId: classItem.courseId,
           courseName: classItem.course?.courseName || '',
           coursePrice: classItem.course?.price || 0,
-          trainingFee: totalTrainingFee.toFixed(2),
           createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
           description: classItem.description,
           endDate: classItem.endDate.toISOString().split('T')[0],
@@ -87,7 +86,8 @@ class ClassController {
           name: classItem.name,
           startDate: classItem.startDate.toISOString().split('T')[0],
           status: classItem.status,
-          studentCount: studentCount,
+          studentCount,
+          trainingFee: totalTrainingFee.toFixed(2),
           updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
         };
       });
@@ -144,7 +144,6 @@ class ClassController {
         courseId: classItem.courseId,
         courseName: classItem.course?.courseName || '',
         coursePrice: classItem.course?.price || 0,
-        trainingFee: totalTrainingFee.toFixed(2),
         createdAt: classItem.createdAt.toISOString().replace('T', ' ').substring(0, 19),
         description: classItem.description,
         endDate: classItem.endDate.toISOString().split('T')[0],
@@ -152,7 +151,7 @@ class ClassController {
         name: classItem.name,
         startDate: classItem.startDate.toISOString().split('T')[0],
         status: classItem.status,
-        studentCount: studentCount,
+        studentCount,
         students: classItem.students.map((student: any) => ({
           attendanceRate: student.attendanceRate,
           avatar: student.avatar,
@@ -168,6 +167,7 @@ class ClassController {
           status: student.status,
           trainingFee: student.trainingFee ? student.trainingFee.toString() : null
         })),
+        trainingFee: totalTrainingFee.toFixed(2),
         updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       };
 
@@ -226,8 +226,7 @@ class ClassController {
         categoryName: newClass.category?.name || '',
         courseId: newClass.courseId,
         courseName: newClass.course?.courseName || '',
-        coursePrice: coursePrice,
-        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
+        coursePrice,
         createdAt: newClass.createdAt.toISOString().replace('T', ' ').substring(0, 19),
         description: newClass.description,
         endDate: newClass.endDate.toISOString().split('T')[0],
@@ -235,7 +234,8 @@ class ClassController {
         name: newClass.name,
         startDate: newClass.startDate.toISOString().split('T')[0],
         status: newClass.status,
-        studentCount: studentCount,
+        studentCount,
+        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
         updatedAt: newClass.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       };
 
@@ -300,8 +300,7 @@ class ClassController {
         categoryName: updatedClass.category?.name || '',
         courseId: updatedClass.courseId,
         courseName: updatedClass.course?.courseName || '',
-        coursePrice: coursePrice,
-        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
+        coursePrice,
         createdAt: updatedClass.createdAt.toISOString().replace('T', ' ').substring(0, 19),
         description: updatedClass.description,
         endDate: updatedClass.endDate.toISOString().split('T')[0],
@@ -309,7 +308,8 @@ class ClassController {
         name: updatedClass.name,
         startDate: updatedClass.startDate.toISOString().split('T')[0],
         status: updatedClass.status,
-        studentCount: studentCount,
+        studentCount,
+        trainingFee: (studentCount * Number(coursePrice)).toFixed(2),
         updatedAt: updatedClass.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       };
 

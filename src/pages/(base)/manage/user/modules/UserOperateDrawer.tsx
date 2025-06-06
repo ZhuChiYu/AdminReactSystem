@@ -1,60 +1,87 @@
-import { useRequest } from '@sa/hooks';
 import { Button, Drawer, Flex, Form, Input, Radio, Select } from 'antd';
-import type { FC } from 'react';
+import { type FC, useEffect, useState } from 'react';
 
 import { enableStatusOptions, userGenderOptions } from '@/constants/business';
 import { useFormRules } from '@/features/form';
-import { fetchGetAllRoles } from '@/service/api';
+import { fetchGetRoleList } from '@/service/api';
 
 interface OptionsProps {
   label: string;
   value: string;
 }
 
+// 扩展用户类型以包含新的角色字段
+interface ExtendedUser extends Api.SystemManage.User {
+  permissionRole?: string;
+  positionRole?: string;
+}
+
 type Model = Pick<
-  Api.SystemManage.User,
+  ExtendedUser,
   | 'address'
   | 'bankCard'
   | 'idCard'
   | 'nickName'
+  | 'permissionRole'
+  | 'positionRole'
   | 'status'
   | 'tim'
   | 'userEmail'
   | 'userGender'
   | 'userName'
   | 'userPhone'
-  | 'userRoles'
   | 'wechat'
 >;
 
 type RuleKey = Extract<keyof Model, 'status' | 'userName'>;
 
-function getOptions(item: Api.SystemManage.AllRole) {
-  return {
-    label: item.roleName,
-    value: item.roleCode
-  };
-}
+// 权限角色选项
+const permissionRoleOptions = [
+  { label: '超级管理员', value: 'super_admin' },
+  { label: '管理员', value: 'admin' },
+  { label: '员工', value: 'employee' }
+];
 
 const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, onClose, open, operateType }) => {
   const { t } = useTranslation();
 
-  const { data, run } = useRequest(fetchGetAllRoles, {
-    manual: true
-  });
+  const [positionRoleOptions, setPositionRoleOptions] = useState<OptionsProps[]>([]);
+
+  // Add state to track if current user is super admin
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const { defaultRequiredRule } = useFormRules();
-
-  const roleOptions: OptionsProps[] = data ? data.map(getOptions) : [];
 
   const rules: Record<RuleKey, App.Global.FormRule> = {
     status: defaultRequiredRule,
     userName: defaultRequiredRule
   };
 
-  useUpdateEffect(() => {
+  useEffect(() => {
+    // Check if current user is super admin when form values change
+    const roles = form.getFieldValue('roles') || [];
+    const isSuper = roles.some((role: any) => role.type === 'permission' && role.code === 'super_admin');
+    setIsSuperAdmin(isSuper);
+  }, [form, open]);
+
+  useEffect(() => {
+    async function fetchPositionRoles() {
+      const response = await fetchGetRoleList({ current: 1, roleType: 'position', size: 100 });
+      if (response && response.records) {
+        const options = response.records.map((role: Api.SystemManage.Role) => ({
+          label: role.roleName || role.roleCode,
+          value: role.roleCode
+        }));
+        setPositionRoleOptions(options);
+      } else {
+        setPositionRoleOptions([]);
+      }
+    }
+
     if (open) {
-      run();
+      fetchPositionRoles();
+    } else {
+      setPositionRoleOptions([]);
     }
   }, [open]);
 
@@ -187,15 +214,30 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
           </Radio.Group>
         </Form.Item>
 
-        <Form.Item
-          label={t('page.manage.user.userRole')}
-          name="roles"
-        >
-          <Select
-            options={roleOptions}
-            placeholder={t('page.manage.user.form.userRole')}
-          />
-        </Form.Item>
+        {/* Hide role selection dropdowns for super admin */}
+        {!isSuperAdmin && (
+          <>
+            <Form.Item
+              label="职位角色"
+              name="positionRole"
+            >
+              <Select
+                options={positionRoleOptions}
+                placeholder="请选择职位角色"
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="权限角色"
+              name="permissionRole"
+            >
+              <Select
+                options={permissionRoleOptions}
+                placeholder="请选择权限角色"
+              />
+            </Form.Item>
+          </>
+        )}
       </Form>
     </Drawer>
   );

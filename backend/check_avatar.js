@@ -6,9 +6,9 @@ async function checkAvatar() {
   try {
     const users = await prisma.user.findMany({
       select: {
+        avatar: true,
         id: true,
-        userName: true,
-        avatar: true
+        userName: true
       }
     });
 

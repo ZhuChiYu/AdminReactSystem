@@ -1,7 +1,8 @@
-import { Router } from 'express';
 import fs from 'node:fs';
-import multer from 'multer';
 import path from 'node:path';
+
+import { Router } from 'express';
+import multer from 'multer';
 
 import { customerController } from '@/controllers/customerController';
 import { permissionMiddleware } from '@/middleware/auth';
@@ -25,10 +26,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({
-  storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB
-  },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['.xlsx', '.xls'];
     const fileExt = path.extname(file.originalname).toLowerCase();
@@ -37,7 +34,11 @@ const upload = multer({
     } else {
       cb(new Error('只允许上传 Excel 文件 (.xlsx, .xls)'));
     }
-  }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  },
+  storage
 });
 
 const router = Router();
@@ -127,7 +128,11 @@ router.get(
  *       200:
  *         description: 查询成功
  */
-router.get('/assignments', permissionMiddleware('customer:assign'), asyncErrorHandler(customerController.getCustomerAssignments));
+router.get(
+  '/assignments',
+  permissionMiddleware('customer:assign'),
+  asyncErrorHandler(customerController.getCustomerAssignments)
+);
 
 /**
  * @swagger
@@ -157,7 +162,11 @@ router.get('/assignments', permissionMiddleware('customer:assign'), asyncErrorHa
  *       200:
  *         description: 分配成功
  */
-router.post('/assignments', permissionMiddleware('customer:assign'), asyncErrorHandler(customerController.assignCustomers));
+router.post(
+  '/assignments',
+  permissionMiddleware('customer:assign'),
+  asyncErrorHandler(customerController.assignCustomers)
+);
 
 /**
  * @swagger
@@ -176,7 +185,11 @@ router.post('/assignments', permissionMiddleware('customer:assign'), asyncErrorH
  *       200:
  *         description: 取消成功
  */
-router.delete('/assignments/:id', permissionMiddleware('customer:assign'), asyncErrorHandler(customerController.removeCustomerAssignment));
+router.delete(
+  '/assignments/:id',
+  permissionMiddleware('customer:assign'),
+  asyncErrorHandler(customerController.removeCustomerAssignment)
+);
 
 /**
  * @swagger
@@ -199,7 +212,12 @@ router.delete('/assignments/:id', permissionMiddleware('customer:assign'), async
  *       200:
  *         description: 导入成功
  */
-router.post('/import', upload.single('file'), permissionMiddleware('customer:create'), asyncErrorHandler(customerController.importCustomers));
+router.post(
+  '/import',
+  upload.single('file'),
+  permissionMiddleware('customer:create'),
+  asyncErrorHandler(customerController.importCustomers)
+);
 
 /**
  * @swagger

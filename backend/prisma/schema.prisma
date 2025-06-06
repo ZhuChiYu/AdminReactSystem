@@ -93,6 +93,7 @@ model Role {
   status    Int      @default(1)
   sort      Int      @default(0)
   remark    String?  @db.Text
+  roleType  String   @default("position") @map("role_type") @db.VarChar(20) // "permission" or "position"
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

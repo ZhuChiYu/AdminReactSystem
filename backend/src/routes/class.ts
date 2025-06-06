@@ -1,9 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { PrismaClient } from '@prisma/client';
 import { Router } from 'express';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
-import fs from 'node:fs';
-import path from 'node:path';
 
 import { classController } from '@/controllers/classController';
 import { asyncErrorHandler } from '@/middleware/errorHandler';
@@ -30,10 +31,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
-  },
   fileFilter: (req, file, cb) => {
     const allowedMimes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
@@ -49,7 +46,11 @@ const upload = multer({
     } else {
       cb(new Error('只支持 .xlsx 和 .xls 格式的文件'));
     }
-  }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  },
+  storage
 });
 
 // 配置multer用于头像上传
@@ -69,18 +70,8 @@ const avatarStorage = multer.diskStorage({
 });
 
 const avatarUpload = multer({
-  storage: avatarStorage,
-  limits: {
-    fileSize: 2 * 1024 * 1024 // 2MB
-  },
   fileFilter: (req, file, cb) => {
-    const allowedMimes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'image/webp'
-    ];
+    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(originalName);
@@ -90,7 +81,11 @@ const avatarUpload = multer({
     } else {
       cb(new Error('只支持 jpg、png、gif、webp 格式的图片文件'));
     }
-  }
+  },
+  limits: {
+    fileSize: 2 * 1024 * 1024 // 2MB
+  },
+  storage: avatarStorage
 });
 
 /**
@@ -333,11 +328,11 @@ router.post('/students/import', upload.single('file'), async (req, res) => {
       const rowNumber = i + 2; // Excel行号（从第2行开始，因为第1行是标题）
 
       // 支持多种字段名称映射
-      const name = row['姓名'] || row['name'] || row['Name'];
-      const company = row['公司'] || row['company'] || row['单位名称'] || row['单位'] || row['Company'];
-      const position = row['职位'] || row['position'] || row['职务'] || row['Position'];
-      const phone = row['电话'] || row['phone'] || row['手机'] || row['联系电话'] || row['Phone'];
-      const email = row['邮箱'] || row['email'] || row['Email'] || row['电子邮箱'];
+      const name = row['姓名'] || row.name || row.Name;
+      const company = row['公司'] || row.company || row['单位名称'] || row['单位'] || row.Company;
+      const position = row['职位'] || row.position || row['职务'] || row.Position;
+      const phone = row['电话'] || row.phone || row['手机'] || row['联系电话'] || row.Phone;
+      const email = row['邮箱'] || row.email || row.Email || row['电子邮箱'];
 
       // 验证必填字段
       if (!name) {
@@ -351,18 +346,20 @@ router.post('/students/import', upload.single('file'), async (req, res) => {
       }
 
       const student = {
-        classId: Number.parseInt(classId),
-        name: String(name).trim(),
-        gender: row['性别'] || row['gender'] || '',
-        company: String(company).trim(),
-        position: position ? String(position).trim() : '',
-        phone: phone ? String(phone).replace(/\D/g, '') : '', // 只保留数字
-        email: email ? String(email).trim() : '',
-        avatar: null, // 导入时暂不设置头像，使用默认头像
-        trainingFee: row['培训费'] || row['trainingFee'] || null,
-        joinDate: new Date(),
         attendanceRate: 100,
-        status: 1
+        avatar: null,
+        classId: Number.parseInt(classId),
+        company: String(company).trim(),
+        // 只保留数字
+        email: email ? String(email).trim() : '',
+        gender: row['性别'] || row.gender || '',
+        joinDate: new Date(),
+        name: String(name).trim(),
+        phone: phone ? String(phone).replace(/\D/g, '') : '',
+        position: position ? String(position).trim() : '',
+        status: 1,
+        // 导入时暂不设置头像，使用默认头像
+        trainingFee: row['培训费'] || row.trainingFee || null
       };
 
       // 验证邮箱格式（如果提供了邮箱）
@@ -412,8 +409,8 @@ router.post('/students/import', upload.single('file'), async (req, res) => {
     });
 
     await prisma.class.update({
-      where: { id: Number.parseInt(classId) },
-      data: { studentCount: totalStudents }
+      data: { studentCount: totalStudents },
+      where: { id: Number.parseInt(classId) }
     });
 
     logger.info(`班级${classId}批量导入学员成功: ${createdStudents.count}名学员`);
@@ -421,15 +418,14 @@ router.post('/students/import', upload.single('file'), async (req, res) => {
     res.json({
       code: 0,
       data: {
+        classId: Number.parseInt(classId),
         importedCount: createdStudents.count,
-        totalCount: students.length,
-        classId: Number.parseInt(classId)
+        totalCount: students.length
       },
       message: `成功导入${createdStudents.count}名学员`,
       path: req.path,
       timestamp: Date.now()
     });
-
   } catch (error) {
     logger.error('批量导入学员失败:', error);
     res.status(500).json({
@@ -467,18 +463,18 @@ router.get('/students/template', (req, res) => {
     // 创建模板数据
     const templateData = [
       {
-        '姓名': '张三',
-        '单位名称': '示例公司',
-        '职务': '财务经理',
-        '电话': '13800138000',
-        '邮箱': 'zhangsan@example.com'
+        单位名称: '示例公司',
+        姓名: '张三',
+        电话: '13800138000',
+        职务: '财务经理',
+        邮箱: 'zhangsan@example.com'
       },
       {
-        '姓名': '李四',
-        '单位名称': '测试企业',
-        '职务': '会计主管',
-        '电话': '13900139000',
-        '邮箱': 'lisi@test.com'
+        单位名称: '测试企业',
+        姓名: '李四',
+        电话: '13900139000',
+        职务: '会计主管',
+        邮箱: 'lisi@test.com'
       }
     ];
 
@@ -492,17 +488,20 @@ router.get('/students/template', (req, res) => {
       { wch: 30 }, // 单位名称
       { wch: 15 }, // 职务
       { wch: 15 }, // 电话
-      { wch: 25 }  // 邮箱
+      { wch: 25 } // 邮箱
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, '学员名单');
 
     // 生成Excel文件缓冲区
-    const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
 
     // 设置响应头
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename*=UTF-8\'\'%E5%AD%A6%E5%91%98%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx');
+    res.setHeader(
+      'Content-Disposition',
+      "attachment; filename*=UTF-8''%E5%AD%A6%E5%91%98%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx"
+    );
     res.setHeader('Content-Length', excelBuffer.length);
 
     // 发送文件
@@ -536,10 +535,7 @@ router.get('/categories/list', async (req, res) => {
     logger.info('🔵 GET /api/classes/categories/list - 开始处理');
 
     const categories = await prisma.classCategory.findMany({
-      orderBy: [
-        { sort: 'asc' },
-        { createdAt: 'desc' }
-      ],
+      orderBy: [{ sort: 'asc' }, { createdAt: 'desc' }],
       where: {
         status: 1 // 只返回启用的分类
       }
@@ -768,7 +764,7 @@ router.delete('/:id', asyncErrorHandler(classController.deleteClass));
 router.post('/categories', async (req, res) => {
   try {
     logger.info('🔵 POST /api/classes/categories - 开始处理');
-    const { name, code, description, status = 1, sort = 0 } = req.body;
+    const { code, description, name, sort = 0, status = 1 } = req.body;
 
     if (!name || !code) {
       return res.status(400).json({
@@ -893,7 +889,7 @@ router.put('/categories/:id', async (req, res) => {
   try {
     logger.info(`🔵 PUT /api/classes/categories/${req.params.id} - 开始处理`);
     const categoryId = Number.parseInt(req.params.id);
-    const { name, code, description, status, sort } = req.body;
+    const { code, description, name, sort, status } = req.body;
 
     if (Number.isNaN(categoryId)) {
       return res.status(400).json({
@@ -1124,12 +1120,12 @@ router.delete('/categories/:id', async (req, res) => {
 router.put('/students/:id', async (req, res) => {
   try {
     const studentId = Number.parseInt(req.params.id);
-    const { name, gender, company, position, phone, email, trainingFee, avatar } = req.body;
+    const { avatar, company, email, gender, name, phone, position, trainingFee } = req.body;
 
     logger.info('更新学员信息请求:', {
-      studentId,
+      hasAvatar: Boolean(avatar),
       requestBody: req.body,
-      hasAvatar: !!avatar
+      studentId
     });
 
     if (Number.isNaN(studentId)) {
@@ -1159,7 +1155,6 @@ router.put('/students/:id', async (req, res) => {
 
     // 更新学员信息
     const updatedStudent = await prisma.classStudent.update({
-      where: { id: studentId },
       data: {
         ...(name && { name }),
         ...(gender && { gender }),
@@ -1170,7 +1165,8 @@ router.put('/students/:id', async (req, res) => {
         ...(trainingFee !== undefined && { trainingFee: trainingFee ? Number.parseFloat(trainingFee) : null }),
         // 只有当请求明确包含头像信息时才更新头像字段
         ...(avatar !== undefined && { avatar })
-      }
+      },
+      where: { id: studentId }
     });
 
     logger.info(`学员信息更新成功: ${updatedStudent.name}, 头像: ${updatedStudent.avatar}`);
@@ -1242,17 +1238,19 @@ router.post('/students/:id/avatar', avatarUpload.single('avatar'), async (req, r
     const file = req.file;
 
     logger.info('请求参数:', {
-      studentId,
-      file: file ? {
-        fieldname: file.fieldname,
-        originalname: file.originalname,
-        encoding: file.encoding,
-        mimetype: file.mimetype,
-        size: file.size,
-        destination: file.destination,
-        filename: file.filename,
-        path: file.path
-      } : null
+      file: file
+        ? {
+            destination: file.destination,
+            encoding: file.encoding,
+            fieldname: file.fieldname,
+            filename: file.filename,
+            mimetype: file.mimetype,
+            originalname: file.originalname,
+            path: file.path,
+            size: file.size
+          }
+        : null,
+      studentId
     });
 
     if (Number.isNaN(studentId)) {
@@ -1314,9 +1312,9 @@ router.post('/students/:id/avatar', avatarUpload.single('avatar'), async (req, r
     const avatarPath = path.join(avatarDir, fileName);
 
     logger.info('文件处理信息:', {
+      avatarPath,
       fileExtension,
       fileName,
-      avatarPath,
       tempFilePath
     });
 
@@ -1333,8 +1331,8 @@ router.post('/students/:id/avatar', avatarUpload.single('avatar'), async (req, r
     // 更新学员头像
     logger.info('开始更新数据库');
     const updatedStudent = await prisma.classStudent.update({
-      where: { id: studentId },
-      data: { avatar: avatarUrl }
+      data: { avatar: avatarUrl },
+      where: { id: studentId }
     });
 
     logger.info(`学员头像上传成功: ${updatedStudent.name}, 头像URL: ${updatedStudent.avatar}`);
@@ -1349,7 +1347,6 @@ router.post('/students/:id/avatar', avatarUpload.single('avatar'), async (req, r
       path: req.path,
       timestamp: Date.now()
     });
-
   } catch (error) {
     logger.error('上传学员头像失败，详细错误信息:');
     if (error instanceof Error) {
@@ -1360,17 +1357,19 @@ router.post('/students/:id/avatar', avatarUpload.single('avatar'), async (req, r
       logger.error('未知错误:', error);
     }
     logger.error('请求信息:', {
-      method: req.method,
-      url: req.url,
-      params: req.params,
       body: req.body,
-      files: req.file ? {
-        fieldname: req.file.fieldname,
-        originalname: req.file.originalname,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-        path: req.file.path
-      } : null
+      files: req.file
+        ? {
+            fieldname: req.file.fieldname,
+            mimetype: req.file.mimetype,
+            originalname: req.file.originalname,
+            path: req.file.path,
+            size: req.file.size
+          }
+        : null,
+      method: req.method,
+      params: req.params,
+      url: req.url
     });
 
     res.status(500).json({

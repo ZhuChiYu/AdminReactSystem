@@ -183,3 +183,8 @@ export function fetchGetSystemStatistics() {
     };
   }
 }
+
+/** update employee permission role */
+export function updateEmployeePermissionRole(userId: number, roleCode: string) {
+  return apiClient.put(`/system/users/${userId}/permission-role`, { roleCode });
+}

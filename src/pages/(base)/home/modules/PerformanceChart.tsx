@@ -9,14 +9,20 @@ import { localStg } from '@/utils/storage';
 
 // 客户跟进状态枚举 - 根据实际数据更新
 enum FollowUpStatus {
-  ARRIVED = 'arrived',           // 已实到
-  CONSULT = 'consult',          // 咨询中
-  EFFECTIVE_VISIT = 'effective_visit', // 有效回访
-  NEW_DEVELOP = 'new_develop',   // 新开发
-  NOT_ARRIVED = 'not_arrived',   // 未实到
-  REGISTERED = 'registered',     // 已报名
-  WECHAT_ADDED = 'wechat_added', // 已加微信
-  EARLY_25 = 'early_25'         // 25日前
+  ARRIVED = 'arrived', // 已实到
+  CONSULT = 'consult', // 咨询中
+  // 已加微信
+  EARLY_25 = 'early_25', // 有效回访
+  // 咨询中
+  EFFECTIVE_VISIT = 'effective_visit', // 新开发
+  // 有效回访
+  NEW_DEVELOP = 'new_develop', // 未实到
+  // 新开发
+  NOT_ARRIVED = 'not_arrived', // 已报名
+  // 未实到
+  REGISTERED = 'registered', // 已加微信
+  // 已报名
+  WECHAT_ADDED = 'wechat_added' // 25日前
 }
 
 // 跟进状态中文映射
@@ -430,7 +436,15 @@ const PerformanceChart = () => {
       default:
         break;
     }
-  }, [activeTab, customerData, updateClientSourceChart, updateMonthChart, updateQuarterChart, updateYearChart, isAdmin]);
+  }, [
+    activeTab,
+    customerData,
+    updateClientSourceChart,
+    updateMonthChart,
+    updateQuarterChart,
+    updateYearChart,
+    isAdmin
+  ]);
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);

@@ -212,7 +212,11 @@ router.put('/:id/password', authMiddleware, asyncErrorHandler(userController.cha
  *       200:
  *         description: 查询成功
  */
-router.get('/employee-manager-relations', permissionMiddleware('system:user:list'), asyncErrorHandler(userController.getEmployeeManagerRelations));
+router.get(
+  '/employee-manager-relations',
+  permissionMiddleware('system:user:list'),
+  asyncErrorHandler(userController.getEmployeeManagerRelations)
+);
 
 /**
  * @swagger
@@ -242,7 +246,11 @@ router.get('/employee-manager-relations', permissionMiddleware('system:user:list
  *       200:
  *         description: 分配成功
  */
-router.post('/employee-manager-relations', permissionMiddleware('system:user:manage'), asyncErrorHandler(userController.assignEmployeesToManager));
+router.post(
+  '/employee-manager-relations',
+  permissionMiddleware('system:user:manage'),
+  asyncErrorHandler(userController.assignEmployeesToManager)
+);
 
 /**
  * @swagger
@@ -261,7 +269,11 @@ router.post('/employee-manager-relations', permissionMiddleware('system:user:man
  *       200:
  *         description: 取消成功
  */
-router.delete('/employee-manager-relations/:id', permissionMiddleware('system:user:manage'), asyncErrorHandler(userController.removeEmployeeManagerRelation));
+router.delete(
+  '/employee-manager-relations/:id',
+  permissionMiddleware('system:user:manage'),
+  asyncErrorHandler(userController.removeEmployeeManagerRelation)
+);
 
 // 导入员工数据
 router.post(
@@ -275,13 +287,25 @@ router.post(
 router.get('/template', permissionMiddleware('system:user:import'), asyncErrorHandler(userController.downloadTemplate));
 
 // 调试：检查导入用户状态
-router.get('/debug/imported', permissionMiddleware('system:user:list'), asyncErrorHandler(userController.debugImportedUsers));
+router.get(
+  '/debug/imported',
+  permissionMiddleware('system:user:list'),
+  asyncErrorHandler(userController.debugImportedUsers)
+);
 
 // 修复没有角色的用户
-router.post('/fix/roles', permissionMiddleware('system:user:import'), asyncErrorHandler(userController.fixUsersWithoutRoles));
+router.post(
+  '/fix/roles',
+  permissionMiddleware('system:user:import'),
+  asyncErrorHandler(userController.fixUsersWithoutRoles)
+);
 
 // 为用户分配角色
-router.post('/assign-role', permissionMiddleware('system:user:edit'), asyncErrorHandler(userController.assignRoleToUser));
+router.post(
+  '/assign-role',
+  permissionMiddleware('system:user:edit'),
+  asyncErrorHandler(userController.assignRoleToUser)
+);
 
 /**
  * @swagger
@@ -372,6 +396,10 @@ router.delete('/:id', permissionMiddleware('system:user:delete'), asyncErrorHand
  *       403:
  *         description: 权限不足或尝试删除超级管理员
  */
-router.post('/batch-delete', permissionMiddleware('system:user:delete'), asyncErrorHandler(userController.batchDeleteUsers));
+router.post(
+  '/batch-delete',
+  permissionMiddleware('system:user:delete'),
+  asyncErrorHandler(userController.batchDeleteUsers)
+);
 
 export default router;

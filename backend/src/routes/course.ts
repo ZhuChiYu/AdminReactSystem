@@ -184,12 +184,12 @@ router.get('/class', async (req, res) => {
       include: {
         course: {
           include: {
-            category: true,
             _count: {
               select: {
                 enrollments: true
               }
-            }
+            },
+            category: true
           }
         }
       },
@@ -481,8 +481,8 @@ router.post('/', async (req, res) => {
     // 如果提供了classId，更新班级的courseId
     if (classId) {
       await prisma.class.update({
-        where: { id: Number.parseInt(classId.toString()) },
-        data: { courseId: course.id }
+        data: { courseId: course.id },
+        where: { id: Number.parseInt(classId.toString()) }
       });
 
       logger.info(`班级${classId}关联课程成功: ${courseName}`);

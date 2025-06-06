@@ -81,6 +81,7 @@ async function main() {
         remark: '系统超级管理员，拥有所有权限',
         roleCode: 'super_admin',
         roleName: '超级管理员',
+        roleType: 'permission',
         sort: 1,
         status: 1
       }
@@ -90,7 +91,28 @@ async function main() {
         remark: '系统管理员',
         roleCode: 'admin',
         roleName: '管理员',
+        roleType: 'permission',
         sort: 2,
+        status: 1
+      }
+    }),
+    prisma.role.create({
+      data: {
+        remark: '普通员工权限',
+        roleCode: 'employee',
+        roleName: '员工',
+        roleType: 'permission',
+        sort: 3,
+        status: 1
+      }
+    }),
+    prisma.role.create({
+      data: {
+        remark: '公司最高管理职位',
+        roleCode: 'general_manager',
+        roleName: '总经理',
+        roleType: 'position',
+        sort: 4,
         status: 1
       }
     }),
@@ -99,7 +121,8 @@ async function main() {
         remark: '负责提供专业咨询和建议',
         roleCode: 'consultant',
         roleName: '顾问',
-        sort: 3,
+        roleType: 'position',
+        sort: 5,
         status: 1
       }
     }),
@@ -108,7 +131,8 @@ async function main() {
         remark: '负责销售团队管理和业绩',
         roleCode: 'sales_manager',
         roleName: '销售经理',
-        sort: 4,
+        roleType: 'position',
+        sort: 6,
         status: 1
       }
     }),
@@ -117,7 +141,8 @@ async function main() {
         remark: '负责市场部门的管理工作',
         roleCode: 'marketing_manager',
         roleName: '市场部经理',
-        sort: 5,
+        roleType: 'position',
+        sort: 7,
         status: 1
       }
     }),
@@ -126,7 +151,8 @@ async function main() {
         remark: '负责人力资源日常事务',
         roleCode: 'hr_specialist',
         roleName: '人力专员',
-        sort: 6,
+        roleType: 'position',
+        sort: 8,
         status: 1
       }
     })

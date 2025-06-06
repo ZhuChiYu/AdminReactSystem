@@ -121,11 +121,15 @@ declare namespace Api {
       roleHome: string;
       /** role name */
       roleName: string;
+      /** role type */
+      roleType: 'permission' | 'position';
     }>;
 
     /** role search params */
     type RoleSearchParams = CommonType.RecordNullable<
-      Pick<Api.SystemManage.Role, 'roleCode' | 'roleName' | 'status'> & CommonSearchParams
+      Pick<Role, 'roleCode' | 'roleName' | 'status'> & {
+        roleType?: 'permission' | 'position';
+      } & CommonSearchParams
     >;
 
     /** role list */

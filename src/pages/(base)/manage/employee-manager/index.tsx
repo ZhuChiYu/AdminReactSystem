@@ -1,5 +1,5 @@
 import { UserOutlined } from '@ant-design/icons';
-import { Button as AButton, Card, Form, Modal, Select, Space, Table, Tag, message } from 'antd';
+import { Button as AButton, Card, Checkbox, Form, Modal, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,8 +9,12 @@ import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from
 
 // 角色中文名称映射
 const roleNames = {
+  // 权限角色
   admin: '管理员',
+  // 职务角色
   consultant: '顾问',
+  employee: '员工',
+  general_manager: '总经理',
   hr_bp: '人力BP',
   hr_specialist: '人力专员',
   marketing_manager: '市场部经理',
@@ -18,6 +22,13 @@ const roleNames = {
   sales_manager: '销售经理',
   super_admin: '超级管理员'
 };
+
+// 权限角色选项
+const permissionRoleOptions = [
+  { label: '超级管理员', value: 'super_admin' },
+  { label: '管理员', value: 'admin' },
+  { label: '员工', value: 'employee' }
+];
 
 interface EmployeeManagerRelation {
   assignedById: number;
@@ -43,6 +54,7 @@ const EmployeeManagerManagement = () => {
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [selectedManager, setSelectedManager] = useState<number | undefined>();
   const [assignRemark, setAssignRemark] = useState('');
+  const [editingPermissionRole, setEditingPermissionRole] = useState<{ currentRole: string; id: number } | null>(null);
 
   // 检查权限
   useEffect(() => {
@@ -159,61 +171,182 @@ const EmployeeManagerManagement = () => {
     return roleNames[roleCode as keyof typeof roleNames] || roleCode || '未知角色';
   };
 
+  // 处理权限角色修改
+  const handlePermissionRoleChange = async (employeeId: number, newRole: string) => {
+    try {
+      await employeeService.updateEmployeePermissionRole(employeeId, newRole);
+      message.success('权限角色更新成功');
+      // 刷新列表
+      // TODO: 调用获取列表的方法
+    } catch (error) {
+      message.error('权限角色更新失败');
+    }
+    setEditingPermissionRole(null);
+  };
+
   // 表格列定义
   const columns = [
     {
-      dataIndex: 'employeeName',
-      key: 'employeeName',
-      ...getCenterColumnConfig(),
-      render: (text: string) => (
+      align: 'center',
+      dataIndex: 'index',
+      key: 'index',
+      title: '序号',
+      width: 80
+    },
+    {
+      align: 'center',
+      dataIndex: 'username',
+      key: 'username',
+      title: '用户名',
+      width: 120
+    },
+    {
+      align: 'center',
+      dataIndex: 'password',
+      key: 'password',
+      render: () => (
         <Space>
-          <UserOutlined />
-          {text}
-        </Space>
-      ),
-      title: '员工姓名'
-    },
-    {
-      dataIndex: 'managerName',
-      key: 'managerName',
-      ...getCenterColumnConfig(),
-      render: (text: string) => <Tag color="blue">{text}</Tag>,
-      title: '管理员'
-    },
-    {
-      dataIndex: 'assignedByName',
-      key: 'assignedByName',
-      ...getCenterColumnConfig(),
-      render: (text: string) => <Tag color="green">{text}</Tag>,
-      title: '分配人'
-    },
-    {
-      dataIndex: 'assignedTime',
-      key: 'assignedTime',
-      ...getCenterColumnConfig(),
-      title: '分配时间'
-    },
-    {
-      key: 'action',
-      ...getActionColumnConfig(120),
-      render: (_: any, record: EmployeeManagerRelation) => (
-        <Space>
+          ******
           <AButton
-            danger
             size="small"
-            onClick={() => {
-              Modal.confirm({
-                content: `确定要取消员工 ${record.employeeName} 与管理员 ${record.managerName} 的关系吗？`,
-                onOk: () => handleRemoveAssignment(record.id),
-                title: '确认取消分配'
-              });
-            }}
+            type="link"
           >
-            取消分配
+            查看
           </AButton>
         </Space>
       ),
-      title: '操作'
+      title: '密码',
+      width: 120
+    },
+    {
+      align: 'center',
+      dataIndex: 'nickName',
+      key: 'nickName',
+      title: '姓名',
+      width: 120
+    },
+    {
+      align: 'center',
+      dataIndex: 'roles',
+      key: 'positionRole',
+      render: (roles: Array<{ code: string; name: string; type: string }>) => {
+        const positionRole = roles.find(role => role.type === 'position');
+        return positionRole ? (
+          <Tag color="blue">{roleNames[positionRole.code as keyof typeof roleNames] || positionRole.code}</Tag>
+        ) : null;
+      },
+      title: '员工角色',
+      width: 120
+    },
+    {
+      align: 'center',
+      dataIndex: 'roles',
+      key: 'permissionRole',
+      render: (roles: Array<{ code: string; name: string; type: string }>, record: any) => {
+        const permissionRole = roles.find(role => role.type === 'permission');
+        const currentRole = permissionRole?.code || 'employee';
+
+        if (editingPermissionRole?.id === record.id) {
+          return (
+            <Select
+              autoFocus
+              defaultValue={currentRole}
+              options={permissionRoleOptions}
+              style={{ width: 120 }}
+              onBlur={() => setEditingPermissionRole(null)}
+              onChange={value => handlePermissionRoleChange(record.id, value)}
+              onClick={e => e.stopPropagation()}
+            />
+          );
+        }
+
+        const roleColor = currentRole === 'super_admin' ? 'gold' : currentRole === 'admin' ? 'green' : 'blue';
+
+        return (
+          <Tag
+            color={roleColor}
+            style={{ cursor: isSuperAdmin() ? 'pointer' : 'default' }}
+            onClick={e => {
+              e.stopPropagation();
+              if (isSuperAdmin()) {
+                setEditingPermissionRole({ currentRole, id: record.id });
+              }
+            }}
+          >
+            {roleNames[currentRole as keyof typeof roleNames] || currentRole}
+          </Tag>
+        );
+      },
+      title: '权限角色',
+      width: 120
+    },
+    {
+      align: 'center',
+      dataIndex: 'gender',
+      key: 'gender',
+      render: (gender: string) => <Tag color={gender === '男' ? 'blue' : 'pink'}>{gender}</Tag>,
+      title: '性别',
+      width: 80
+    },
+    {
+      align: 'center',
+      dataIndex: 'phone',
+      key: 'phone',
+      title: '手机号',
+      width: 120
+    },
+    {
+      align: 'center',
+      dataIndex: 'email',
+      key: 'email',
+      title: '邮箱',
+      width: 200
+    },
+    {
+      align: 'center',
+      dataIndex: 'address',
+      key: 'address',
+      title: '家庭住址',
+      width: 200
+    },
+    {
+      align: 'center',
+      dataIndex: 'bankCardNo',
+      key: 'bankCardNo',
+      title: '银行卡号',
+      width: 180
+    },
+    {
+      align: 'center',
+      fixed: 'right',
+      key: 'action',
+      render: (_: any, record: any) => (
+        <Space>
+          <AButton
+            size="small"
+            type="link"
+          >
+            编辑
+          </AButton>
+          <AButton
+            size="small"
+            type="link"
+          >
+            详情
+          </AButton>
+          {record.username !== 'admin' && (
+            <AButton
+              danger
+              size="small"
+              type="link"
+            >
+              删除
+            </AButton>
+          )}
+        </Space>
+      ),
+      title: '操作',
+      width: 180
     }
   ];
 

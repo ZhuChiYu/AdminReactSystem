@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger';
 class CustomerController {
   /** 获取客户列表 */
   async getCustomers(req: Request, res: Response) {
-    const { company, current = 1, customerName, followStatus, industry, size = 10, source, scope } = req.query;
+    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source } = req.query;
 
     const user = (req as any).user; // 获取当前登录用户
     const page = Number(current);
@@ -21,7 +21,7 @@ class CustomerController {
     // scope = 'all' 表示客户资料管理页面，显示所有数据
     // scope = 'own' 表示客户跟进页面，只显示自己创建的数据
     // 默认为 'own'
-    const dataScope = scope as string || 'own';
+    const dataScope = (scope as string) || 'own';
 
     if (dataScope === 'own' && !user?.roles?.includes('super_admin')) {
       // 客户跟进页面：普通用户只能查看自己创建的客户
@@ -94,6 +94,9 @@ class CustomerController {
               name: customer.assignedTo.nickName
             }
           : null,
+        canDelete: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
+        // 添加权限字段
+        canEdit: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
         company: customer.company,
         createdAt: customer.createdAt,
         createdBy: customer.createdBy
@@ -115,10 +118,7 @@ class CustomerController {
         remark: customer.remark,
         source: customer.source,
         updatedAt: customer.updatedAt,
-        wechat: customer.wechat,
-        // 添加权限字段
-        canEdit: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
-        canDelete: user?.roles?.includes('super_admin') || customer.createdById === user?.id
+        wechat: customer.wechat
       }));
 
       const pages = Math.ceil(total / pageSize);
@@ -522,7 +522,7 @@ class CustomerController {
       const where: any = {};
 
       // 权限控制：根据scope参数决定数据范围
-      const dataScope = scope as string || 'own';
+      const dataScope = (scope as string) || 'own';
 
       if (dataScope === 'own' && !user?.roles?.includes('super_admin')) {
         // 客户跟进页面：普通用户只能查看自己创建的客户统计
@@ -615,32 +615,36 @@ class CustomerController {
 
           // 状态映射：中文 -> 英文枚举
           const statusMap: Record<string, string> = {
-            '咨询': 'consult',
-            '已加微信': 'wechat_added',
-            '已报名': 'registered',
-            '已实到': 'arrived',
-            '未实到': 'not_arrived',
-            '新开发': 'new_develop',
-            '早25客户': 'early_25',
-            '早25': 'early_25',
-            '有效回访': 'effective_visit',
-            '大客户': 'vip',
-            '未通过': 'rejected'
+            咨询: 'consult',
+            大客户: 'vip',
+            已加微信: 'wechat_added',
+            已实到: 'arrived',
+            已报名: 'registered',
+            新开发: 'new_develop',
+            早25: 'early_25',
+            早25客户: 'early_25',
+            有效回访: 'effective_visit',
+            未实到: 'not_arrived',
+            未通过: 'rejected'
           };
 
           const customerData = {
-            customerName: row[0]?.toString().trim() || '',     // A列：姓名
-            company: row[1]?.toString().trim() || '',          // B列：单位
-            position: row[2]?.toString().trim() || '',         // C列：职务
-            phone: row[3]?.toString().trim() || '',            // D列：电话
-            mobile: row[4]?.toString().trim() || '',           // E列：手机
-            remark: row[5]?.toString().trim() || '',           // F列：跟进内容
+            // A列：姓名
+            company: row[1]?.toString().trim() || '',
+            createdById: req.user.id,
+            customerName: row[0]?.toString().trim() || '',
+            email: '', // F列：跟进内容
             followStatus: statusMap[rawStatus] || rawStatus || 'consult', // G列：状态
             industry: 'other',
-            source: 'import',
-            createdById: req.user.id,
-            level: 1,
-            email: ''
+            level: 1, // D列：电话
+            mobile: row[4]?.toString().trim() || '',
+            // C列：职务
+            phone: row[3]?.toString().trim() || '',
+            // B列：单位
+            position: row[2]?.toString().trim() || '',
+            // E列：手机
+            remark: row[5]?.toString().trim() || '',
+            source: 'import'
           };
 
           // 验证必填字段
@@ -653,8 +657,8 @@ class CustomerController {
           // 检查是否已存在相同的客户（根据姓名和公司）
           const existingCustomer = await prisma.customer.findFirst({
             where: {
-              customerName: customerData.customerName,
-              company: customerData.company
+              company: customerData.company,
+              customerName: customerData.customerName
             }
           });
 
@@ -678,39 +682,36 @@ class CustomerController {
       }
 
       // 删除临时文件
-      const fs = require('fs');
+      const fs = require('node:fs');
       if (fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
 
       logger.info(`用户 ${req.user.userName} 导入客户文件: ${req.file.originalname}`, {
-        userId: req.user.id,
+        failureCount,
         fileName: req.file.originalname,
         fileSize: req.file.size,
         successCount,
-        failureCount,
-        totalCount: successCount + failureCount
+        totalCount: successCount + failureCount,
+        userId: req.user.id
       });
 
       const importResult = {
-        successCount,
+        errors: errors.slice(0, 10),
         failureCount,
-        totalCount: successCount + failureCount,
-        errors: errors.slice(0, 10), // 最多返回前10个错误
-        hasMoreErrors: errors.length > 10
+        // 最多返回前10个错误
+        hasMoreErrors: errors.length > 10,
+        successCount,
+        totalCount: successCount + failureCount
       };
 
       res.json(
-        createSuccessResponse(
-          importResult,
-          `导入完成：成功 ${successCount} 条，失败 ${failureCount} 条`,
-          req.path
-        )
+        createSuccessResponse(importResult, `导入完成：成功 ${successCount} 条，失败 ${failureCount} 条`, req.path)
       );
     } catch (error) {
       // 清理临时文件
       if (req.file && req.file.path) {
-        const fs = require('fs');
+        const fs = require('node:fs');
         if (fs.existsSync(req.file.path)) {
           fs.unlinkSync(req.file.path);
         }
@@ -750,9 +751,9 @@ class CustomerController {
           },
           customer: {
             select: {
-              id: true,
+              company: true,
               customerName: true,
-              company: true
+              id: true
             }
           }
         },
@@ -770,9 +771,9 @@ class CustomerController {
         assignedTime: assignment.assignedTime.toISOString().split('T')[0],
         assignedToId: assignment.assignedToId,
         assignedToName: assignment.assignedTo.nickName,
+        customerCompany: assignment.customer.company,
         customerId: assignment.customerId,
         customerName: assignment.customer.customerName,
-        customerCompany: assignment.customer.company,
         id: assignment.id,
         remark: assignment.remark,
         status: assignment.status
@@ -801,7 +802,7 @@ class CustomerController {
 
   /** 分配客户给员工 */
   async assignCustomers(req: Request, res: Response) {
-    const { customerIds, assignedToId, remark } = req.body;
+    const { assignedToId, customerIds, remark } = req.body;
     const assignedById = (req as any).user!.id;
 
     try {
@@ -839,10 +840,10 @@ class CustomerController {
       // 检查是否已经存在分配关系
       const existingAssignments = await prisma.customerAssignment.findMany({
         where: {
+          assignedToId,
           customerId: {
             in: customerIds.map(Number)
-          },
-          assignedToId
+          }
         }
       });
 
@@ -871,11 +872,11 @@ class CustomerController {
       await Promise.all(
         customerIds.map(customerId =>
           prisma.customer.update({
-            where: { id: Number(customerId) },
             data: {
-              assignedToId,
-              assignedTime: new Date()
-            }
+              assignedTime: new Date(),
+              assignedToId
+            },
+            where: { id: Number(customerId) }
           })
         )
       );
@@ -894,11 +895,11 @@ class CustomerController {
     try {
       // 验证分配关系是否存在
       const assignment = await prisma.customerAssignment.findUnique({
-        where: {
-          id: Number(id)
-        },
         include: {
           customer: true
+        },
+        where: {
+          id: Number(id)
         }
       });
 
@@ -915,11 +916,11 @@ class CustomerController {
 
       // 同时清除customer表的assignedToId和assignedTime
       await prisma.customer.update({
-        where: { id: assignment.customerId },
         data: {
-          assignedToId: null,
-          assignedTime: null
-        }
+          assignedTime: null,
+          assignedToId: null
+        },
+        where: { id: assignment.customerId }
       });
 
       res.json(createSuccessResponse(null, '取消分配成功', req.path));

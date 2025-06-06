@@ -13,6 +13,14 @@ CREATE TABLE "users" (
     "last_login_time" TIMESTAMP(3),
     "department_id" INTEGER,
     "position" VARCHAR(100),
+    "address" VARCHAR(500),
+    "bank_card" VARCHAR(50),
+    "id_card" VARCHAR(18),
+    "wechat" VARCHAR(100),
+    "tim" VARCHAR(100),
+    "contract_years" INTEGER,
+    "contract_start_date" TIMESTAMP(3),
+    "contract_end_date" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -40,6 +48,7 @@ CREATE TABLE "roles" (
     "id" SERIAL NOT NULL,
     "role_name" VARCHAR(100) NOT NULL,
     "role_code" VARCHAR(50) NOT NULL,
+    "role_type" VARCHAR(20) NOT NULL DEFAULT 'position',
     "status" INTEGER NOT NULL DEFAULT 1,
     "sort" INTEGER NOT NULL DEFAULT 0,
     "remark" TEXT,
@@ -159,8 +168,6 @@ CREATE TABLE "courses" (
     "location" VARCHAR(200) NOT NULL,
     "tags" JSONB,
     "status" INTEGER NOT NULL DEFAULT 0,
-    "rating" DECIMAL(3,2) DEFAULT 0,
-    "review_count" INTEGER NOT NULL DEFAULT 0,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -180,18 +187,6 @@ CREATE TABLE "course_enrollments" (
     "remark" TEXT,
 
     CONSTRAINT "course_enrollments_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "course_reviews" (
-    "id" SERIAL NOT NULL,
-    "course_id" INTEGER NOT NULL,
-    "student_name" VARCHAR(100) NOT NULL,
-    "rating" INTEGER NOT NULL,
-    "comment" TEXT,
-    "review_time" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "course_reviews_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -301,6 +296,190 @@ CREATE TABLE "operation_logs" (
     CONSTRAINT "operation_logs_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "attachments" (
+    "id" SERIAL NOT NULL,
+    "course_id" INTEGER NOT NULL,
+    "file_name" VARCHAR(255) NOT NULL,
+    "original_name" VARCHAR(255),
+    "file_type" VARCHAR(50) NOT NULL,
+    "file_size" INTEGER NOT NULL,
+    "uploader_id" INTEGER NOT NULL,
+    "upload_time" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "download_count" INTEGER NOT NULL DEFAULT 0,
+    "status" INTEGER NOT NULL DEFAULT 1,
+
+    CONSTRAINT "attachments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "class_categories" (
+    "id" SERIAL NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "code" VARCHAR(50) NOT NULL,
+    "description" TEXT,
+    "sort" INTEGER NOT NULL DEFAULT 0,
+    "status" INTEGER NOT NULL DEFAULT 1,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "class_categories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "classes" (
+    "id" SERIAL NOT NULL,
+    "name" VARCHAR(200) NOT NULL,
+    "category_id" INTEGER NOT NULL,
+    "course_id" INTEGER,
+    "description" TEXT,
+    "start_date" TIMESTAMP(3) NOT NULL,
+    "end_date" TIMESTAMP(3) NOT NULL,
+    "status" INTEGER NOT NULL DEFAULT 0,
+    "student_count" INTEGER NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "classes_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "class_students" (
+    "id" SERIAL NOT NULL,
+    "class_id" INTEGER NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "gender" VARCHAR(10),
+    "company" VARCHAR(200) NOT NULL,
+    "position" VARCHAR(100),
+    "phone" VARCHAR(20),
+    "email" VARCHAR(100),
+    "avatar" VARCHAR(500),
+    "training_fee" DECIMAL(10,2),
+    "join_date" TIMESTAMP(3) NOT NULL,
+    "attendance_rate" INTEGER NOT NULL DEFAULT 100,
+    "status" INTEGER NOT NULL DEFAULT 1,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "class_students_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "notifications" (
+    "id" SERIAL NOT NULL,
+    "title" VARCHAR(200) NOT NULL,
+    "content" TEXT NOT NULL,
+    "type" VARCHAR(50) NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "read_status" INTEGER NOT NULL DEFAULT 0,
+    "read_time" TEXT,
+    "related_id" INTEGER,
+    "related_type" VARCHAR(50),
+    "create_time" TEXT NOT NULL,
+
+    CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "notification_attachments" (
+    "id" SERIAL NOT NULL,
+    "notification_id" INTEGER NOT NULL,
+    "file_name" VARCHAR(255) NOT NULL,
+    "original_name" VARCHAR(255),
+    "file_type" VARCHAR(50) NOT NULL,
+    "file_size" INTEGER NOT NULL,
+    "uploader_id" INTEGER NOT NULL,
+    "upload_time" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "download_count" INTEGER NOT NULL DEFAULT 0,
+    "status" INTEGER NOT NULL DEFAULT 1,
+
+    CONSTRAINT "notification_attachments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tasks" (
+    "id" SERIAL NOT NULL,
+    "task_name" VARCHAR(200) NOT NULL,
+    "task_desc" TEXT,
+    "project_name" VARCHAR(200) NOT NULL,
+    "due_date" TIMESTAMP(3) NOT NULL,
+    "target_count" INTEGER NOT NULL DEFAULT 0,
+    "actual_count" INTEGER NOT NULL DEFAULT 0,
+    "assignee_id" INTEGER NOT NULL,
+    "task_type" VARCHAR(50) NOT NULL DEFAULT 'normal',
+    "priority" INTEGER NOT NULL DEFAULT 1,
+    "task_status" INTEGER NOT NULL DEFAULT 0,
+    "remark" TEXT,
+    "create_time" TEXT NOT NULL,
+    "update_time" TEXT,
+
+    CONSTRAINT "tasks_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "expense_applications" (
+    "id" SERIAL NOT NULL,
+    "application_no" VARCHAR(50) NOT NULL,
+    "applicant_id" INTEGER NOT NULL,
+    "expense_type" VARCHAR(100) NOT NULL,
+    "total_amount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "application_reason" TEXT,
+    "expense_period_start" TIMESTAMP(3),
+    "expense_period_end" TIMESTAMP(3),
+    "remark" TEXT,
+    "application_status" INTEGER NOT NULL DEFAULT 0,
+    "current_approver_id" INTEGER,
+    "approval_time" TIMESTAMP(3),
+    "approval_comment" TEXT,
+    "attachments" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "expense_applications_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "expense_items" (
+    "id" SERIAL NOT NULL,
+    "application_id" INTEGER NOT NULL,
+    "item_name" VARCHAR(200) NOT NULL,
+    "item_type" VARCHAR(100) NOT NULL,
+    "expense_date" TIMESTAMP(3) NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "description" TEXT,
+    "receipt_no" VARCHAR(100),
+    "vendor" VARCHAR(200),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "expense_items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "employee_manager_relations" (
+    "id" SERIAL NOT NULL,
+    "employee_id" INTEGER NOT NULL,
+    "manager_id" INTEGER NOT NULL,
+    "assigned_by_id" INTEGER NOT NULL,
+    "assigned_time" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "status" INTEGER NOT NULL DEFAULT 1,
+    "remark" TEXT,
+
+    CONSTRAINT "employee_manager_relations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "customer_assignments" (
+    "id" SERIAL NOT NULL,
+    "customer_id" INTEGER NOT NULL,
+    "assigned_to_id" INTEGER NOT NULL,
+    "assigned_by_id" INTEGER NOT NULL,
+    "assigned_time" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "status" INTEGER NOT NULL DEFAULT 1,
+    "remark" TEXT,
+
+    CONSTRAINT "customer_assignments_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_user_name_key" ON "users"("user_name");
 
@@ -336,6 +515,18 @@ CREATE UNIQUE INDEX "meeting_participants_meeting_id_user_id_key" ON "meeting_pa
 
 -- CreateIndex
 CREATE UNIQUE INDEX "system_dict_dict_type_dict_value_key" ON "system_dict"("dict_type", "dict_value");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "class_categories_code_key" ON "class_categories"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "expense_applications_application_no_key" ON "expense_applications"("application_no");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "employee_manager_relations_employee_id_manager_id_key" ON "employee_manager_relations"("employee_id", "manager_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "customer_assignments_customer_id_assigned_to_id_key" ON "customer_assignments"("customer_id", "assigned_to_id");
 
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_department_id_fkey" FOREIGN KEY ("department_id") REFERENCES "departments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -377,9 +568,6 @@ ALTER TABLE "courses" ADD CONSTRAINT "courses_category_id_fkey" FOREIGN KEY ("ca
 ALTER TABLE "course_enrollments" ADD CONSTRAINT "course_enrollments_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "course_reviews" ADD CONSTRAINT "course_reviews_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "meetings" ADD CONSTRAINT "meetings_room_id_fkey" FOREIGN KEY ("room_id") REFERENCES "meeting_rooms"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -396,3 +584,54 @@ ALTER TABLE "financial_records" ADD CONSTRAINT "financial_records_created_by_id_
 
 -- AddForeignKey
 ALTER TABLE "operation_logs" ADD CONSTRAINT "operation_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "attachments" ADD CONSTRAINT "attachments_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "attachments" ADD CONSTRAINT "attachments_uploader_id_fkey" FOREIGN KEY ("uploader_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "classes" ADD CONSTRAINT "classes_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "class_categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "classes" ADD CONSTRAINT "classes_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "class_students" ADD CONSTRAINT "class_students_class_id_fkey" FOREIGN KEY ("class_id") REFERENCES "classes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notification_attachments" ADD CONSTRAINT "notification_attachments_notification_id_fkey" FOREIGN KEY ("notification_id") REFERENCES "notifications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notification_attachments" ADD CONSTRAINT "notification_attachments_uploader_id_fkey" FOREIGN KEY ("uploader_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_assignee_id_fkey" FOREIGN KEY ("assignee_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "expense_applications" ADD CONSTRAINT "expense_applications_applicant_id_fkey" FOREIGN KEY ("applicant_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "expense_applications" ADD CONSTRAINT "expense_applications_current_approver_id_fkey" FOREIGN KEY ("current_approver_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "expense_items" ADD CONSTRAINT "expense_items_application_id_fkey" FOREIGN KEY ("application_id") REFERENCES "expense_applications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "employee_manager_relations" ADD CONSTRAINT "employee_manager_relations_employee_id_fkey" FOREIGN KEY ("employee_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "employee_manager_relations" ADD CONSTRAINT "employee_manager_relations_manager_id_fkey" FOREIGN KEY ("manager_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "employee_manager_relations" ADD CONSTRAINT "employee_manager_relations_assigned_by_id_fkey" FOREIGN KEY ("assigned_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "customer_assignments" ADD CONSTRAINT "customer_assignments_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "customer_assignments" ADD CONSTRAINT "customer_assignments_assigned_to_id_fkey" FOREIGN KEY ("assigned_to_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "customer_assignments" ADD CONSTRAINT "customer_assignments_assigned_by_id_fkey" FOREIGN KEY ("assigned_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
