@@ -48,10 +48,10 @@ CREATE TABLE "roles" (
     "id" SERIAL NOT NULL,
     "role_name" VARCHAR(100) NOT NULL,
     "role_code" VARCHAR(50) NOT NULL,
-    "role_type" VARCHAR(20) NOT NULL DEFAULT 'position',
     "status" INTEGER NOT NULL DEFAULT 1,
     "sort" INTEGER NOT NULL DEFAULT 0,
     "remark" TEXT,
+    "role_type" VARCHAR(20) NOT NULL DEFAULT 'position',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 

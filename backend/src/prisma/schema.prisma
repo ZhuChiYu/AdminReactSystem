@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  description String?
+  status      Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("departments")
+}
+
+model Class {
+  id           Int            @id @default(autoincrement())
+  name         String
+  categoryId   Int
+  categoryName String
+  teacher      String
+  startDate    DateTime
+  endDate      DateTime
+  status       Int            @default(1)
+  studentCount Int            @default(0)
+  description  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  students     ClassStudent[]
+
+  @@map("classes")
+}
+
+model ClassStudent {
+  id             Int      @id @default(autoincrement())
+  classId        Int
+  name           String
+  company        String
+  position       String?
+  phone          String?
+  email          String?
+  joinDate       DateTime @default(now())
+  attendanceRate Float    @default(100)
+  status         Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  avatar         String?
+  gender         String?
+  trainingFee    Float?
+  class          Class    @relation(fields: [classId], references: [id])
+
+  @@map("class_students")
+}
+
+model ClassCategory {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  description String?
+  status      Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("class_categories")
+} 

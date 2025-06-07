@@ -292,5 +292,29 @@ export const classService = {
       console.error('上传学员头像失败:', error);
       throw error;
     }
+  },
+
+  /** 删除学员 */
+  async deleteStudent(studentId: number): Promise<any> {
+    try {
+      const response = await apiClient.delete(`/classes/students/${studentId}`);
+      return response;
+    } catch (error) {
+      console.error('删除学员失败:', error);
+      throw error;
+    }
+  },
+
+  /** 批量删除学员 */
+  async deleteStudentsBatch(studentIds: number[]): Promise<any> {
+    try {
+      const response = await apiClient.delete('/classes/students/batch', {
+        data: { studentIds }
+      });
+      return response;
+    } catch (error) {
+      console.error('批量删除学员失败:', error);
+      throw error;
+    }
   }
 };

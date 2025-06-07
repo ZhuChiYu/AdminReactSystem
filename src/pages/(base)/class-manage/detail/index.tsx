@@ -146,6 +146,10 @@ const ClassDetail = () => {
   const [searchText, setSearchText] = useState('');
   const [filteredStudentList, setFilteredStudentList] = useState<any[]>([]);
 
+  // 添加选择相关状态
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // 计算总培训费
   const calculateTotalTrainingFee = () => {
     return studentList.reduce((total, student) => {
@@ -186,16 +190,18 @@ const ClassDetail = () => {
 
       const formattedStudents = studentsResponse.records.map((student: any) => ({
         attendance: student.attendanceRate || 0,
-        avatar: student.avatar || null,
+        avatar: null, // 使用默认头像
         company: student.company || '',
         email: student.email || '',
         gender: student.gender || '',
         id: student.id,
-        joinDate: student.joinDate || '',
+        joinDate: student.joinDate || student.enrollmentDate || '',
+        landline: student.landline || '',
         name: student.name,
         phone: student.phone || '',
         position: student.position || '',
-        trainingFee: student.trainingFee || null
+        studentId: student.studentId || '',
+        trainingFee: student.trainingFee || 0 // 确保培训费有默认值
       }));
 
       setStudentList(formattedStudents);
@@ -371,14 +377,21 @@ const ClassDetail = () => {
   };
 
   // 处理移除学员
-  const handleRemoveStudent = (studentId: number) => {
+  const handleRemoveStudent = async (studentId: number) => {
     Modal.confirm({
-      content: '确定要移除该学员吗？',
-      onOk: () => {
-        setStudentList(prevList => prevList.filter(student => student.id !== studentId));
-        message.success('学员已移除');
+      content: '确定要删除该学员吗？此操作不可恢复。',
+      onOk: async () => {
+        try {
+          await classService.deleteStudent(studentId);
+          message.success('学员删除成功');
+          // 重新获取学员列表
+          await fetchClassInfo();
+        } catch (error) {
+          message.error('删除失败');
+          console.error('删除学员失败:', error);
+        }
       },
-      title: '移除学员'
+      title: '删除学员'
     });
   };
 
@@ -519,6 +532,21 @@ const ClassDetail = () => {
   const studentColumns = [
     {
       align: 'center' as const,
+      dataIndex: 'index',
+      key: 'index',
+      render: (_: any, __: any, index: number) => index + 1,
+      title: '序号',
+      width: 80
+    },
+    {
+      align: 'center' as const,
+      dataIndex: 'company',
+      key: 'company',
+      title: '单位',
+      width: 150
+    },
+    {
+      align: 'center' as const,
       dataIndex: 'name',
       key: 'name',
       render: (text: string, record: any) => (
@@ -540,13 +568,6 @@ const ClassDetail = () => {
       key: 'gender',
       title: '性别',
       width: 80
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'company',
-      key: 'company',
-      title: '单位',
-      width: 150
     },
     {
       align: 'center' as const,
@@ -588,33 +609,34 @@ const ClassDetail = () => {
       align: 'center' as const,
       fixed: 'right' as const,
       key: 'action',
-      render: (_: unknown, record: any) => {
-        return (
-          <Space size="middle">
-            <Button
-              type="link"
-              onClick={() => handleViewStudentDetail(record)}
-            >
-              详情
-            </Button>
-            <Button
-              type="link"
-              onClick={() => handleEditStudent(record)}
-            >
-              编辑
-            </Button>
-            <Button
-              danger
-              type="link"
-              onClick={() => handleRemoveStudent(record.id)}
-            >
-              移除
-            </Button>
-          </Space>
-        );
-      },
+      render: (_: unknown, record: any) => (
+        <Space size={[4, 0]}>
+          <Button
+            size="small"
+            type="link"
+            onClick={() => handleViewStudentDetail(record)}
+          >
+            详情
+          </Button>
+          <Button
+            size="small"
+            type="link"
+            onClick={() => handleEditStudent(record)}
+          >
+            编辑
+          </Button>
+          <Button
+            danger
+            size="small"
+            type="link"
+            onClick={() => handleRemoveStudent(record.id)}
+          >
+            删除
+          </Button>
+        </Space>
+      ),
       title: '操作',
-      width: 180
+      width: 160
     }
   ];
 
@@ -711,9 +733,7 @@ const ClassDetail = () => {
 
         const formattedStudents = studentsResponse.records.map((student: any) => ({
           attendance: student.attendanceRate || 0,
-          avatar:
-            student.avatar ||
-            `https://xsgames.co/randomusers/avatar.php?g=${student.gender === '女' ? 'female' : 'male'}&id=${student.id}`,
+          avatar: null, // 使用默认头像
           company: student.company || '',
           email: student.email || '',
           gender: student.gender || '',
@@ -723,7 +743,8 @@ const ClassDetail = () => {
           name: student.name,
           phone: student.phone || '',
           position: student.position || '',
-          studentId: student.studentId || ''
+          studentId: student.studentId || '',
+          trainingFee: student.trainingFee || 0 // 确保培训费有默认值
         }));
 
         setStudentList(formattedStudents);
@@ -1435,6 +1456,39 @@ const ClassDetail = () => {
     setFilteredStudentList(filteredAndSorted);
   }, [studentList, searchText]);
 
+  // 处理表格选择变化
+  const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
+    setSelectedRowKeys(newSelectedRowKeys);
+  };
+
+  // 处理批量删除
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请选择要删除的学员');
+      return;
+    }
+
+    Modal.confirm({
+      content: `确定要删除选中的 ${selectedRowKeys.length} 名学员吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          setDeleteLoading(true);
+          await classService.deleteStudentsBatch(selectedRowKeys as number[]);
+          message.success(`成功删除 ${selectedRowKeys.length} 名学员`);
+          setSelectedRowKeys([]);
+          // 重新获取学员列表
+          await fetchClassInfo();
+        } catch (error) {
+          message.error('批量删除失败');
+          console.error('批量删除失败:', error);
+        } finally {
+          setDeleteLoading(false);
+        }
+      },
+      title: '批量删除学员'
+    });
+  };
+
   // 渲染主要信息区域
   const renderBasicInfo = () => {
     if (!classInfo) return null;
@@ -1515,6 +1569,14 @@ const ClassDetail = () => {
               添加学员
             </Button>
             <Button onClick={handleExportStudents}>导出学员</Button>
+            <Button
+              danger
+              disabled={selectedRowKeys.length === 0}
+              loading={deleteLoading}
+              onClick={handleBatchDelete}
+            >
+              批量删除
+            </Button>
           </Space>
         }
       >
@@ -1536,6 +1598,10 @@ const ClassDetail = () => {
           dataSource={filteredStudentList}
           loading={loading}
           rowKey="id"
+          rowSelection={{
+            onChange: onSelectChange,
+            selectedRowKeys
+          }}
           scroll={{ x: 1200 }}
           pagination={{
             pageSize: 20,
