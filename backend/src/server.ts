@@ -52,14 +52,11 @@ app.use(
 
 app.use(
   cors({
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    origin(origin, callback) {
-      // 允许没有origin的请求（比如移动应用）
+    origin: function (origin, callback) {
+      // 允许没有origin的请求（比如移动应用、Postman等）
       if (!origin) return callback(null, true);
 
-      // 开发环境允许的域名
+      // 开发环境允许的域名列表
       const allowedOrigins = [
         'http://localhost:3001',
         'http://localhost:5173',
@@ -70,7 +67,7 @@ app.use(
         'http://localhost:9531',
         'http://localhost:9532',
         'http://localhost:9533',
-        // 添加服务器IP地址
+        // 服务器IP地址 - 支持HTTP和HTTPS
         'http://111.230.110.95',
         'http://111.230.110.95:9527',
         'http://111.230.110.95:3000',
@@ -81,36 +78,63 @@ app.use(
 
       // 从环境变量读取额外允许的域名
       if (process.env.CORS_ORIGIN) {
-        const envOrigins = process.env.CORS_ORIGIN.split(',').map(origin => origin.trim());
+        const envOrigins = process.env.CORS_ORIGIN.split(',').map(o => o.trim());
         allowedOrigins.push(...envOrigins);
       }
 
-      // 生产环境允许的域名
+      // 生产环境的域名
       if (process.env.NODE_ENV === 'production') {
         allowedOrigins.push('https://your-domain.com');
       }
 
+      console.log(`🌐 CORS检查: 请求来源 = ${origin}`);
+      console.log(`📋 CORS允许的域名:`, allowedOrigins);
+
       // 检查是否在允许列表中
       if (allowedOrigins.includes(origin)) {
+        console.log(`✅ CORS: 允许访问 ${origin}`);
         return callback(null, true);
       }
 
-      // 开发环境允许所有localhost域名和指定IP域名
-      if (process.env.NODE_ENV !== 'production' &&
-          (origin.includes('localhost') || origin.includes('111.230.110.95'))) {
-        return callback(null, true);
+      // 开发环境宽松策略：允许localhost和指定IP
+      if (process.env.NODE_ENV !== 'production') {
+        if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('111.230.110.95')) {
+          console.log(`✅ CORS: 开发环境允许 ${origin}`);
+          return callback(null, true);
+        }
       }
 
-      console.log(`❌ CORS: 不允许的域名: ${origin}`);
-      console.log(`✅ CORS: 允许的域名:`, allowedOrigins);
-      callback(new Error('不允许的跨域请求'));
-    }
+      console.log(`❌ CORS: 拒绝访问 ${origin}`);
+      callback(new Error(`CORS策略不允许来自 ${origin} 的访问`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'Cache-Control'
+    ],
+    optionsSuccessStatus: 200, // 某些传统浏览器（IE11，各种SmartTVs）在204上窒息
+    preflightContinue: false
   })
 );
 
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 全局OPTIONS预检请求处理
+app.options('*', (req, res) => {
+  console.log(`🔍 OPTIONS请求: ${req.method} ${req.url}, Origin: ${req.headers.origin}`);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
+  res.status(200).end();
+});
 
 // 设置响应编码为UTF-8，但只针对API路由
 app.use('/api', (req, res, next) => {

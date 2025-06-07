@@ -28,9 +28,12 @@ class ApiClient {
     this.instance = axios.create({
       baseURL: this.baseURL,
       headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache',
         'Content-Type': 'application/json'
       },
-      timeout: 10000
+      timeout: 10000,
+      withCredentials: false // 暂时设为false，避免CORS复杂性
     });
 
     // 设置请求拦截器

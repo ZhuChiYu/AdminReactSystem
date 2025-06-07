@@ -201,17 +201,6 @@ export class CustomerService {
     }
   }
 
-  /** 取消客户分配 */
-  async removeCustomerAssignment(assignmentId: number): Promise<any> {
-    try {
-      const response = await apiClient.delete(`/customers/assignments/${assignmentId}`);
-      return response;
-    } catch (error) {
-      console.error('取消客户分配失败:', error);
-      throw error;
-    }
-  }
-
   /** 导出客户数据 */
   async exportCustomers(params?: CustomerApi.CustomerQueryParams): Promise<void> {
     try {
