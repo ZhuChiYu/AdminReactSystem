@@ -286,15 +286,20 @@ export namespace CourseApi {
     coverImage?: string;
     createdAt?: string;
     createTime?: string;
+    currentStudents: number;
+    description?: string;
     duration: number;
+    endDate: string;
     enrollCount?: number;
     enrollmentCount?: number;
     id: number;
     instructor?: string;
     isFeatured?: boolean;
+    location: string;
     maxStudents: number;
     price: number | string;
     rating: number | string;
+    startDate: string;
     status: number;
     teacher?: {
       id: number;
