@@ -62,7 +62,30 @@ REDIS_PASSWORD=redis123
 JWT_SECRET=test-jwt-secret-32-chars-for-development
 JWT_REFRESH_SECRET=test-refresh-secret-32-chars-for-dev
 RUN_SEED=true
-VITE_API_BASE_URL=http://localhost:3000/api
+VITE_API_BASE_URL=http://111.230.110.95:3000/api
+VITE_SERVICE_BASE_URL=http://111.230.110.95:3000/api
+VITE_HTTP_PROXY=N
+VITE_BASE_URL=/
+VITE_APP_TITLE=Admin
+VITE_APP_DESC=Admin is a fresh and elegant admin template
+VITE_ICON_PREFIX=icon
+VITE_ICON_LOCAL_PREFIX=icon-local
+VITE_AUTH_ROUTE_MODE=static
+VITE_ROUTE_HOME=/home
+VITE_MENU_ICON=mdi:menu
+VITE_ROUTER_HISTORY_MODE=history
+VITE_SERVICE_SUCCESS_CODE=0000
+VITE_SERVICE_LOGOUT_CODES=8888,8889
+VITE_SERVICE_MODAL_LOGOUT_CODES=7777,7778
+VITE_SERVICE_EXPIRED_TOKEN_CODES=9999,9998,3333
+VITE_STATIC_SUPER_ROLE=R_SUPER
+VITE_SOURCE_MAP=N
+VITE_STORAGE_PREFIX=SOY-REACT_
+VITE_AUTOMATICALLY_DETECT_UPDATE=Y
+VITE_OTHER_SERVICE_BASE_URL='{
+  "demo": "http://111.230.110.95:9528"
+}'
+VITE_PROXY_LOG=Y
 EOF
 
 # 同时为backend目录创建.env文件
@@ -84,6 +107,9 @@ JWT_REFRESH_EXPIRES_IN="30d"
 NODE_ENV="development"
 PORT=3000
 HOST="0.0.0.0"
+
+# CORS配置
+CORS_ORIGIN="http://111.230.110.95:9527,http://111.230.110.95,https://111.230.110.95:9527,https://111.230.110.95"
 
 # 文件上传配置
 UPLOAD_PATH="./uploads"
@@ -124,6 +150,11 @@ cd ..
 # 停止现有服务
 pm2 delete all 2>/dev/null || true
 
+# 重启Docker容器确保数据库服务正常
+echo "🔄 重启数据库服务..."
+docker restart test-postgres test-redis 2>/dev/null || true
+sleep 3
+
 # 启动服务
 echo "🔥 启动后端服务（热更新）..."
 cd backend
@@ -139,7 +170,7 @@ if command -v nginx &> /dev/null; then
     sudo tee /etc/nginx/sites-available/test-admin << 'EOF'
 server {
     listen 80;
-    server_name _;
+    server_name 111.230.110.95 _;
 
     location / {
         proxy_pass http://localhost:9527;
@@ -147,6 +178,9 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
     }
 
@@ -156,6 +190,9 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
     }
 }

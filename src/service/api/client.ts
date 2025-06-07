@@ -12,10 +12,17 @@ class ApiClient {
   private baseURL: string;
 
   constructor() {
-    // 使用本地API地址
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+    // 使用环境变量配置的API地址，优先级：VITE_API_BASE_URL > VITE_SERVICE_BASE_URL > 默认值
+    this.baseURL =
+      import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_SERVICE_BASE_URL || 'http://localhost:3001/api';
 
     console.log(`🌐 API Base URL: ${this.baseURL}`);
+    console.log('🔧 Environment Variables:', {
+      MODE: import.meta.env.MODE,
+      NODE_ENV: import.meta.env.NODE_ENV,
+      VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+      VITE_SERVICE_BASE_URL: import.meta.env.VITE_SERVICE_BASE_URL
+    });
 
     // 创建axios实例
     this.instance = axios.create({

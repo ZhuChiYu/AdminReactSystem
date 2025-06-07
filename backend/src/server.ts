@@ -69,8 +69,21 @@ app.use(
         'http://localhost:9530',
         'http://localhost:9531',
         'http://localhost:9532',
-        'http://localhost:9533'
+        'http://localhost:9533',
+        // 添加服务器IP地址
+        'http://111.230.110.95',
+        'http://111.230.110.95:9527',
+        'http://111.230.110.95:3000',
+        'https://111.230.110.95',
+        'https://111.230.110.95:9527',
+        'https://111.230.110.95:3000'
       ];
+
+      // 从环境变量读取额外允许的域名
+      if (process.env.CORS_ORIGIN) {
+        const envOrigins = process.env.CORS_ORIGIN.split(',').map(origin => origin.trim());
+        allowedOrigins.push(...envOrigins);
+      }
 
       // 生产环境允许的域名
       if (process.env.NODE_ENV === 'production') {
@@ -82,11 +95,14 @@ app.use(
         return callback(null, true);
       }
 
-      // 开发环境允许所有localhost域名
-      if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+      // 开发环境允许所有localhost域名和指定IP域名
+      if (process.env.NODE_ENV !== 'production' &&
+          (origin.includes('localhost') || origin.includes('111.230.110.95'))) {
         return callback(null, true);
       }
 
+      console.log(`❌ CORS: 不允许的域名: ${origin}`);
+      console.log(`✅ CORS: 允许的域名:`, allowedOrigins);
       callback(new Error('不允许的跨域请求'));
     }
   })
