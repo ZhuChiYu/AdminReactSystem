@@ -14,11 +14,14 @@ interface CourseItem {
   attachment: string;
   attachmentCount: number;
   category: string;
+  courseCode: string;
   createdAt: string;
   date: string;
+  endDate: string;
   id: number;
   name: string;
   price: number;
+  startDate: string;
   status: string;
 }
 
@@ -59,11 +62,14 @@ const CourseList = () => {
         attachment: '获取中...',
         attachmentCount: 0,
         category: course.category.name,
+        courseCode: course.courseCode,
         createdAt: course.createTime || course.createdAt || new Date().toISOString(),
-        date: course.createTime || course.createdAt || new Date().toISOString(),
+        date: course.startDate || course.createdAt || new Date().toISOString(),
+        endDate: course.endDate || '',
         id: course.id,
         name: course.courseName,
         price: typeof course.price === 'string' ? Number.parseFloat(course.price) : course.price,
+        startDate: course.startDate || '',
         status: course.status === 1 ? '已上线' : '未上线'
       }));
 
@@ -196,7 +202,7 @@ const CourseList = () => {
     setCurrentCourse(course);
     editForm.setFieldsValue({
       category: course.category,
-      date: dayjs(course.date),
+      date: dayjs(course.startDate || course.date),
       name: course.name,
       price: course.price
     });
@@ -263,17 +269,18 @@ const CourseList = () => {
       }
 
       // 准备API请求数据
+      const startDate = values.date.format('YYYY-MM-DD');
       const courseData = {
-        categoryId: categories.find(cat => cat.name === values.category)?.id || 1,
+        categoryId: Number(categories.find(cat => cat.name === values.category)?.id || 1),
         courseName: values.name,
-        courseStartDate: values.date.format('YYYY-MM-DD'),
-        price: values.price.toString(),
+        endDate: values.date.clone().add(30, 'days').format('YYYY-MM-DD'),
+        price: Number(values.price),
+        startDate,
         status: 1 // 默认状态为已上线
       };
 
       try {
         await courseService.updateCourse(currentCourse.id, courseData);
-
         message.success(`课程"${values.name}"已成功更新`);
 
         // 关闭模态框并重置状态

@@ -133,11 +133,37 @@ const UserCenter = () => {
   const handleChangePassword = async (values: any) => {
     try {
       setSubmitting(true);
+
+      // 获取用户ID - 多种方式尝试
+      let userId: number | undefined;
+
+      // 首先尝试从currentUserData获取
+      if (currentUserData.userId) {
+        userId = Number.parseInt(String(currentUserData.userId), 10);
+      }
+
+      // 如果没有，尝试从localStorage获取
+      if (!userId || Number.isNaN(userId)) {
+        const storedUserInfo = localStg.get('userInfo');
+        if (storedUserInfo?.userId) {
+          userId = Number.parseInt(String(storedUserInfo.userId), 10);
+        }
+      }
+
+      // 如果还是没有，使用默认值（通常超级管理员是1）
+      if (!userId || Number.isNaN(userId)) {
+        console.warn('无法获取用户ID，使用默认值');
+        userId = 1;
+      }
+
+      console.log('🔍 修改密码使用的用户ID:', userId);
+
       await userService.changePassword({
         newPassword: values.newPassword,
         oldPassword: values.oldPassword,
-        userId: Number.parseInt(currentUserData.userId, 10)
+        userId
       });
+
       message.success('密码修改成功');
       passwordForm.resetFields();
     } catch (error: any) {

@@ -618,12 +618,17 @@ export const generatedRoutes: ElegantConstRoute[] = [
                     },
                     children: [
                       {
-                        matchedFiles: [null, '/src/pages/(base)/multi-menu/second/child/home/index.tsx', null, null],
-                        name: '(base)_multi-menu_second_child_home',
-                        path: '/multi-menu/second/child/home',
+                        matchedFiles: [
+                          null,
+                          '/src/pages/(base)/multi-menu/second/child/home-page/index.tsx',
+                          null,
+                          null
+                        ],
+                        name: '(base)_multi-menu_second_child_home-page',
+                        path: '/multi-menu/second/child/home-page',
                         handle: {
-                          i18nKey: 'route.(base)_multi-menu_second_child_home',
-                          title: '(base)_multi-menu_second_child_home'
+                          i18nKey: 'route.(base)_multi-menu_second_child_home-page',
+                          title: '(base)_multi-menu_second_child_home-page'
                         }
                       }
                     ]

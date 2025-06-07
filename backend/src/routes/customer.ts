@@ -170,6 +170,41 @@ router.post(
 
 /**
  * @swagger
+ * /api/customers/assignments:
+ *   put:
+ *     summary: 更新客户分配关系
+ *     tags: [客户管理]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: integer
+ *                 description: 分配ID
+ *               customerId:
+ *                 type: integer
+ *                 description: 客户ID
+ *               employeeId:
+ *                 type: integer
+ *                 description: 员工ID
+ *               remark:
+ *                 type: string
+ *                 description: 备注
+ *     responses:
+ *       200:
+ *         description: 更新成功
+ */
+router.put(
+  '/assignments',
+  permissionMiddleware('customer:assign'),
+  asyncErrorHandler(customerController.updateCustomerAssignment)
+);
+
+/**
+ * @swagger
  * /api/customers/assignments/{id}:
  *   delete:
  *     summary: 取消客户分配

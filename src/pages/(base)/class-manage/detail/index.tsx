@@ -878,29 +878,48 @@ const ClassDetail = () => {
     try {
       const values = await courseForm.validateFields();
 
-      // 使用真实的API创建课程
-      const courseData = {
-        // 生成唯一编码
-        categoryId: 1,
-        // 关联到当前班级
-        classId: Number.parseInt(classId!, 10),
-        courseCode: `COURSE_${Date.now()}`,
-        courseName: values.name,
-        description: values.description || '',
-        duration: values.duration || 30,
-        endDate: values.endDate?.format('YYYY-MM-DD') || dayjs().add(30, 'day').format('YYYY-MM-DD'),
-        // 默认分类ID，可以从课程分类API获取
-        instructor: values.teacher,
-        location: values.classroom || '线上',
-        maxStudents: values.maxStudents || 50,
-        originalPrice: values.price || 0,
-        price: values.price || 0,
-        startDate: values.startDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
-      };
+      if (currentCourse) {
+        // 编辑现有课程
+        const courseData = {
+          categoryId: currentCourse.categoryId || 1,
+          classId: Number.parseInt(classId!, 10),
+          courseCode: currentCourse.courseCode,
+          courseName: values.name,
+          description: values.description || currentCourse.description || '',
+          duration: values.duration || currentCourse.duration || 30,
+          endDate: values.endDate?.format('YYYY-MM-DD') || currentCourse.endDate,
+          instructor: values.teacher,
+          location: values.classroom || '线上',
+          maxStudents: values.maxStudents || currentCourse.maxStudents || 50,
+          originalPrice: values.price || currentCourse.originalPrice || 0,
+          price: values.price || currentCourse.price || 0,
+          startDate: values.startDate?.format('YYYY-MM-DD') || currentCourse.startDate
+        };
 
-      await courseService.createCourse(courseData);
+        await courseService.updateCourse(currentCourse.id, courseData);
+        message.success('课程更新成功');
+      } else {
+        // 创建新课程
+        const courseData = {
+          categoryId: 1,
+          classId: Number.parseInt(classId!, 10),
+          courseCode: `COURSE_${Date.now()}`,
+          courseName: values.name,
+          description: values.description || '',
+          duration: values.duration || 30,
+          endDate: values.endDate?.format('YYYY-MM-DD') || dayjs().add(30, 'day').format('YYYY-MM-DD'),
+          instructor: values.teacher,
+          location: values.classroom || '线上',
+          maxStudents: values.maxStudents || 50,
+          originalPrice: values.price || 0,
+          price: values.price || 0,
+          startDate: values.startDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
+        };
 
-      message.success('课程添加成功');
+        await courseService.createCourse(courseData);
+        message.success('课程添加成功');
+      }
+
       setCourseModalVisible(false);
       courseForm.resetFields();
       setCurrentCourse(null);
@@ -908,8 +927,9 @@ const ClassDetail = () => {
       // 重新获取所有班级数据，确保课程列表更新
       await fetchClassInfo();
     } catch (error) {
-      message.error('添加课程失败');
-      console.error('添加课程失败:', error);
+      const errorMessage = currentCourse ? '更新课程失败' : '添加课程失败';
+      message.error(errorMessage);
+      console.error(`${errorMessage}:`, error);
     }
   };
 

@@ -43,7 +43,8 @@ function initRoutes() {
       const id = route.id || '';
       const path = route.path || '';
 
-      return !removeMenuIds.includes(id) && !removeMenuIds.some(removeId => path === `/${removeId}`);
+      // 更严格的过滤逻辑，确保同时匹配id和path
+      return !removeMenuIds.includes(id) && !removeMenuIds.some(removeId => path === `/${removeId}` || id === removeId);
     });
   }
 

@@ -376,7 +376,10 @@ class CustomerController {
       }
 
       const existingCustomer = await prisma.customer.findFirst({
-        where: whereCondition
+        where: {
+          id: Number(id),
+          ...whereCondition
+        }
       });
 
       if (!existingCustomer) {
@@ -927,6 +930,82 @@ class CustomerController {
     } catch (error) {
       logger.error('取消客户分配失败:', error);
       res.status(500).json(createErrorResponse(500, '取消分配失败', null, req.path));
+    }
+  }
+
+  /** 更新客户分配关系 */
+  async updateCustomerAssignment(req: Request, res: Response) {
+    const { id, customerId, employeeId, remark } = req.body;
+    const user = (req as any).user;
+
+    try {
+      // 验证参数
+      if (!id || !customerId || !employeeId) {
+        throw new ValidationError('缺少必要参数');
+      }
+
+      // 检查分配关系是否存在
+      const existingAssignment = await prisma.customerAssignment.findUnique({
+        where: { id: Number(id) }
+      });
+
+      if (!existingAssignment) {
+        throw new NotFoundError('客户分配关系不存在');
+      }
+
+      // 权限控制：只有超级管理员或分配者可以修改分配关系
+      if (!user.roles?.includes('super_admin') && existingAssignment.assignedById !== user.id) {
+        return res.status(403).json(createErrorResponse(403, '无权修改此分配关系', null, req.path));
+      }
+
+      // 检查客户是否存在
+      const customer = await prisma.customer.findUnique({
+        where: { id: Number(customerId) }
+      });
+
+      if (!customer) {
+        throw new NotFoundError('客户不存在');
+      }
+
+      // 检查员工是否存在
+      const employee = await prisma.user.findUnique({
+        where: { id: Number(employeeId) }
+      });
+
+      if (!employee) {
+        throw new NotFoundError('员工不存在');
+      }
+
+      // 更新分配关系
+      const updatedAssignment = await prisma.customerAssignment.update({
+        data: {
+          customerId: Number(customerId),
+          assignedToId: Number(employeeId),
+          assignedById: user.id,
+          assignedTime: new Date(),
+          remark: remark || null
+        },
+        where: { id: Number(id) }
+      });
+
+      // 更新客户表中的分配信息
+      await prisma.customer.update({
+        data: {
+          assignedToId: Number(employeeId),
+          assignedTime: new Date()
+        },
+        where: { id: Number(customerId) }
+      });
+
+      res.json(createSuccessResponse(updatedAssignment, '更新成功', req.path));
+    } catch (error) {
+      logger.error('更新客户分配关系失败:', error);
+
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        res.status(error.code).json(createErrorResponse(error.code, error.message, null, req.path));
+      } else {
+        res.status(500).json(createErrorResponse(500, '更新客户分配关系失败', null, req.path));
+      }
     }
   }
 }

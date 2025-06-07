@@ -1,10 +1,10 @@
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 
 import { config } from '@/config';
 import { logger } from '@/utils/logger';
 
 // 创建Redis客户端
-export const redis = createClient({
+export const redis: RedisClientType = createClient({
   socket: {
     connectTimeout: 5000,
     host: 'localhost',

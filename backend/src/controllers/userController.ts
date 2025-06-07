@@ -908,11 +908,23 @@ class UserController {
     }
   }
 
-  /** 修改用户密码 */
+  /** 修改密码 */
   async changePassword(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const { newPassword, oldPassword } = req.body;
+      const currentUser = (req as any).user;
+
+      // 记录请求信息
+      logger.info('修改密码请求:', {
+        currentUserId: currentUser?.id,
+        targetUserId: id,
+        userRoles: currentUser?.roles
+      });
+
+      if (!id || isNaN(Number(id))) {
+        return res.status(400).json(createErrorResponse(400, '无效的用户ID', null, req.path));
+      }
 
       if (!oldPassword || !newPassword) {
         return res.status(400).json(createErrorResponse(400, '旧密码和新密码不能为空', null, req.path));
@@ -928,28 +940,42 @@ class UserController {
 
       // 检查用户是否存在
       const user = await prisma.user.findUnique({
-        where: { id: Number.parseInt(id) }
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        },
+        where: { id: Number(id) }
       });
 
       if (!user) {
+        logger.warn('用户不存在:', { targetUserId: id });
         return res.status(404).json(createErrorResponse(404, '用户不存在', null, req.path));
       }
 
       // 检查权限 - 用户只能修改自己的密码，或者管理员可以修改其他用户的密码
       const canChangePassword =
-        req.user &&
-        (req.user.id === Number.parseInt(id) ||
-          req.user.roles.includes('super_admin') ||
-          req.user.roles.includes('admin'));
+        currentUser &&
+        (currentUser.id === Number(id) ||
+          currentUser.roles?.includes('super_admin') ||
+          currentUser.roles?.includes('admin'));
 
       if (!canChangePassword) {
+        logger.warn('无权修改密码:', {
+          currentUserId: currentUser?.id,
+          targetUserId: id,
+          userRoles: currentUser?.roles
+        });
         return res.status(403).json(createErrorResponse(403, '没有权限修改此用户密码', null, req.path));
       }
 
       // 如果是用户修改自己的密码，需要验证旧密码
-      if (req.user && req.user.id === Number.parseInt(id)) {
+      if (currentUser && currentUser.id === Number(id)) {
         const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
         if (!isOldPasswordValid) {
+          logger.warn('旧密码错误:', { userId: id });
           return res.status(400).json(createErrorResponse(400, '旧密码错误', null, req.path));
         }
       }
@@ -963,17 +989,22 @@ class UserController {
           password: hashedNewPassword,
           updatedAt: new Date()
         },
-        where: { id: Number.parseInt(id) }
+        where: { id: Number(id) }
       });
 
-      logger.info(`用户密码修改成功: ${user.userName}`, {
-        updatedBy: req.user?.id,
-        userId: user.id
+      logger.info('用户密码修改成功:', {
+        updatedBy: currentUser?.id,
+        userId: user.id,
+        userName: user.userName
       });
 
       res.json(createSuccessResponse(null, '密码修改成功', req.path));
     } catch (error: any) {
-      logger.error('修改用户密码失败:', error);
+      logger.error('修改用户密码失败:', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.params.id
+      });
       res.status(500).json(createErrorResponse(500, '修改用户密码失败', null, req.path));
     }
   }
