@@ -267,11 +267,13 @@ async function main() {
   // 创建角色数据
   logger.info('👥 创建角色数据...');
   const roles = await Promise.all([
+    // 权限角色
     prisma.role.upsert({
       create: {
         remark: '系统超级管理员，拥有所有权限',
         roleCode: 'super_admin',
         roleName: '超级管理员',
+        roleType: 'permission',
         sort: 1,
         status: 1
       },
@@ -283,6 +285,7 @@ async function main() {
         remark: '系统管理员，拥有大部分权限',
         roleCode: 'admin',
         roleName: '管理员',
+        roleType: 'permission',
         sort: 2,
         status: 1
       },
@@ -291,54 +294,48 @@ async function main() {
     }),
     prisma.role.upsert({
       create: {
-        remark: '普通顾问，拥有基础权限',
-        roleCode: 'consultant',
-        roleName: '顾问',
+        remark: '普通员工，基础权限',
+        roleCode: 'employee',
+        roleName: '员工',
+        roleType: 'permission',
         sort: 3,
         status: 1
       },
       update: {},
-      where: { roleCode: 'consultant' }
+      where: { roleCode: 'employee' }
     }),
+    // 职位角色
     prisma.role.upsert({
       create: {
-        remark: '负责市场部门的管理工作',
-        roleCode: 'marketing_manager',
-        roleName: '市场部经理',
+        remark: '负责公司整体运营',
+        roleCode: 'general_manager',
+        roleName: '总经理',
+        roleType: 'position',
         sort: 4,
         status: 1
       },
       update: {},
-      where: { roleCode: 'marketing_manager' }
+      where: { roleCode: 'general_manager' }
     }),
     prisma.role.upsert({
       create: {
-        remark: '负责人力资源日常事务',
-        roleCode: 'hr_specialist',
-        roleName: '人力专员',
+        remark: '负责销售战略和整体销售业绩',
+        roleCode: 'sales_director',
+        roleName: '销售总监',
+        roleType: 'position',
         sort: 5,
         status: 1
       },
       update: {},
-      where: { roleCode: 'hr_specialist' }
-    }),
-    prisma.role.upsert({
-      create: {
-        remark: '负责人力资源业务合作伙伴工作',
-        roleCode: 'hr_bp',
-        roleName: '人力BP',
-        sort: 6,
-        status: 1
-      },
-      update: {},
-      where: { roleCode: 'hr_bp' }
+      where: { roleCode: 'sales_director' }
     }),
     prisma.role.upsert({
       create: {
         remark: '负责销售团队管理和业绩',
         roleCode: 'sales_manager',
         roleName: '销售经理',
-        sort: 7,
+        roleType: 'position',
+        sort: 6,
         status: 1
       },
       update: {},
@@ -346,14 +343,51 @@ async function main() {
     }),
     prisma.role.upsert({
       create: {
-        remark: '负责销售战略和整体销售业绩',
-        roleCode: 'sales_director',
-        roleName: '销售总监',
+        remark: '负责市场部门的管理工作',
+        roleCode: 'marketing_manager',
+        roleName: '市场部经理',
+        roleType: 'position',
+        sort: 7,
+        status: 1
+      },
+      update: {},
+      where: { roleCode: 'marketing_manager' }
+    }),
+    prisma.role.upsert({
+      create: {
+        remark: '负责人力资源业务合作伙伴工作',
+        roleCode: 'hr_bp',
+        roleName: '人力BP',
+        roleType: 'position',
         sort: 8,
         status: 1
       },
       update: {},
-      where: { roleCode: 'sales_director' }
+      where: { roleCode: 'hr_bp' }
+    }),
+    prisma.role.upsert({
+      create: {
+        remark: '负责人力资源日常事务',
+        roleCode: 'hr_specialist',
+        roleName: '人力专员',
+        roleType: 'position',
+        sort: 9,
+        status: 1
+      },
+      update: {},
+      where: { roleCode: 'hr_specialist' }
+    }),
+    prisma.role.upsert({
+      create: {
+        remark: '专业咨询顾问',
+        roleCode: 'consultant',
+        roleName: '顾问',
+        roleType: 'position',
+        sort: 10,
+        status: 1
+      },
+      update: {},
+      where: { roleCode: 'consultant' }
     })
   ]);
 
@@ -517,13 +551,13 @@ async function main() {
     // 员工1 - 顾问角色
     prisma.userRole.upsert({
       create: {
-        roleId: roles[2].id, // consultant
+        roleId: roles[8].id, // consultant
         userId: createdUsers[3].id
       },
       update: {},
       where: {
         userId_roleId: {
-          roleId: roles[2].id,
+          roleId: roles[8].id,
           userId: createdUsers[3].id
         }
       }
@@ -545,13 +579,13 @@ async function main() {
     // 员工3 - 人力专员角色
     prisma.userRole.upsert({
       create: {
-        roleId: roles[4].id, // hr_specialist
+        roleId: roles[7].id, // hr_specialist
         userId: createdUsers[5].id
       },
       update: {},
       where: {
         userId_roleId: {
-          roleId: roles[4].id,
+          roleId: roles[7].id,
           userId: createdUsers[5].id
         }
       }
@@ -559,13 +593,13 @@ async function main() {
     // 员工4 - 市场部经理角色
     prisma.userRole.upsert({
       create: {
-        roleId: roles[3].id, // marketing_manager
+        roleId: roles[5].id, // marketing_manager
         userId: createdUsers[6].id
       },
       update: {},
       where: {
         userId_roleId: {
-          roleId: roles[3].id,
+          roleId: roles[5].id,
           userId: createdUsers[6].id
         }
       }

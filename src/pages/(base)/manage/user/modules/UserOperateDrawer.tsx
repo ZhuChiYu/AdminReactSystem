@@ -66,15 +66,32 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
 
   useEffect(() => {
     async function fetchPositionRoles() {
-      const response = await fetchGetRoleList({ current: 1, roleType: 'position', size: 100 });
-      if (response && response.records) {
-        const options = response.records.map((role: Api.SystemManage.Role) => ({
-          label: role.roleName || role.roleCode,
-          value: role.roleCode
-        }));
-        setPositionRoleOptions(options);
-      } else {
-        setPositionRoleOptions([]);
+      try {
+        const response = await fetchGetRoleList({ current: 1, roleType: 'position', size: 100 });
+        console.log('获取职位角色响应:', response);
+        
+        if (response && response.records) {
+          const options = response.records.map((role: Api.SystemManage.Role) => ({
+            label: role.roleName || role.roleCode,
+            value: role.roleCode
+          }));
+          setPositionRoleOptions(options);
+        } else {
+          console.warn('职位角色响应格式异常:', response);
+          setPositionRoleOptions([]);
+        }
+      } catch (error) {
+        console.error('获取职位角色失败:', error);
+        // 设置默认的职位角色选项
+        setPositionRoleOptions([
+          { label: '总经理', value: 'general_manager' },
+          { label: '销售总监', value: 'sales_director' },
+          { label: '销售经理', value: 'sales_manager' },
+          { label: '市场部经理', value: 'marketing_manager' },
+          { label: '人力BP', value: 'hr_bp' },
+          { label: '人力专员', value: 'hr_specialist' },
+          { label: '顾问', value: 'consultant' }
+        ]);
       }
     }
 
