@@ -295,10 +295,7 @@ const Role = () => {
         />
 
         <Suspense>
-          <RoleOperateDrawer
-            {...generalPopupOperation}
-            rowId={editingData?.id || -1}
-          />
+          <RoleOperateDrawer {...generalPopupOperation} />
         </Suspense>
       </ACard>
     </div>

@@ -1,23 +1,14 @@
 import { enableStatusOptions } from '@/constants/business';
 import { useFormRules } from '@/features/form';
 
-import ButtonAuthModal from './button-auth-modal';
-import MenuAuthModal from './menu-auth-modal';
-
-type Props = Page.OperateDrawerProps & { rowId: number };
-
 type Model = Pick<Api.SystemManage.Role, 'roleCode' | 'roleDesc' | 'roleName' | 'status'>;
 
 type RuleKey = Exclude<keyof Model, 'roleDesc'>;
 
-const RoleOperateDrawer: FC<Props> = memo(({ form, handleSubmit, onClose, open, operateType, rowId }) => {
+const RoleOperateDrawer: FC<Page.OperateDrawerProps> = memo(({ form, handleSubmit, onClose, open, operateType }) => {
   const { t } = useTranslation();
 
   const { defaultRequiredRule } = useFormRules();
-
-  const [buttonAuthVisible, { setFalse: closeButtonAuthModal, setTrue: openButtonAuthModal }] = useBoolean();
-
-  const [menuAuthVisible, { setFalse: closeMenuAuthModal, setTrue: openMenuAuthModal }] = useBoolean();
 
   const rules: Record<RuleKey, App.Global.FormRule> = {
     roleCode: defaultRequiredRule,
@@ -86,24 +77,6 @@ const RoleOperateDrawer: FC<Props> = memo(({ form, handleSubmit, onClose, open, 
           <AInput placeholder={t('page.manage.role.form.roleDesc')} />
         </AForm.Item>
       </AForm>
-
-      {operateType === 'edit' && (
-        <ASpace>
-          <AButton onClick={openButtonAuthModal}>{t('page.manage.role.buttonAuth')}</AButton>
-          <ButtonAuthModal
-            open={buttonAuthVisible}
-            roleId={rowId}
-            onClose={closeButtonAuthModal}
-          />
-
-          <AButton onClick={openMenuAuthModal}>{t('page.manage.role.menuAuth')}</AButton>
-          <MenuAuthModal
-            open={menuAuthVisible}
-            roleId={rowId}
-            onClose={closeMenuAuthModal}
-          />
-        </ASpace>
-      )}
     </ADrawer>
   );
 });

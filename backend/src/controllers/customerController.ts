@@ -953,8 +953,8 @@ class CustomerController {
         throw new NotFoundError('客户分配关系不存在');
       }
 
-      // 权限控制：只有超级管理员或分配者可以修改分配关系
-      if (!user.roles?.includes('super_admin') && existingAssignment.assignedById !== user.id) {
+      // 权限控制：只有超级管理员或创建者可以修改分配关系
+      if (!user.roles?.includes('super_admin') && existingAssignment.createdById !== user.id) {
         return res.status(403).json(createErrorResponse(403, '无权修改此分配关系', null, req.path));
       }
 
@@ -980,10 +980,10 @@ class CustomerController {
       const updatedAssignment = await prisma.customerAssignment.update({
         data: {
           customerId: Number(customerId),
-          assignedToId: Number(employeeId),
-          assignedById: user.id,
-          assignedTime: new Date(),
-          remark: remark || null
+          employeeId: Number(employeeId),
+          remark: remark || null,
+          updatedAt: new Date(),
+          updatedById: user.id
         },
         where: { id: Number(id) }
       });
@@ -991,8 +991,8 @@ class CustomerController {
       // 更新客户表中的分配信息
       await prisma.customer.update({
         data: {
-          assignedToId: Number(employeeId),
-          assignedTime: new Date()
+          assignedTime: new Date(),
+          assignedToId: Number(employeeId)
         },
         where: { id: Number(customerId) }
       });
