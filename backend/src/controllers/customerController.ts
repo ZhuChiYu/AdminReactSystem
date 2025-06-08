@@ -949,7 +949,7 @@ class CustomerController {
       }
 
       // 权限控制：只有超级管理员或创建者可以修改分配关系
-      if (!user.roles?.includes('super_admin') && existingAssignment.createdById !== user.id) {
+      if (!user.roles?.includes('super_admin') && existingAssignment.assignedById !== user.id) {
         return res.status(403).json(createErrorResponse(403, '无权修改此分配关系', null, req.path));
       }
 
@@ -975,10 +975,8 @@ class CustomerController {
       const updatedAssignment = await prisma.customerAssignment.update({
         data: {
           customerId: Number(customerId),
-          employeeId: Number(employeeId),
-          remark: remark || null,
-          updatedAt: new Date(),
-          updatedById: user.id
+          assignedToId: Number(employeeId),
+          remark: remark || null
         },
         where: { id: Number(id) }
       });

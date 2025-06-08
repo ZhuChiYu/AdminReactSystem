@@ -108,7 +108,7 @@ router.get('/', permissionMiddleware('system:user:list'), (req, res) => {
  *       200:
  *         description: 查询成功
  */
-router.get('/employees', permissionMiddleware('system:user:list'), asyncErrorHandler(userController.getEmployees));
+router.get('/employees', authMiddleware, asyncErrorHandler(userController.getEmployees));
 
 /**
  * @swagger
