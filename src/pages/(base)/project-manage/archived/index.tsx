@@ -362,41 +362,48 @@ const ArchivedProjectPage: React.FC = () => {
                 <h3 style={{ marginBottom: 16 }}>项目附件</h3>
                 {attachmentLoading ? (
                   <div style={{ padding: '20px', textAlign: 'center' }}>加载附件中...</div>
-                ) : currentTaskAttachments.length > 0 ? (
-                  <List
-                    bordered
-                    dataSource={currentTaskAttachments}
-                    size="small"
-                    renderItem={(attachment: TaskAttachmentApi.TaskAttachmentListItem) => (
-                      <List.Item
-                        actions={[
-                          <Button
-                            key="download"
-                            type="link"
-                            onClick={() =>
-                              handleDownloadAttachment(attachment.id, attachment.originalName || attachment.fileName)
-                            }
-                          >
-                            下载
-                          </Button>
-                        ]}
-                      >
-                        <List.Item.Meta
-                          title={attachment.originalName || attachment.fileName}
-                          description={
-                            <div>
-                              <div>文件大小: {(attachment.fileSize / 1024 / 1024).toFixed(2)}MB</div>
-                              <div>文件类型: {attachment.fileType}</div>
-                              <div>上传时间: {dayjs(attachment.uploadTime).format('YYYY-MM-DD HH:mm')}</div>
-                              {attachment.uploader && <div>上传者: {attachment.uploader.name}</div>}
-                            </div>
-                          }
-                        />
-                      </List.Item>
-                    )}
-                  />
                 ) : (
-                  <div style={{ color: '#999', padding: '20px', textAlign: 'center' }}>暂无附件</div>
+                  <>
+                    {currentTaskAttachments.length > 0 ? (
+                      <List
+                        bordered
+                        dataSource={currentTaskAttachments}
+                        size="small"
+                        renderItem={(attachment: TaskAttachmentApi.TaskAttachmentListItem) => (
+                          <List.Item
+                            actions={[
+                              <Button
+                                key="download"
+                                type="link"
+                                onClick={() =>
+                                  handleDownloadAttachment(
+                                    attachment.id,
+                                    attachment.originalName || attachment.fileName
+                                  )
+                                }
+                              >
+                                下载
+                              </Button>
+                            ]}
+                          >
+                            <List.Item.Meta
+                              title={attachment.originalName || attachment.fileName}
+                              description={
+                                <div>
+                                  <div>文件大小: {(attachment.fileSize / 1024 / 1024).toFixed(2)}MB</div>
+                                  <div>文件类型: {attachment.fileType}</div>
+                                  <div>上传时间: {dayjs(attachment.uploadTime).format('YYYY-MM-DD HH:mm')}</div>
+                                  {attachment.uploader && <div>上传者: {attachment.uploader.name}</div>}
+                                </div>
+                              }
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    ) : (
+                      <div style={{ color: '#999', padding: '20px', textAlign: 'center' }}>暂无附件</div>
+                    )}
+                  </>
                 )}
               </div>
 

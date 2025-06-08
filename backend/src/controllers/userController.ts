@@ -1026,7 +1026,8 @@ class UserController {
             include: {
               role: true
             }
-          }
+          },
+          createdCustomers: true
         },
         where: { id: userId }
       });
@@ -1046,19 +1047,32 @@ class UserController {
         return res.status(403).json(createErrorResponse(403, '没有权限删除用户', null, req.path));
       }
 
-      // 删除用户的角色关联
-      await prisma.userRole.deleteMany({
-        where: { userId }
-      });
+      // 开始事务处理删除操作
+      await prisma.$transaction(async (tx) => {
+        // 处理用户创建的客户数据 - 将createdById设置为null
+        if (user.createdCustomers.length > 0) {
+          await tx.customer.updateMany({
+            where: { createdById: userId },
+            data: { createdById: null }
+          });
+          logger.info(`处理了 ${user.createdCustomers.length} 个客户的创建者关联`);
+        }
 
-      // 删除用户
-      await prisma.user.delete({
-        where: { id: userId }
+        // 删除用户的角色关联
+        await tx.userRole.deleteMany({
+          where: { userId }
+        });
+
+        // 删除用户
+        await tx.user.delete({
+          where: { id: userId }
+        });
       });
 
       logger.info(`用户删除成功: ${user.userName}`, {
         deletedBy: req.user?.id,
-        deletedUserId: userId
+        deletedUserId: userId,
+        affectedCustomers: user.createdCustomers.length
       });
 
       res.json(
@@ -1066,7 +1080,8 @@ class UserController {
           {
             deletedNickName: user.nickName,
             deletedUserId: userId,
-            deletedUserName: user.userName
+            deletedUserName: user.userName,
+            affectedCustomers: user.createdCustomers.length
           },
           '用户删除成功',
           req.path
@@ -1105,7 +1120,8 @@ class UserController {
             include: {
               role: true
             }
-          }
+          },
+          createdCustomers: true
         },
         where: {
           id: { in: parsedUserIds }
@@ -1135,43 +1151,64 @@ class UserController {
         return res.status(400).json(createErrorResponse(400, '没有可删除的用户', null, req.path));
       }
 
-      // 删除用户的角色关联
-      await prisma.userRole.deleteMany({
-        where: {
-          userId: { in: deletableUserIds }
+      // 统计受影响的客户数量
+      const totalAffectedCustomers = deletableUsers.reduce((total, user) => total + user.createdCustomers.length, 0);
+
+      // 使用事务批量删除用户
+      const result = await prisma.$transaction(async (tx) => {
+        // 处理用户创建的客户数据 - 将createdById设置为null
+        if (totalAffectedCustomers > 0) {
+          await tx.customer.updateMany({
+            where: { createdById: { in: deletableUserIds } },
+            data: { createdById: null }
+          });
+          logger.info(`处理了 ${totalAffectedCustomers} 个客户的创建者关联`);
         }
+
+        // 删除用户的角色关联
+        await tx.userRole.deleteMany({
+          where: {
+            userId: { in: deletableUserIds }
+          }
+        });
+
+        // 批量删除用户
+        const deleteResult = await tx.user.deleteMany({
+          where: {
+            id: { in: deletableUserIds }
+          }
+        });
+
+        return {
+          deletedCount: deleteResult.count,
+          deletedUsers: deletableUsers.map(user => ({
+            id: user.id,
+            nickName: user.nickName,
+            userName: user.userName,
+            affectedCustomers: user.createdCustomers.length
+          })),
+          skippedSuperAdmins: superAdmins.map(user => ({
+            id: user.id,
+            nickName: user.nickName,
+            userName: user.userName
+          })),
+          totalAffectedCustomers
+        };
       });
 
-      // 批量删除用户
-      const deleteResult = await prisma.user.deleteMany({
-        where: {
-          id: { in: deletableUserIds }
-        }
-      });
-
-      const result = {
-        deletedCount: deleteResult.count,
-        deletedUsers: deletableUsers.map(user => ({
-          id: user.id,
-          nickName: user.nickName,
-          userName: user.userName
-        })),
-        skippedSuperAdmins: superAdmins.map(user => ({
-          id: user.id,
-          nickName: user.nickName,
-          userName: user.userName
-        }))
-      };
-
-      let message = `成功删除 ${deleteResult.count} 个用户`;
+      let message = `成功删除 ${result.deletedCount} 个用户`;
       if (superAdmins.length > 0) {
         message += `，跳过 ${superAdmins.length} 个超级管理员`;
+      }
+      if (totalAffectedCustomers > 0) {
+        message += `，处理了 ${totalAffectedCustomers} 个客户关联`;
       }
 
       logger.info('批量删除用户成功', {
         deletedBy: req.user?.id,
-        deletedCount: deleteResult.count,
-        skippedSuperAdmins: superAdmins.length
+        deletedCount: result.deletedCount,
+        skippedSuperAdmins: superAdmins.length,
+        totalAffectedCustomers
       });
 
       res.json(createSuccessResponse(result, message, req.path));

@@ -507,6 +507,35 @@ const CustomerImport = () => {
 
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
+      {/* 添加自定义样式 */}
+      <style>
+        {`
+          .customer-import-table .ant-table-thead > tr > th {
+            background-color: #fafafa !important;
+          }
+          .customer-import-table .ant-table-tbody > tr > td {
+            background-color: #ffffff !important;
+          }
+          .dark .customer-import-table .ant-table-thead > tr > th {
+            background-color: #1f1f1f !important;
+            color: #ffffff !important;
+          }
+          .dark .customer-import-table .ant-table-tbody > tr > td {
+            background-color: #141414 !important;
+            color: #ffffff !important;
+          }
+          .customer-import-preview {
+            background-color: #ffffff !important;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #d9d9d9;
+          }
+          .dark .customer-import-preview {
+            background-color: #1f1f1f !important;
+            border-color: #434343;
+          }
+        `}
+      </style>
       <Card
         className="h-full"
         title="客户导入"
@@ -563,18 +592,32 @@ const CustomerImport = () => {
 
                     {previewData.length > 0 && (
                       <Col span={24}>
-                        <Divider>数据预览</Divider>
-                        <Tabs
-                          activeKey={followUpStatus}
-                          items={followUpStatusTabs}
-                          onChange={key => setFollowUpStatus(key as FollowUpStatus | '')}
-                        />
-                        <Table
-                          columns={columns}
-                          dataSource={filteredData}
-                          rowKey="id"
-                          scroll={{ x: 1300 }}
-                        />
+                        <Card
+                          title="数据预览"
+                          variant="borderless"
+                          className="bg-white dark:bg-[#1f1f1f]"
+                        >
+                          <Tabs
+                            activeKey={followUpStatus}
+                            items={followUpStatusTabs}
+                            onChange={key => setFollowUpStatus(key as FollowUpStatus | '')}
+                          />
+                          <div className="customer-import-preview">
+                            <Table
+                              columns={columns}
+                              dataSource={filteredData}
+                              rowKey="id"
+                              scroll={{ x: 1300 }}
+                              className="customer-import-table"
+                              pagination={{
+                                pageSize: 10,
+                                showQuickJumper: true,
+                                showSizeChanger: true,
+                                showTotal: (total, range) => `第 ${range[0]}-${range[1]} 项，共 ${total} 项`,
+                              }}
+                            />
+                          </div>
+                        </Card>
                       </Col>
                     )}
                   </Row>
@@ -690,14 +733,17 @@ const CustomerImport = () => {
                         }
                       >
                         {manualEntryList.length > 0 ? (
-                          <Table
-                            columns={columns}
-                            dataSource={manualEntryList}
-                            pagination={{ pageSize: 5 }}
-                            rowKey="id"
-                            scroll={{ x: 800, y: 300 }}
-                            size="small"
-                          />
+                          <div className="customer-import-preview">
+                            <Table
+                              columns={columns}
+                              dataSource={manualEntryList}
+                              pagination={{ pageSize: 5 }}
+                              rowKey="id"
+                              scroll={{ x: 800, y: 300 }}
+                              size="small"
+                              className="customer-import-table"
+                            />
+                          </div>
                         ) : (
                           <div className="py-10 text-center text-gray-400">暂无添加的客户信息</div>
                         )}
@@ -722,14 +768,17 @@ const CustomerImport = () => {
         width={1200}
         onCancel={() => setIsPreviewVisible(false)}
       >
-        <Table
-          columns={columns}
-          dataSource={previewData}
-          pagination={{ pageSize: 10 }}
-          rowKey="id"
-          scroll={{ x: 1000 }}
-          size="small"
-        />
+        <div className="customer-import-preview">
+          <Table
+            columns={columns}
+            dataSource={previewData}
+            pagination={{ pageSize: 10 }}
+            rowKey="id"
+            scroll={{ x: 1000 }}
+            size="small"
+            className="customer-import-table"
+          />
+        </div>
       </Modal>
 
       {/* 单个录入弹窗 */}
