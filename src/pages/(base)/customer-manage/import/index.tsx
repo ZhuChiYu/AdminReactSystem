@@ -521,39 +521,43 @@ const CustomerImport = () => {
                   <Row gutter={[16, 16]}>
                     <Col span={24}>
                       <Card variant="borderless">
-                        <Row justify="center">
-                          <Col span={12}>
-                            <Dragger {...uploadProps}>
-                              <p className="ant-upload-drag-icon">
-                                <InboxOutlined />
-                              </p>
-                              <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-                              <p className="ant-upload-hint">支持.xlsx, .xls格式的Excel文件</p>
-                            </Dragger>
-                          </Col>
-                        </Row>
-                        <Row
-                          className="mt-4"
-                          justify="center"
-                        >
+                        <div className="ant-row ant-row-center mt-4 css-dev-only-do-not-override-t23gha css-var-r0">
+                          <Upload.Dragger {...uploadProps}>
+                            <p className="ant-upload-drag-icon">
+                              <InboxOutlined />
+                            </p>
+                            <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                            <p className="ant-upload-hint">支持.xlsx, .xls格式的Excel文件</p>
+                          </Upload.Dragger>
+                        </div>
+
+                        {fileList.length > 0 && (
+                          <div className="mt-4">
+                            <div className="text-sm text-gray-500 mb-2">
+                              已选择文件：{fileList[0].name}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-center mt-6">
                           <Button
-                            disabled={fileList.length === 0}
-                            style={{ marginRight: 16 }}
                             type="primary"
+                            style={{ marginRight: 16 }}
+                            disabled={fileList.length === 0}
                             onClick={handlePreview}
                           >
                             预览数据
                           </Button>
                           <Button
-                            disabled={previewData.length === 0}
-                            icon={<UploadOutlined />}
-                            loading={uploading}
                             type="primary"
+                            icon={<UploadOutlined />}
+                            disabled={previewData.length === 0}
+                            loading={uploading}
                             onClick={handleImport}
                           >
                             确认导入
                           </Button>
-                        </Row>
+                        </div>
                       </Card>
                     </Col>
 

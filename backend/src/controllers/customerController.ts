@@ -17,17 +17,13 @@ class CustomerController {
     // 构建查询条件
     const where: any = {};
 
-    // 权限控制：根据scope参数决定数据范围
-    // scope = 'all' 表示客户资料管理页面，显示所有数据
-    // scope = 'own' 表示客户跟进页面，只显示自己创建的数据
-    // 默认为 'own'
-    const dataScope = (scope as string) || 'own';
-
-    if (dataScope === 'own' && !user?.roles?.includes('super_admin')) {
-      // 客户跟进页面：普通用户只能查看自己创建的客户
+    // 权限控制：根据权限角色决定数据范围
+    // 超级管理员：可以看到所有客户数据
+    // 管理员和员工：只能看到自己创建的客户数据
+    if (!user?.roles?.includes('super_admin')) {
+      // 管理员和员工只能查看自己创建的客户
       where.createdById = user?.id;
     }
-    // 客户资料管理页面：所有用户都能查看所有数据（scope = 'all'）
 
     if (customerName) {
       where.customerName = {
@@ -524,14 +520,13 @@ class CustomerController {
       // 构建查询条件，添加权限控制
       const where: any = {};
 
-      // 权限控制：根据scope参数决定数据范围
-      const dataScope = (scope as string) || 'own';
-
-      if (dataScope === 'own' && !user?.roles?.includes('super_admin')) {
-        // 客户跟进页面：普通用户只能查看自己创建的客户统计
+      // 权限控制：根据权限角色决定数据范围
+      // 超级管理员：可以看到所有客户数据
+      // 管理员和员工：只能看到自己创建的客户数据
+      if (!user?.roles?.includes('super_admin')) {
+        // 管理员和员工只能查看自己创建的客户
         where.createdById = user?.id;
       }
-      // 客户资料管理页面：所有用户都能查看所有数据统计（scope = 'all'）
 
       // 获取各个状态的客户数量
       const statistics = await prisma.customer.groupBy({

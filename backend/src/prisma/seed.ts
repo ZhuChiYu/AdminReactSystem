@@ -548,16 +548,16 @@ async function main() {
         }
       }
     }),
-    // 员工1 - 顾问角色
+    // 员工1 - employee权限角色
     prisma.userRole.upsert({
       create: {
-        roleId: roles[8].id, // consultant
+        roleId: roles[2].id, // employee
         userId: createdUsers[3].id
       },
       update: {},
       where: {
         userId_roleId: {
-          roleId: roles[8].id,
+          roleId: roles[2].id,
           userId: createdUsers[3].id
         }
       }
@@ -653,6 +653,57 @@ async function main() {
         }
       }
     });
+  }
+
+  // 为员工权限角色分配基本客户权限（只能操作自己创建的客户）
+  const employeeRole = roles[2]; // employee
+  const employeePermissions = permissions.filter(
+    p =>
+      p.code === 'customer:create' ||
+      p.code === 'customer:list' ||
+      p.code === 'customer:update'
+  );
+
+  for (const permission of employeePermissions) {
+    await prisma.rolePermission.upsert({
+      create: {
+        permissionId: permission.id,
+        roleId: employeeRole.id
+      },
+      update: {},
+      where: {
+        roleId_permissionId: {
+          permissionId: permission.id,
+          roleId: employeeRole.id
+        }
+      }
+    });
+  }
+
+  // 为相关职位角色也分配客户权限（销售相关、市场相关、顾问等）
+  const positionRolesWithCustomerAccess = [
+    roles[5], // marketing_manager 市场部经理
+    roles[6], // sales_manager 销售经理
+    roles[7], // hr_specialist 人力专员
+    roles[8]  // consultant 顾问
+  ];
+
+  for (const role of positionRolesWithCustomerAccess) {
+    for (const permission of employeePermissions) {
+      await prisma.rolePermission.upsert({
+        create: {
+          permissionId: permission.id,
+          roleId: role.id
+        },
+        update: {},
+        where: {
+          roleId_permissionId: {
+            permissionId: permission.id,
+            roleId: role.id
+          }
+        }
+      });
+    }
   }
 
   logger.info('角色权限分配完成');
