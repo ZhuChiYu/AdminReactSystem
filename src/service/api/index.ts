@@ -40,6 +40,8 @@ export { statisticsService } from './statistics';
 
 export * from './system-manage';
 
+export { taskAttachmentService } from './taskAttachment';
+
 // 导出类型定义
 export * from './types';
 
