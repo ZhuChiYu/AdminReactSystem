@@ -957,14 +957,14 @@ const TaskManagement = () => {
             </Form.Item>
             <Form.Item
               label="培训项目"
-              name="name"
+              name="projectName"
               rules={[{ message: '请输入培训项目名称', required: true }]}
             >
               <Input placeholder="请输入培训项目名称" />
             </Form.Item>
             <Form.Item
               label="任务名称"
-              name="name"
+              name="taskName"
               rules={[{ message: '请输入任务名称', required: true }]}
             >
               <Input placeholder="请输入任务名称" />

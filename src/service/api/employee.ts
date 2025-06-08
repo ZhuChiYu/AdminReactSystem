@@ -151,8 +151,12 @@ export class EmployeeService {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const response = await this.apiClient.post('/users/import', formData);
-      return response.data;
+      const response = await this.apiClient.post('/users/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response;
     } catch (error) {
       console.error('导入员工数据失败:', error);
       throw error;

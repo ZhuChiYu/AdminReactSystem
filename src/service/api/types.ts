@@ -445,6 +445,7 @@ export namespace TaskApi {
     parentTaskId?: number;
     priority?: number;
     projectId?: number;
+    projectName?: string;
     startDate?: string;
     targetCount?: number;
     taskDesc?: string;

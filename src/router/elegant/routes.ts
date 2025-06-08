@@ -658,12 +658,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/project-manage/task/index.tsx', null, null],
                 name: '(base)_project-manage_task',
                 path: '/project-manage/task',
-                handle: {
-                  i18nKey: 'route.(base)_project-manage_task',
-                  title: '(base)_project-manage_task',
-                  icon: 'mdi:clipboard-check-outline',
-                  order: 2
-                }
+                handle: { i18nKey: 'route.(base)_project-manage_task', title: '(base)_project-manage_task', order: 2 }
               }
             ]
           },
