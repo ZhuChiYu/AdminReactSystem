@@ -535,8 +535,8 @@ model Task {
   priority    Int      @default(1) // 1-低, 2-中, 3-高
   taskStatus  Int      @default(0) @map("task_status") // 0-未开始, 1-进行中, 2-已完成, 3-已暂停
   remark      String?  @db.Text
-  createTime  String   @map("create_time")
-  updateTime  String?  @map("update_time")
+  createTime  DateTime @default(now()) @map("create_time")
+  updateTime  DateTime? @updatedAt @map("update_time")
 
   // 关联关系
   assignee User @relation("TaskAssignee", fields: [assigneeId], references: [id])

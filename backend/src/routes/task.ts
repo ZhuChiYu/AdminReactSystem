@@ -185,22 +185,48 @@ router.post('/', async (req, res) => {
       targetCount,
       taskDesc,
       taskName,
-      taskType = 'normal'
+      taskType = 'normal',
+      taskStatus = 0
     } = req.body;
+
+    // 验证必填字段
+    if (!taskName || !projectName) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '任务名称和项目名称不能为空',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 验证负责人是否存在
+    const assignee = await prisma.user.findUnique({
+      where: { id: Number(assigneeId) }
+    });
+
+    if (!assigneeId || !assignee) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '负责人不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
 
     const task = await prisma.task.create({
       data: {
         actualCount: 0,
-        assigneeId,
-        // 未开始
-        createTime: new Date().toISOString(),
-        dueDate: new Date(dueDate),
-        priority,
+        assigneeId: Number(assigneeId),
+        createTime: new Date(),
+        dueDate: dueDate ? new Date(dueDate) : new Date(),
+        priority: Number(priority),
         projectName,
-        targetCount,
-        taskDesc,
+        targetCount: Number(targetCount) || 0,
+        taskDesc: taskDesc || '',
         taskName,
-        taskStatus: 0,
+        taskStatus: Number(taskStatus),
         taskType
       },
       include: {
@@ -214,9 +240,18 @@ router.post('/', async (req, res) => {
       }
     });
 
+    // 格式化返回数据
+    const formattedTask = {
+      ...task,
+      assignee: {
+        id: task.assignee.id,
+        name: task.assignee.nickName || task.assignee.userName
+      }
+    };
+
     res.json({
       code: 0,
-      data: task,
+      data: formattedTask,
       message: '创建任务成功',
       path: req.path,
       timestamp: Date.now()
@@ -226,7 +261,7 @@ router.post('/', async (req, res) => {
     res.status(500).json({
       code: 500,
       data: null,
-      message: '创建任务失败',
+      message: error.message || '创建任务失败',
       path: req.path,
       timestamp: Date.now()
     });
@@ -237,17 +272,68 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
 
+    // 验证任务是否存在
+    const existingTask = await prisma.task.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!existingTask) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '任务不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 处理日期字段
     if (updateData.dueDate) {
       updateData.dueDate = new Date(updateData.dueDate);
     }
 
+    // 处理assigneeId字段
+    if (updateData.assigneeId !== undefined) {
+      // 验证新负责人是否存在
+      const newAssignee = await prisma.user.findUnique({
+        where: { id: Number(updateData.assigneeId) }
+      });
+
+      if (!newAssignee) {
+        return res.status(400).json({
+          code: 400,
+          data: null,
+          message: '负责人不存在',
+          path: req.path,
+          timestamp: Date.now()
+        });
+      }
+    }
+
+    // 构建更新数据
+    const taskData = {
+      taskName: updateData.taskName,
+      projectName: updateData.projectName,
+      taskType: updateData.taskType,
+      taskDesc: updateData.taskDesc || '',
+      priority: Number(updateData.priority),
+      targetCount: Number(updateData.targetCount) || 0,
+      dueDate: updateData.dueDate,
+      taskStatus: updateData.taskStatus === null ? existingTask.taskStatus : Number(updateData.taskStatus),
+      updateTime: new Date()
+    };
+
+    // 如果有assigneeId，添加到更新数据中
+    if (updateData.assigneeId !== undefined) {
+      taskData.assignee = {
+        connect: { id: Number(updateData.assigneeId) }
+      };
+    }
+
     const task = await prisma.task.update({
-      data: {
-        ...updateData,
-        updateTime: new Date().toISOString()
-      },
+      data: taskData,
       include: {
         assignee: {
           select: {
@@ -257,12 +343,21 @@ router.put('/:id', async (req, res) => {
           }
         }
       },
-      where: { id: Number.parseInt(id) }
+      where: { id: Number(id) }
     });
+
+    // 格式化返回数据
+    const formattedTask = {
+      ...task,
+      assignee: {
+        id: task.assignee.id,
+        name: task.assignee.nickName || task.assignee.userName
+      }
+    };
 
     res.json({
       code: 0,
-      data: task,
+      data: formattedTask,
       message: '更新任务成功',
       path: req.path,
       timestamp: Date.now()
@@ -272,7 +367,7 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({
       code: 500,
       data: null,
-      message: '更新任务失败',
+      message: error.message || '更新任务失败',
       path: req.path,
       timestamp: Date.now()
     });
