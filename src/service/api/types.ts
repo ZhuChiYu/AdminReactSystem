@@ -400,57 +400,162 @@ export namespace MeetingApi {
   }
 }
 
-// 任务相关类型
+// 任务相关类型 - 重新设计为项目事项管理
 export namespace TaskApi {
+  // 项目阶段枚举
+  export enum ProjectStage {
+    CUSTOMER_INQUIRY = 'customer_inquiry', // 客户询价
+    PROPOSAL_SUBMISSION = 'proposal_submission', // 方案申报
+    TEACHER_CONFIRMATION = 'teacher_confirmation', // 师资确定
+    PROJECT_APPROVAL = 'project_approval', // 项目审批
+    CONTRACT_SIGNING = 'contract_signing', // 签订合同
+    PROJECT_EXECUTION = 'project_execution', // 项目进行
+    PROJECT_SETTLEMENT = 'project_settlement' // 项目结算
+  }
+
+  // 项目阶段名称
+  export const ProjectStageNames = {
+    [ProjectStage.CUSTOMER_INQUIRY]: '客户询价',
+    [ProjectStage.PROPOSAL_SUBMISSION]: '方案申报',
+    [ProjectStage.TEACHER_CONFIRMATION]: '师资确定',
+    [ProjectStage.PROJECT_APPROVAL]: '项目审批',
+    [ProjectStage.CONTRACT_SIGNING]: '签订合同',
+    [ProjectStage.PROJECT_EXECUTION]: '项目进行',
+    [ProjectStage.PROJECT_SETTLEMENT]: '项目结算'
+  };
+
+  // 优先级枚举
+  export enum Priority {
+    HIGH = 1, // 高
+    MEDIUM = 2, // 中
+    LOW = 3 // 低
+  }
+
+  // 优先级名称
+  export const PriorityNames = {
+    [Priority.HIGH]: '高',
+    [Priority.MEDIUM]: '中',
+    [Priority.LOW]: '低'
+  };
+
   export interface TaskQueryParams extends PageParams {
-    assigneeId?: number;
-    dueDateEnd?: string;
-    dueDateStart?: string;
-    priority?: number;
-    projectId?: number;
-    taskName?: string;
-    taskStatus?: number;
-    taskType?: string;
+    projectType?: string;
+    projectName?: string;
+    currentStage?: ProjectStage;
+    responsiblePersonId?: number;
+    executorId?: number;
+    consultantId?: number;
+    marketManagerId?: number;
+    priority?: Priority;
+    startTimeStart?: string;
+    startTimeEnd?: string;
+    endTimeStart?: string;
+    endTimeEnd?: string;
+    isArchived?: boolean;
   }
 
   export interface TaskListItem {
-    actualCount?: number;
-    actualHours?: number;
-    assignee: {
-      id: number;
-      name: string;
-    };
-    createTime: string;
-    dueDate?: string;
-    estimatedHours?: number;
     id: number;
-    priority: number;
-    progress: number;
-    projectId?: number;
-    projectName?: string;
-    startDate?: string;
-    targetCount?: number;
-    taskCode?: string;
-    taskDesc?: string;
-    taskName: string;
-    taskStatus: number;
-    taskType: string;
+    projectType: string;
+    projectName: string;
+    currentStage: ProjectStage;
+    stageHistory?: any[];
+    
+    // 人员信息
+    responsiblePerson: {
+      id: number;
+      nickName: string;
+      userName: string;
+    };
+    executor?: {
+      id: number;
+      nickName: string;
+      userName: string;
+    };
+    consultant?: {
+      id: number;
+      nickName: string;
+      userName: string;
+    };
+    marketManager?: {
+      id: number;
+      nickName: string;
+      userName: string;
+    };
+    
+    priority: Priority;
+    startTime: string;
+    endTime: string;
+    
+    // 各阶段状态
+    customerInquiryStatus?: string;
+    proposalStatus?: string;
+    proposalAttachments?: any[];
+    teacherConfirmed: boolean;
+    teacherInfo?: any;
+    approvalStatus?: string;
+    contractSigned: boolean;
+    projectCompleted: boolean;
+    paymentReceived: boolean;
+    
+    remark?: string;
+    createTime: string;
     updateTime: string;
+    isArchived: boolean;
   }
 
   export interface CreateTaskRequest {
-    assigneeId?: number;
-    dueDate?: string;
-    estimatedHours?: number;
-    parentTaskId?: number;
-    priority?: number;
-    projectId?: number;
+    projectType: string;
+    projectName: string;
+    responsiblePersonId: number;
+    executorId?: number;
+    consultantId?: number;
+    marketManagerId?: number;
+    priority?: Priority;
+    startTime: string;
+    endTime: string;
+    remark?: string;
+  }
+
+  export interface UpdateTaskRequest {
+    projectType?: string;
     projectName?: string;
-    startDate?: string;
-    targetCount?: number;
-    taskDesc?: string;
-    taskName: string;
-    taskType: string;
+    responsiblePersonId?: number;
+    executorId?: number;
+    consultantId?: number;
+    marketManagerId?: number;
+    priority?: Priority;
+    startTime?: string;
+    endTime?: string;
+    remark?: string;
+  }
+
+  // 阶段操作相关类型
+  export interface StageActionRequest {
+    taskId: number;
+    action: string;
+    data?: any;
+    attachments?: any[];
+    remark?: string;
+  }
+
+  // 方案上传请求
+  export interface UploadProposalRequest {
+    taskId: number;
+    attachments: any[];
+    remark?: string;
+  }
+
+  // 师资确定请求
+  export interface ConfirmTeacherRequest {
+    taskId: number;
+    teacherInfo: {
+      name: string;
+      title: string;
+      experience: string;
+      specialties: string[];
+    };
+    remark?: string;
   }
 }
 

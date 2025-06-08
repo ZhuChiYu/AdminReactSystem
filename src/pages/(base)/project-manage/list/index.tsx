@@ -1,4 +1,4 @@
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined } from '@ant-design/icons';
 import { Button, Card, DatePicker, Form, Input, Modal, Progress, Select, Space, Table, Tag, message } from 'antd';
 import type { RangePickerProps } from 'antd/es/date-picker';
 import dayjs from 'dayjs';
@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 
 import type { CustomerApi } from '@/service/api';
 import { customerService } from '@/service/api';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
 // 暂时注释掉未使用的导入
 // import { getCurrentUserId, getCurrentUserName, isAdmin } from '@/utils/auth';
 
@@ -140,8 +140,6 @@ interface TaskRecord {
 
 /** 任务管理组件 */
 const TaskManagement = () => {
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isTargetModalVisible, setIsTargetModalVisible] = useState(false);
   const [isRemarkModalVisible, setIsRemarkModalVisible] = useState(false);
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isFollowUpModalVisible, setIsFollowUpModalVisible] = useState(false);
@@ -157,13 +155,18 @@ const TaskManagement = () => {
     [TaskType.FOLLOW_UP]: 50,
     [TaskType.REGISTER]: 50
   });
-  const [form] = Form.useForm();
-  const [targetForm] = Form.useForm();
   const [followUpForm] = Form.useForm();
 
   // 任务数据
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<TaskRecord[]>([]);
+
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
 
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
@@ -326,38 +329,6 @@ const TaskManagement = () => {
     }
   };
 
-  // 保存任务目标
-  const saveTaskTarget = async (taskType: TaskType, targetCount: number) => {
-    try {
-      console.log('🔄 保存任务目标:', { period: selectedPeriod, targetCount, taskType });
-
-      // 更新目标状态
-      const newTargets = { ...taskTargets, [taskType]: targetCount };
-      setTaskTargets(newTargets);
-
-      // 实际调用后端API保存目标
-      // await taskService.saveTaskTarget({
-      //   type: taskType,
-      //   period: selectedPeriod,
-      //   target: targetCount
-      // });
-
-      // 暂时使用本地存储模拟持久化
-      localStorage.setItem('taskTargets', JSON.stringify(newTargets));
-
-      message.success('目标设置成功');
-
-      // 立即重新生成任务数据以反映新的目标
-      await fetchCustomerData(newTargets);
-
-      setIsTargetModalVisible(false);
-      targetForm.resetFields();
-    } catch (error) {
-      console.error('❌ 保存目标失败:', error);
-      message.error('保存失败，请重试');
-    }
-  };
-
   // 初始化数据
   useEffect(() => {
     const initializeData = async () => {
@@ -370,17 +341,30 @@ const TaskManagement = () => {
     initializeData();
   }, []);
 
-  // 当任务数据变化时更新列表
+  // 当任务数据变化时更新列表和分页
   useEffect(() => {
     setFilteredTasks(tasks);
+    setPagination(prev => ({
+      ...prev,
+      total: tasks.length
+    }));
   }, [tasks]);
 
-  // 模拟当前用户信息
-  const currentUser = {
-    department: '销售部',
-    id: 1,
-    isAdmin: true,
-    name: '张三'
+  // 处理分页变化
+  const handleTableChange = (page: number, pageSize: number) => {
+    setPagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize
+    }));
+  };
+
+  // 获取当前页的数据
+  const getCurrentPageData = () => {
+    const { current, pageSize } = pagination;
+    const startIndex = (current - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredTasks.slice(startIndex, endIndex);
   };
 
   // 获取统计数据
@@ -442,28 +426,28 @@ const TaskManagement = () => {
     }
 
     setFilteredTasks(filtered);
+    // 重置分页到第一页
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filtered.length
+    }));
   };
 
-  // 重置搜索
   const resetSearch = () => {
     setSearchParams({
-      followUpStatus: '',
       keyword: '',
-      timeRange: null,
-      type: ''
+      type: '',
+      followUpStatus: '',
+      timeRange: null
     });
     setFilteredTasks(tasks);
-  };
-
-  // 打开新增弹窗
-  const openAddModal = () => {
-    form.resetFields();
-    setIsModalVisible(true);
-  };
-
-  // 打开设置目标弹窗
-  const openTargetModal = () => {
-    setIsTargetModalVisible(true);
+    // 重置分页
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: tasks.length
+    }));
   };
 
   // 打开备注弹窗
@@ -489,15 +473,6 @@ const TaskManagement = () => {
     setIsFollowUpModalVisible(true);
   };
 
-  // 取消弹窗
-  const handleCancel = () => {
-    setIsModalVisible(false);
-  };
-
-  const handleTargetCancel = () => {
-    setIsTargetModalVisible(false);
-  };
-
   const handleRemarkCancel = () => {
     setIsRemarkModalVisible(false);
     setSelectedTask(null);
@@ -508,32 +483,6 @@ const TaskManagement = () => {
     setIsFollowUpModalVisible(false);
     setSelectedCustomer(null);
     followUpForm.resetFields();
-  };
-
-  // 提交新增任务
-  const handleSubmit = () => {
-    form
-      .validateFields()
-      .then(() => {
-        message.success('新增任务成功');
-        setIsModalVisible(false);
-        form.resetFields();
-      })
-      .catch(info => {
-        console.log('Validate Failed:', info);
-      });
-  };
-
-  // 提交目标设置
-  const handleTargetSubmit = () => {
-    targetForm
-      .validateFields()
-      .then(async values => {
-        await saveTaskTarget(values.type, values.targetCount);
-      })
-      .catch(info => {
-        console.log('Validate Failed:', info);
-      });
   };
 
   // 提交跟进状态修改
@@ -658,7 +607,6 @@ const TaskManagement = () => {
     },
     {
       dataIndex: 'remark',
-      ellipsis: true,
       key: 'remark',
       ...getCenterColumnConfig(),
       render: (text: string, record: TaskRecord) => (
@@ -669,15 +617,13 @@ const TaskManagement = () => {
           >
             {text || '-'}
           </span>
-          {currentUser.isAdmin && (
-            <Button
-              size="small"
-              type="link"
-              onClick={() => openRemarkModal(record)}
-            >
-              {text ? '编辑' : '添加'}
-            </Button>
-          )}
+          <Button
+            size="small"
+            type="link"
+            onClick={() => openRemarkModal(record)}
+          >
+            {text ? '编辑' : '添加'}
+          </Button>
         </div>
       ),
       title: '备注',
@@ -835,29 +781,20 @@ const TaskManagement = () => {
   };
 
   return (
-    <div className="h-full bg-white dark:bg-[#141414]">
+    <div className="space-y-6">
       <Card
-        className="h-full"
-        variant="borderless"
+        className="shadow-md"
         extra={
           <Space>
             <Select
-              style={{ width: 100 }}
+              style={{ width: 120 }}
               value={selectedPeriod}
-              options={Object.values(StatisticsPeriod).map(period => ({
-                label: periodNames[period],
-                value: period
-              }))}
+              options={[
+                { label: '本周', value: StatisticsPeriod.WEEK },
+                { label: '本月', value: StatisticsPeriod.MONTH }
+              ]}
               onChange={value => setSelectedPeriod(value)}
             />
-            {currentUser.isAdmin && (
-              <Button
-                type="primary"
-                onClick={openTargetModal}
-              >
-                设置目标
-              </Button>
-            )}
           </Space>
         }
         title={
@@ -915,145 +852,24 @@ const TaskManagement = () => {
             搜索
           </Button>
           <Button onClick={resetSearch}>重置</Button>
-          <Button
-            icon={<PlusOutlined />}
-            type="primary"
-            onClick={openAddModal}
-          >
-            新增任务
-          </Button>
         </div>
 
         <Table
           columns={columns}
-          dataSource={filteredTasks}
+          dataSource={getCurrentPageData()}
           rowKey="id"
-          {...getFullTableConfig(10)}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            onChange: handleTableChange,
+            onShowSizeChange: handleTableChange
+          }}
         />
-
-        <Modal
-          open={isModalVisible}
-          title="新增任务"
-          onCancel={handleCancel}
-          onOk={handleSubmit}
-        >
-          <Form
-            form={form}
-            labelCol={{ span: 6 }}
-            wrapperCol={{ span: 16 }}
-          >
-            <Form.Item
-              label="任务类型"
-              name="type"
-              rules={[{ message: '请选择任务类型', required: true }]}
-            >
-              <Select
-                placeholder="请选择任务类型"
-                options={Object.values(TaskType).map(type => ({
-                  label: taskTypeNames[type],
-                  value: type
-                }))}
-              />
-            </Form.Item>
-            <Form.Item
-              label="培训项目"
-              name="projectName"
-              rules={[{ message: '请输入培训项目名称', required: true }]}
-            >
-              <Input placeholder="请输入培训项目名称" />
-            </Form.Item>
-            <Form.Item
-              label="任务名称"
-              name="taskName"
-              rules={[{ message: '请输入任务名称', required: true }]}
-            >
-              <Input placeholder="请输入任务名称" />
-            </Form.Item>
-            <Form.Item
-              label="描述"
-              name="description"
-            >
-              <Input.TextArea
-                placeholder="请输入描述"
-                rows={3}
-              />
-            </Form.Item>
-            <Form.Item
-              label="数量"
-              name="count"
-              rules={[{ message: '请输入数量', required: true }]}
-            >
-              <Input
-                min={1}
-                placeholder="请输入数量"
-                type="number"
-              />
-            </Form.Item>
-            <Form.Item
-              initialValue={TaskFollowUpStatus.NOT_STARTED}
-              label="跟进状态"
-              name="followUpStatus"
-              rules={[{ message: '请选择跟进状态', required: true }]}
-            >
-              <Select
-                placeholder="请选择跟进状态"
-                options={Object.values(TaskFollowUpStatus).map(status => ({
-                  label: taskFollowUpStatusNames[status],
-                  value: status
-                }))}
-              />
-            </Form.Item>
-            <Form.Item
-              label="截止时间"
-              name="dueDate"
-              rules={[{ message: '请选择截止时间', required: true }]}
-            >
-              <DatePicker
-                showTime
-                placeholder="请选择截止时间"
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-          </Form>
-        </Modal>
-
-        <Modal
-          open={isTargetModalVisible}
-          title="设置目标"
-          onCancel={handleTargetCancel}
-          onOk={handleTargetSubmit}
-        >
-          <Form
-            form={targetForm}
-            labelCol={{ span: 6 }}
-            wrapperCol={{ span: 16 }}
-          >
-            <Form.Item
-              label="任务类型"
-              name="type"
-              rules={[{ message: '请选择任务类型', required: true }]}
-            >
-              <Select
-                placeholder="请选择任务类型"
-                options={Object.values(TaskType).map(type => ({
-                  label: taskTypeNames[type],
-                  value: type
-                }))}
-              />
-            </Form.Item>
-            <Form.Item
-              label="目标数量"
-              name="targetCount"
-              rules={[{ message: '请输入目标数量', required: true }]}
-            >
-              <Input
-                min={1}
-                placeholder="请输入目标数量"
-                type="number"
-              />
-            </Form.Item>
-          </Form>
-        </Modal>
 
         {/* 备注编辑弹窗 */}
         <Modal
@@ -1089,7 +905,13 @@ const TaskManagement = () => {
             columns={customerColumns}
             dataSource={selectedTaskCustomers}
             rowKey="id"
-            {...getFullTableConfig(10)}
+            pagination={{
+              pageSize: 10,
+              showQuickJumper: true,
+              showSizeChanger: true,
+              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+              pageSizeOptions: ['10', '20', '50', '100']
+            }}
           />
         </Modal>
 

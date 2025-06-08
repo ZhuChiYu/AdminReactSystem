@@ -1,11 +1,126 @@
-import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
-import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, message } from 'antd';
+import {
+  ArrowRightOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  ContainerOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
+  FileTextOutlined,
+  MoneyCollectOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  UploadOutlined,
+  UserOutlined
+} from '@ant-design/icons';
+import {
+  Button,
+  Card,
+  DatePicker,
+  Descriptions,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Steps,
+  Table,
+  Tag,
+  Tooltip,
+  Upload,
+  message
+} from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 
+import { selectUserInfo } from '@/features/auth/authStore';
 import { employeeService, projectService } from '@/service/api';
+import { taskAttachmentService } from '@/service/api/taskAttachment';
+import type { TaskAttachmentApi } from '@/service/api/taskAttachment';
 import type { EmployeeApi, TaskApi } from '@/service/api/types';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
+
+const { RangePicker } = DatePicker;
+const { TextArea } = Input;
+
+/** 项目阶段步骤配置 */
+const PROJECT_STAGES = [
+  { description: '负责人发起项目', key: 'customer_inquiry', title: '客户询价' },
+  { description: '咨询部上传方案', key: 'proposal_submission', title: '方案申报' },
+  { description: '咨询部确认授课老师', key: 'teacher_confirmation', title: '师资确定' },
+  { description: '市场部经理审批', key: 'project_approval', title: '项目审批' },
+  { description: '咨询部确认合同签订', key: 'contract_signing', title: '签订合同' },
+  { description: '咨询部跟进项目过程', key: 'project_execution', title: '项目进行' },
+  { description: '负责人确认收款', key: 'project_settlement', title: '项目结算' }
+];
+
+/** 获取当前阶段在步骤中的索引 */
+const getCurrentStageIndex = (stage: string): number => {
+  return PROJECT_STAGES.findIndex(s => s.key === stage);
+};
+
+/** 获取阶段标签颜色 */
+const getStageTagColor = (stage: string): string => {
+  const colors: Record<string, string> = {
+    contract_signing: 'green',
+    customer_inquiry: 'blue',
+    project_approval: 'cyan',
+    project_execution: 'lime',
+    project_settlement: 'gold',
+    proposal_submission: 'orange',
+    teacher_confirmation: 'purple'
+  };
+  return colors[stage] || 'default';
+};
+
+/** 获取优先级标签颜色 */
+const getPriorityTagColor = (priority: number): string => {
+  const colors: Record<number, string> = {
+    1: 'red',
+    2: 'orange',
+    3: 'green'
+  };
+  return colors[priority] || 'default';
+};
+
+/** 优先级名称映射 */
+const PRIORITY_NAMES: Record<number, string> = {
+  1: '高',
+  2: '中',
+  3: '低'
+};
+
+/** 操作名称映射 */
+const ACTION_NAMES: Record<string, string> = {
+  advance_to_proposal: '推进到方案申报',
+  approve_project: '审批通过',
+  confirm_completion: '确认完成',
+  confirm_contract: '确认合同签订',
+  confirm_payment: '确认收款',
+  confirm_proposal: '确认方案',
+  confirm_teacher: '确认师资',
+  reject_project: '审批拒绝',
+  upload_proposal: '上传方案'
+};
+
+/** 根据阶段获取当前办理人 */
+const getCurrentExecutor = (stage: string, task: TaskApi.TaskListItem) => {
+  switch (stage) {
+    case 'customer_inquiry':
+    case 'project_settlement':
+      return task.responsiblePerson;
+    case 'proposal_submission':
+    case 'teacher_confirmation':
+    case 'contract_signing':
+    case 'project_execution':
+      return task.consultant;
+    case 'project_approval':
+      return task.marketManager;
+    default:
+      return null;
+  }
+};
 
 /** 任务状态枚举 */
 enum TaskStatus {
@@ -52,7 +167,8 @@ interface TaskRecord {
   actualCount?: number;
   assignee?: {
     id: number;
-    name: string;
+    nickName?: string;
+    userName?: string;
   };
   createTime: string;
   dueDate?: string;
@@ -68,26 +184,150 @@ interface TaskRecord {
   updateTime?: string;
 }
 
+/** 检查用户权限 */
+const checkUserPermissions = (currentUser: any, task: TaskApi.TaskListItem) => {
+  const currentExecutor = getCurrentExecutor(task.currentStage, task);
+  const userIdNumber = Number.parseInt(currentUser.userId, 10);
+
+  // 检查是否是当前阶段办理人（通过ID和用户名双重验证）
+  let isCurrentExecutor = false;
+  if (currentExecutor) {
+    // 优先通过ID匹配（确保userId不为空且有效）
+    if (!Number.isNaN(userIdNumber) && userIdNumber > 0) {
+      isCurrentExecutor = currentExecutor.id === userIdNumber;
+    }
+    // 如果ID匹配不上，尝试通过用户名匹配
+    if (!isCurrentExecutor) {
+      isCurrentExecutor =
+        currentExecutor.userName === currentUser.userName || currentExecutor.nickName === currentUser.userName;
+    }
+  }
+
+  // 检查是否是负责人（通过ID和用户名双重验证）
+  let isResponsiblePerson = false;
+  if (task.responsiblePerson) {
+    // 优先通过ID匹配（确保userId不为空且有效）
+    if (!Number.isNaN(userIdNumber) && userIdNumber > 0) {
+      isResponsiblePerson = task.responsiblePerson.id === userIdNumber;
+    }
+    // 如果ID匹配不上，尝试通过用户名匹配
+    if (!isResponsiblePerson) {
+      isResponsiblePerson =
+        task.responsiblePerson.userName === currentUser.userName ||
+        task.responsiblePerson.nickName === currentUser.userName;
+    }
+  }
+
+  // 只有超级管理员才有全局权限，普通管理员没有
+  const isSuperAdmin = currentUser.roles?.includes('super_admin') || currentUser.roles?.includes('SUPER_ADMIN');
+  const isAdmin = currentUser.roles?.includes('admin') || currentUser.roles?.includes('ADMIN');
+
+  return {
+    // 只有办理人、负责人或超级管理员才能执行操作，普通管理员不能
+    canPerformAction: isCurrentExecutor || isResponsiblePerson || isSuperAdmin,
+    isAdmin,
+    isCurrentExecutor,
+    isResponsiblePerson,
+    isSuperAdmin
+  };
+};
+
+/** 根据阶段获取可用操作 */
+const getStageActions = (stage: string, permissions: any): Array<{ color: string; key: string; title: string }> => {
+  const { isCurrentExecutor, isResponsiblePerson, isSuperAdmin } = permissions;
+  const actions: Array<{ color: string; key: string; title: string }> = [];
+
+  switch (stage) {
+    case 'customer_inquiry':
+      // 客户询价阶段：只有负责人或超级管理员可以操作
+      if (isResponsiblePerson || isSuperAdmin) {
+        actions.push({ color: 'blue', key: 'advance_to_proposal', title: '推进到方案提交' });
+      }
+      break;
+    case 'proposal_submission':
+      // 方案申报阶段：只有当前办理人（咨询部）或超级管理员可以操作
+      if (isCurrentExecutor || isSuperAdmin) {
+        actions.push({ color: 'blue', key: 'upload_proposal', title: '上传方案' });
+        actions.push({ color: 'green', key: 'confirm_proposal', title: '客户已同意方案' });
+      }
+      break;
+    case 'teacher_confirmation':
+      // 师资确定阶段：只有当前办理人（咨询部）或超级管理员可以操作
+      if (isCurrentExecutor || isSuperAdmin) {
+        actions.push({ color: 'purple', key: 'confirm_teacher', title: '确认授课老师' });
+      }
+      break;
+    case 'project_approval':
+      // 项目审批阶段：只有当前办理人（市场部经理）或超级管理员可以操作
+      if (isCurrentExecutor || isSuperAdmin) {
+        actions.push({ color: 'green', key: 'approve_project', title: '审批通过' });
+        actions.push({ color: 'red', key: 'reject_project', title: '审批拒绝' });
+      }
+      break;
+    case 'contract_signing':
+      // 签订合同阶段：只有当前办理人（咨询部）或超级管理员可以操作
+      if (isCurrentExecutor || isSuperAdmin) {
+        actions.push({ color: 'green', key: 'confirm_contract', title: '客户已签合同' });
+      }
+      break;
+    case 'project_execution':
+      // 项目进行阶段：只有当前办理人（咨询部）或超级管理员可以操作
+      if (isCurrentExecutor || isSuperAdmin) {
+        actions.push({ color: 'green', key: 'confirm_completion', title: '项目已完成' });
+      }
+      break;
+    case 'project_settlement':
+      // 项目结算阶段：只有负责人或超级管理员可以操作
+      if (isResponsiblePerson || isSuperAdmin) {
+        actions.push({ color: 'gold', key: 'confirm_payment', title: '已收到客户款项' });
+      }
+      break;
+    default:
+      break;
+  }
+
+  return actions;
+};
+
 /** 事项列表组件 */
 const ItemList = () => {
+  // 基础状态
   const [loading, setLoading] = useState(false);
-  const [tasks, setTasks] = useState<TaskRecord[]>([]);
-  const [filteredTasks, setFilteredTasks] = useState<TaskRecord[]>([]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isContentModalVisible, setIsContentModalVisible] = useState(false);
-  const [currentContent, setCurrentContent] = useState('');
-  const [editingTask, setEditingTask] = useState<TaskRecord | null>(null);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const [tasks, setTasks] = useState<TaskApi.TaskListItem[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<TaskApi.TaskListItem[]>([]);
   const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
-  const [form] = Form.useForm();
 
-  // 搜索条件
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
+
+  // 弹窗状态
+  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [isStageActionModalVisible, setIsStageActionModalVisible] = useState(false);
+
+  // 表单和当前操作的数据
+  const [createForm] = Form.useForm();
+  const [stageActionForm] = Form.useForm();
+  const [currentTask, setCurrentTask] = useState<TaskApi.TaskListItem | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const [attachments, setAttachments] = useState<TaskAttachmentApi.TaskAttachmentListItem[]>([]);
+  const [uploadFileList, setUploadFileList] = useState<File[]>([]);
+
+  // 搜索和筛选状态
   const [searchParams, setSearchParams] = useState({
+    currentStage: undefined as string | undefined,
     keyword: '',
-    priority: '',
-    status: '',
+    priority: undefined as number | undefined,
+    responsiblePersonId: undefined as number | undefined,
     timeRange: null as any
   });
+
+  // 获取当前用户信息
+  const currentUser = useSelector(selectUserInfo);
 
   // 获取员工列表
   const fetchEmployees = async () => {
@@ -99,46 +339,139 @@ const ItemList = () => {
     }
   };
 
-  // 获取任务列表
-  const fetchTasks = async () => {
+  // 获取项目事项列表
+  const fetchTasks = async (params?: any) => {
     setLoading(true);
     try {
-      const response = await projectService.getTaskList({
-        current: 1,
-        size: 1000
-      });
+      const requestParams = {
+        current: pagination.current,
+        isArchived: false,
+        size: pagination.pageSize, // 只显示未归档的项目
+        ...params
+      };
+      const response = await projectService.getTaskList(requestParams);
+      setTasks(response.records || []);
+      setFilteredTasks(response.records || []);
 
-      // 将API返回的数据转换为组件需要的格式
-      const formattedTasks: TaskRecord[] = response.records.map((task: TaskApi.TaskListItem) => ({
-        actualCount: task.actualCount || 0,
-        assignee: task.assignee,
-        createTime: task.createTime || '',
-        dueDate: task.dueDate || '',
-        id: task.id,
-        priority: task.priority,
-        progress: task.progress,
-        projectName: task.projectName || '',
-        targetCount: task.targetCount || 0,
-        taskDesc: task.taskDesc || '',
-        taskName: task.taskName || '',
-        taskStatus: task.taskStatus,
-        taskType: task.taskType,
-        updateTime: task.updateTime || ''
+      // 更新分页信息
+      setPagination(prev => ({
+        ...prev,
+        current: response.current || 1,
+        total: response.total || 0
       }));
-
-      setTasks(formattedTasks);
-      setFilteredTasks(formattedTasks);
     } catch (error) {
-      message.error('获取任务列表失败');
-      console.error('获取任务列表失败:', error);
+      console.error('获取项目事项列表失败:', error);
+      // 使用 App 组件包装的 message
+      message.error('获取项目事项列表失败');
     } finally {
       setLoading(false);
     }
   };
 
+  // 获取项目事项附件列表
+  const fetchTaskAttachments = async (taskId: number) => {
+    try {
+      const response = await taskAttachmentService.getTaskAttachmentList({
+        current: 1,
+        size: 100,
+        taskId
+      });
+
+      console.log('附件列表响应:', response);
+
+      // 兼容不同的响应结构
+      let attachmentList = [];
+      if (response.data?.records) {
+        attachmentList = response.data.records;
+      } else if ((response as any).records) {
+        attachmentList = (response as any).records;
+      } else if (Array.isArray(response.data)) {
+        attachmentList = response.data;
+      } else if (Array.isArray(response)) {
+        attachmentList = response as any[];
+      }
+
+      setAttachments(attachmentList);
+      console.log('设置的附件列表:', attachmentList);
+    } catch (error) {
+      console.error('获取附件列表失败:', error);
+    }
+  };
+
+  // 处理附件上传
+  const handleFileUpload = async (file: File, taskId: number, stage?: string) => {
+    try {
+      console.log('开始上传附件:', file.name, 'taskId:', taskId);
+
+      await taskAttachmentService.uploadTaskAttachment({
+        description: `${stage || '阶段'}附件`,
+        file,
+        stage: stage || currentTask?.currentStage,
+        taskId
+      });
+
+      message.success('附件上传成功');
+      console.log('附件上传成功，开始刷新附件列表');
+      await fetchTaskAttachments(taskId);
+    } catch (error: any) {
+      console.error('上传附件失败:', error);
+      message.error(error.message || '上传附件失败');
+    }
+  };
+
+  // 删除附件
+  const handleDeleteAttachment = async (attachmentId: number, taskId: number) => {
+    try {
+      await taskAttachmentService.deleteTaskAttachment(attachmentId);
+      message.success('附件删除成功');
+      await fetchTaskAttachments(taskId);
+    } catch (error: any) {
+      console.error('删除附件失败:', error);
+      message.error(error.message || '删除附件失败');
+    }
+  };
+
+  // 下载附件
+  const handleDownloadAttachment = async (attachmentId: number, fileName: string) => {
+    try {
+      const blob = await taskAttachmentService.downloadTaskAttachment(attachmentId);
+
+      // 创建下载链接
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+
+      // 清理
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (error: any) {
+      console.error('下载附件失败:', error);
+      message.error(error.message || '下载附件失败');
+    }
+  };
+
+  // 检查用户权限 - 只有当前办理人和管理员可以编辑/删除
+  const canEditAttachment = (attachment: TaskAttachmentApi.TaskAttachmentListItem) => {
+    if (!currentUser || !currentTask) return false;
+
+    // 超级管理员可以操作所有附件
+    const isSuperAdmin = currentUser.roles?.includes('super_admin');
+    if (isSuperAdmin) return true;
+
+    // 附件上传者可以删除自己的附件
+    if (attachment.uploader?.id === Number(currentUser.userId)) return true;
+
+    // 当前阶段的办理人可以操作
+    const currentExecutor = getCurrentExecutor(currentTask.currentStage, currentTask);
+    return currentExecutor?.id === Number(currentUser.userId);
+  };
+
   useEffect(() => {
     fetchTasks();
-    fetchEmployees(); // 获取员工列表
+    fetchEmployees();
   }, []);
 
   // 搜索处理
@@ -148,27 +481,30 @@ const ItemList = () => {
     if (searchParams.keyword) {
       filtered = filtered.filter(
         task =>
-          task.taskName.includes(searchParams.keyword) ||
-          task.projectName?.includes(searchParams.keyword) ||
-          task.assignee?.name?.includes(searchParams.keyword) ||
-          task.taskDesc?.includes(searchParams.keyword)
+          task.projectName.includes(searchParams.keyword) ||
+          task.projectType.includes(searchParams.keyword) ||
+          task.responsiblePerson?.nickName?.includes(searchParams.keyword) ||
+          task.remark?.includes(searchParams.keyword)
       );
     }
 
-    if (searchParams.status) {
-      filtered = filtered.filter(task => task.taskStatus.toString() === searchParams.status);
+    if (searchParams.currentStage) {
+      filtered = filtered.filter(task => task.currentStage === searchParams.currentStage);
     }
 
     if (searchParams.priority) {
-      filtered = filtered.filter(task => task.priority.toString() === searchParams.priority);
+      filtered = filtered.filter(task => task.priority === searchParams.priority);
+    }
+
+    if (searchParams.responsiblePersonId) {
+      filtered = filtered.filter(task => task.responsiblePerson.id === searchParams.responsiblePersonId);
     }
 
     if (searchParams.timeRange && searchParams.timeRange.length === 2) {
       const [start, end] = searchParams.timeRange;
       filtered = filtered.filter(task => {
-        if (!task.dueDate) return false;
-        const dueDate = dayjs(task.dueDate);
-        return dueDate.isAfter(start) && dueDate.isBefore(end);
+        const startTime = dayjs(task.startTime);
+        return startTime.isAfter(start) && startTime.isBefore(end);
       });
     }
 
@@ -177,63 +513,92 @@ const ItemList = () => {
 
   // 重置搜索
   const resetSearch = () => {
-    setSearchParams({ keyword: '', priority: '', status: '', timeRange: null });
+    setSearchParams({
+      currentStage: undefined,
+      keyword: '',
+      priority: undefined,
+      responsiblePersonId: undefined,
+      timeRange: null
+    });
     setFilteredTasks(tasks);
   };
 
   // 打开新增/编辑弹窗
-  const openModal = (task?: TaskRecord) => {
-    form.resetFields();
+  const openModal = (task?: TaskApi.TaskListItem) => {
+    createForm.resetFields();
     if (task) {
-      setEditingTask(task);
-      form.setFieldsValue({
-        ...task,
-        dueDate: task.dueDate ? dayjs(task.dueDate) : null
+      setCurrentTask(task);
+      createForm.setFieldsValue({
+        consultantId: task.consultant?.id,
+        endTime: task.endTime ? dayjs(task.endTime) : null,
+        marketManagerId: task.marketManager?.id,
+        priority: task.priority,
+        projectName: task.projectName,
+        projectType: task.projectType,
+        remark: task.remark,
+        responsiblePersonId: task.responsiblePerson?.id,
+        startTime: task.startTime ? dayjs(task.startTime) : null
       });
     } else {
-      setEditingTask(null);
+      setCurrentTask(null);
+      createForm.setFieldsValue({
+        priority: 2
+      });
     }
-    setIsModalVisible(true);
+    setIsCreateModalVisible(true);
   };
 
   // 关闭弹窗
   const handleCancel = () => {
-    setIsModalVisible(false);
-    setEditingTask(null);
-    form.resetFields();
+    setIsCreateModalVisible(false);
+    setCurrentTask(null);
+    createForm.resetFields();
   };
 
   // 提交表单
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields();
+      const values = await createForm.validateFields();
       const formData = {
         ...values,
-        assigneeId: values.assigneeId || null,
-        dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD HH:mm:ss') : null
+        consultantId: values.consultantId ? Number(values.consultantId) : null,
+        endTime: values.endTime ? dayjs(values.endTime).toISOString() : null,
+        marketManagerId: values.marketManagerId ? Number(values.marketManagerId) : null,
+        priority: values.priority ? Number(values.priority) : 2,
+        responsiblePersonId: values.responsiblePersonId ? Number(values.responsiblePersonId) : null,
+        startTime: values.startTime ? dayjs(values.startTime).toISOString() : null
       };
 
-      if (editingTask) {
-        // 更新任务
-        await projectService.updateTask(editingTask.id, formData);
-        message.success('更新任务成功');
+      if (currentTask) {
+        await projectService.updateTask(currentTask.id, formData);
+        message.success('更新项目事项成功');
       } else {
-        // 创建任务
         await projectService.createTask(formData);
-        message.success('创建任务成功');
+        message.success('创建项目事项成功');
       }
 
-      setIsModalVisible(false);
-      setEditingTask(null);
-      form.resetFields();
-      await fetchTasks(); // 重新获取数据
-    } catch (error) {
+      setIsCreateModalVisible(false);
+      setCurrentTask(null);
+      createForm.resetFields();
+      await fetchTasks();
+    } catch (error: any) {
       console.error('操作失败:', error);
-      message.error('操作失败，请重试');
+      message.error(error.message || '操作失败，请重试');
     }
   };
 
-  // 删除任务
+  // 处理阶段操作
+  const handleStageAction = (task: TaskApi.TaskListItem, action: string) => {
+    setCurrentTask(task);
+    setUploadFileList([]); // 清空文件列表
+    setIsStageActionModalVisible(true);
+    stageActionForm.setFieldsValue({
+      action: ACTION_NAMES[action] || action,
+      actionKey: action // 保存原始key用于API调用
+    });
+  };
+
+  // 删除项目事项
   const handleDelete = (id: number) => {
     Modal.confirm({
       content: '确定要删除这条记录吗？',
@@ -241,7 +606,7 @@ const ItemList = () => {
         try {
           await projectService.deleteTask(id);
           message.success('删除成功');
-          await fetchTasks(); // 重新获取数据
+          await fetchTasks();
         } catch (error) {
           console.error('删除失败:', error);
           message.error('删除失败，请重试');
@@ -254,7 +619,7 @@ const ItemList = () => {
   // 批量删除
   const handleBatchDelete = () => {
     if (selectedRowKeys.length === 0) {
-      message.warning('请先选择要删除的任务');
+      message.warning('请先选择要删除的项目事项');
       return;
     }
 
@@ -262,12 +627,11 @@ const ItemList = () => {
       content: `确定要删除选中的 ${selectedRowKeys.length} 条记录吗？`,
       onOk: async () => {
         try {
-          // 批量删除任务
           const deletePromises = selectedRowKeys.map(id => projectService.deleteTask(id));
           await Promise.all(deletePromises);
           message.success(`成功删除 ${selectedRowKeys.length} 条记录`);
           setSelectedRowKeys([]);
-          await fetchTasks(); // 重新获取数据
+          await fetchTasks();
         } catch (error) {
           console.error('批量删除失败:', error);
           message.error('批量删除失败，请重试');
@@ -277,30 +641,69 @@ const ItemList = () => {
     });
   };
 
-  // 查看详情
-  const handleViewDetail = (task: TaskRecord) => {
-    setCurrentContent(`
-任务名称：${task.taskName}
-项目名称：${task.projectName || '无'}
-任务类型：${task.taskType}
-任务描述：${task.taskDesc || '无'}
-负责人：${task.assignee?.name || '未分配'}
-优先级：${priorityNames[task.priority as Priority]}
-状态：${taskStatusNames[task.taskStatus as TaskStatus]}
-完成进度：${task.progress}%
-目标数量：${task.targetCount || 0}
-实际完成：${task.actualCount || 0}
-截止时间：${task.dueDate || '无'}
-创建时间：${task.createTime || '无'}
-更新时间：${task.updateTime || '无'}
-    `);
-    setIsContentModalVisible(true);
+  // 获取当前用户可以执行的操作
+  const getAvailableActions = (task: TaskApi.TaskListItem): Array<{ color: string; key: string; title: string }> => {
+    if (!currentUser) {
+      return [];
+    }
+
+    const permissions = checkUserPermissions(currentUser, task);
+
+    console.log('权限检查:', {
+      currentExecutor: {
+        id: getCurrentExecutor(task.currentStage, task)?.id,
+        nickName: getCurrentExecutor(task.currentStage, task)?.nickName,
+        userName: getCurrentExecutor(task.currentStage, task)?.userName
+      },
+      currentStage: task.currentStage,
+      currentUser: {
+        nickName: currentUser.nickName,
+        roles: currentUser.roles,
+        userId: currentUser.userId,
+        userName: currentUser.userName
+      },
+      permissions: {
+        canPerformAction: permissions.canPerformAction,
+        isAdmin: permissions.isAdmin,
+        isCurrentExecutor: permissions.isCurrentExecutor,
+        isResponsiblePerson: permissions.isResponsiblePerson,
+        isSuperAdmin: permissions.isSuperAdmin
+      },
+      taskInfo: {
+        consultant: {
+          id: task.consultant?.id,
+          nickName: task.consultant?.nickName,
+          userName: task.consultant?.userName
+        },
+        marketManager: {
+          id: task.marketManager?.id,
+          nickName: task.marketManager?.nickName,
+          userName: task.marketManager?.userName
+        },
+        responsiblePerson: {
+          id: task.responsiblePerson?.id,
+          nickName: task.responsiblePerson?.nickName,
+          userName: task.responsiblePerson?.userName
+        }
+      },
+      taskName: task.projectName,
+      userIdNumber: Number.parseInt(currentUser.userId, 10)
+    });
+
+    if (!permissions.canPerformAction) {
+      return []; // 没有权限，返回空操作列表
+    }
+
+    return getStageActions(task.currentStage, permissions);
   };
 
-  // 获取状态标签
-  const getStatusTag = (status: number) => (
-    <Tag color={taskStatusColors[status as TaskStatus]}>{taskStatusNames[status as TaskStatus] || '未知'}</Tag>
-  );
+  // 查看详情
+  const handleViewDetail = (task: TaskApi.TaskListItem) => {
+    setCurrentTask(task);
+    setIsDetailModalVisible(true);
+    // 获取附件列表
+    fetchTaskAttachments(task.id);
+  };
 
   // 表格行选择配置
   const rowSelection = {
@@ -310,100 +713,176 @@ const ItemList = () => {
     selectedRowKeys
   };
 
+  // 处理分页变化
+  const handleTableChange = (page: number, pageSize: number) => {
+    setPagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize
+    }));
+
+    fetchTasks({
+      current: page,
+      size: pageSize
+    });
+  };
+
   // 表格列定义
   const columns = [
     {
       dataIndex: 'id',
       key: 'id',
       title: '序号',
-      ...getCenterColumnConfig(),
-      width: 60
+      width: 60,
+      ...getCenterColumnConfig()
     },
     {
-      dataIndex: 'taskName',
-      key: 'taskName',
-      title: '任务名称',
-      ...getCenterColumnConfig(),
-      width: 150
+      dataIndex: 'projectType',
+      key: 'projectType',
+      title: '项目类型',
+      width: 120,
+      ...getCenterColumnConfig()
     },
     {
       dataIndex: 'projectName',
       key: 'projectName',
       title: '项目名称',
-      ...getCenterColumnConfig(),
-      width: 180
+      width: 200,
+      ...getCenterColumnConfig()
     },
     {
-      dataIndex: 'assignee',
-      key: 'assignee',
+      dataIndex: 'currentStage',
+      key: 'currentStage',
+      title: '所属阶段',
+      width: 120,
+      ...getCenterColumnConfig(),
+      render: (stage: string) => {
+        const stageInfo = PROJECT_STAGES.find(s => s.key === stage);
+        return <Tag color={getStageTagColor(stage)}>{stageInfo?.title || stage}</Tag>;
+      }
+    },
+    {
+      dataIndex: 'responsiblePerson',
+      key: 'responsiblePerson',
       title: '负责人',
+      width: 100,
       ...getCenterColumnConfig(),
-      render: (assignee: any) => assignee?.name || '未分配',
-      width: 100
+      render: (person: any) => person?.nickName || person?.userName || '未分配'
     },
     {
-      dataIndex: 'taskStatus',
-      key: 'taskStatus',
-      title: '状态',
+      dataIndex: 'executor',
+      key: 'executor',
+      title: '办理人',
+      width: 100,
       ...getCenterColumnConfig(),
-      render: (status: number) => getStatusTag(status),
-      width: 100
+      render: (_: any, record: TaskApi.TaskListItem) => {
+        const currentExecutor = getCurrentExecutor(record.currentStage, record);
+        return currentExecutor?.nickName || currentExecutor?.userName || '未分配';
+      }
     },
     {
-      dataIndex: 'actualCount',
-      key: 'actualCount',
-      title: '完成数量',
+      dataIndex: 'priority',
+      key: 'priority',
+      title: '优先级',
+      width: 80,
       ...getCenterColumnConfig(),
-      width: 80
+      render: (priority: number) => <Tag color={getPriorityTagColor(priority)}>{PRIORITY_NAMES[priority]}</Tag>
     },
     {
-      dataIndex: 'targetCount',
-      key: 'targetCount',
-      title: '目标数量',
+      dataIndex: 'startTime',
+      key: 'startTime',
+      title: '开始时间',
+      width: 150,
       ...getCenterColumnConfig(),
-      width: 80
+      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm')
     },
     {
-      dataIndex: 'dueDate',
-      key: 'dueDate',
-      title: '截止时间',
+      dataIndex: 'endTime',
+      key: 'endTime',
+      title: '结束时间',
+      width: 150,
       ...getCenterColumnConfig(),
-      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '无'),
-      width: 150
+      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm')
     },
     {
       key: 'action',
       title: '操作',
-      ...getActionColumnConfig(200),
-      render: (_: any, record: TaskRecord) => (
-        <Space>
-          <Tooltip title="查看详情">
-            <Button
-              icon={<EyeOutlined />}
-              size="small"
-              type="link"
-              onClick={() => handleViewDetail(record)}
-            />
-          </Tooltip>
-          <Tooltip title="编辑">
-            <Button
-              icon={<EditOutlined />}
-              size="small"
-              type="link"
-              onClick={() => openModal(record)}
-            />
-          </Tooltip>
-          <Tooltip title="删除">
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              size="small"
-              type="link"
-              onClick={() => handleDelete(record.id)}
-            />
-          </Tooltip>
-        </Space>
-      )
+      ...getActionColumnConfig(250),
+      render: (_: any, record: TaskApi.TaskListItem) => {
+        const actions = getAvailableActions(record);
+
+        return (
+          <Space wrap>
+            <Tooltip title="查看详情">
+              <Button
+                icon={<EyeOutlined />}
+                size="small"
+                type="link"
+                onClick={() => handleViewDetail(record)}
+              />
+            </Tooltip>
+            <Tooltip title="编辑">
+              <Button
+                icon={<EditOutlined />}
+                size="small"
+                type="link"
+                onClick={() => openModal(record)}
+              />
+            </Tooltip>
+            {actions.map(action => {
+              // 获取操作对应的图标
+              const getActionIcon = (key: string) => {
+                switch (key) {
+                  case 'advance_to_proposal':
+                    return <ArrowRightOutlined />;
+                  case 'upload_proposal':
+                    return <UploadOutlined />;
+                  case 'confirm_proposal':
+                    return <CheckOutlined />;
+                  case 'confirm_teacher':
+                    return <UserOutlined />;
+                  case 'approve_project':
+                    return <CheckOutlined />;
+                  case 'reject_project':
+                    return <CloseOutlined />;
+                  case 'confirm_contract':
+                    return <FileTextOutlined />;
+                  case 'confirm_completion':
+                    return <ContainerOutlined />;
+                  case 'confirm_payment':
+                    return <MoneyCollectOutlined />;
+                  default:
+                    return <ArrowRightOutlined />;
+                }
+              };
+
+              return (
+                <Tooltip
+                  key={action.key}
+                  title={action.title}
+                >
+                  <Button
+                    icon={getActionIcon(action.key)}
+                    size="small"
+                    style={{ color: action.color }}
+                    type="link"
+                    onClick={() => handleStageAction(record, action.key)}
+                  />
+                </Tooltip>
+              );
+            })}
+            <Tooltip title="删除">
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                type="link"
+                onClick={() => handleDelete(record.id)}
+              />
+            </Tooltip>
+          </Space>
+        );
+      }
     }
   ];
 
@@ -411,7 +890,7 @@ const ItemList = () => {
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
         className="h-full"
-        title="事项列表"
+        title="项目事项列表"
         variant="borderless"
         extra={
           <Space>
@@ -420,7 +899,7 @@ const ItemList = () => {
               type="primary"
               onClick={() => openModal()}
             >
-              新建任务
+              新建项目事项
             </Button>
             {selectedRowKeys.length > 0 && (
               <Button
@@ -434,27 +913,28 @@ const ItemList = () => {
           </Space>
         }
       >
+        {/* 搜索筛选栏 */}
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Input
             allowClear
-            placeholder="请输入关键词搜索"
-            style={{ width: 200 }}
+            placeholder="请输入关键词搜索（项目名称、项目类型、负责人、备注）"
+            style={{ width: 280 }}
             value={searchParams.keyword}
             onChange={e => setSearchParams({ ...searchParams, keyword: e.target.value })}
           />
           <Select
             allowClear
-            placeholder="请选择状态"
-            style={{ width: 120 }}
-            value={searchParams.status}
-            onChange={value => setSearchParams({ ...searchParams, status: value || '' })}
+            placeholder="请选择所属阶段"
+            style={{ width: 150 }}
+            value={searchParams.currentStage}
+            onChange={value => setSearchParams({ ...searchParams, currentStage: value })}
           >
-            {Object.entries(taskStatusNames).map(([key, value]) => (
+            {PROJECT_STAGES.map(stage => (
               <Select.Option
-                key={key}
-                value={key}
+                key={stage.key}
+                value={stage.key}
               >
-                {value}
+                {stage.title}
               </Select.Option>
             ))}
           </Select>
@@ -463,18 +943,29 @@ const ItemList = () => {
             placeholder="请选择优先级"
             style={{ width: 120 }}
             value={searchParams.priority}
-            onChange={value => setSearchParams({ ...searchParams, priority: value || '' })}
+            onChange={value => setSearchParams({ ...searchParams, priority: value })}
           >
-            {Object.entries(priorityNames).map(([key, value]) => (
+            <Select.Option value={1}>高</Select.Option>
+            <Select.Option value={2}>中</Select.Option>
+            <Select.Option value={3}>低</Select.Option>
+          </Select>
+          <Select
+            allowClear
+            placeholder="请选择负责人"
+            style={{ width: 150 }}
+            value={searchParams.responsiblePersonId}
+            onChange={value => setSearchParams({ ...searchParams, responsiblePersonId: value })}
+          >
+            {employees.map(emp => (
               <Select.Option
-                key={key}
-                value={key}
+                key={emp.id}
+                value={emp.id}
               >
-                {value}
+                {emp.nickName || emp.userName}
               </Select.Option>
             ))}
           </Select>
-          <DatePicker.RangePicker
+          <RangePicker
             placeholder={['开始时间', '结束时间']}
             style={{ width: 280 }}
             value={searchParams.timeRange}
@@ -490,59 +981,56 @@ const ItemList = () => {
           <Button onClick={resetSearch}>重置</Button>
         </div>
 
+        {/* 数据表格 */}
         <Table
           columns={columns}
           dataSource={filteredTasks}
           loading={loading}
           rowKey="id"
           rowSelection={rowSelection}
-          {...getFullTableConfig(10)}
+          scroll={{ x: 1200, y: 600 }}
+          pagination={{
+            current: pagination.current,
+            onChange: handleTableChange,
+            onShowSizeChange: handleTableChange,
+            pageSize: pagination.pageSize,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 项，共 ${total} 项`,
+            total: pagination.total
+          }}
         />
 
+        {/* 新建/编辑项目事项弹窗 */}
         <Modal
-          open={isModalVisible}
-          title={editingTask ? '编辑任务' : '新建任务'}
-          width={700}
+          open={isCreateModalVisible}
+          title={currentTask ? '编辑项目事项' : '新建项目事项'}
+          width={800}
           onCancel={handleCancel}
           onOk={handleSubmit}
         >
           <Form
-            form={form}
+            form={createForm}
             labelCol={{ span: 6 }}
             wrapperCol={{ span: 16 }}
           >
             <Form.Item
-              label="任务名称"
-              name="taskName"
-              rules={[{ message: '请输入任务名称', required: true }]}
+              label="项目类型"
+              name="projectType"
+              rules={[{ message: '请输入项目类型', required: true }]}
             >
-              <Input placeholder="请输入任务名称" />
+              <Input placeholder="请输入项目类型" />
             </Form.Item>
             <Form.Item
               label="项目名称"
               name="projectName"
+              rules={[{ message: '请输入项目名称', required: true }]}
             >
               <Input placeholder="请输入项目名称" />
             </Form.Item>
             <Form.Item
-              label="任务类型"
-              name="taskType"
-              rules={[{ message: '请输入任务类型', required: true }]}
-            >
-              <Input placeholder="请输入任务类型" />
-            </Form.Item>
-            <Form.Item
-              label="任务描述"
-              name="taskDesc"
-            >
-              <Input.TextArea
-                placeholder="请输入任务描述"
-                rows={3}
-              />
-            </Form.Item>
-            <Form.Item
               label="负责人"
-              name="assigneeId"
+              name="responsiblePersonId"
               rules={[{ message: '请选择负责人', required: true }]}
             >
               <Select
@@ -556,40 +1044,76 @@ const ItemList = () => {
               />
             </Form.Item>
             <Form.Item
-              initialValue={Priority.MEDIUM}
+              label="咨询部人员"
+              name="consultantId"
+              rules={[{ message: '请选择咨询部人员', required: true }]}
+            >
+              <Select
+                showSearch
+                filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                placeholder="请选择咨询部人员"
+                options={employees.map(emp => ({
+                  label: `${emp.nickName || emp.userName} (${emp.userName})`,
+                  value: emp.id
+                }))}
+              />
+            </Form.Item>
+            <Form.Item
+              label="市场部经理"
+              name="marketManagerId"
+              rules={[{ message: '请选择市场部经理', required: true }]}
+            >
+              <Select
+                showSearch
+                filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                placeholder="请选择市场部经理"
+                options={employees.map(emp => ({
+                  label: `${emp.nickName || emp.userName} (${emp.userName})`,
+                  value: emp.id
+                }))}
+              />
+            </Form.Item>
+            <Form.Item
+              initialValue={2}
               label="优先级"
               name="priority"
               rules={[{ message: '请选择优先级', required: true }]}
             >
               <Select placeholder="请选择优先级">
-                {Object.entries(priorityNames).map(([key, value]) => (
-                  <Select.Option
-                    key={key}
-                    value={Number(key)}
-                  >
-                    {value}
-                  </Select.Option>
-                ))}
+                <Select.Option value={1}>高</Select.Option>
+                <Select.Option value={2}>中</Select.Option>
+                <Select.Option value={3}>低</Select.Option>
               </Select>
             </Form.Item>
             <Form.Item
-              label="目标数量"
-              name="targetCount"
-            >
-              <Input
-                min={0}
-                placeholder="请输入目标数量"
-                type="number"
-              />
-            </Form.Item>
-            <Form.Item
-              label="截止时间"
-              name="dueDate"
+              label="开始时间"
+              name="startTime"
+              rules={[{ message: '请选择开始时间', required: true }]}
             >
               <DatePicker
                 showTime
-                placeholder="请选择截止时间"
+                placeholder="请选择开始时间"
                 style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="结束时间"
+              name="endTime"
+              rules={[{ message: '请选择结束时间', required: true }]}
+            >
+              <DatePicker
+                showTime
+                placeholder="请选择结束时间"
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="备注"
+              name="remark"
+            >
+              <TextArea
+                placeholder="请输入备注"
+                rows={3}
               />
             </Form.Item>
           </Form>
@@ -598,12 +1122,492 @@ const ItemList = () => {
         {/* 查看详情弹窗 */}
         <Modal
           footer={null}
-          open={isContentModalVisible}
-          title="任务详情"
-          width={600}
-          onCancel={() => setIsContentModalVisible(false)}
+          open={isDetailModalVisible}
+          title="项目事项详情"
+          width={800}
+          onCancel={() => setIsDetailModalVisible(false)}
         >
-          <div className="whitespace-pre-wrap break-all">{currentContent}</div>
+          {currentTask && (
+            <>
+              <Descriptions
+                bordered
+                column={2}
+              >
+                <Descriptions.Item label="项目类型">{currentTask.projectType}</Descriptions.Item>
+                <Descriptions.Item label="项目名称">{currentTask.projectName}</Descriptions.Item>
+                <Descriptions.Item label="当前阶段">
+                  <Tag color={getStageTagColor(currentTask.currentStage)}>
+                    {PROJECT_STAGES.find(s => s.key === currentTask.currentStage)?.title}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="优先级">
+                  <Tag color={getPriorityTagColor(currentTask.priority)}>{PRIORITY_NAMES[currentTask.priority]}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="负责人">
+                  {currentTask.responsiblePerson?.nickName || currentTask.responsiblePerson?.userName}
+                </Descriptions.Item>
+                <Descriptions.Item label="办理人">
+                  {(() => {
+                    const currentExecutor = getCurrentExecutor(currentTask.currentStage, currentTask);
+                    return currentExecutor?.nickName || currentExecutor?.userName || '未分配';
+                  })()}
+                </Descriptions.Item>
+                <Descriptions.Item label="咨询部人员">
+                  {currentTask.consultant?.nickName || currentTask.consultant?.userName || '未分配'}
+                </Descriptions.Item>
+                <Descriptions.Item label="市场部经理">
+                  {currentTask.marketManager?.nickName || currentTask.marketManager?.userName || '未分配'}
+                </Descriptions.Item>
+                <Descriptions.Item label="开始时间">
+                  {dayjs(currentTask.startTime).format('YYYY-MM-DD HH:mm:ss')}
+                </Descriptions.Item>
+                <Descriptions.Item label="结束时间">
+                  {dayjs(currentTask.endTime).format('YYYY-MM-DD HH:mm:ss')}
+                </Descriptions.Item>
+                <Descriptions.Item label="创建时间">
+                  {dayjs(currentTask.createTime).format('YYYY-MM-DD HH:mm:ss')}
+                </Descriptions.Item>
+                <Descriptions.Item label="更新时间">
+                  {dayjs(currentTask.updateTime).format('YYYY-MM-DD HH:mm:ss')}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label="备注"
+                  span={2}
+                >
+                  {currentTask.remark || '无'}
+                </Descriptions.Item>
+              </Descriptions>
+
+              {/* 操作历史 */}
+              {currentTask.stageHistory && currentTask.stageHistory.length > 0 && (
+                <div style={{ marginTop: '24px' }}>
+                  <h4 style={{ marginBottom: '16px' }}>操作历史</h4>
+                  <Steps
+                    direction="vertical"
+                    size="small"
+                    items={(() => {
+                      try {
+                        const history =
+                          typeof currentTask.stageHistory === 'string'
+                            ? JSON.parse(currentTask.stageHistory)
+                            : currentTask.stageHistory;
+
+                        return history.map((item: any, index: number) => {
+                          const stageInfo = PROJECT_STAGES.find(s => s.key === item.stage);
+
+                          // 获取操作人姓名
+                          let operatorName = item.operatorName;
+                          if (!operatorName && item.operator) {
+                            // 尝试从员工列表中查找（支持多种匹配方式）
+                            const operatorId = Number(item.operator);
+                            let operator = employees.find(emp => emp.id === operatorId);
+
+                            // 如果通过ID找不到，尝试通过用户名查找
+                            if (!operator && typeof item.operator === 'string') {
+                              operator = employees.find(
+                                emp => emp.userName === item.operator || emp.nickName === item.operator
+                              );
+                            }
+
+                            // 如果还是找不到，检查是否是当前任务相关的人员
+                            if (!operator && currentTask) {
+                              // 检查是否是负责人
+                              if (
+                                currentTask.responsiblePerson &&
+                                (currentTask.responsiblePerson.id === operatorId ||
+                                  currentTask.responsiblePerson.userName === item.operator)
+                              ) {
+                                operatorName =
+                                  currentTask.responsiblePerson.nickName || currentTask.responsiblePerson.userName;
+                              }
+                              // 检查是否是咨询部人员
+                              else if (
+                                currentTask.consultant &&
+                                (currentTask.consultant.id === operatorId ||
+                                  currentTask.consultant.userName === item.operator)
+                              ) {
+                                operatorName = currentTask.consultant.nickName || currentTask.consultant.userName;
+                              }
+                              // 检查是否是市场部经理
+                              else if (
+                                currentTask.marketManager &&
+                                (currentTask.marketManager.id === operatorId ||
+                                  currentTask.marketManager.userName === item.operator)
+                              ) {
+                                operatorName = currentTask.marketManager.nickName || currentTask.marketManager.userName;
+                              }
+                            }
+
+                            // 最终设置操作人姓名
+                            if (operator) {
+                              operatorName = operator.nickName || operator.userName;
+                            } else if (!operatorName) {
+                              operatorName = `用户${item.operator}`;
+                            }
+                          }
+
+                          // 获取中文操作名称
+                          const actionName = ACTION_NAMES[item.action] || item.action || '阶段推进';
+
+                          return {
+                            description: (
+                              <div>
+                                <div>操作：{actionName}</div>
+                                <div>操作人：{operatorName || '未知用户'}</div>
+                                <div>时间：{dayjs(item.timestamp).format('YYYY-MM-DD HH:mm:ss')}</div>
+                                {item.comment && <div>备注：{item.comment}</div>}
+                              </div>
+                            ),
+                            status: index === history.length - 1 ? 'process' : 'finish',
+                            title: stageInfo?.title || item.stage
+                          };
+                        });
+                      } catch (error) {
+                        console.error('解析操作历史失败:', error);
+                        return [];
+                      }
+                    })()}
+                  />
+                </div>
+              )}
+
+              {/* 项目附件 */}
+              <div style={{ marginTop: '24px' }}>
+                <div
+                  style={{
+                    alignItems: 'center',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '16px'
+                  }}
+                >
+                  <h4 style={{ margin: 0 }}>项目附件</h4>
+                  {(() => {
+                    // 检查当前用户是否可以上传附件
+                    if (!currentUser) return null;
+
+                    // 检查权限
+                    const permissions = checkUserPermissions(currentUser, currentTask);
+                    const canUpload = permissions.canPerformAction;
+
+                    if (canUpload) {
+                      return (
+                        <Upload
+                          accept="*"
+                          showUploadList={false}
+                          beforeUpload={file => {
+                            handleFileUpload(file, currentTask.id);
+                            return false; // 阻止自动上传
+                          }}
+                        >
+                          <Button
+                            icon={<UploadOutlined />}
+                            size="small"
+                            type="primary"
+                          >
+                            上传附件
+                          </Button>
+                        </Upload>
+                      );
+                    }
+
+                    return null;
+                  })()}
+                </div>
+
+                {attachments && attachments.length > 0 ? (
+                  <div style={{ border: '1px solid #f0f0f0', borderRadius: '6px', padding: '16px' }}>
+                    {attachments.map(attachment => (
+                      <div
+                        key={attachment.id}
+                        style={{
+                          alignItems: 'center',
+                          borderBottom: '1px solid #f5f5f5',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          padding: '8px 0'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 'bold' }}>{attachment.originalName || attachment.fileName}</div>
+                          <div style={{ color: '#666', fontSize: '12px' }}>
+                            大小: {attachment.fileSize ? (attachment.fileSize / 1024).toFixed(1) : 0}KB | 上传者:{' '}
+                            {(() => {
+                              // 尝试获取上传者姓名
+                              let uploaderName =
+                                (attachment.uploader as any)?.name ||
+                                (attachment.uploader as any)?.nickName ||
+                                (attachment.uploader as any)?.userName;
+
+                              // 如果还是没有，从员工列表中查找
+                              if (!uploaderName && attachment.uploader?.id) {
+                                const uploader = employees.find(emp => emp.id === attachment.uploader?.id);
+                                if (uploader) {
+                                  uploaderName = uploader.nickName || uploader.userName;
+                                }
+                              }
+
+                              return uploaderName || '未知';
+                            })()}{' '}
+                            | 时间:{' '}
+                            {attachment.uploadTime
+                              ? dayjs(attachment.uploadTime).format('YYYY-MM-DD HH:mm')
+                              : '未知时间'}
+                            {attachment.description && ` | 描述: ${attachment.description}`}
+                          </div>
+                        </div>
+                        <Space>
+                          <Button
+                            size="small"
+                            type="link"
+                            onClick={() =>
+                              handleDownloadAttachment(attachment.id, attachment.originalName || attachment.fileName)
+                            }
+                          >
+                            下载
+                          </Button>
+                          {canEditAttachment(attachment) && (
+                            <Button
+                              danger
+                              size="small"
+                              type="link"
+                              onClick={() => handleDeleteAttachment(attachment.id, currentTask.id)}
+                            >
+                              删除
+                            </Button>
+                          )}
+                        </Space>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      border: '1px dashed #d9d9d9',
+                      borderRadius: '6px',
+                      color: '#999',
+                      padding: '20px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    暂无附件
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </Modal>
+
+        {/* 阶段操作弹窗 */}
+        <Modal
+          open={isStageActionModalVisible}
+          title="阶段操作"
+          width={600}
+          onCancel={() => {
+            setIsStageActionModalVisible(false);
+            setUploadFileList([]); // 清空文件列表
+            stageActionForm.resetFields();
+          }}
+          onOk={async () => {
+            try {
+              const values = await stageActionForm.validateFields();
+              if (!currentTask) return;
+
+              // 根据不同的操作调用不同的API
+              switch (values.actionKey) {
+                case 'advance_to_proposal':
+                  await projectService.advanceStage({
+                    action: 'advance_to_proposal',
+                    remark: values.comment,
+                    taskId: currentTask.id
+                  });
+                  break;
+                case 'upload_proposal':
+                  // 先上传附件（如果有）
+                  if (uploadFileList.length > 0) {
+                    try {
+                      const uploadPromises = uploadFileList.map(file =>
+                        handleFileUpload(file, currentTask.id, 'proposal_submission')
+                      );
+                      await Promise.all(uploadPromises);
+                    } catch (error) {
+                      console.error('上传附件失败:', error);
+                      message.error('部分附件上传失败');
+                    }
+                  }
+
+                  // 然后调用上传方案API
+                  await projectService.uploadProposal({
+                    attachments: [],
+                    remark: values.comment,
+                    taskId: currentTask.id
+                  });
+
+                  message.success('方案上传成功！');
+                  break;
+                case 'confirm_proposal':
+                  // 客户已同意方案，推进到师资确定阶段
+                  await projectService.confirmProposal({
+                    remark: values.comment,
+                    taskId: currentTask.id
+                  });
+                  message.success('方案确认成功，已进入师资确定阶段！');
+                  break;
+                case 'confirm_teacher':
+                  await projectService.confirmTeacher({
+                    remark: values.comment,
+                    taskId: currentTask.id,
+                    teacherInfo: {
+                      experience: '',
+                      name: values.teacherName || '',
+                      specialties: [],
+                      title: ''
+                    }
+                  });
+                  break;
+                case 'approve_project':
+                  await projectService.approveProject(currentTask.id, true, values.comment);
+                  break;
+                case 'confirm_contract':
+                  await projectService.confirmContract(currentTask.id, true, values.comment);
+                  break;
+                case 'confirm_completion':
+                  await projectService.confirmProjectCompletion(currentTask.id, true, values.comment);
+                  break;
+                case 'confirm_payment':
+                  const receivedPayment = values.paymentReceived !== false;
+                  const paymentAmount = values.paymentAmount ? Number(values.paymentAmount) : undefined;
+
+                  await projectService.confirmPayment(currentTask.id, receivedPayment, paymentAmount, values.comment);
+
+                  if (receivedPayment) {
+                    message.success('收款确认成功，项目已完成并归档！所有相关人员已收到通知。');
+                  } else {
+                    message.success('收款状态已更新');
+                  }
+                  break;
+                default:
+                  break;
+              }
+
+              setIsStageActionModalVisible(false);
+              message.success('操作成功');
+              await fetchTasks();
+            } catch (error: any) {
+              console.error('操作失败:', error);
+              message.error(error.message || '操作失败，请重试');
+            }
+          }}
+        >
+          <Form
+            form={stageActionForm}
+            labelCol={{ span: 6 }}
+            wrapperCol={{ span: 16 }}
+          >
+            <Form.Item
+              label="操作"
+              name="action"
+            >
+              <Input disabled />
+            </Form.Item>
+            <Form.Item
+              hidden
+              name="actionKey"
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label="备注"
+              name="comment"
+            >
+              <TextArea
+                placeholder="请输入操作备注"
+                rows={3}
+              />
+            </Form.Item>
+
+            {/* 根据操作类型显示不同的字段 */}
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) => prevValues.action !== currentValues.action}
+            >
+              {({ getFieldValue }) => {
+                const action = getFieldValue('action');
+                const actionKey = getFieldValue('actionKey');
+
+                // 上传方案操作显示文件上传
+                if (actionKey === 'upload_proposal') {
+                  return (
+                    <Form.Item label="方案附件">
+                      <Upload
+                        multiple
+                        beforeUpload={file => {
+                          setUploadFileList([...uploadFileList, file]);
+                          return false; // 阻止自动上传
+                        }}
+                        fileList={uploadFileList.map((file, index) => ({
+                          name: file.name,
+                          size: file.size,
+                          status: 'done' as const,
+                          type: file.type,
+                          uid: `${index}`
+                        }))}
+                        onRemove={file => {
+                          const index = Number.parseInt(file.uid || '0', 10);
+                          const newFileList = [...uploadFileList];
+                          newFileList.splice(index, 1);
+                          setUploadFileList(newFileList);
+                        }}
+                      >
+                        <Button icon={<UploadOutlined />}>选择文件</Button>
+                      </Upload>
+                      <div style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
+                        支持上传方案文档、设计图等相关文件
+                      </div>
+                    </Form.Item>
+                  );
+                }
+
+                if (action === 'confirm_teacher') {
+                  return (
+                    <>
+                      <Form.Item
+                        label="授课老师"
+                        name="teacherName"
+                        rules={[{ message: '请输入授课老师姓名', required: true }]}
+                      >
+                        <Input placeholder="请输入授课老师姓名" />
+                      </Form.Item>
+                      <Form.Item
+                        label="联系方式"
+                        name="teacherContact"
+                      >
+                        <Input placeholder="请输入老师联系方式" />
+                      </Form.Item>
+                    </>
+                  );
+                }
+
+                if (action === 'confirm_payment') {
+                  return (
+                    <Form.Item
+                      label="收款金额"
+                      name="amount"
+                      rules={[{ message: '请输入收款金额', required: true }]}
+                    >
+                      <Input
+                        placeholder="请输入收款金额"
+                        prefix="¥"
+                        type="number"
+                      />
+                    </Form.Item>
+                  );
+                }
+
+                return null;
+              }}
+            </Form.Item>
+          </Form>
         </Modal>
       </Card>
     </div>
