@@ -1,22 +1,11 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import {
-  Button,
-  Card,
-  Descriptions,
-  Empty,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-  message,
-  theme
-} from 'antd';
+import { Button, Card, Descriptions, Empty, Space, Spin, Tag, Typography, message, theme } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { attachmentService, courseService } from '@/service/api';
-import type { AttachmentApi, CourseApi } from '@/service/api/types';
+import type { CourseApi } from '@/service/api/types';
 
 const CourseDetail = () => {
   const navigate = useNavigate();
@@ -26,14 +15,7 @@ const CourseDetail = () => {
   const [attachmentCount, setAttachmentCount] = useState(0);
   const { token } = theme.useToken();
 
-  useEffect(() => {
-    fetchCourseDetail();
-    if (courseId) {
-      fetchAttachmentCount();
-    }
-  }, [courseId]);
-
-  const fetchCourseDetail = async () => {
+  const fetchCourseDetail = useCallback(async () => {
     if (!courseId) {
       message.error('课程ID无效');
       return;
@@ -49,20 +31,30 @@ const CourseDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId]);
 
-  const fetchAttachmentCount = async () => {
+  const fetchAttachmentCount = useCallback(async () => {
+    if (!courseId) {
+      return;
+    }
     try {
-      const response = await attachmentService.getAttachmentStats(Number.parseInt(courseId, 10));
-      setAttachmentCount(response.totalCount || 0);
+      const response = await attachmentService.getCourseAttachmentStats(Number.parseInt(courseId, 10));
+      setAttachmentCount(response?.totalCount || 0);
     } catch (error) {
       console.error('获取附件数量失败:', error);
     }
-  };
+  }, [courseId]);
+
+  useEffect(() => {
+    fetchCourseDetail();
+    if (courseId) {
+      fetchAttachmentCount();
+    }
+  }, [fetchCourseDetail, fetchAttachmentCount, courseId]);
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <Spin size="large" />
       </div>
     );
@@ -70,7 +62,7 @@ const CourseDetail = () => {
 
   if (!course) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <Empty description="未找到课程信息" />
       </div>
     );
@@ -110,13 +102,9 @@ const CourseDetail = () => {
               ¥{course.price}
             </Typography.Text>
           </Descriptions.Item>
-          <Descriptions.Item label="开课日期">
-            {dayjs(course.startDate).format('YYYY-MM-DD')}
-          </Descriptions.Item>
+          <Descriptions.Item label="开课日期">{dayjs(course.startDate).format('YYYY-MM-DD')}</Descriptions.Item>
           <Descriptions.Item label="状态">
-            <Tag color={course.status === 1 ? 'success' : 'default'}>
-              {course.status === 1 ? '已上线' : '未上线'}
-            </Tag>
+            <Tag color={course.status === 1 ? 'success' : 'default'}>{course.status === 1 ? '已上线' : '未上线'}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="附件数量">
             <Tag color="purple">{attachmentCount} 个文件</Tag>
@@ -128,7 +116,7 @@ const CourseDetail = () => {
       </Card>
 
       {course.description && (
-        <Card 
+        <Card
           className="mt-4"
           title="课程描述"
         >

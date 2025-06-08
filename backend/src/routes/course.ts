@@ -673,11 +673,13 @@ router.get('/categories/list', async (req, res) => {
       data: categories.map((cat: any) => ({
         code: cat.code,
         courseCount: cat._count.courses,
+        createdAt: cat.createdAt,
         description: cat.description,
         id: cat.id,
         name: cat.name,
         sort: cat.sort,
-        status: cat.status
+        status: cat.status,
+        updatedAt: cat.updatedAt
       })),
       message: '获取课程分类成功',
       path: req.path,

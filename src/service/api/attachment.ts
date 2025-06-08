@@ -83,7 +83,11 @@ class AttachmentService {
   }
 
   /** 获取课程的附件统计 */
-  async getCourseAttachmentStats(courseId: number) {
+  async getCourseAttachmentStats(courseId: number): Promise<{
+    fileTypes: { count: number; type: string }[];
+    totalCount: number;
+    totalSize: number;
+  }> {
     const response = await apiClient.get<
       ApiResponse<{
         fileTypes: { count: number; type: string }[];
