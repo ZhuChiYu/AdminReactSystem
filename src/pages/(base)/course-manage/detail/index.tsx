@@ -1,16 +1,37 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Button, Card, Descriptions, Empty, Space, Spin, Typography, message } from 'antd';
+import {
+  Button,
+  Card,
+  Descriptions,
+  Empty,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+  message,
+  theme
+} from 'antd';
+import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { courseService } from '@/service/api';
-import type { CourseApi } from '@/service/api/types';
+import { attachmentService, courseService } from '@/service/api';
+import type { AttachmentApi, CourseApi } from '@/service/api/types';
 
 const CourseDetail = () => {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId: string }>();
   const [course, setCourse] = useState<CourseApi.CourseListItem | null>(null);
   const [loading, setLoading] = useState(false);
+  const [attachmentCount, setAttachmentCount] = useState(0);
+  const { token } = theme.useToken();
+
+  useEffect(() => {
+    fetchCourseDetail();
+    if (courseId) {
+      fetchAttachmentCount();
+    }
+  }, [courseId]);
 
   const fetchCourseDetail = async () => {
     if (!courseId) {
@@ -30,13 +51,18 @@ const CourseDetail = () => {
     }
   };
 
-  useEffect(() => {
-    fetchCourseDetail();
-  }, [courseId]);
+  const fetchAttachmentCount = async () => {
+    try {
+      const response = await attachmentService.getAttachmentStats(Number.parseInt(courseId, 10));
+      setAttachmentCount(response.totalCount || 0);
+    } catch (error) {
+      console.error('获取附件数量失败:', error);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="flex h-full items-center justify-center">
         <Spin size="large" />
       </div>
     );
@@ -44,7 +70,7 @@ const CourseDetail = () => {
 
   if (!course) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="flex h-full items-center justify-center">
         <Empty description="未找到课程信息" />
       </div>
     );
@@ -76,14 +102,33 @@ const CourseDetail = () => {
           title="基本信息"
         >
           <Descriptions.Item label="课程名称">{course.courseName}</Descriptions.Item>
-          <Descriptions.Item label="课程分类">{course.category?.name}</Descriptions.Item>
-          <Descriptions.Item label="课程价格">¥{course.price}</Descriptions.Item>
-          <Descriptions.Item label="开课日期">{course.startDate}</Descriptions.Item>
+          <Descriptions.Item label="课程分类">
+            <Tag color="blue">{course.category?.name}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="课程价格">
+            <Typography.Text style={{ color: token.colorPrimary, fontSize: '16px', fontWeight: 'bold' }}>
+              ¥{course.price}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item label="开课日期">
+            {dayjs(course.startDate).format('YYYY-MM-DD')}
+          </Descriptions.Item>
+          <Descriptions.Item label="状态">
+            <Tag color={course.status === 1 ? 'success' : 'default'}>
+              {course.status === 1 ? '已上线' : '未上线'}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="附件数量">
+            <Tag color="purple">{attachmentCount} 个文件</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="创建时间">
+            {dayjs(course.createdAt || course.createTime).format('YYYY-MM-DD HH:mm')}
+          </Descriptions.Item>
         </Descriptions>
       </Card>
 
       {course.description && (
-        <Card
+        <Card 
           className="mt-4"
           title="课程描述"
         >

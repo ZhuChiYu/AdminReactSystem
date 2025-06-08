@@ -96,13 +96,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 matchedFiles: [null, '/src/pages/(base)/course-manage/category/index.tsx', null, null],
                 name: '(base)_course-manage_category',
                 path: '/course-manage/category',
-                handle: {
-                  i18nKey: 'route.(base)_course-manage_category',
-                  title: '(base)_course-manage_category',
-                  icon: 'mdi:folder-multiple-outline',
-                  order: 2,
-                  hideInMenu: true
-                }
+                handle: { i18nKey: 'route.(base)_course-manage_category', title: '(base)_course-manage_category' }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/course-manage/class/layout.tsx', null, null],

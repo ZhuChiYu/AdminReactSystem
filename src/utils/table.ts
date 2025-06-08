@@ -1,33 +1,82 @@
-import type { TableProps } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import dayjs from 'dayjs';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-/** 表格通用配置 */
-export const getTableConfig = (): Pick<TableProps<any>, 'bordered' | 'scroll' | 'size'> => ({
-  bordered: false,
-  scroll: { x: 'max-content' },
-  size: 'middle'
-});
+import { courseService } from '@/service/api';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
-/** 为操作列添加固定配置 */
-export const getActionColumnConfig = (width: number = 120) => ({
-  align: 'center' as const,
-  fixed: 'right' as const,
-  width
-});
+// ... existing code ...
 
-/** 为普通列添加居中配置 */
-export const getCenterColumnConfig = () => ({
-  align: 'center' as const
-});
-
-/** 获取完整的表格配置，包含分页，排除可能冲突的属性 */
-export const getFullTableConfig = (
-  pageSize: number = 10
-): Omit<TableProps<any>, 'columns' | 'dataSource' | 'rowKey'> => ({
-  ...getTableConfig(),
-  pagination: {
-    pageSize,
-    showQuickJumper: true,
-    showSizeChanger: true,
-    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`
-  }
-});
+  const columns = [
+    {
+      dataIndex: 'id',
+      key: 'id',
+      ...getCenterColumnConfig(),
+      title: '序号',
+      width: 80
+    },
+    {
+      dataIndex: 'name',
+      key: 'name',
+      ...getCenterColumnConfig(),
+      title: '分类名称'
+    },
+    {
+      dataIndex: 'description',
+      key: 'description',
+      ...getCenterColumnConfig(),
+      render: (text: string) => text || '-',
+      title: '描述'
+    },
+    {
+      dataIndex: 'status',
+      key: 'status',
+      ...getCenterColumnConfig(),
+      render: (status: string) => <Tag color={status === '启用' ? 'green' : 'red'}>{status}</Tag>,
+      title: '状态'
+    },
+    {
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      ...getCenterColumnConfig(),
+      render: (date: string) => dayjs(date).format('YYYY-MM-DD'),
+      title: '创建时间'
+    },
+    {
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      ...getCenterColumnConfig(),
+      render: (date: string) => dayjs(date).format('YYYY-MM-DD'),
+      title: '更新时间'
+    },
+    {
+      key: 'action',
+      ...getActionColumnConfig(120),
+      render: (_: any, record: CategoryItem) => (
+        <Space>
+          <Button
+            type="link"
+            onClick={() => showEditModal(record)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            cancelText="取消"
+            okText="确定"
+            title="确定要删除这个分类吗？"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button
+              danger
+              type="link"
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+      title: '操作'
+    }
+  ];
