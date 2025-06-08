@@ -644,15 +644,16 @@ export const generatedRoutes: ElegantConstRoute[] = [
             },
             children: [
               {
+                matchedFiles: [null, '/src/pages/(base)/project-manage/archived/index.tsx', null, null],
+                name: '(base)_project-manage_archived',
+                path: '/project-manage/archived',
+                handle: { i18nKey: 'route.(base)_project-manage_archived', title: '(base)_project-manage_archived' }
+              },
+              {
                 matchedFiles: [null, '/src/pages/(base)/project-manage/list/index.tsx', null, null],
                 name: '(base)_project-manage_list',
                 path: '/project-manage/list',
-                handle: {
-                  i18nKey: 'route.(base)_project-manage_list',
-                  title: '(base)_project-manage_list',
-                  icon: 'mdi:format-list-bulleted',
-                  order: 1
-                }
+                handle: { i18nKey: 'route.(base)_project-manage_list', title: '(base)_project-manage_list' }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/project-manage/task/index.tsx', null, null],

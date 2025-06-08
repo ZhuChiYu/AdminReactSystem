@@ -75,6 +75,7 @@ export const pages: Record<string, () => Promise<any>> = {
 "(base)_multi-menu_second_child_home-page": () => import("@/pages/(base)/multi-menu/second/child/home-page/index.tsx"),
 "(base)_multi-menu_second_child": () => import("@/pages/(base)/multi-menu/second/child/index.tsx"),
 "(base)_multi-menu_second": () => import("@/pages/(base)/multi-menu/second/index.tsx"),
+"(base)_project-manage_archived": () => import("@/pages/(base)/project-manage/archived/index.tsx"),
 "(base)_project-manage_list": () => import("@/pages/(base)/project-manage/list/index.tsx"),
 "(base)_project-manage_task": () => import("@/pages/(base)/project-manage/task/index.tsx"),
 "(base)_projects_[pid]_edit_[id]": () => import("@/pages/(base)/projects/[pid]/edit/[id].tsx"),

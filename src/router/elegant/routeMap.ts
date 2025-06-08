@@ -87,6 +87,7 @@ export const routeMap: RouteMap = {
  "(base)_multi-menu_second_child": "/multi-menu/second/child",
  "(base)_multi-menu_second_child_home-page": "/multi-menu/second/child/home-page",
  "(base)_project-manage": "/project-manage",
+ "(base)_project-manage_archived": "/project-manage/archived",
  "(base)_project-manage_list": "/project-manage/list",
  "(base)_project-manage_task": "/project-manage/task",
  "(base)_projects": "/projects",

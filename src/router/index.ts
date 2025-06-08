@@ -30,6 +30,8 @@ function initRoutes() {
       'customer-import', // 避免客户导入重复
       'customer-info', // 避免客户资料重复
       'meeting-manage', // 避免会议管理重复
+      'project-manage', // 避免事项管理重复 - 使用手动配置的路由
+      'project-manage_list', // 避免任务管理重复
       'employee-manage', // 过滤掉自动生成的员工管理路由，使用手动配置的
       'about', // 删除关于
       'finance-dashboard', // 删除财务看板

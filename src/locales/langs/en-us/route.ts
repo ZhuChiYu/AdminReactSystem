@@ -110,7 +110,6 @@ const route: App.I18n.Schema['translation']['route'] = {
   'route.(base)_meeting-manage_record': 'Meeting Records',
   'route.(base)_meeting-manage_summary': 'Meeting Summary',
   'route.(base)_project-manage': 'Task Management',
-  'route.(base)_project-manage_list': 'Task Management',
   'route.(base)_project-manage_task': 'Task Items',
   'route.about': 'About',
   'route.class_category': 'Class Category',

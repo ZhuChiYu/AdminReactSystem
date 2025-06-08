@@ -301,5 +301,50 @@ export const BaseChildrenRoutes = [
     },
     id: 'meeting_manage',
     path: '/meeting-manage'
+  },
+  {
+    children: [
+      {
+        handle: {
+          i18nKey: 'route.(base)_project-manage_list',
+          icon: 'mdi:clipboard-text-outline',
+          order: 1,
+          title: '任务管理'
+        },
+        id: 'project_task_management',
+        lazy: () => import('@/pages/(base)/project-manage/list').then(convert),
+        path: '/project-manage/list'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_project-manage_task',
+          icon: 'mdi:format-list-bulleted',
+          order: 2,
+          title: '事项列表'
+        },
+        id: 'project_task_list',
+        lazy: () => import('@/pages/(base)/project-manage/task').then(convert),
+        path: '/project-manage/task'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_project-manage_archived',
+          icon: 'mdi:archive-outline',
+          order: 3,
+          title: '事项历史'
+        },
+        id: 'project_archived',
+        lazy: () => import('@/pages/(base)/project-manage/archived').then(convert),
+        path: '/project-manage/archived'
+      }
+    ],
+    handle: {
+      i18nKey: 'route.(base)_project-manage',
+      icon: 'mdi:clipboard-list-outline',
+      order: 6,
+      title: '事项管理'
+    },
+    id: 'project_manage',
+    path: '/project-manage'
   }
 ] satisfies RouteObject[];
