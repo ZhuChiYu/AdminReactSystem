@@ -17,7 +17,12 @@ const permissionTypeNames = {
   [PermissionType.VIEW_CUSTOMER]: '查看客户信息',
   [PermissionType.EDIT_CUSTOMER]: '编辑客户信息',
   [PermissionType.EDIT_CLASS]: '编辑班级信息',
-  [PermissionType.ASSIGN_CUSTOMER]: '分配客户'
+  [PermissionType.ASSIGN_CUSTOMER]: '分配客户',
+  [PermissionType.VIEW_CLASS_STUDENT_NAME]: '查看班级学员姓名',
+  [PermissionType.VIEW_CLASS_STUDENT_PHONE]: '查看班级学员电话',
+  [PermissionType.VIEW_CLASS_STUDENT_MOBILE]: '查看班级学员手机',
+  [PermissionType.VIEW_CLASS_STUDENT]: '查看班级学员信息',
+  [PermissionType.EDIT_CLASS_STUDENT]: '编辑班级学员信息'
 };
 
 // 角色中文名称映射
@@ -59,6 +64,17 @@ const PermissionManagement = () => {
   const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // 班级列表数据 - 新增状态
+  const [classes, setClasses] = useState<any[]>([]);
+  const [classLoading, setClassLoading] = useState(false);
+
+  // 员工列表分页状态
+  const [employeePagination, setEmployeePagination] = useState({
+    current: 1,
+    size: 10,
+    total: 0
+  });
+
   // 检查是否为超级管理员
   useEffect(() => {
     if (!isSuperAdmin()) {
@@ -73,8 +89,15 @@ const PermissionManagement = () => {
     const fetchEmployees = async () => {
       try {
         setLoading(true);
-        const response = await employeeService.getEmployeeList({ current: 1, size: 1000 });
+        const response = await employeeService.getEmployeeList({
+          current: employeePagination.current,
+          size: employeePagination.size
+        });
         setEmployees(response.records);
+        setEmployeePagination(prev => ({
+          ...prev,
+          total: response.total
+        }));
       } catch (error) {
         console.error('获取员工列表失败:', error);
         message.error('获取员工列表失败');
@@ -84,6 +107,26 @@ const PermissionManagement = () => {
     };
 
     fetchEmployees();
+  }, [employeePagination.current, employeePagination.size]);
+
+  // 加载班级数据 - 新增
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setClassLoading(true);
+        // 使用classService获取班级列表
+        const { classService } = await import('@/service/api/class');
+        const response = await classService.getClassList({ current: 1, size: 1000 });
+        setClasses(response.records || []);
+      } catch (error) {
+        console.error('获取班级列表失败:', error);
+        message.error('获取班级列表失败');
+      } finally {
+        setClassLoading(false);
+      }
+    };
+
+    fetchClasses();
   }, []);
 
   // 当前选择的员工
@@ -128,6 +171,16 @@ const PermissionManagement = () => {
     setFilteredUsers(filtered);
   }, [userSearchKey, employees]);
 
+  // 当搜索关键词变化时，重置分页到第一页
+  useEffect(() => {
+    if (userSearchKey) {
+      setEmployeePagination(prev => ({
+        ...prev,
+        current: 1
+      }));
+    }
+  }, [userSearchKey]);
+
   // 当选中员工变化时，获取该员工的权限
   useEffect(() => {
     if (!selectedUser) {
@@ -145,8 +198,8 @@ const PermissionManagement = () => {
         const customer = customers.find(c => c.id === permission.customerId);
         scope = `客户: ${customer?.name || 'Unknown'}`;
       } else if (permission.classId) {
-        const employee = employees.find(e => e.id === permission.classId);
-        scope = `班级: ${employee?.nickName || 'Unknown'}`;
+        const classItem = classes.find(c => c.id === permission.classId);
+        scope = `班级: ${classItem?.name || 'Unknown'}`;
       }
 
       return {
@@ -159,11 +212,20 @@ const PermissionManagement = () => {
     });
 
     setUserPermissions(formattedPermissions);
-  }, [selectedUser, getUserPermissions, customers, employees]);
+  }, [selectedUser, getUserPermissions, customers, classes]);
 
   // 处理选择员工
   const handleUserSelect = (user: { id: string; name: string; role: string }) => {
     setSelectedUser(user);
+  };
+
+  // 处理员工列表分页变化
+  const handleEmployeePaginationChange = (page: number, size?: number) => {
+    setEmployeePagination(prev => ({
+      ...prev,
+      current: page,
+      size: size || prev.size
+    }));
   };
 
   // 打开全局权限设置对话框
@@ -254,8 +316,8 @@ const PermissionManagement = () => {
           const customer = customers.find(c => c.id === permission.customerId);
           scope = `客户: ${customer?.name || 'Unknown'}`;
         } else if (permission.classId) {
-          const employee = employees.find(e => e.id === permission.classId);
-          scope = `班级: ${employee?.nickName || 'Unknown'}`;
+          const classItem = classes.find(c => c.id === permission.classId);
+          scope = `班级: ${classItem?.name || 'Unknown'}`;
         }
 
         return {
@@ -297,8 +359,8 @@ const PermissionManagement = () => {
           const customer = customers.find(c => c.id === permission.customerId);
           scope = `客户: ${customer?.name || 'Unknown'}`;
         } else if (permission.classId) {
-          const employee = employees.find(e => e.id === permission.classId);
-          scope = `班级: ${employee?.nickName || 'Unknown'}`;
+          const classItem = classes.find(c => c.id === permission.classId);
+          scope = `班级: ${classItem?.name || 'Unknown'}`;
         }
 
         return {
@@ -340,8 +402,8 @@ const PermissionManagement = () => {
           const customer = customers.find(c => c.id === permission.customerId);
           scope = `客户: ${customer?.name || 'Unknown'}`;
         } else if (permission.classId) {
-          const employee = employees.find(e => e.id === permission.classId);
-          scope = `班级: ${employee?.nickName || 'Unknown'}`;
+          const classItem = classes.find(c => c.id === permission.classId);
+          scope = `班级: ${classItem?.name || 'Unknown'}`;
         }
 
         return {
@@ -387,8 +449,8 @@ const PermissionManagement = () => {
         const customer = customers.find(c => c.id === permission.customerId);
         scope = `客户: ${customer?.name || 'Unknown'}`;
       } else if (permission.classId) {
-        const employee = employees.find(e => e.id === permission.classId);
-        scope = `班级: ${employee?.nickName || 'Unknown'}`;
+        const classItem = classes.find(c => c.id === permission.classId);
+        scope = `班级: ${classItem?.name || 'Unknown'}`;
       }
 
       return {
@@ -509,85 +571,95 @@ const PermissionManagement = () => {
         title="权限管理"
         variant="borderless"
       >
-        <Row gutter={24}>
-          <Col span={8}>
-            <Card
-              bordered
-              title={
-                <div className="flex items-center justify-between">
-                  <span>员工列表</span>
-                  <Input.Search
-                    placeholder="搜索员工"
-                    style={{ width: 200 }}
-                    onChange={e => setUserSearchKey(e.target.value)}
-                  />
-                </div>
-              }
-            >
-              <Table
-                columns={userColumns}
-                dataSource={filteredUsers}
-                rowClassName={record => (String(record.id) === selectedUser?.id ? 'ant-table-row-selected' : '')}
-                rowKey="id"
-                size="small"
-                {...getFullTableConfig(5)}
-              />
-            </Card>
-          </Col>
-          <Col span={16}>
-            <Card
-              bordered
-              title={
-                <div className="flex items-center justify-between">
-                  <span>
-                    {selectedUser
-                      ? `${selectedUser.name}（${roleNames[selectedUser.role as keyof typeof roleNames] || selectedUser.role || '未知角色'}）的权限`
-                      : '员工权限'}
-                  </span>
-                  <Space>
-                    <Button
-                      disabled={!selectedUser}
-                      icon={<UserOutlined />}
-                      type="primary"
-                      onClick={openGlobalPermissionModal}
-                    >
-                      设置全局权限
-                    </Button>
-                    <Button
-                      disabled={!selectedUser}
-                      icon={<FileDoneOutlined />}
-                      onClick={openCustomerPermissionModal}
-                    >
-                      设置客户权限
-                    </Button>
-                    <Button
-                      disabled={!selectedUser}
-                      onClick={openClassPermissionModal}
-                    >
-                      设置班级权限
-                    </Button>
-                  </Space>
-                </div>
-              }
-            >
-              {selectedUser ? (
-                <Table
-                  columns={permissionColumns}
-                  dataSource={userPermissions}
-                  rowKey="key"
-                  {...getFullTableConfig(8)}
+        <div className="space-y-6">
+          <Card
+            bordered
+            title={
+              <div className="flex items-center justify-between">
+                <span>员工列表</span>
+                <Input.Search
+                  placeholder="搜索员工"
+                  style={{ width: 200 }}
+                  onChange={e => setUserSearchKey(e.target.value)}
                 />
-              ) : (
-                <div className="h-64 flex items-center justify-center">
-                  <span className="text-gray-400">请先选择一个员工</span>
-                </div>
-              )}
-            </Card>
-          </Col>
-        </Row>
+              </div>
+            }
+          >
+            <Table
+              columns={userColumns}
+              dataSource={filteredUsers}
+              loading={loading}
+              rowClassName={record => (String(record.id) === selectedUser?.id ? 'ant-table-row-selected' : '')}
+              rowKey="id"
+              size="small"
+              pagination={
+                userSearchKey
+                  ? false
+                  : {
+                      current: employeePagination.current,
+                      onChange: handleEmployeePaginationChange,
+                      onShowSizeChange: handleEmployeePaginationChange,
+                      pageSize: employeePagination.size,
+                      showQuickJumper: true,
+                      showSizeChanger: true,
+                      showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+                      total: employeePagination.total
+                    }
+              }
+            />
+          </Card>
+
+          <Card
+            bordered
+            title={
+              <div className="flex items-center justify-between">
+                <span>
+                  {selectedUser
+                    ? `${selectedUser.name}（${roleNames[selectedUser.role as keyof typeof roleNames] || selectedUser.role || '未知角色'}）的权限`
+                    : '员工权限'}
+                </span>
+                <Space>
+                  <Button
+                    disabled={!selectedUser}
+                    icon={<UserOutlined />}
+                    type="primary"
+                    onClick={openGlobalPermissionModal}
+                  >
+                    设置全局权限
+                  </Button>
+                  <Button
+                    disabled={!selectedUser}
+                    icon={<FileDoneOutlined />}
+                    onClick={openCustomerPermissionModal}
+                  >
+                    设置客户权限
+                  </Button>
+                  <Button
+                    disabled={!selectedUser}
+                    onClick={openClassPermissionModal}
+                  >
+                    设置班级权限
+                  </Button>
+                </Space>
+              </div>
+            }
+          >
+            {selectedUser ? (
+              <Table
+                columns={permissionColumns}
+                dataSource={userPermissions}
+                rowKey="key"
+                {...getFullTableConfig(8)}
+              />
+            ) : (
+              <div className="h-64 flex items-center justify-center">
+                <span className="text-gray-400">请先选择一个员工</span>
+              </div>
+            )}
+          </Card>
+        </div>
       </Card>
 
-      {/* 全局权限设置对话框 */}
       <Modal
         open={isGlobalModalVisible}
         title="设置全局权限"
@@ -619,7 +691,6 @@ const PermissionManagement = () => {
         </Form>
       </Modal>
 
-      {/* 客户权限设置对话框 */}
       <Modal
         open={isCustomerModalVisible}
         title="设置客户权限"
@@ -674,7 +745,6 @@ const PermissionManagement = () => {
         </Form>
       </Modal>
 
-      {/* 班级权限设置对话框 */}
       <Modal
         open={isClassModalVisible}
         title="设置班级权限"
@@ -690,13 +760,16 @@ const PermissionManagement = () => {
             name="classId"
             rules={[{ message: '请选择班级', required: true }]}
           >
-            <Select placeholder="请选择班级">
-              {employees.map(employee => (
+            <Select
+              loading={classLoading}
+              placeholder="请选择班级"
+            >
+              {classes.map(classItem => (
                 <Select.Option
-                  key={employee.id}
-                  value={employee.id}
+                  key={classItem.id}
+                  value={classItem.id}
                 >
-                  {employee.nickName} - {employee.roles?.[0]?.code || ''}
+                  {classItem.name} - {classItem.categoryName || '未分类'}
                 </Select.Option>
               ))}
             </Select>
@@ -706,8 +779,27 @@ const PermissionManagement = () => {
             name="permissions"
             rules={[{ message: '请至少选择一项权限', required: true }]}
           >
-            <Checkbox.Group>
-              <Checkbox value={PermissionType.EDIT_CLASS}>编辑班级信息</Checkbox>
+            <Checkbox.Group style={{ width: '100%' }}>
+              <Row>
+                <Col span={12}>
+                  <Checkbox value={PermissionType.EDIT_CLASS}>编辑班级信息</Checkbox>
+                </Col>
+                <Col span={12}>
+                  <Checkbox value={PermissionType.VIEW_CLASS_STUDENT_NAME}>查看学员姓名</Checkbox>
+                </Col>
+                <Col span={12}>
+                  <Checkbox value={PermissionType.VIEW_CLASS_STUDENT_PHONE}>查看学员电话</Checkbox>
+                </Col>
+                <Col span={12}>
+                  <Checkbox value={PermissionType.VIEW_CLASS_STUDENT_MOBILE}>查看学员手机</Checkbox>
+                </Col>
+                <Col span={12}>
+                  <Checkbox value={PermissionType.VIEW_CLASS_STUDENT}>查看学员信息</Checkbox>
+                </Col>
+                <Col span={12}>
+                  <Checkbox value={PermissionType.EDIT_CLASS_STUDENT}>编辑学员信息</Checkbox>
+                </Col>
+              </Row>
             </Checkbox.Group>
           </Form.Item>
         </Form>

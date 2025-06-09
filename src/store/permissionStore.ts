@@ -25,7 +25,14 @@ export enum PermissionType {
   VIEW_CUSTOMER_MOBILE = 'view_customer_mobile', // 编辑客户信息权限
   VIEW_CUSTOMER_NAME = 'view_customer_name', // 编辑班级信息权限
   // 查看客户姓名权限
-  VIEW_CUSTOMER_PHONE = 'view_customer_phone' // 分配客户权限
+  VIEW_CUSTOMER_PHONE = 'view_customer_phone', // 分配客户权限
+  
+  // 班级学员权限
+  VIEW_CLASS_STUDENT_NAME = 'view_class_student_name', // 查看班级学员姓名
+  VIEW_CLASS_STUDENT_PHONE = 'view_class_student_phone', // 查看班级学员电话
+  VIEW_CLASS_STUDENT_MOBILE = 'view_class_student_mobile', // 查看班级学员手机
+  VIEW_CLASS_STUDENT = 'view_class_student', // 查看班级学员信息
+  EDIT_CLASS_STUDENT = 'edit_class_student' // 编辑班级学员信息
 }
 
 // 用户权限接口
