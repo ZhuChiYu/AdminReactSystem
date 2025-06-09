@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
 import { authService, avatarService, userService } from '@/service/api';
-import { UserRole, isAdmin, isSuperAdmin } from '@/utils/auth';
+import { UserRole, isAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
 
 // 扩展用户信息接口以包含更多属性
@@ -36,7 +36,44 @@ const UserCenter = () => {
 
   // 判断当前用户权限
   const isUserAdmin = isAdmin();
-  const isUserSuperAdmin = isSuperAdmin();
+
+  // 获取用户职务角色对应的部门信息
+  const getUserDepartmentFromRole = async (userRoles: any[]): Promise<string> => {
+    if (!userRoles?.length) {
+      return isUserAdmin ? '管理部门' : '员工部门';
+    }
+
+    try {
+      const { fetchGetRoleList } = await import('@/service/api/system-manage');
+      const roleResponse = await fetchGetRoleList({
+        current: 1,
+        roleType: 'position',
+        size: 100
+      });
+
+      if (!roleResponse?.records) {
+        return isUserAdmin ? '管理部门' : '员工部门';
+      }
+
+      // 找到用户的职务角色
+      const userPositionRole = userRoles.find((role: any) =>
+        roleResponse.records.some((r: any) => r.roleCode === role.roleCode || r.roleCode === role)
+      );
+
+      if (userPositionRole) {
+        const roleData = roleResponse.records.find(
+          (r: any) => r.roleCode === (userPositionRole.roleCode || userPositionRole)
+        );
+        if (roleData?.department) {
+          return roleData.department;
+        }
+      }
+    } catch (error) {
+      console.error('获取角色部门信息失败:', error);
+    }
+
+    return isUserAdmin ? '管理部门' : '员工部门';
+  };
 
   // 加载最新用户信息
   const loadUserInfo = async () => {
@@ -44,12 +81,15 @@ const UserCenter = () => {
       setLoading(true);
       const latestUserInfo = await authService.getUserInfo();
 
+      // 获取用户职务角色对应的部门信息
+      const userDepartment = await getUserDepartmentFromRole(latestUserInfo.roles);
+
       // 转换API返回的用户信息格式以匹配本地状态
       const convertedUserInfo: ExtendedUserInfo = {
         // 扩展属性
         avatar: latestUserInfo.avatar || '',
         buttons: latestUserInfo.buttons || [],
-        department: latestUserInfo.department || (isUserAdmin ? '管理部门' : '员工部门'),
+        department: userDepartment,
         email: latestUserInfo.email || '',
         gender: latestUserInfo.gender || undefined,
         nickName: latestUserInfo.nickName || '',
@@ -397,7 +437,7 @@ const UserCenter = () => {
         name="department"
       >
         <Input
-          disabled={!isUserSuperAdmin} // 只有超级管理员可以修改部门
+          disabled // 所属部门不允许修改，从职务角色中自动获取
           placeholder="所属部门"
         />
       </Form.Item>

@@ -99,10 +99,10 @@ const Role = () => {
         },
         {
           align: 'center',
-          dataIndex: 'roleCode',
-          key: 'roleCode',
+          dataIndex: 'department',
+          key: 'department',
           minWidth: 120,
-          title: t('page.manage.role.roleCode')
+          title: '所属部门'
         },
         {
           align: 'center',
@@ -184,8 +184,9 @@ const Role = () => {
       try {
         // 调用创建角色API
         await createRole({
+          department: res.department,
           remark: res.roleDesc,
-          roleCode: res.roleCode,
+          roleCode: res.roleName.toLowerCase().replace(/\s+/g, '_'), // 基于角色名生成roleCode
           roleName: res.roleName,
           status: Number(res.status)
         });
@@ -199,8 +200,9 @@ const Role = () => {
       // 编辑角色
       try {
         await updateRole(editingData!.id, {
+          department: res.department,
           remark: res.roleDesc,
-          roleCode: res.roleCode,
+          roleCode: res.roleName.toLowerCase().replace(/\s+/g, '_'), // 基于角色名生成roleCode
           roleName: res.roleName,
           status: Number(res.status)
         });

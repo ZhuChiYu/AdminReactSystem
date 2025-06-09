@@ -1,20 +1,63 @@
+import { Button as AButton, Drawer as ADrawer, Flex as AFlex, Form as AForm, Input as AInput, Radio as ARadio, Select as ASelect } from 'antd';
+import { memo, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { enableStatusOptions } from '@/constants/business';
 import { useFormRules } from '@/features/form';
+import { fetchGetDepartmentList } from '@/service/api/system-manage';
 
-type Model = Pick<Api.SystemManage.Role, 'roleCode' | 'roleDesc' | 'roleName' | 'status'>;
+type Model = Pick<Api.SystemManage.Role, 'department' | 'roleDesc' | 'roleName' | 'status'>;
 
 type RuleKey = Exclude<keyof Model, 'roleDesc'>;
 
 const RoleOperateDrawer: FC<Page.OperateDrawerProps> = memo(({ form, handleSubmit, onClose, open, operateType }) => {
   const { t } = useTranslation();
+  
+  // 部门选项状态
+  const [departments, setDepartments] = useState<{ label: string; value: string }[]>([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
 
   const { defaultRequiredRule } = useFormRules();
 
   const rules: Record<RuleKey, App.Global.FormRule> = {
-    roleCode: defaultRequiredRule,
+    department: defaultRequiredRule,
     roleName: defaultRequiredRule,
     status: defaultRequiredRule
   };
+
+  // 加载部门列表
+  useEffect(() => {
+    const loadDepartments = async () => {
+      if (!open) return;
+      
+      try {
+        setLoadingDepartments(true);
+        const response = await fetchGetDepartmentList();
+        if (response?.data) {
+          const deptOptions = response.data.map((dept: any) => ({
+            label: dept.name,
+            value: dept.name
+          }));
+          setDepartments(deptOptions);
+        }
+      } catch (error) {
+        console.error('获取部门列表失败:', error);
+        // 设置默认部门选项
+        setDepartments([
+          { label: '管理部', value: '管理部' },
+          { label: '销售部', value: '销售部' },
+          { label: '教学部', value: '教学部' },
+          { label: '财务部', value: '财务部' },
+          { label: '人力资源部', value: '人力资源部' },
+          { label: '市场部', value: '市场部' }
+        ]);
+      } finally {
+        setLoadingDepartments(false);
+      }
+    };
+
+    loadDepartments();
+  }, [open]);
 
   return (
     <ADrawer
@@ -46,11 +89,15 @@ const RoleOperateDrawer: FC<Page.OperateDrawerProps> = memo(({ form, handleSubmi
         </AForm.Item>
 
         <AForm.Item
-          label={t('page.manage.role.roleCode')}
-          name="roleCode"
-          rules={[rules.roleCode]}
+          label="所属部门"
+          name="department"
+          rules={[rules.department]}
         >
-          <AInput placeholder={t('page.manage.role.form.roleCode')} />
+          <ASelect
+            loading={loadingDepartments}
+            options={departments}
+            placeholder="请选择所属部门"
+          />
         </AForm.Item>
 
         <AForm.Item

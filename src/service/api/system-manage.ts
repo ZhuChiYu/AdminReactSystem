@@ -20,6 +20,7 @@ export function fetchGetRoleList(params?: Api.SystemManage.RoleSearchParams) {
 
 /** create role */
 export function createRole(data: {
+  department?: string;
   remark?: string;
   roleCode: string;
   roleName: string;
@@ -36,10 +37,11 @@ export function createRole(data: {
 export function updateRole(
   id: number,
   data: {
+    department?: string;
     remark?: string;
-    roleCode: string;
-    roleName: string;
-    status: number;
+    roleCode?: string;
+    roleName?: string;
+    status?: number;
   }
 ) {
   return apiClient.put(`/system/roles/${id}`, data);
