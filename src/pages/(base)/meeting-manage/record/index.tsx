@@ -18,7 +18,7 @@ import {
 import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 
-import { meetingService } from '@/service/api';
+import { meetingService, fetchGetUserList } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
 
 const { Paragraph, Text, Title } = Typography;
@@ -51,6 +51,7 @@ const Component: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<MeetingRecord | null>(null);
   const [records, setRecords] = useState<MeetingRecord[]>([]);
   const [meetings, setMeetings] = useState<MeetingApi.MeetingListItem[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
 
   // 模拟当前用户，实际应用中应从用户认证上下文中获取
   const currentUser = '张三';
@@ -59,6 +60,22 @@ const Component: React.FC = () => {
   const getMeetingTitle = (meetingId: string): string => {
     const meeting = meetings.find(m => m.id.toString() === meetingId);
     return meeting ? meeting.meetingTitle : '未知会议';
+  };
+
+  // 获取用户列表
+  const fetchUsers = async () => {
+    try {
+      const response = await fetchGetUserList({
+        current: 1,
+        size: 1000 // 获取所有用户
+      });
+
+      if (response?.records) {
+        setUsers(response.records);
+      }
+    } catch (error) {
+      console.error('获取用户列表失败:', error);
+    }
   };
 
   // 获取会议列表
@@ -89,6 +106,7 @@ const Component: React.FC = () => {
   useEffect(() => {
     fetchMeetings();
     fetchRecords();
+    fetchUsers();
   }, []);
 
   const showModal = (record?: MeetingRecord) => {
@@ -348,14 +366,14 @@ const Component: React.FC = () => {
             <Select
               mode="multiple"
               placeholder="请选择参会人员"
-              options={[
-                { label: '张三', value: '张三' },
-                { label: '李四', value: '李四' },
-                { label: '王五', value: '王五' },
-                { label: '赵六', value: '赵六' },
-                { label: '钱七', value: '钱七' },
-                { label: '孙八', value: '孙八' }
-              ]}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={users.map(user => ({
+                label: `${user.nickName || user.userName} (${user.userName})`,
+                value: user.id
+              }))}
             />
           </Form.Item>
 

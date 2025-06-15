@@ -16,7 +16,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { meetingService } from '@/service/api';
+import { meetingService, fetchGetUserList } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
@@ -50,10 +50,27 @@ const Component: React.FC = () => {
   const [summaryForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const { message } = App.useApp();
 
   // 当前用户角色，在实际应用中应该从认证上下文中获取
   const currentUserRole = 'employee'; // 可能的值: 'super-admin', 'admin', 'employee'
+
+  // 获取用户列表
+  const fetchUsers = async () => {
+    try {
+      const response = await fetchGetUserList({
+        current: 1,
+        size: 1000 // 获取所有用户
+      });
+
+      if (response?.records) {
+        setUsers(response.records);
+      }
+    } catch (error) {
+      console.error('获取用户列表失败:', error);
+    }
+  };
 
   // 获取会议列表
   const fetchMeetings = async () => {
@@ -65,18 +82,18 @@ const Component: React.FC = () => {
       });
 
       // 转换API数据格式
-      const formattedMeetings: MeetingItem[] = response.records.map((meeting: MeetingApi.MeetingListItem) => ({
-        approvalStatus: 0, // 默认待审批状态
+      const formattedMeetings: MeetingItem[] = response.records.map((meeting: any) => ({
+        approvalStatus: meeting.approvalStatus || 1, // 使用实际的审批状态
         endTime: meeting.endTime,
         id: meeting.id,
-        location: meeting.meetingRoom || '未指定',
-        organizer: meeting.organizer?.name || '',
+        location: meeting.location || meeting.room?.name || '未指定',
+        organizer: meeting.organizer?.nickName || meeting.organizer?.userName || '',
         participants: [], // API中没有participants字段，使用空数组
         record: '', // API中没有meetingRecord字段，使用空字符串
         startTime: meeting.startTime,
-        status: meeting.meetingStatus,
+        status: meeting.status || 0,
         summary: '', // API中没有meetingSummary字段，使用空字符串
-        title: meeting.meetingTitle
+        title: meeting.title
       }));
 
       setMeetings(formattedMeetings);
@@ -90,6 +107,7 @@ const Component: React.FC = () => {
 
   useEffect(() => {
     fetchMeetings();
+    fetchUsers();
   }, []);
 
   // 显示创建会议弹窗
@@ -110,7 +128,7 @@ const Component: React.FC = () => {
         meetingRoom: values.location,
         meetingTitle: values.title,
         meetingType: 'meeting',
-        participantIds: [],
+        participantIds: values.participants || [], // 使用选择的参会人员ID
         startTime: values.time[0].format('YYYY-MM-DD HH:mm:ss')
       };
 
@@ -187,9 +205,9 @@ const Component: React.FC = () => {
   // 获取审批状态标签
   const getApprovalStatusTag = (status: number) => {
     switch (status) {
-      case 1:
+      case 2:
         return <Tag color="success">已批准</Tag>;
-      case 0:
+      case 1:
         return <Tag color="processing">审批中</Tag>;
       case -1:
         return <Tag color="error">已拒绝</Tag>;
@@ -274,7 +292,7 @@ const Component: React.FC = () => {
       render: (_: any, record: MeetingItem) => (
         <Space>
           {/* 只有会议被批准且已结束才能添加记录和总结 */}
-          {record.approvalStatus === 1 && record.status === 2 && (
+          {record.approvalStatus === 2 && record.status === 2 && (
             <>
               <Button
                 size="small"
@@ -294,7 +312,7 @@ const Component: React.FC = () => {
           )}
 
           {/* 显示审批状态消息 */}
-          {record.approvalStatus === 0 && <Tag color="orange">等待审批</Tag>}
+          {record.approvalStatus === 1 && <Tag color="orange">等待审批</Tag>}
           {record.approvalStatus === -1 && <Tag color="red">审批拒绝</Tag>}
         </Space>
       )
@@ -369,12 +387,14 @@ const Component: React.FC = () => {
             <Select
               mode="multiple"
               placeholder="请选择参会人员"
-              options={[
-                { label: '张三', value: '张三' },
-                { label: '李四', value: '李四' },
-                { label: '王五', value: '王五' },
-                { label: '赵六', value: '赵六' }
-              ]}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={users.map(user => ({
+                label: `${user.nickName || user.userName} (${user.userName})`,
+                value: user.id
+              }))}
             />
           </Form.Item>
 

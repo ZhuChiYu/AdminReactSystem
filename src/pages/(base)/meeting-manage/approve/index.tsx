@@ -9,10 +9,12 @@ import {
 } from '@ant-design/icons';
 import { Badge, Button, Card, Form, Input, Modal, Radio, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { meetingService } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { isSuperAdmin } from '@/utils/auth';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -40,32 +42,41 @@ const Component: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [meetings, setMeetings] = useState<MeetingApproval[]>([]);
+  const navigate = useNavigate();
+
+  // 检查权限
+  useEffect(() => {
+    if (!isSuperAdmin()) {
+      message.error('只有超级管理员可以访问此页面');
+      navigate('/home');
+    }
+  }, [navigate]);
 
   // 获取待审批的会议列表
   const fetchMeetings = async () => {
     setLoading(true);
     try {
       const response = await meetingService.getMeetingList({
-        approvalStatus: 0,
+        approvalStatus: 1, // 1表示待审批，0表示未提交审批
         current: 1,
         size: 1000 // 只获取待审批的会议
       });
 
       // 转换API数据格式
-      const formattedMeetings: MeetingApproval[] = response.records.map((meeting: MeetingApi.MeetingListItem) => ({
+      const formattedMeetings: MeetingApproval[] = response.records.map((meeting: any) => ({
         approvalDate: meeting.approvalTime || '',
         approver: meeting.approver?.name || '',
         comment: meeting.approvalComment || '',
         department: meeting.organizer?.department || '',
         endTime: meeting.endTime,
         id: meeting.id,
-        location: meeting.meetingRoom || meeting.meetingUrl || '',
-        meetingTitle: meeting.meetingTitle,
-        participantsCount: meeting.participants?.length || 0,
-        proposer: meeting.organizer?.name || '',
-        purpose: meeting.meetingDesc || '',
+        location: meeting.location || meeting.room?.name || '',
+        meetingTitle: meeting.title,
+        participantsCount: meeting.participantCount || 0,
+        proposer: meeting.organizer?.nickName || meeting.organizer?.userName || '',
+        purpose: meeting.description || '',
         startTime: meeting.startTime,
-        status: meeting.approvalStatus || 0
+        status: meeting.approvalStatus || 1
       }));
 
       setMeetings(formattedMeetings);
@@ -149,14 +160,14 @@ const Component: React.FC = () => {
       key: 'status',
       ...getCenterColumnConfig(),
       render: (status: number) => {
-        if (status === 0) {
+        if (status === 1) {
           return (
             <Badge
               status="processing"
               text="待审批"
             />
           );
-        } else if (status === 1) {
+        } else if (status === 2) {
           return (
             <Badge
               status="success"
@@ -200,7 +211,7 @@ const Component: React.FC = () => {
             />
           </Tooltip>
 
-          {record.status === 0 && (
+          {record.status === 1 && (
             <Tooltip title="审批">
               <Button
                 size="small"
@@ -298,7 +309,7 @@ const Component: React.FC = () => {
                 rules={[{ message: '请选择审批结果', required: true }]}
               >
                 <Radio.Group>
-                  <Radio value={1}>
+                  <Radio value={2}>
                     <CheckCircleOutlined className="text-green-500" />
                     &nbsp;同意
                   </Radio>
@@ -378,7 +389,7 @@ const Component: React.FC = () => {
               </div>
             </Card>
 
-            {(currentMeeting.status === 1 || currentMeeting.status === -1) && (
+            {(currentMeeting.status === 2 || currentMeeting.status === -1) && (
               <Card
                 className="mt-4"
                 size="small"
@@ -388,7 +399,7 @@ const Component: React.FC = () => {
                   <div className="flex items-center">
                     <Text strong>审批状态：</Text>
                     <Text className="ml-2">
-                      {currentMeeting.status === 1 ? <Tag color="green">已通过</Tag> : <Tag color="red">已拒绝</Tag>}
+                      {currentMeeting.status === 2 ? <Tag color="green">已通过</Tag> : <Tag color="red">已拒绝</Tag>}
                     </Text>
                   </div>
                   <div className="flex items-center">

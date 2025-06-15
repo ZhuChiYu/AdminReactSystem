@@ -101,6 +101,34 @@ router.get('/', async (req, res) => {
       };
     }
 
+    // 根据用户角色过滤会议
+    const user = (req as any).user;
+    if (user) {
+      if (user.roles && user.roles.includes('super_admin')) {
+        // 超级管理员可以看到所有会议
+        // 不添加额外过滤条件
+      } else {
+        // 普通用户只能看到：
+        // 1. 自己创建的会议
+        // 2. 自己参与的已审批通过的会议
+        where.OR = [
+          { organizerId: user.id }, // 自己创建的会议
+          {
+            AND: [
+              { approvalStatus: 2 }, // 已审批通过
+              {
+                participants: {
+                  some: {
+                    userId: user.id
+                  }
+                }
+              }
+            ]
+          }
+        ];
+      }
+    }
+
     const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
     const take = Number.parseInt(size as string);
 
@@ -351,7 +379,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // 字段映射处理
     const actualTitle = title || meetingTitle;
-    const actualDescription = description || meetingDesc || meetingAgenda;
+    const actualDescription = description || meetingDesc || meetingAgenda || agenda;
     const actualLocation = location || meetingRoom;
     const actualParticipants = participants.length > 0 ? participants : participantIds;
     const actualMeetingType = meetingType || 'meeting';
@@ -418,10 +446,20 @@ router.post('/', authMiddleware, async (req, res) => {
     // 设置默认组织者为当前用户
     const actualOrganizerId = organizerId || (req.user ? req.user.id : 1);
 
+    // 检查用户角色，决定是否需要审批
+    const user = req.user;
+    let approvalStatus = 1; // 默认待审批
+
+    // 如果是超级管理员，直接通过审批
+    if (user && user.roles && user.roles.includes('super_admin')) {
+      approvalStatus = 2; // 已通过
+    }
+
     // 创建会议
     const meeting = await prisma.meeting.create({
       data: {
-        agenda,
+        agenda: actualDescription ? JSON.stringify({ content: actualDescription }) : null,
+        approvalStatus,
         description: actualDescription,
         endTime: new Date(endTime),
         isRecurring,
@@ -456,14 +494,48 @@ router.post('/', authMiddleware, async (req, res) => {
           userId: actualOrganizerId // 已接受
         }
       });
+
+      // 如果是超级管理员创建的会议（已通过审批），直接通知参会人员
+      if (approvalStatus === 2) {
+        try {
+          // 获取组织者信息
+          const organizer = await prisma.user.findUnique({
+            where: { id: actualOrganizerId },
+            select: { nickName: true, userName: true }
+          });
+
+          const organizerName = organizer?.nickName || organizer?.userName || '未知';
+
+          // 为每个参会人员创建通知
+          for (const participantId of actualParticipants) {
+            await prisma.notification.create({
+              data: {
+                title: '会议通知',
+                content: `您被邀请参加会议"${actualTitle}"，会议时间：${startTime} - ${endTime}，地点：${actualLocation || '待定'}，组织者：${organizerName}`,
+                type: 'meeting',
+                userId: participantId,
+                readStatus: 0,
+                relatedId: meeting.id,
+                relatedType: 'meeting',
+                createTime: new Date().toISOString()
+              }
+            });
+          }
+        } catch (notificationError) {
+          logger.error('创建会议通知失败:', notificationError);
+          // 不影响会议创建，只记录错误
+        }
+      }
     }
 
     logger.info(`会议创建成功: ${actualTitle}`);
 
+    const message = approvalStatus === 2 ? '会议创建成功，已通知参会人员' : '会议创建成功，等待审批';
+
     res.json({
       code: 0,
       data: meeting,
-      message: '会议创建成功',
+      message,
       path: req.path,
       timestamp: Date.now()
     });
@@ -622,13 +694,18 @@ router.put('/:id/approval', async (req, res) => {
       data: {
         approvalStatus,
         approvalTime: approvalStatus !== 1 ? new Date() : null,
-        approverId
+        approverId: req.user?.id || approverId
       },
       include: {
         organizer: {
           select: {
             nickName: true,
             userName: true
+          }
+        },
+        participants: {
+          select: {
+            userId: true
           }
         }
       },
@@ -637,6 +714,64 @@ router.put('/:id/approval', async (req, res) => {
 
     const statusText = approvalStatus === 2 ? '通过' : '拒绝';
     logger.info(`会议审批${statusText}: ${meeting.title}`);
+
+    // 如果审批通过，通知参会人员
+    if (approvalStatus === 2) {
+      try {
+        const organizerName = meeting.organizer?.nickName || meeting.organizer?.userName || '未知';
+
+        // 为每个参会人员创建通知
+        for (const participant of meeting.participants) {
+          await prisma.notification.create({
+            data: {
+              title: '会议审批通过通知',
+              content: `您参与的会议"${meeting.title}"已审批通过，会议时间：${meeting.startTime.toLocaleString()} - ${meeting.endTime.toLocaleString()}，地点：${meeting.location || '待定'}，组织者：${organizerName}`,
+              type: 'meeting',
+              userId: participant.userId,
+              readStatus: 0,
+              relatedId: meeting.id,
+              relatedType: 'meeting',
+              createTime: new Date().toISOString()
+            }
+          });
+        }
+
+        // 通知组织者
+        await prisma.notification.create({
+          data: {
+            title: '会议审批结果',
+            content: `您申请的会议"${meeting.title}"已审批通过`,
+            type: 'meeting',
+            userId: meeting.organizerId,
+            readStatus: 0,
+            relatedId: meeting.id,
+            relatedType: 'meeting',
+            createTime: new Date().toISOString()
+          }
+        });
+      } catch (notificationError) {
+        logger.error('创建审批通知失败:', notificationError);
+        // 不影响审批结果，只记录错误
+      }
+    } else if (approvalStatus === -1) {
+      // 审批拒绝，只通知组织者
+      try {
+        await prisma.notification.create({
+          data: {
+            title: '会议审批结果',
+            content: `您申请的会议"${meeting.title}"审批被拒绝${remark ? `，原因：${remark}` : ''}`,
+            type: 'meeting',
+            userId: meeting.organizerId,
+            readStatus: 0,
+            relatedId: meeting.id,
+            relatedType: 'meeting',
+            createTime: new Date().toISOString()
+          }
+        });
+      } catch (notificationError) {
+        logger.error('创建审批拒绝通知失败:', notificationError);
+      }
+    }
 
     res.json({
       code: 0,
