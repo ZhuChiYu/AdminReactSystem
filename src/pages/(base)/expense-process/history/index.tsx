@@ -1,11 +1,18 @@
-import { DeleteOutlined, EyeOutlined, FileTextOutlined, SendOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  DownloadOutlined,
+  EyeOutlined,
+  FileTextOutlined,
+  PaperClipOutlined,
+  SendOutlined
+} from '@ant-design/icons';
 import { Button, Card, Descriptions, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { expenseService } from '@/service/api';
-import type { ExpenseApi } from '@/service/api/types';
+import { isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Text, Title } = Typography;
@@ -13,6 +20,16 @@ const { Text, Title } = Typography;
 interface HistoryItem {
   applicationNo?: string;
   approvalTime?: string;
+  attachments?: Array<{
+    description?: string;
+    downloadUrl?: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    id: string;
+    originalName: string;
+    uploadTime: string;
+  }>;
   createdAt: string;
   expenseType: string;
   id: number;
@@ -29,6 +46,8 @@ const Component: React.FC = () => {
   const [currentItem, setCurrentItem] = useState<any>(null);
   const navigate = useNavigate();
 
+  // 检查权限 - 移除这个检查，因为员工也应该能查看自己的申请历史
+
   // 获取申请历史
   const fetchHistory = async () => {
     setLoading(true);
@@ -44,17 +63,21 @@ const Component: React.FC = () => {
       let submittedItems: HistoryItem[] = [];
 
       // 检查API响应格式
-      if (submittedResponse && submittedResponse.records && Array.isArray(submittedResponse.records)) {
-        submittedItems = submittedResponse.records.map((item: ExpenseApi.ExpenseListItem) => ({
-          applicationNo: `APP${item.id}`,
+      if (
+        submittedResponse &&
+        (submittedResponse as any).records &&
+        Array.isArray((submittedResponse as any).records)
+      ) {
+        submittedItems = (submittedResponse as any).records.map((item: any) => ({
+          applicationNo: item.applicationNo || `APP${item.id}`,
           approvalTime: item.approvalTime,
           createdAt: item.applicationTime,
           expenseType: item.expenseType,
           id: item.id,
           isDraft: false,
           status: item.status,
-          title: item.description || '报销申请',
-          totalAmount: item.amount
+          title: item.description || item.applicationReason || '报销申请',
+          totalAmount: item.amount || 0
         }));
       } else {
         console.warn('API响应格式不正确或无数据:', submittedResponse);
@@ -101,10 +124,15 @@ const Component: React.FC = () => {
       const draft = drafts.find((d: any) => d.id === record.id);
       setCurrentItem(draft);
     } else {
-      // 从API获取详情
+      // 从API获取详情，包括附件
       try {
-        const detail = await expenseService.getExpenseDetail(record.id);
-        setCurrentItem(detail);
+        const detail = (await expenseService.getExpenseDetail(record.id)) as unknown as any;
+
+        // 详情API已经包含了附件信息，不需要单独获取
+        setCurrentItem({
+          ...detail,
+          attachments: detail.attachments || []
+        });
       } catch {
         message.error('获取详情失败');
         return;
@@ -153,6 +181,30 @@ const Component: React.FC = () => {
     }
   };
 
+  // 下载附件
+  const handleDownloadAttachment = async (expenseId: number, fileName: string, originalName?: string) => {
+    try {
+      const response = await expenseService.downloadExpenseAttachment(expenseId, fileName);
+
+      // 创建下载链接
+      const url = window.URL.createObjectURL(new Blob([response]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = originalName || fileName;
+      document.body.appendChild(link);
+      link.click();
+
+      // 清理
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+
+      message.success('文件下载成功');
+    } catch (error) {
+      console.error('下载附件失败:', error);
+      message.error('下载附件失败');
+    }
+  };
+
   // 获取状态标签
   const getStatusTag = (status: number, isDraft?: boolean) => {
     if (isDraft) {
@@ -180,7 +232,7 @@ const Component: React.FC = () => {
       render: (text: string, record: HistoryItem) => (
         <Space>
           <FileTextOutlined />
-          <Text strong={record.isDraft}>{text}</Text>
+          <Text strong={record.isDraft}>{text || '报销申请'}</Text>
         </Space>
       )
     },
@@ -202,6 +254,7 @@ const Component: React.FC = () => {
           communication: '通讯费',
           entertainment: '招待费',
           meal: '餐费',
+          medical: '医疗费',
           office: '办公用品',
           other: '其他',
           property: '物业费',
@@ -217,7 +270,10 @@ const Component: React.FC = () => {
       key: 'totalAmount',
       title: '申请金额',
       ...getCenterColumnConfig(),
-      render: (amount: number) => <Text style={{ color: '#f50', fontWeight: 'bold' }}>¥{amount.toFixed(2)}</Text>
+      render: (amount: number) => {
+        const validAmount = amount || 0;
+        return <Text style={{ color: '#f50', fontWeight: 'bold' }}>¥{validAmount.toFixed(2)}</Text>;
+      }
     },
     {
       dataIndex: 'status',
@@ -231,7 +287,20 @@ const Component: React.FC = () => {
       key: 'createdAt',
       title: '创建时间',
       ...getCenterColumnConfig(),
-      render: (time: string) => new Date(time).toLocaleString('zh-CN')
+      render: (time: string) => {
+        if (!time) return '-';
+        try {
+          return new Date(time).toLocaleString('zh-CN', {
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } catch {
+          return time;
+        }
+      }
     },
     {
       key: 'action',
@@ -283,7 +352,7 @@ const Component: React.FC = () => {
     <div className="p-4">
       <Card>
         <div className="mb-4 flex items-center justify-between">
-          <Title level={4}>申请历史</Title>
+          <Title level={4}>{isSuperAdmin() ? '申请历史（全部）' : '我的申请历史'}</Title>
           <Button
             type="primary"
             onClick={() => navigate('/expense-process/apply')}
@@ -318,28 +387,79 @@ const Component: React.FC = () => {
               label="申请标题"
               span={2}
             >
-              {currentItem.title || currentItem.applicationReason}
+              {currentItem.title || currentItem.description || currentItem.applicationReason || '报销申请'}
             </Descriptions.Item>
             {!currentItem.isDraft && (
               <Descriptions.Item label="申请编号">{currentItem.applicationNo}</Descriptions.Item>
             )}
             <Descriptions.Item label="申请金额">
-              <Text style={{ color: '#f50', fontWeight: 'bold' }}>¥{currentItem.totalAmount?.toFixed(2)}</Text>
+              <Text style={{ color: '#f50', fontWeight: 'bold' }}>
+                ¥{(currentItem.totalAmount || currentItem.amount || 0).toFixed(2)}
+              </Text>
             </Descriptions.Item>
-            <Descriptions.Item label="费用类型">{currentItem.expenseType}</Descriptions.Item>
+            <Descriptions.Item label="费用类型">
+              {(() => {
+                const typeMap: Record<string, string> = {
+                  accommodation: '住宿费',
+                  communication: '通讯费',
+                  entertainment: '招待费',
+                  meal: '餐费',
+                  medical: '医疗费',
+                  office: '办公用品',
+                  other: '其他',
+                  property: '物业费',
+                  training: '培训费',
+                  transportation: '交通费',
+                  travel: '差旅费'
+                };
+                return typeMap[currentItem.expenseType] || currentItem.expenseType;
+              })()}
+            </Descriptions.Item>
             <Descriptions.Item label="状态">{getStatusTag(currentItem.status, currentItem.isDraft)}</Descriptions.Item>
+            {currentItem.applicant && (
+              <Descriptions.Item label="申请人">
+                {currentItem.applicant.name}
+                {currentItem.department && ` (${currentItem.department})`}
+              </Descriptions.Item>
+            )}
+            {currentItem.approver && <Descriptions.Item label="审批人">{currentItem.approver.name}</Descriptions.Item>}
+            {currentItem.approvalTime && (
+              <Descriptions.Item label="审批时间">
+                {new Date(currentItem.approvalTime).toLocaleString('zh-CN', {
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric'
+                })}
+              </Descriptions.Item>
+            )}
             <Descriptions.Item
               label="创建时间"
               span={2}
             >
-              {new Date(currentItem.createdAt).toLocaleString('zh-CN')}
+              {(() => {
+                const timeField = currentItem.createdAt || currentItem.applicationTime;
+                if (!timeField) return '-';
+                try {
+                  return new Date(timeField).toLocaleString('zh-CN', {
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  });
+                } catch {
+                  return timeField;
+                }
+              })()}
             </Descriptions.Item>
-            {currentItem.remark && (
+            {(currentItem.remark || currentItem.description) && (
               <Descriptions.Item
-                label="备注"
+                label="申请说明"
                 span={2}
               >
-                {currentItem.remark}
+                {currentItem.remark || currentItem.description}
               </Descriptions.Item>
             )}
             {currentItem.items && currentItem.items.length > 0 && (
@@ -359,6 +479,51 @@ const Component: React.FC = () => {
                           <Text type="secondary">{item.description}</Text>
                         </div>
                       )}
+                    </div>
+                  ))}
+                </div>
+              </Descriptions.Item>
+            )}
+            {currentItem.attachments && currentItem.attachments.length > 0 && (
+              <Descriptions.Item
+                span={2}
+                label={
+                  <span>
+                    <PaperClipOutlined /> 附件
+                  </span>
+                }
+              >
+                <div style={{ maxHeight: '200px', overflow: 'auto' }}>
+                  {currentItem.attachments.map((attachment: any, index: number) => (
+                    <div
+                      key={index}
+                      style={{
+                        alignItems: 'center',
+                        background: '#f5f5f5',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        padding: '8px'
+                      }}
+                    >
+                      <div>
+                        <Text strong>{attachment.originalName || attachment.fileName}</Text>
+                        <div>
+                          <Text type="secondary">大小: {(attachment.fileSize / 1024 / 1024).toFixed(2)}MB</Text>
+                          {attachment.description && <Text type="secondary"> | {attachment.description}</Text>}
+                        </div>
+                      </div>
+                      <Button
+                        icon={<DownloadOutlined />}
+                        size="small"
+                        type="link"
+                        onClick={() =>
+                          handleDownloadAttachment(currentItem.id, attachment.fileName, attachment.originalName)
+                        }
+                      >
+                        下载
+                      </Button>
                     </div>
                   ))}
                 </div>

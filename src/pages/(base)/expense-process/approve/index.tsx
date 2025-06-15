@@ -4,8 +4,10 @@ import {
   CheckOutlined,
   CloseCircleOutlined,
   DollarOutlined,
+  DownloadOutlined,
   EyeOutlined,
   FileTextOutlined,
+  PaperClipOutlined,
   SyncOutlined,
   UserOutlined
 } from '@ant-design/icons';
@@ -40,6 +42,16 @@ interface ExpenseItem {
   applicationDate: string;
   approvalDate?: string;
   approver?: string;
+  attachments?: Array<{
+    description?: string;
+    downloadUrl: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    id: string;
+    originalName: string;
+    uploadTime: string;
+  }>;
   comment?: string;
   department: string;
   description: string;
@@ -122,15 +134,108 @@ const Component: React.FC = () => {
     );
   }
 
-  const showApprovalModal = (record: ExpenseItem) => {
-    setCurrentExpense(record);
-    form.resetFields();
-    setVisible(true);
+  const showApprovalModal = async (record: ExpenseItem) => {
+    try {
+      // 获取完整的费用申请详情，包括附件
+      const detail = (await expenseService.getExpenseDetail(record.id)) as unknown as ExpenseApi.ExpenseListItem;
+
+      // 转换详情数据格式 - detail已经包含附件信息
+      const formattedDetail: ExpenseItem = {
+        amount: detail.amount || 0,
+        applicant: detail.applicant?.name || '未知用户',
+        applicationDate: detail.applicationTime || '',
+        approvalDate: detail.approvalTime || '',
+        approver: detail.approver?.name || '',
+        attachments: Array.isArray(detail.attachments)
+          ? detail.attachments.map((att: any) => ({
+              description: att.description || '',
+              downloadUrl: att.downloadUrl || att.fileUrl || '',
+              fileName: att.fileName || '',
+              fileSize: att.fileSize || 0,
+              fileType: att.fileType || '',
+              id: att.id?.toString() || '',
+              originalName: att.originalName || att.fileName || '',
+              uploadTime: att.uploadTime || ''
+            }))
+          : [],
+        comment: detail.remark || '',
+        department: detail.department || '未知部门',
+        description: detail.description || '',
+        expenseType: detail.expenseType || '未知类型',
+        id: detail.id,
+        status: detail.status || 0
+      };
+
+      setCurrentExpense(formattedDetail);
+      form.resetFields();
+      setVisible(true);
+    } catch (error) {
+      console.error('获取费用申请详情失败:', error);
+      message.error('获取详情失败');
+    }
   };
 
-  const showDetailModal = (record: ExpenseItem) => {
-    setCurrentExpense(record);
-    setDetailVisible(true);
+  const showDetailModal = async (record: ExpenseItem) => {
+    try {
+      // 获取完整的费用申请详情，包括附件
+      const detail = (await expenseService.getExpenseDetail(record.id)) as unknown as ExpenseApi.ExpenseListItem;
+
+      // 转换详情数据格式 - detail已经包含附件信息
+      const formattedDetail: ExpenseItem = {
+        amount: detail.amount || 0,
+        applicant: detail.applicant?.name || '未知用户',
+        applicationDate: detail.applicationTime || '',
+        approvalDate: detail.approvalTime || '',
+        approver: detail.approver?.name || '',
+        attachments: Array.isArray(detail.attachments)
+          ? detail.attachments.map((att: any) => ({
+              description: att.description || '',
+              downloadUrl: att.downloadUrl || att.fileUrl || '',
+              fileName: att.fileName || '',
+              fileSize: att.fileSize || 0,
+              fileType: att.fileType || '',
+              id: att.id?.toString() || '',
+              originalName: att.originalName || att.fileName || '',
+              uploadTime: att.uploadTime || ''
+            }))
+          : [],
+        comment: detail.remark || '',
+        department: detail.department || '未知部门',
+        description: detail.description || '',
+        expenseType: detail.expenseType || '未知类型',
+        id: detail.id,
+        status: detail.status || 0
+      };
+
+      setCurrentExpense(formattedDetail);
+      setDetailVisible(true);
+    } catch (error) {
+      console.error('获取费用申请详情失败:', error);
+      message.error('获取详情失败');
+    }
+  };
+
+  // 下载附件
+  const handleDownloadAttachment = async (expenseId: number, fileName: string, originalName: string) => {
+    try {
+      const response = await expenseService.downloadExpenseAttachment(expenseId, fileName);
+
+      // 创建下载链接
+      const blob = new Blob([response]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = originalName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      message.success('下载成功');
+    } catch (error) {
+      console.error('下载附件失败:', error);
+      message.error('下载失败');
+    }
   };
 
   const handleApprove = async () => {
@@ -196,8 +301,12 @@ const Component: React.FC = () => {
           accommodation: '住宿费',
           communication: '通讯费',
           entertainment: '招待费',
+          meal: '餐费',
           medical: '医疗费',
-          office: '办公费',
+          office: '办公用品',
+          other: '其他',
+          property: '物业费',
+          training: '培训费',
           transportation: '交通费',
           travel: '差旅费'
         };
@@ -343,7 +452,24 @@ const Component: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="部门">{currentExpense.department}</Descriptions.Item>
               <Descriptions.Item label="费用类型">
-                <Tag color="blue">{currentExpense.expenseType}</Tag>
+                <Tag color="blue">
+                  {(() => {
+                    const typeMap: Record<string, string> = {
+                      accommodation: '住宿费',
+                      communication: '通讯费',
+                      entertainment: '招待费',
+                      meal: '餐费',
+                      medical: '医疗费',
+                      office: '办公用品',
+                      other: '其他',
+                      property: '物业费',
+                      training: '培训费',
+                      transportation: '交通费',
+                      travel: '差旅费'
+                    };
+                    return typeMap[currentExpense.expenseType] || currentExpense.expenseType;
+                  })()}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="申请金额">
                 <Space>
@@ -387,6 +513,48 @@ const Component: React.FC = () => {
                 </Space>
               </Descriptions.Item>
             </Descriptions>
+
+            {/* 附件列表 */}
+            {currentExpense.attachments && currentExpense.attachments.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <Text strong>
+                  <PaperClipOutlined /> 相关附件
+                </Text>
+                <div style={{ marginTop: 8 }}>
+                  {currentExpense.attachments.map((attachment, index) => (
+                    <div
+                      key={attachment.id || index}
+                      style={{
+                        alignItems: 'center',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        padding: '8px 12px'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 500 }}>{attachment.originalName}</div>
+                        <div style={{ color: '#666', fontSize: '12px' }}>
+                          {attachment.fileType} • {(attachment.fileSize / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
+                      <Button
+                        icon={<DownloadOutlined />}
+                        size="small"
+                        type="link"
+                        onClick={() =>
+                          handleDownloadAttachment(currentExpense.id, attachment.fileName, attachment.originalName)
+                        }
+                      >
+                        下载
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Form
               form={form}
@@ -448,7 +616,24 @@ const Component: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="部门">{currentExpense.department}</Descriptions.Item>
               <Descriptions.Item label="费用类型">
-                <Tag color="blue">{currentExpense.expenseType}</Tag>
+                <Tag color="blue">
+                  {(() => {
+                    const typeMap: Record<string, string> = {
+                      accommodation: '住宿费',
+                      communication: '通讯费',
+                      entertainment: '招待费',
+                      meal: '餐费',
+                      medical: '医疗费',
+                      office: '办公用品',
+                      other: '其他',
+                      property: '物业费',
+                      training: '培训费',
+                      transportation: '交通费',
+                      travel: '差旅费'
+                    };
+                    return typeMap[currentExpense.expenseType] || currentExpense.expenseType;
+                  })()}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="申请金额">
                 <Space>
@@ -543,6 +728,54 @@ const Component: React.FC = () => {
                 </Descriptions.Item>
               )}
             </Descriptions>
+
+            {/* 附件列表 */}
+            {currentExpense.attachments && currentExpense.attachments.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <Text strong>
+                  <PaperClipOutlined /> 相关附件
+                </Text>
+                <div style={{ marginTop: 12 }}>
+                  {currentExpense.attachments.map((attachment, index) => (
+                    <div
+                      key={attachment.id || index}
+                      style={{
+                        alignItems: 'center',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        padding: '8px 12px'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 500 }}>{attachment.originalName}</div>
+                        <div style={{ color: '#666', fontSize: '12px' }}>
+                          {attachment.fileType} • {(attachment.fileSize / 1024).toFixed(1)} KB
+                          {attachment.uploadTime && ` • ${new Date(attachment.uploadTime).toLocaleString('zh-CN')}`}
+                        </div>
+                        {attachment.description && (
+                          <div style={{ color: '#999', fontSize: '12px', marginTop: '4px' }}>
+                            {attachment.description}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        icon={<DownloadOutlined />}
+                        size="small"
+                        type="link"
+                        onClick={() =>
+                          handleDownloadAttachment(currentExpense.id, attachment.fileName, attachment.originalName)
+                        }
+                      >
+                        下载
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

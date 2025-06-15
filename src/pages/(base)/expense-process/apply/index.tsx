@@ -28,7 +28,7 @@ import type dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { expenseService, notificationService } from '@/service/api';
+import { expenseService } from '@/service/api';
 import { isSuperAdmin } from '@/utils/auth';
 
 const { Text, Title } = Typography;
@@ -249,6 +249,26 @@ const Component: React.FC = () => {
     });
   };
 
+  // 上传附件的辅助函数
+  const uploadAttachments = async (applicationId: number) => {
+    if (fileList.length === 0) return;
+
+    message.info('正在上传附件...');
+
+    const uploadPromises = fileList
+      .filter(file => file.originFileObj)
+      .map(async file => {
+        try {
+          await expenseService.uploadExpenseAttachment(applicationId, file.originFileObj!, file.name);
+        } catch (uploadError) {
+          console.error('上传附件失败:', uploadError);
+          message.warning(`附件 ${file.name} 上传失败，但申请已提交成功`);
+        }
+      });
+
+    await Promise.all(uploadPromises);
+  };
+
   // 提交申请
   const handleSubmit = async (values: any) => {
     if (expenseItems.length === 0) {
@@ -272,24 +292,22 @@ const Component: React.FC = () => {
           itemName: item.itemName,
           itemType: item.itemType
         })),
-        remark: values.description
+        remark: values.remarks
       };
 
       // 调用API提交费用申请
-      const response = await expenseService.createExpense(expenseData);
+      const result = await expenseService.createExpense(expenseData);
+      const applicationId = result.id;
 
-      // 发送通知给管理员
-      if (response) {
-        await notificationService.createNotification({
-          content: `${values.applicant || '员工'}提交了新的报销申请: ${values.title}，请尽快审核`,
-          relatedId: response.id,
-          relatedType: 'expense_application',
-          title: '新报销申请待审核',
-          type: 'expense'
-        });
+      if (!applicationId || typeof applicationId !== 'number') {
+        console.error('创建申请响应数据:', result);
+        throw new Error('创建申请失败，未获取到申请ID');
       }
 
-      message.success('报销申请提交成功');
+      // 上传附件
+      await uploadAttachments(applicationId);
+
+      message.success('报销申请提交成功，已通知超级管理员审核');
 
       // 提交成功后清空表单
       form.resetFields();

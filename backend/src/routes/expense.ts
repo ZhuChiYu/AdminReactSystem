@@ -1,4 +1,7 @@
 import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 import { prisma } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
@@ -6,6 +9,46 @@ import { logger } from '../utils/logger';
 import { createErrorResponse, createSuccessResponse } from '../utils/response';
 
 const router = express.Router();
+
+// 配置附件上传
+const uploadsDir = path.join(__dirname, '../../uploads/expense-attachments');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `expense-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('不支持的文件格式'));
+    }
+  }
+});
 
 // 获取费用申请列表
 router.get('/list', authMiddleware, async (req, res) => {
@@ -27,6 +70,16 @@ router.get('/list', authMiddleware, async (req, res) => {
 
     if (expenseType) {
       where.expenseType = expenseType as string;
+    }
+
+    // 权限控制：只有超级管理员可以看到所有申请，其他用户只能看到自己的申请
+    const user = (req as any).user;
+    if (user && user.roles && user.roles.includes('super_admin')) {
+      // 超级管理员可以看到所有申请
+      // 不添加额外过滤条件
+    } else {
+      // 普通用户只能看到自己的申请
+      where.applicantId = user?.id;
     }
 
     const [applications, total] = await Promise.all([
@@ -78,7 +131,7 @@ router.get('/list', authMiddleware, async (req, res) => {
             name: app.approver.nickName || app.approver.userName
           }
         : null,
-      attachments: app.attachments as any[],
+      attachments: (app.attachments as any[]) || [],
       department: app.applicant.department?.name || '未知部门',
       description: app.applicationReason,
       expenseType: app.expenseType,
@@ -152,7 +205,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
             name: application.approver.nickName || application.approver.userName
           }
         : null,
-      attachments: application.attachments as any[],
+      attachments: (application.attachments as any[]) || [],
       department: application.applicant.department?.name || '未知部门',
       description: application.applicationReason,
       expenseType: application.expenseType,
@@ -196,6 +249,7 @@ router.post('/create', authMiddleware, async (req, res) => {
         applicantId: userId,
         applicationNo,
         applicationReason,
+        attachments: [], // 初始化为空数组
         expensePeriodEnd: expensePeriodEnd ? new Date(expensePeriodEnd) : null,
         expensePeriodStart: expensePeriodStart ? new Date(expensePeriodStart) : null,
         expenseType,
@@ -586,6 +640,173 @@ router.get('/statistics', authMiddleware, async (req, res) => {
   } catch (error) {
     logger.error('获取费用统计失败:', error);
     res.status(500).json(createErrorResponse(500, '获取费用统计失败', error, req.path));
+  }
+});
+
+// 上传费用申请附件
+router.post('/:id/attachments/upload', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { description } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json(createErrorResponse(400, '请选择要上传的文件', null, req.path));
+    }
+
+    // 检查费用申请是否存在
+    const application = await prisma.expenseApplication.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!application) {
+      return res.status(404).json(createErrorResponse(404, '费用申请不存在', null, req.path));
+    }
+
+    // 获取当前附件列表
+    const currentAttachments = (application.attachments as any[]) || [];
+
+    // 创建新附件信息
+    const newAttachment = {
+      id: Date.now(),
+      fileName: req.file.filename,
+      originalName: req.file.originalname,
+      fileSize: req.file.size,
+      fileType: path.extname(req.file.originalname).substring(1),
+      uploadTime: new Date().toISOString(),
+      description: description || '',
+      downloadUrl: `/api/expenses/${id}/attachments/${req.file.filename}/download`
+    };
+
+    // 更新附件列表
+    const updatedAttachments = [...currentAttachments, newAttachment];
+
+    // 更新数据库
+    await prisma.expenseApplication.update({
+      where: { id: Number(id) },
+      data: {
+        attachments: updatedAttachments
+      }
+    });
+
+    res.json(createSuccessResponse(newAttachment, '附件上传成功', req.path));
+  } catch (error) {
+    logger.error('上传费用申请附件失败:', error);
+    res.status(500).json(createErrorResponse(500, '上传费用申请附件失败', error, req.path));
+  }
+});
+
+// 获取费用申请附件列表
+router.get('/:id/attachments', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const application = await prisma.expenseApplication.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!application) {
+      return res.status(404).json(createErrorResponse(404, '费用申请不存在', null, req.path));
+    }
+
+    const attachments = (application.attachments as any[]) || [];
+
+    res.json(createSuccessResponse(attachments, '获取附件列表成功', req.path));
+  } catch (error) {
+    logger.error('获取费用申请附件列表失败:', error);
+    res.status(500).json(createErrorResponse(500, '获取费用申请附件列表失败', error, req.path));
+  }
+});
+
+// 下载费用申请附件
+router.get('/:id/attachments/:fileName/download', authMiddleware, async (req, res) => {
+  try {
+    const { id, fileName } = req.params;
+
+    // 检查费用申请是否存在
+    const application = await prisma.expenseApplication.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!application) {
+      return res.status(404).json(createErrorResponse(404, '费用申请不存在', null, req.path));
+    }
+
+    // 检查附件是否存在于数据库记录中
+    const attachments = (application.attachments as any[]) || [];
+    const attachment = attachments.find(att => att.fileName === fileName);
+
+    if (!attachment) {
+      return res.status(404).json(createErrorResponse(404, '附件不存在', null, req.path));
+    }
+
+    const filePath = path.join(uploadsDir, fileName);
+
+    // 检查文件是否存在
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json(createErrorResponse(404, '文件不存在', null, req.path));
+    }
+
+    const originalName = attachment.originalName || fileName;
+
+    // 设置响应头
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    // 发送文件流
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    logger.info(`费用申请附件下载: ${originalName}, 申请ID: ${id}`);
+  } catch (error) {
+    logger.error('下载费用申请附件失败:', error);
+    res.status(500).json(createErrorResponse(500, '下载费用申请附件失败', error, req.path));
+  }
+});
+
+// 删除费用申请附件
+router.delete('/:id/attachments/:fileName', authMiddleware, async (req, res) => {
+  try {
+    const { id, fileName } = req.params;
+
+    // 检查费用申请是否存在
+    const application = await prisma.expenseApplication.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!application) {
+      return res.status(404).json(createErrorResponse(404, '费用申请不存在', null, req.path));
+    }
+
+    // 获取当前附件列表
+    const currentAttachments = (application.attachments as any[]) || [];
+    const attachmentIndex = currentAttachments.findIndex(att => att.fileName === fileName);
+
+    if (attachmentIndex === -1) {
+      return res.status(404).json(createErrorResponse(404, '附件不存在', null, req.path));
+    }
+
+    // 删除文件
+    const filePath = path.join(uploadsDir, fileName);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // 更新附件列表
+    const updatedAttachments = currentAttachments.filter(att => att.fileName !== fileName);
+
+    // 更新数据库
+    await prisma.expenseApplication.update({
+      where: { id: Number(id) },
+      data: {
+        attachments: updatedAttachments
+      }
+    });
+
+    res.json(createSuccessResponse(null, '附件删除成功', req.path));
+  } catch (error) {
+    logger.error('删除费用申请附件失败:', error);
+    res.status(500).json(createErrorResponse(500, '删除费用申请附件失败', error, req.path));
   }
 });
 
