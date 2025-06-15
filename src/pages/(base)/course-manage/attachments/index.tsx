@@ -35,6 +35,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { attachmentService, courseService } from '@/service/api';
 import type { AttachmentApi, CourseApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { isSuperAdmin } from '@/utils/auth';
 
 const { Dragger } = Upload;
 const { Text, Title } = Typography;
@@ -461,20 +462,22 @@ function Component() {
           >
             下载
           </Button>
-          <Popconfirm
-            cancelText="取消"
-            okText="确定"
-            title="确定要删除这个文件吗？"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              type="link"
+          {isSuperAdmin() && (
+            <Popconfirm
+              cancelText="取消"
+              okText="确定"
+              title="确定要删除这个文件吗？"
+              onConfirm={() => handleDelete(record.id)}
             >
-              删除
-            </Button>
-          </Popconfirm>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                type="link"
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -523,13 +526,15 @@ function Component() {
               onChange={e => !e.target.value && setSearchQuery('')}
               onSearch={handleSearch}
             />
-            <Button
-              icon={<CloudDownloadOutlined />}
-              type="primary"
-              onClick={showUploadModal}
-            >
-              上传文件
-            </Button>
+            {isSuperAdmin() && (
+              <Button
+                icon={<CloudDownloadOutlined />}
+                type="primary"
+                onClick={showUploadModal}
+              >
+                上传文件
+              </Button>
+            )}
           </div>
         </div>
 

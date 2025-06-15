@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { classService } from '@/service/api/class';
 import type { ClassApi } from '@/service/api/types';
 import { getEndDateDisabledDate, getStartDateDisabledDate, validateDateRange } from '@/utils/dateUtils';
+import { isSuperAdmin } from '@/utils/auth';
 
 interface ClassItem {
   categoryId: number;
@@ -244,29 +245,33 @@ const ClassList = () => {
           >
             详情
           </Button>
-          <Button
-            icon={<EditOutlined />}
-            size="small"
-            type="link"
-            onClick={() => handleEdit(record.id)}
-          >
-            编辑
-          </Button>
-          <Popconfirm
-            cancelText="取消"
-            okText="确定"
-            title="确定要删除这个班级吗？"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              size="small"
-              type="link"
-            >
-              删除
-            </Button>
-          </Popconfirm>
+          {isSuperAdmin() && (
+            <>
+              <Button
+                icon={<EditOutlined />}
+                size="small"
+                type="link"
+                onClick={() => handleEdit(record.id)}
+              >
+                编辑
+              </Button>
+              <Popconfirm
+                cancelText="取消"
+                okText="确定"
+                title="确定要删除这个班级吗？"
+                onConfirm={() => handleDelete(record.id)}
+              >
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  size="small"
+                  type="link"
+                >
+                  删除
+                </Button>
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ),
       title: '操作',
@@ -289,13 +294,15 @@ const ClassList = () => {
               onChange={e => !e.target.value && handleSearch('')}
               onSearch={handleSearch}
             />
-            <Button
-              icon={<PlusOutlined />}
-              type="primary"
-              onClick={showModal}
-            >
-              新增班级
-            </Button>
+            {isSuperAdmin() && (
+              <Button
+                icon={<PlusOutlined />}
+                type="primary"
+                onClick={showModal}
+              >
+                新增班级
+              </Button>
+            )}
           </div>
         </div>
 

@@ -2,9 +2,10 @@ import { PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 
-import { classService } from '@/service/api';
-import type { ClassApi } from '@/service/api/class';
+import { classService } from '@/service/api/class';
+import type { ClassApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { isSuperAdmin } from '@/utils/auth';
 
 interface CategoryItem {
   code: string;
@@ -194,25 +195,29 @@ const ClassCategory = () => {
       ...getActionColumnConfig(120),
       render: (_: any, record: CategoryItem) => (
         <Space>
-          <Button
-            type="link"
-            onClick={() => showEditModal(record)}
-          >
-            编辑
-          </Button>
-          <Popconfirm
-            cancelText="取消"
-            okText="确定"
-            title="确定要删除这个分类吗？"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button
-              danger
-              type="link"
-            >
-              删除
-            </Button>
-          </Popconfirm>
+          {isSuperAdmin() && (
+            <>
+              <Button
+                type="link"
+                onClick={() => showEditModal(record)}
+              >
+                编辑
+              </Button>
+              <Popconfirm
+                cancelText="取消"
+                okText="确定"
+                title="确定要删除这个分类吗？"
+                onConfirm={() => handleDelete(record.id)}
+              >
+                <Button
+                  danger
+                  type="link"
+                >
+                  删除
+                </Button>
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ),
       title: '操作'
@@ -225,13 +230,15 @@ const ClassCategory = () => {
         title="班级分类"
         variant="borderless"
         extra={
-          <Button
-            icon={<PlusOutlined />}
-            type="primary"
-            onClick={showAddModal}
-          >
-            新增分类
-          </Button>
+          isSuperAdmin() && (
+            <Button
+              icon={<PlusOutlined />}
+              type="primary"
+              onClick={showAddModal}
+            >
+              新增分类
+            </Button>
+          )
         }
       >
         <Table

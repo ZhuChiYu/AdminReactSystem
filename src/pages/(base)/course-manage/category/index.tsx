@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { courseService } from '@/service/api';
 import { getFullTableConfig } from '@/utils/table';
+import { isSuperAdmin } from '@/utils/auth';
 
 interface CategoryItem {
   createdAt: string;
@@ -171,21 +172,25 @@ const CourseCategory = () => {
       key: 'action',
       render: (_: any, record: CategoryItem) => (
         <Space>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => showEditModal(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            size="small"
-            type="link"
-            onClick={() => handleDelete(record.id)}
-          >
-            删除
-          </Button>
+          {isSuperAdmin() && (
+            <>
+              <Button
+                size="small"
+                type="link"
+                onClick={() => showEditModal(record)}
+              >
+                编辑
+              </Button>
+              <Button
+                danger
+                size="small"
+                type="link"
+                onClick={() => handleDelete(record.id)}
+              >
+                删除
+              </Button>
+            </>
+          )}
         </Space>
       ),
       title: '操作',
@@ -199,13 +204,15 @@ const CourseCategory = () => {
         title={t('course.category')}
         variant="borderless"
         extra={
-          <Button
-            icon={<PlusOutlined />}
-            type="primary"
-            onClick={showAddModal}
-          >
-            新增分类
-          </Button>
+          isSuperAdmin() && (
+            <Button
+              icon={<PlusOutlined />}
+              type="primary"
+              onClick={showAddModal}
+            >
+              新增分类
+            </Button>
+          )
         }
       >
         <Table

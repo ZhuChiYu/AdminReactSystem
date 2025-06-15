@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { attachmentService, courseService } from '@/service/api';
 import type { CourseApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { isSuperAdmin } from '@/utils/auth';
 
 const { RangePicker } = DatePicker;
 
@@ -390,20 +391,24 @@ const CourseList = () => {
           >
             附件管理
           </Button>
-          <Button
-            size="small"
-            type="primary"
-            onClick={() => showEditModal(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            size="small"
-            onClick={() => showDeleteConfirm(record)}
-          >
-            删除
-          </Button>
+          {isSuperAdmin() && (
+            <>
+              <Button
+                size="small"
+                type="primary"
+                onClick={() => showEditModal(record)}
+              >
+                编辑
+              </Button>
+              <Button
+                danger
+                size="small"
+                onClick={() => showDeleteConfirm(record)}
+              >
+                删除
+              </Button>
+            </>
+          )}
         </Space>
       )
     }
@@ -471,13 +476,15 @@ const CourseList = () => {
               搜索
             </Button>
             <Button onClick={resetFilters}>重置</Button>
-            <Button
-              icon={<PlusOutlined />}
-              type="primary"
-              onClick={showAddModal}
-            >
-              新增课程
-            </Button>
+            {isSuperAdmin() && (
+              <Button
+                icon={<PlusOutlined />}
+                type="primary"
+                onClick={showAddModal}
+              >
+                新增课程
+              </Button>
+            )}
           </div>
         </div>
 
