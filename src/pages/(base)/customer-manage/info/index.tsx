@@ -8,6 +8,11 @@ import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
+// 导入员工服务
+import { UserSwitchOutlined } from '@ant-design/icons';
+import { employeeService } from '@/service/api';
+import type { EmployeeApi } from '@/service/api/types';
+
 // 定义本地的跟进状态枚举和映射
 export enum FollowUpStatus {
   ARRIVED = 'arrived', // 已实到
@@ -63,6 +68,13 @@ const CustomerManagement = () => {
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
 
+  // 分配相关状态
+  const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
+  const [assignForm] = Form.useForm();
+  const [managedEmployees, setManagedEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
+  const [selectedCustomersForAssign, setSelectedCustomersForAssign] = useState<number[]>([]);
+  const [assignLoading, setAssignLoading] = useState(false);
+
   // 数据状态
   const [customers, setCustomers] = useState<CustomerApi.CustomerListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -99,8 +111,7 @@ const CustomerManagement = () => {
         current: pagination.current,
         customerName: searchParams.customerName || undefined,
         followStatus: searchParams.followStatus || undefined,
-        scope: 'all',
-        size: pagination.pageSize // 客户资料管理页面显示所有数据
+        size: pagination.pageSize
       };
 
       const response = await customerService.getCustomerList(params);
@@ -122,6 +133,23 @@ const CustomerManagement = () => {
   useEffect(() => {
     fetchCustomers();
   }, [pagination.current, pagination.pageSize]);
+
+  // 获取管理员管理的员工
+  const fetchManagedEmployees = async () => {
+    if (isUserAdmin || isUserSuperAdmin) {
+      try {
+        const response = await employeeService.getManagedEmployees({ current: 1, size: 1000 });
+        setManagedEmployees(response.records);
+      } catch (error) {
+        console.error('获取管理的员工失败:', error);
+      }
+    }
+  };
+
+  // 初始化时获取管理的员工
+  useEffect(() => {
+    fetchManagedEmployees();
+  }, [isUserAdmin, isUserSuperAdmin]);
 
   // 检查用户是否有权限修改客户信息（简化版，主要权限控制在后端）
   const canEditCustomer = (customer: CustomerApi.CustomerListItem) => {
@@ -240,6 +268,63 @@ const CustomerManagement = () => {
     });
   };
 
+  // 打开分配客户弹窗
+  const openAssignModal = (customerIds: number[]) => {
+    if (managedEmployees.length === 0) {
+      message.warning('您暂无管理的员工，无法分配客户');
+      return;
+    }
+    setSelectedCustomersForAssign(customerIds);
+    assignForm.resetFields();
+    setIsAssignModalVisible(true);
+  };
+
+  // 批量分配客户
+  const openBatchAssignModal = () => {
+    if (selectedCustomersForAssign.length === 0) {
+      message.warning('请先选择要分配的客户');
+      return;
+    }
+    openAssignModal(selectedCustomersForAssign);
+  };
+
+  // 分配单个客户
+  const assignSingleCustomer = (customer: CustomerApi.CustomerListItem) => {
+    openAssignModal([customer.id]);
+  };
+
+  // 提交分配
+  const handleAssignSubmit = async () => {
+    try {
+      const values = await assignForm.validateFields();
+      setAssignLoading(true);
+
+      await customerService.assignCustomers({
+        customerIds: selectedCustomersForAssign,
+        assignedToId: values.employeeId,
+        remark: values.remark || ''
+      });
+
+      message.success('分配成功');
+      setIsAssignModalVisible(false);
+      setSelectedCustomersForAssign([]);
+      assignForm.resetFields();
+      fetchCustomers(); // 重新获取数据
+    } catch (error) {
+      console.error('分配客户失败:', error);
+      message.error('分配失败');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  // 取消分配弹窗
+  const handleAssignCancel = () => {
+    setIsAssignModalVisible(false);
+    setSelectedCustomersForAssign([]);
+    assignForm.resetFields();
+  };
+
   // 表格分页处理
   const handleTableChange = (page: number, pageSize?: number) => {
     console.log('🔍 分页变化:', { current: pagination.current, oldPageSize: pagination.pageSize, page, pageSize });
@@ -330,7 +415,7 @@ const CustomerManagement = () => {
     {
       key: 'action',
       title: '操作',
-      ...getActionColumnConfig(120),
+      ...getActionColumnConfig(isUserAdmin || isUserSuperAdmin ? 150 : 120),
       render: (_: any, record: CustomerApi.CustomerListItem) => (
         <Space>
           <Button
@@ -341,6 +426,16 @@ const CustomerManagement = () => {
           >
             修改状态
           </Button>
+          {(isUserAdmin || isUserSuperAdmin) && (
+            <Button
+              icon={<UserSwitchOutlined />}
+              size="small"
+              type="link"
+              onClick={() => assignSingleCustomer(record)}
+            >
+              分配
+            </Button>
+          )}
         </Space>
       )
     }
@@ -361,16 +456,27 @@ const CustomerManagement = () => {
   return (
     <div className="h-full bg-white p-4 dark:bg-[#141414]">
       <Card
-        title="客户资料管理"
+        title={isUserAdmin || isUserSuperAdmin ? "客户资料管理" : "我的客户"}
         extra={
           <Space>
-            <Button
-              icon={<UserAddOutlined />}
-              type="primary"
-              onClick={addNewCustomer}
-            >
-              添加客户
-            </Button>
+            {(isUserAdmin || isUserSuperAdmin) && (
+              <Button
+                icon={<UserAddOutlined />}
+                type="primary"
+                onClick={addNewCustomer}
+              >
+                添加客户
+              </Button>
+            )}
+            {(isUserAdmin || isUserSuperAdmin) && (
+              <Button
+                icon={<UserSwitchOutlined />}
+                onClick={openBatchAssignModal}
+                disabled={selectedCustomersForAssign.length === 0}
+              >
+                批量分配
+              </Button>
+            )}
             <Button onClick={resetSearch}>重置筛选</Button>
           </Space>
         }
@@ -426,6 +532,16 @@ const CustomerManagement = () => {
           dataSource={customers}
           loading={loading}
           rowKey="id"
+          rowSelection={
+            isUserAdmin || isUserSuperAdmin
+              ? {
+                  selectedRowKeys: selectedCustomersForAssign,
+                  onChange: (selectedRowKeys: React.Key[]) => {
+                    setSelectedCustomersForAssign(selectedRowKeys as number[]);
+                  }
+                }
+              : undefined
+          }
           {...getFullTableConfig(10)}
           pagination={{
             ...getFullTableConfig(10).pagination,
@@ -550,6 +666,43 @@ const CustomerManagement = () => {
             name="source"
           >
             <Input placeholder="请输入来源" />
+          </Form.Item>
+          <Form.Item
+            label="备注"
+            name="remark"
+          >
+            <Input.TextArea
+              placeholder="请输入备注"
+              rows={3}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 分配客户弹窗 */}
+      <Modal
+        open={isAssignModalVisible}
+        title="分配客户"
+        confirmLoading={assignLoading}
+        onCancel={handleAssignCancel}
+        onOk={handleAssignSubmit}
+      >
+        <Form
+          form={assignForm}
+          layout="vertical"
+        >
+          <Form.Item
+            label="分配给"
+            name="employeeId"
+            rules={[{ message: '请选择要分配的员工', required: true }]}
+          >
+            <Select
+              placeholder="请选择要分配的员工"
+              options={managedEmployees.map(employee => ({
+                label: `${employee.nickName} (${employee.userName})`,
+                value: employee.id
+              }))}
+            />
           </Form.Item>
           <Form.Item
             label="备注"

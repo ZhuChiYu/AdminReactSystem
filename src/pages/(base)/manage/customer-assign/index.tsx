@@ -76,8 +76,7 @@ const CustomerAssignManagement = () => {
         // 获取客户列表（所有数据）
         const customerResponse = await customerService.getCustomerList({
           current: 1,
-          scope: 'all',
-          size: 1000 // 显示所有客户数据
+          size: 1000
         });
         setCustomers(customerResponse.records);
 
