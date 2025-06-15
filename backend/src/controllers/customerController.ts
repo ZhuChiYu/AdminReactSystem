@@ -96,10 +96,20 @@ class CustomerController {
 
       // 格式化返回数据
       const records = customers.map(customer => {
-        // 判断是否需要脱敏处理
+        // 判断是否需要脱敏处理和编辑权限
         const isOwnCustomer = customer.createdById === user?.id;
+        const isAssignedToUser = customer.assignedToId === user?.id;
         const isSuperAdmin = user?.roles?.includes('super_admin');
-        const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer;
+        const isAdmin = user?.roles?.includes('admin');
+
+        // 脱敏规则：超级管理员、创建者、分配给的员工都可以看到完整信息
+        const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer && !isAssignedToUser;
+
+        // 编辑权限：超级管理员、创建者、分配给的员工都可以编辑
+        const canEdit = isSuperAdmin || isOwnCustomer || isAssignedToUser;
+
+        // 删除权限：超级管理员或创建者可以删除
+        const canDelete = isSuperAdmin || isOwnCustomer;
 
         return {
           assignedTime: customer.assignedTime,
@@ -109,9 +119,8 @@ class CustomerController {
                 name: customer.assignedTo.nickName
               }
             : null,
-          canDelete: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
-          // 添加权限字段
-          canEdit: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
+          canDelete,
+          canEdit,
           company: customer.company,
           createdAt: customer.createdAt,
           createdBy: customer.createdBy
@@ -120,7 +129,6 @@ class CustomerController {
                 name: customer.createdBy.nickName
               }
             : null,
-          // 对管理员查看其管理员工创建的客户进行脱敏
           customerName: shouldMaskSensitiveInfo ? '***' : customer.customerName,
           email: shouldMaskSensitiveInfo ? '***' : customer.email,
           followStatus: customer.followStatus,
@@ -229,8 +237,9 @@ class CustomerController {
 
       // 判断是否需要脱敏处理
       const isOwnCustomer = customer.createdById === user?.id;
+      const isAssignedToUser = customer.assignedToId === user?.id;
       const isSuperAdmin = user?.roles?.includes('super_admin');
-      const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer;
+      const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer && !isAssignedToUser;
 
       const result = {
         assignedTime: customer.assignedTime,
@@ -409,22 +418,21 @@ class CustomerController {
 
     try {
       // 检查客户是否存在并且用户有权限修改
-      const whereCondition: any = { id: Number(id) };
-
-      // 权限控制：超级管理员可以修改所有客户，其他用户只能修改自己创建的客户
-      if (!req.user.roles?.includes('super_admin')) {
-        whereCondition.createdById = req.user.id;
-      }
-
-      const existingCustomer = await prisma.customer.findFirst({
-        where: {
-          id: Number(id),
-          ...whereCondition
-        }
+      const existingCustomer = await prisma.customer.findUnique({
+        where: { id: Number(id) }
       });
 
       if (!existingCustomer) {
-        throw new NotFoundError('客户不存在或您没有权限修改此客户');
+        throw new NotFoundError('客户不存在');
+      }
+
+      // 权限控制：超级管理员可以修改所有客户，创建者可以修改自己创建的客户，分配给的员工也可以修改
+      const isSuperAdmin = req.user.roles?.includes('super_admin');
+      const isCreator = existingCustomer.createdById === req.user.id;
+      const isAssignedUser = existingCustomer.assignedToId === req.user.id;
+
+      if (!isSuperAdmin && !isCreator && !isAssignedUser) {
+        throw new NotFoundError('您没有权限修改此客户');
       }
 
       const customer = await prisma.customer.update({
