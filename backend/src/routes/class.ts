@@ -183,6 +183,15 @@ router.get('/students', async (req, res) => {
 
     const [students, total] = await Promise.all([
       prisma.classStudent.findMany({
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              nickName: true,
+              userName: true
+            }
+          }
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: pageSize,
@@ -201,6 +210,11 @@ router.get('/students', async (req, res) => {
         avatar: student.avatar,
         company: student.company,
         createdAt: student.createdAt.toISOString(),
+        createdBy: student.createdBy ? {
+          id: student.createdBy.id,
+          nickName: student.createdBy.nickName,
+          userName: student.createdBy.userName
+        } : null,
         email: student.email,
         gender: student.gender,
         id: student.id,
@@ -358,7 +372,8 @@ router.post('/students/import', upload.single('file'), async (req, res) => {
         phone: phone ? String(phone).replace(/\D/g, '') : '',
         position: position ? String(position).trim() : '',
         status: 1,
-        trainingFee: row['培训费'] ? Number(row['培训费']) : (row.trainingFee ? Number(row.trainingFee) : 0)
+        trainingFee: row['培训费'] ? Number(row['培训费']) : (row.trainingFee ? Number(row.trainingFee) : 0),
+        createdById: req.user?.id // 记录创建者
       };
 
       // 验证邮箱格式（如果提供了邮箱）
@@ -546,7 +561,17 @@ router.post('/students', async (req, res) => {
         joinDate: joinDate ? new Date(joinDate) : new Date(),
         trainingFee: trainingFee ? Number.parseFloat(trainingFee) : null,
         attendanceRate: 100,
-        status: 1
+        status: 1,
+        createdById: req.user?.id // 记录创建者
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
       }
     });
 
@@ -569,6 +594,11 @@ router.post('/students', async (req, res) => {
         avatar: newStudent.avatar,
         company: newStudent.company,
         createdAt: newStudent.createdAt.toISOString(),
+        createdBy: newStudent.createdBy ? {
+          id: newStudent.createdBy.id,
+          nickName: newStudent.createdBy.nickName,
+          userName: newStudent.createdBy.userName
+        } : null,
         email: newStudent.email,
         gender: newStudent.gender,
         id: newStudent.id,

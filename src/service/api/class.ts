@@ -40,6 +40,11 @@ export interface ClassStudent {
   attendanceRate: number;
   company: string;
   createdAt: string;
+  createdBy?: {
+    id: number;
+    nickName: string;
+    userName: string;
+  } | null;
   email?: string;
   id: number;
   joinDate: string;

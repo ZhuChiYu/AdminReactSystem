@@ -16,6 +16,7 @@ import {
 import {
   Button,
   Card,
+  DatePicker,
   Descriptions,
   Divider,
   Empty,
@@ -36,7 +37,6 @@ import {
   message
 } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
-import { DatePicker } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -44,8 +44,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import UserAvatar from '@/components/common/UserAvatar';
 import { attachmentService, classService, courseService, notificationService } from '@/service/api';
 import type { AttachmentApi, ClassApi, NotificationApi } from '@/service/api/types';
-import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
 import { isSuperAdmin } from '@/utils/auth';
+import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
 
 const { Text } = Typography;
 
@@ -199,8 +199,9 @@ const ClassDetail = () => {
 
       const formattedStudents = studentsResponse.records.map((student: any) => ({
         attendance: student.attendanceRate || 0,
-        avatar: null, // 使用默认头像
+        avatar: student.avatar || null,
         company: student.company || '',
+        createdBy: student.createdBy || null, // 包含创建者信息
         email: student.email || '',
         gender: student.gender || '',
         id: student.id,
@@ -341,36 +342,49 @@ const ClassDetail = () => {
 
   // 处理查看学员详情
   const handleViewStudentDetail = (student: any) => {
+    const isSuperAdminUser = isSuperAdmin();
+
     Modal.info({
       content: (
         <div>
           <p>
-            <strong>学员ID：</strong> {student.studentId}
-          </p>
-          <p>
             <strong>姓名：</strong> {student.name}
           </p>
           <p>
-            <strong>性别：</strong> {student.gender}
+            <strong>报名人：</strong>{' '}
+            {student.createdBy ? student.createdBy.nickName || student.createdBy.userName : '-'}
           </p>
-          <p>
-            <strong>单位：</strong> {student.company}
-          </p>
-          <p>
-            <strong>职务：</strong> {student.position}
-          </p>
-          <p>
-            <strong>电话：</strong> {student.phone}
-          </p>
-          <p>
-            <strong>座机号：</strong> {student.landline}
-          </p>
-          <p>
-            <strong>邮箱：</strong> {student.email}
-          </p>
-          <p>
-            <strong>加入日期：</strong> {student.joinDate}
-          </p>
+          {isSuperAdminUser && (
+            <>
+              <p>
+                <strong>学员ID：</strong> {student.studentId || student.id}
+              </p>
+              <p>
+                <strong>性别：</strong> {student.gender || '-'}
+              </p>
+              <p>
+                <strong>单位：</strong> {student.company || '-'}
+              </p>
+              <p>
+                <strong>职务：</strong> {student.position || '-'}
+              </p>
+              <p>
+                <strong>电话：</strong> {student.phone || '-'}
+              </p>
+              <p>
+                <strong>座机号：</strong> {student.landline || '-'}
+              </p>
+              <p>
+                <strong>邮箱：</strong> {student.email || '-'}
+              </p>
+              <p>
+                <strong>加入日期：</strong> {student.joinDate || '-'}
+              </p>
+              <p>
+                <strong>培训费：</strong> {student.trainingFee ? `¥${student.trainingFee}` : '-'}
+              </p>
+            </>
+          )}
         </div>
       ),
       title: '学员详情',
@@ -418,10 +432,10 @@ const ClassDetail = () => {
       // 合并表单数据和当前头像信息
       const updateData = {
         ...values,
-        // 处理日期格式
-        joinDate: values.joinDate ? values.joinDate.format('YYYY-MM-DD') : null,
         // 确保包含当前的头像信息
-        avatar: editFormStudent?.avatar || null
+        avatar: editFormStudent?.avatar || null,
+        // 处理日期格式
+        joinDate: values.joinDate ? values.joinDate.format('YYYY-MM-DD') : null
       };
 
       console.log('保存学员信息，数据:', {
@@ -544,84 +558,108 @@ const ClassDetail = () => {
     }
   };
 
-  // 学员列表表格列配置
-  const studentColumns = [
-    {
-      align: 'center' as const,
-      dataIndex: 'index',
-      key: 'index',
-      render: (_: any, __: any, index: number) => index + 1,
-      title: '序号',
-      width: 80
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'company',
-      key: 'company',
-      title: '单位',
-      width: 150
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string, record: any) => (
-        <Space>
-          <UserAvatar
-            avatar={record.avatar}
-            gender={record.gender}
-            size={40}
-          />
-          {text}
-        </Space>
-      ),
-      title: '姓名',
-      width: 120
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'gender',
-      key: 'gender',
-      title: '性别',
-      width: 80
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'position',
-      key: 'position',
-      title: '职务',
-      width: 120
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'phone',
-      key: 'phone',
-      title: '电话',
-      width: 120
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'trainingFee',
-      key: 'trainingFee',
-      render: (fee: string | null) => (fee ? `¥${fee}` : '-'),
-      title: '培训费',
-      width: 100
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'email',
-      key: 'email',
-      title: '邮箱',
-      width: 180
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'joinDate',
-      key: 'joinDate',
-      title: '加入日期',
-      width: 120
-    },
-    {
+  // 学员列表表格列配置 - 根据权限动态生成
+  const getStudentColumns = () => {
+    const isSuperAdminUser = isSuperAdmin();
+
+    // 基础列（所有用户都能看到）
+    const basicColumns = [
+      {
+        align: 'center' as const,
+        dataIndex: 'index',
+        key: 'index',
+        render: (_: any, __: any, index: number) => index + 1,
+        title: '序号',
+        width: 80
+      },
+      {
+        align: 'center' as const,
+        dataIndex: 'name',
+        key: 'name',
+        render: (text: string, record: any) => (
+          <Space>
+            <UserAvatar
+              avatar={record.avatar}
+              gender={record.gender}
+              size={40}
+            />
+            {text}
+          </Space>
+        ),
+        title: '姓名',
+        width: 120
+      },
+      {
+        align: 'center' as const,
+        dataIndex: 'createdBy',
+        key: 'createdBy',
+        render: (createdBy: any) => {
+          if (!createdBy) return '-';
+          return <span title={`用户名: ${createdBy.userName}`}>{createdBy.nickName || createdBy.userName}</span>;
+        },
+        title: '报名人',
+        width: 100
+      }
+    ];
+
+    // 超级管理员可以看到的额外列
+    const adminColumns = isSuperAdminUser
+      ? [
+          {
+            align: 'center' as const,
+            dataIndex: 'company',
+            key: 'company',
+            title: '单位',
+            width: 150
+          },
+          {
+            align: 'center' as const,
+            dataIndex: 'gender',
+            key: 'gender',
+            title: '性别',
+            width: 80
+          },
+          {
+            align: 'center' as const,
+            dataIndex: 'position',
+            key: 'position',
+            title: '职务',
+            width: 120
+          },
+          {
+            align: 'center' as const,
+            dataIndex: 'phone',
+            key: 'phone',
+            title: '电话',
+            width: 120
+          },
+          {
+            align: 'center' as const,
+            dataIndex: 'trainingFee',
+            key: 'trainingFee',
+            render: (fee: string | null) => (fee ? `¥${fee}` : '-'),
+            title: '培训费',
+            width: 100
+          },
+          {
+            align: 'center' as const,
+            dataIndex: 'email',
+            key: 'email',
+            title: '邮箱',
+            width: 180
+          },
+          {
+            align: 'center' as const,
+            dataIndex: 'joinDate',
+            key: 'joinDate',
+            title: '加入日期',
+            width: 120
+          }
+        ]
+      : [];
+
+    // 操作列
+    const actionColumn = {
       align: 'center' as const,
       fixed: 'right' as const,
       key: 'action',
@@ -634,27 +672,33 @@ const ClassDetail = () => {
           >
             详情
           </Button>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => handleEditStudent(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            size="small"
-            type="link"
-            onClick={() => handleRemoveStudent(record.id)}
-          >
-            删除
-          </Button>
+          {isSuperAdminUser && (
+            <>
+              <Button
+                size="small"
+                type="link"
+                onClick={() => handleEditStudent(record)}
+              >
+                编辑
+              </Button>
+              <Button
+                danger
+                size="small"
+                type="link"
+                onClick={() => handleRemoveStudent(record.id)}
+              >
+                删除
+              </Button>
+            </>
+          )}
         </Space>
       ),
       title: '操作',
-      width: 160
-    }
-  ];
+      width: isSuperAdminUser ? 160 : 80
+    };
+
+    return [...basicColumns, ...adminColumns, actionColumn];
+  };
 
   // 显示添加学员弹窗
   const handleShowAddModal = () => {
@@ -671,14 +715,14 @@ const ClassDetail = () => {
       // 准备提交数据
       const studentData = {
         classId: Number.parseInt(classId!, 10),
-        name: values.name,
-        gender: values.gender,
         company: values.company,
-        position: values.position || '',
-        phone: values.phone,
-        landline: values.landline || '',
         email: values.email || '',
+        gender: values.gender,
         joinDate: values.joinDate ? values.joinDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+        landline: values.landline || '',
+        name: values.name,
+        phone: values.phone,
+        position: values.position || '',
         trainingFee: values.trainingFee || null
       };
 
@@ -1573,34 +1617,38 @@ const ClassDetail = () => {
         variant="borderless"
         extra={
           <Space>
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleDownloadTemplate}
-            >
-              下载模板
-            </Button>
-            <Button
-              icon={<UploadOutlined />}
-              type="default"
-              onClick={handleShowImportModal}
-            >
-              批量导入
-            </Button>
-            <Button
-              type="primary"
-              onClick={handleShowAddModal}
-            >
-              添加学员
-            </Button>
-            <Button onClick={handleExportStudents}>导出学员</Button>
-            <Button
-              danger
-              disabled={selectedRowKeys.length === 0}
-              loading={deleteLoading}
-              onClick={handleBatchDelete}
-            >
-              批量删除
-            </Button>
+            {isSuperAdmin() && (
+              <>
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={handleDownloadTemplate}
+                >
+                  下载模板
+                </Button>
+                <Button
+                  icon={<UploadOutlined />}
+                  type="default"
+                  onClick={handleShowImportModal}
+                >
+                  批量导入
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={handleShowAddModal}
+                >
+                  添加学员
+                </Button>
+                <Button onClick={handleExportStudents}>导出学员</Button>
+                <Button
+                  danger
+                  disabled={selectedRowKeys.length === 0}
+                  loading={deleteLoading}
+                  onClick={handleBatchDelete}
+                >
+                  批量删除
+                </Button>
+              </>
+            )}
           </Space>
         }
       >
@@ -1618,21 +1666,25 @@ const ClassDetail = () => {
         </div>
 
         <Table
-          columns={studentColumns}
+          columns={getStudentColumns()}
           dataSource={filteredStudentList}
           loading={loading}
           rowKey="id"
-          rowSelection={{
-            onChange: onSelectChange,
-            selectedRowKeys
-          }}
-          scroll={{ x: 1200 }}
+          scroll={{ x: isSuperAdmin() ? 1200 : 400 }}
           pagination={{
             pageSize: 20,
             showQuickJumper: true,
             showSizeChanger: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
           }}
+          rowSelection={
+            isSuperAdmin()
+              ? {
+                  onChange: onSelectChange,
+                  selectedRowKeys
+                }
+              : undefined
+          }
         />
 
         {/* 批量导入弹窗 */}
@@ -2185,14 +2237,14 @@ const ClassDetail = () => {
                             下载
                           </Button>
                           {isSuperAdmin() && (
-                          <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            size="small"
-                            onClick={() => handleDeleteAttachment(record.id)}
-                          >
-                            删除
-                          </Button>
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              size="small"
+                              onClick={() => handleDeleteAttachment(record.id)}
+                            >
+                              删除
+                            </Button>
                           )}
                         </Space>
                       ),

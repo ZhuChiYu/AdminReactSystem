@@ -55,6 +55,7 @@ model User {
   responsibleTasks                Task[]                    @relation("TaskResponsiblePerson")
   uploadedTaskAttachments         TaskAttachment[]          @relation("TaskAttachmentUploader")
   userRoles                       UserRole[]
+  createdClassStudents            ClassStudent[]            @relation("ClassStudentCreatedBy")
   department                      Department?               @relation(fields: [departmentId], references: [id])
 
   @@map("users")
@@ -453,12 +454,14 @@ model ClassStudent {
   joinDate       DateTime @map("join_date")
   attendanceRate Int      @default(100) @map("attendance_rate")
   status         Int      @default(1)
+  createdById    Int?     @map("created_by_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   avatar         String?  @db.VarChar(500)
   gender         String?  @db.VarChar(10)
   trainingFee    Decimal? @map("training_fee") @db.Decimal(10, 2)
   class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdBy      User?    @relation("ClassStudentCreatedBy", fields: [createdById], references: [id])
 
   @@map("class_students")
 }
