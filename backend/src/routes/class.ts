@@ -205,6 +205,7 @@ router.get('/students', async (req, res) => {
         gender: student.gender,
         id: student.id,
         joinDate: student.joinDate.toISOString().split('T')[0],
+        landline: student.landline,
         name: student.name,
         phone: student.phone,
         position: student.position,
@@ -443,6 +444,155 @@ router.post('/students/import', upload.single('file'), async (req, res) => {
         logger.error('清理临时文件失败:', err);
       }
     }
+  }
+});
+
+/**
+ * @swagger
+ * /api/classes/students:
+ *   post:
+ *     summary: 添加学员
+ *     tags: [班级管理]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - classId
+ *               - name
+ *               - company
+ *               - phone
+ *             properties:
+ *               classId:
+ *                 type: integer
+ *                 description: 班级ID
+ *               name:
+ *                 type: string
+ *                 description: 学员姓名
+ *               gender:
+ *                 type: string
+ *                 description: 性别
+ *               company:
+ *                 type: string
+ *                 description: 单位名称
+ *               position:
+ *                 type: string
+ *                 description: 职务
+ *               phone:
+ *                 type: string
+ *                 description: 电话
+ *               landline:
+ *                 type: string
+ *                 description: 座机号
+ *               email:
+ *                 type: string
+ *                 description: 邮箱
+ *               joinDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 加入日期
+ *               trainingFee:
+ *                 type: number
+ *                 description: 培训费
+ *     responses:
+ *       200:
+ *         description: 添加成功
+ *       400:
+ *         description: 参数错误
+ */
+router.post('/students', async (req, res) => {
+  try {
+    const { classId, name, gender, company, position, phone, landline, email, joinDate, trainingFee } = req.body;
+
+    // 验证必填字段
+    if (!classId || !name || !company || !phone) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '缺少必填字段：班级ID、姓名、单位、电话',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 验证班级是否存在
+    const classExists = await prisma.class.findUnique({
+      where: { id: Number.parseInt(classId) }
+    });
+
+    if (!classExists) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '班级不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 创建学员
+    const newStudent = await prisma.classStudent.create({
+      data: {
+        classId: Number.parseInt(classId),
+        name: name.trim(),
+        gender: gender || '',
+        company: company.trim(),
+        position: position ? position.trim() : '',
+        phone: phone.trim(),
+        landline: landline ? landline.trim() : '',
+        email: email ? email.trim() : '',
+        joinDate: joinDate ? new Date(joinDate) : new Date(),
+        trainingFee: trainingFee ? Number.parseFloat(trainingFee) : null,
+        attendanceRate: 100,
+        status: 1
+      }
+    });
+
+    // 更新班级学员数量
+    const totalStudents = await prisma.classStudent.count({
+      where: { classId: Number.parseInt(classId) }
+    });
+
+    await prisma.class.update({
+      data: { studentCount: totalStudents },
+      where: { id: Number.parseInt(classId) }
+    });
+
+    logger.info(`班级${classId}添加学员成功: ${newStudent.name}`);
+
+    res.json({
+      code: 0,
+      data: {
+        attendanceRate: newStudent.attendanceRate,
+        avatar: newStudent.avatar,
+        company: newStudent.company,
+        createdAt: newStudent.createdAt.toISOString(),
+        email: newStudent.email,
+        gender: newStudent.gender,
+        id: newStudent.id,
+        joinDate: newStudent.joinDate.toISOString().split('T')[0],
+        landline: newStudent.landline,
+        name: newStudent.name,
+        phone: newStudent.phone,
+        position: newStudent.position,
+        status: newStudent.status,
+        trainingFee: newStudent.trainingFee ? newStudent.trainingFee.toString() : null
+      },
+      message: '学员添加成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    logger.error('添加学员失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '添加学员失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
   }
 });
 
@@ -1118,7 +1268,7 @@ router.delete('/categories/:id', async (req, res) => {
 router.put('/students/:id', async (req, res) => {
   try {
     const studentId = Number.parseInt(req.params.id);
-    const { avatar, company, email, gender, name, phone, position, trainingFee } = req.body;
+    const { avatar, company, email, gender, joinDate, landline, name, phone, position, trainingFee } = req.body;
 
     logger.info('更新学员信息请求:', {
       hasAvatar: Boolean(avatar),
@@ -1159,7 +1309,9 @@ router.put('/students/:id', async (req, res) => {
         ...(company && { company }),
         ...(position !== undefined && { position }),
         ...(phone !== undefined && { phone }),
+        ...(landline !== undefined && { landline }),
         ...(email !== undefined && { email }),
+        ...(joinDate && { joinDate: new Date(joinDate) }),
         ...(trainingFee !== undefined && { trainingFee: trainingFee ? Number.parseFloat(trainingFee) : null }),
         // 只有当请求明确包含头像信息时才更新头像字段
         ...(avatar !== undefined && { avatar })
@@ -1180,6 +1332,7 @@ router.put('/students/:id', async (req, res) => {
         gender: updatedStudent.gender,
         id: updatedStudent.id,
         joinDate: updatedStudent.joinDate.toISOString().split('T')[0],
+        landline: updatedStudent.landline,
         name: updatedStudent.name,
         phone: updatedStudent.phone,
         position: updatedStudent.position,
