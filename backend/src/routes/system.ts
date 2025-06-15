@@ -625,7 +625,7 @@ router.get('/roles', async (req, res) => {
 router.put('/roles/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { remark, roleCode, roleName, status } = req.body;
+    const { department, remark, roleCode, roleName, status } = req.body;
 
     // 检查角色是否存在
     const existingRole = await prisma.role.findUnique({
@@ -659,6 +659,7 @@ router.put('/roles/:id', async (req, res) => {
 
     const role = await prisma.role.update({
       data: {
+        department,
         remark,
         roleCode,
         roleName,
@@ -811,7 +812,7 @@ router.post('/roles/batch-delete', async (req, res) => {
 // 创建角色
 router.post('/roles', async (req, res) => {
   try {
-    const { remark, roleCode, roleName, sort, status } = req.body;
+    const { department, remark, roleCode, roleName, sort, status } = req.body;
 
     // 检查角色代码是否已存在
     const existingRole = await prisma.role.findUnique({
@@ -824,9 +825,11 @@ router.post('/roles', async (req, res) => {
 
     const role = await prisma.role.create({
       data: {
+        department,
         remark,
         roleCode,
         roleName,
+        roleType: 'position', // 默认创建职务角色
         sort: sort || 0,
         status: status || 1
       }
