@@ -3,16 +3,21 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  EditOutlined,
+  ExclamationCircleOutlined,
+  EyeOutlined,
   InboxOutlined,
   LoadingOutlined,
   PaperClipOutlined,
-  UploadOutlined
+  PlusOutlined,
+  UploadOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 import {
   Button,
   Card,
-  DatePicker,
   Descriptions,
+  Divider,
   Empty,
   Form,
   Input,
@@ -30,13 +35,17 @@ import {
   Upload,
   message
 } from 'antd';
+import type { UploadFile } from 'antd/es/upload/interface';
+import { DatePicker } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import UserAvatar from '@/components/common/UserAvatar';
 import { attachmentService, classService, courseService, notificationService } from '@/service/api';
-import type { AttachmentApi, NotificationApi } from '@/service/api/types';
+import type { AttachmentApi, ClassApi, NotificationApi } from '@/service/api/types';
+import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
+import { isSuperAdmin } from '@/utils/auth';
 
 const { Text } = Typography;
 
@@ -372,7 +381,12 @@ const ClassDetail = () => {
   // 处理编辑学员
   const handleEditStudent = (student: any) => {
     setEditFormStudent(student);
-    editForm.setFieldsValue(student);
+    // 处理日期字段
+    const formData = {
+      ...student,
+      joinDate: student.joinDate ? dayjs(student.joinDate) : null
+    };
+    editForm.setFieldsValue(formData);
     setEditModalVisible(true);
   };
 
@@ -404,6 +418,8 @@ const ClassDetail = () => {
       // 合并表单数据和当前头像信息
       const updateData = {
         ...values,
+        // 处理日期格式
+        joinDate: values.joinDate ? values.joinDate.format('YYYY-MM-DD') : null,
         // 确保包含当前的头像信息
         avatar: editFormStudent?.avatar || null
       };
@@ -649,23 +665,28 @@ const ClassDetail = () => {
   // 保存新增学员
   const handleAddStudent = async () => {
     try {
+      setLoading(true);
       const values = await addForm.validateFields();
 
-      // 生成新的学员ID
-      const newId = studentList.length > 0 ? Math.max(...studentList.map(s => s.id)) + 1 : 1;
-
-      // 创建新学员对象
-      const newStudent = {
-        ...values,
-        // 不设置avatar，让UserAvatar组件根据gender显示默认头像
-        avatar: null,
-        id: newId,
-        joinDate: values.joinDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
-        studentId: `${Date.now()}`.slice(-10)
+      // 准备提交数据
+      const studentData = {
+        classId: Number.parseInt(classId!, 10),
+        name: values.name,
+        gender: values.gender,
+        company: values.company,
+        position: values.position || '',
+        phone: values.phone,
+        landline: values.landline || '',
+        email: values.email || '',
+        joinDate: values.joinDate ? values.joinDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+        trainingFee: values.trainingFee || null
       };
 
-      // 更新学员列表
-      setStudentList([...studentList, newStudent]);
+      // 调用后端API创建学员
+      const newStudent = await classService.createStudent(studentData);
+
+      // 重新获取学员列表以确保数据同步
+      await fetchClassInfo();
 
       // 关闭弹窗并清空表单
       setAddModalVisible(false);
@@ -673,7 +694,10 @@ const ClassDetail = () => {
 
       message.success('学员添加成功');
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('添加学员失败:', error);
+      message.error('添加学员失败');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1723,6 +1747,18 @@ const ClassDetail = () => {
               <Input placeholder="请输入电话" />
             </Form.Item>
             <Form.Item
+              label="培训费"
+              name="trainingFee"
+            >
+              <InputNumber
+                addonBefore="¥"
+                min={0}
+                placeholder="请输入培训费"
+                precision={2}
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item
               label="座机号"
               name="landline"
             >
@@ -1833,11 +1869,23 @@ const ClassDetail = () => {
               />
             </Form.Item>
             <Form.Item
+              label="座机号"
+              name="landline"
+            >
+              <Input placeholder="请输入座机号" />
+            </Form.Item>
+            <Form.Item
               label="邮箱"
               name="email"
               rules={[{ message: '请输入有效的邮箱地址', type: 'email' }]}
             >
               <Input placeholder="请输入邮箱" />
+            </Form.Item>
+            <Form.Item
+              label="加入日期"
+              name="joinDate"
+            >
+              <DatePicker className="w-full" />
             </Form.Item>
           </Form>
         </Modal>
@@ -2136,14 +2184,16 @@ const ClassDetail = () => {
                           >
                             下载
                           </Button>
-                          <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            size="small"
-                            onClick={() => handleDeleteAttachment(record.id)}
-                          >
-                            删除
-                          </Button>
+                          {isSuperAdmin() && (
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              size="small"
+                              onClick={() => handleDeleteAttachment(record.id)}
+                            >
+                              删除
+                            </Button>
+                          )}
                         </Space>
                       ),
                       title: '操作',

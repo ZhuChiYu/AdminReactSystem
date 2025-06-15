@@ -229,6 +229,17 @@ export const classService = {
     }
   },
 
+  /** 添加学员 */
+  async createStudent(data: any): Promise<any> {
+    try {
+      const response = await apiClient.post('/classes/students', data);
+      return response;
+    } catch (error) {
+      console.error('添加学员失败:', error);
+      throw error;
+    }
+  },
+
   /** 批量导入学员 */
   async importStudentsBatch(classId: number, file: File): Promise<any> {
     try {
