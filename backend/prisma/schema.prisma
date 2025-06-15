@@ -80,6 +80,7 @@ model Role {
   id              Int              @id @default(autoincrement())
   roleName        String           @map("role_name") @db.VarChar(100)
   roleCode        String           @unique @map("role_code") @db.VarChar(50)
+  department      String?          @db.VarChar(100)
   status          Int              @default(1)
   sort            Int              @default(0)
   remark          String?
@@ -404,6 +405,7 @@ model ClassStudent {
   company        String   @db.VarChar(200)
   position       String?  @db.VarChar(100)
   phone          String?  @db.VarChar(20)
+  landline       String?  @db.VarChar(20)
   email          String?  @db.VarChar(100)
   joinDate       DateTime @map("join_date")
   attendanceRate Int      @default(100) @map("attendance_rate")
