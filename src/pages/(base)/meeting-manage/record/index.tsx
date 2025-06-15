@@ -83,9 +83,12 @@ const Component: React.FC = () => {
     try {
       const response = await meetingService.getMeetingList({
         current: 1,
-        size: 1000
+        size: 1000 // 获取所有会议，暂时不过滤审批状态
       });
-      setMeetings(response.records);
+      const records = response.records || [];
+      setMeetings(records);
+      console.log('获取到的会议列表:', records); // 调试日志
+      console.log('会议数量:', records.length); // 调试日志
     } catch (error) {
       console.error('获取会议列表失败:', error);
     }
@@ -94,11 +97,26 @@ const Component: React.FC = () => {
   // 获取会议记录列表
   const fetchRecords = async () => {
     try {
-      // 由于后端还没有会议记录API，暂时使用空数据
-      // 这里可以调用 meetingService.getMeetingRecordList() 当API实现后
-      setRecords([]);
+      const response = await meetingService.getMeetingRecordList({
+        current: 1,
+        size: 1000
+      });
+
+      // 转换API数据格式
+      const formattedRecords: MeetingRecord[] = response.records.map((record: any) => ({
+        attendees: [], // 从会议参与者中获取
+        content: record.content,
+        id: record.id.toString(),
+        meetingId: record.meetingId.toString(),
+        meetingTitle: record.meeting?.title || '',
+        participantRecords: [],
+        recordDate: dayjs(record.recordTime).format('YYYY-MM-DD'),
+        recorder: record.recorder?.nickName || record.recorder?.userName || '',
+        tags: []
+      }));
+
+      setRecords(formattedRecords);
     } catch (error) {
-      message.error('获取会议记录失败');
       console.error('获取会议记录失败:', error);
     }
   };
@@ -129,7 +147,7 @@ const Component: React.FC = () => {
   const handleOk = () => {
     form
       .validateFields()
-      .then(values => {
+      .then(async values => {
         // 转换日期格式
         const formattedValues = {
           ...values,
@@ -138,28 +156,28 @@ const Component: React.FC = () => {
 
         if (editingRecord) {
           // 更新记录
-          const updatedRecords = records.map(record => {
-            if (record.id === editingRecord.id) {
-              return {
-                ...record,
-                ...formattedValues
-              };
-            }
-            return record;
-          });
-          setRecords(updatedRecords);
-          message.success('会议记录已更新');
+          try {
+            await meetingService.updateMeetingRecord(Number(editingRecord.id), {
+              content: formattedValues.content,
+              title: getMeetingTitle(formattedValues.meetingId)
+            });
+            message.success('会议记录已更新');
+            fetchRecords(); // 重新获取列表
+          } catch (error) {
+            message.error('更新会议记录失败');
+          }
         } else {
           // 创建新记录
-          const newRecord: MeetingRecord = {
-            ...formattedValues,
-            id: (records.length + 1).toString(),
-            meetingTitle: getMeetingTitle(formattedValues.meetingId),
-            participantRecords: [],
-            recorder: currentUser
-          };
-          setRecords([...records, newRecord]);
-          message.success('会议记录已创建');
+          try {
+            await meetingService.createMeetingRecord({
+              meetingId: Number(formattedValues.meetingId),
+              content: formattedValues.content
+            });
+            message.success('会议记录已创建');
+            fetchRecords(); // 重新获取列表
+          } catch (error) {
+            message.error('创建会议记录失败');
+          }
         }
         setIsModalVisible(false);
       })
@@ -344,9 +362,11 @@ const Component: React.FC = () => {
             rules={[{ message: '请选择会议', required: true }]}
           >
             <Select placeholder="请选择会议">
-              <Select.Option value="1">项目进度汇报会 (2023-10-20)</Select.Option>
-              <Select.Option value="2">季度业绩分析会 (2023-10-22)</Select.Option>
-              <Select.Option value="3">产品设计讨论会 (2023-10-18)</Select.Option>
+              {meetings.map(meeting => (
+                <Select.Option key={meeting.id} value={meeting.id.toString()}>
+                  {meeting.title} ({dayjs(meeting.startTime).format('YYYY-MM-DD')})
+                </Select.Option>
+              ))}
             </Select>
           </Form.Item>
 

@@ -45,6 +45,8 @@ model User {
   followRecords                   FollowRecord[]
   meetingParticipants             MeetingParticipant[]
   organizedMeetings               Meeting[]                 @relation("MeetingOrganizer")
+  meetingRecords                  MeetingRecord[]           @relation("MeetingRecorder")
+  meetingSummaries                MeetingSummary[]          @relation("MeetingSummaryCreator")
   uploadedNotificationAttachments NotificationAttachment[]  @relation("NotificationAttachmentUploader")
   operationLogs                   OperationLog[]
   consultantTasks                 Task[]                    @relation("TaskConsultant")
@@ -274,6 +276,8 @@ model Meeting {
   createdAt      DateTime             @default(now()) @map("created_at")
   updatedAt      DateTime             @updatedAt @map("updated_at")
   participants   MeetingParticipant[]
+  records        MeetingRecord[]
+  summaries      MeetingSummary[]
   organizer      User                 @relation("MeetingOrganizer", fields: [organizerId], references: [id])
   room           MeetingRoom?         @relation(fields: [roomId], references: [id])
 
@@ -293,6 +297,45 @@ model MeetingParticipant {
 
   @@unique([meetingId, userId])
   @@map("meeting_participants")
+}
+
+model MeetingRecord {
+  id          Int      @id @default(autoincrement())
+  meetingId   Int      @map("meeting_id")
+  title       String   @db.VarChar(200)
+  content     String
+  keyPoints   String?  @map("key_points")
+  actionItems String?  @map("action_items")
+  decisions   String?
+  nextSteps   String?  @map("next_steps")
+  recorderId  Int      @map("recorder_id")
+  recordTime  DateTime @default(now()) @map("record_time")
+  attachments Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  recorder    User     @relation("MeetingRecorder", fields: [recorderId], references: [id])
+
+  @@map("meeting_records")
+}
+
+model MeetingSummary {
+  id           Int      @id @default(autoincrement())
+  meetingId    Int      @map("meeting_id")
+  title        String   @db.VarChar(200)
+  content      String
+  conclusion   String?
+  nextSteps    String?  @map("next_steps")
+  participants Json?
+  tags         Json?
+  creatorId    Int      @map("creator_id")
+  status       Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  meeting      Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  creator      User     @relation("MeetingSummaryCreator", fields: [creatorId], references: [id])
+
+  @@map("meeting_summaries")
 }
 
 model FinancialRecord {

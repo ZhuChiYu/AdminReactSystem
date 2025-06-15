@@ -182,6 +182,65 @@ export class MeetingService {
       throw error;
     }
   }
+
+  /** 创建会议记录 */
+  async createMeetingRecord(data: {
+    meetingId: number;
+    content: string;
+    title?: string;
+    keyPoints?: string;
+    actionItems?: string;
+    decisions?: string;
+    nextSteps?: string;
+  }) {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>('/meetings/records', data);
+      return response;
+    } catch (error) {
+      console.error('创建会议记录失败:', error);
+      throw error;
+    }
+  }
+
+  /** 获取会议记录列表 */
+  async getMeetingRecordList(params: MeetingApi.MeetingQueryParams) {
+    try {
+      const response = await apiClient.get<PageResponse<any>>('/meetings/records', {
+        params
+      });
+      return response;
+    } catch (error) {
+      console.error('获取会议记录列表失败:', error);
+      return {
+        current: params?.current || 1,
+        pages: 0,
+        records: [],
+        size: params?.size || 10,
+        total: 0
+      };
+    }
+  }
+
+  /** 更新会议记录 */
+  async updateMeetingRecord(
+    recordId: number,
+    data: {
+      title?: string;
+      content?: string;
+      keyPoints?: string;
+      actionItems?: string;
+      decisions?: string;
+      nextSteps?: string;
+    }
+  ) {
+    try {
+      const response = await apiClient.put<ApiResponse<any>>(`/meetings/records/${recordId}`, data);
+      return response;
+    } catch (error) {
+      console.error('更新会议记录失败:', error);
+      throw error;
+    }
+  }
 }
 
 // 创建单例实例

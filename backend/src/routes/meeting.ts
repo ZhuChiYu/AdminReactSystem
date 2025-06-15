@@ -249,17 +249,40 @@ router.get('/summaries', async (req, res) => {
     const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
     const take = Number.parseInt(size as string);
 
-    // 由于我们还没有meeting_summaries表，暂时返回空数据
-    // 后续可以创建该表并实现完整功能
-    const records: any[] = [];
-    const total = 0;
+    // 获取会议总结列表
+    const summaries = await prisma.meetingSummary.findMany({
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+      where
+    });
+
+    const total = await prisma.meetingSummary.count({ where });
 
     res.json({
       code: 0,
       data: {
         current: Number.parseInt(current as string),
         pages: Math.ceil(total / take),
-        records,
+        records: summaries,
         size: Number.parseInt(size as string),
         total
       },
@@ -279,75 +302,7 @@ router.get('/summaries', async (req, res) => {
   }
 });
 
-// 获取会议详情
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const meeting = await prisma.meeting.findUnique({
-      include: {
-        organizer: {
-          select: {
-            email: true,
-            id: true,
-            nickName: true,
-            userName: true
-          }
-        },
-        participants: {
-          include: {
-            user: {
-              select: {
-                department: {
-                  select: {
-                    name: true
-                  }
-                },
-                email: true,
-                id: true,
-                nickName: true,
-                userName: true
-              }
-            }
-          }
-        },
-        room: true
-      },
-      where: { id: Number.parseInt(id) }
-    });
-
-    if (!meeting) {
-      throw new ApiError(404, '会议不存在');
-    }
-
-    res.json({
-      code: 0,
-      data: meeting,
-      message: '获取会议详情成功',
-      path: req.path,
-      timestamp: Date.now()
-    });
-  } catch (error: any) {
-    logger.error('获取会议详情失败:', error);
-    if (error instanceof ApiError) {
-      res.status(error.statusCode).json({
-        code: error.statusCode,
-        data: null,
-        message: error.message,
-        path: req.path,
-        timestamp: Date.now()
-      });
-    } else {
-      res.status(500).json({
-        code: 500,
-        data: null,
-        message: '获取会议详情失败',
-        path: req.path,
-        timestamp: Date.now()
-      });
-    }
-  }
-});
+// 注意：动态路由 /:id 必须放在所有静态路由之后
 
 // 创建会议
 router.post('/', authMiddleware, async (req, res) => {
@@ -871,6 +826,489 @@ router.get('/statistics/overview', async (req, res) => {
       path: req.path,
       timestamp: Date.now()
     });
+  }
+});
+
+// ==================== 会议记录相关API ====================
+
+// 获取会议记录列表
+router.get('/records', async (req, res) => {
+  try {
+    const { current = 1, size = 10, meetingId, recorderId } = req.query;
+
+    const where: any = {};
+    if (meetingId) {
+      where.meetingId = Number.parseInt(meetingId as string);
+    }
+    if (recorderId) {
+      where.recorderId = Number.parseInt(recorderId as string);
+    }
+
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
+
+    const records = await prisma.meetingRecord.findMany({
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        recorder: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+      where
+    });
+
+    const total = await prisma.meetingRecord.count({ where });
+
+    res.json({
+      code: 0,
+      data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / take),
+        records,
+        size: Number.parseInt(size as string),
+        total
+      },
+      message: '获取会议记录列表成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('获取会议记录列表失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '获取会议记录列表失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 创建会议记录
+router.post('/records', authMiddleware, async (req, res) => {
+  try {
+    const { meetingId, title, content, keyPoints, actionItems, decisions, nextSteps } = req.body;
+
+    if (!meetingId || !content) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '会议ID和记录内容不能为空',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 检查会议是否存在
+    const meeting = await prisma.meeting.findUnique({
+      where: { id: meetingId }
+    });
+
+    if (!meeting) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '会议不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    const record = await prisma.meetingRecord.create({
+      data: {
+        meetingId,
+        title: title || `${meeting.title} - 会议记录`,
+        content,
+        keyPoints,
+        actionItems,
+        decisions,
+        nextSteps,
+        recorderId: req.user?.id || 1
+      },
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        recorder: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      code: 0,
+      data: record,
+      message: '会议记录创建成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('创建会议记录失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '创建会议记录失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 更新会议记录
+router.put('/records/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content, keyPoints, actionItems, decisions, nextSteps } = req.body;
+
+    const record = await prisma.meetingRecord.update({
+      data: {
+        title,
+        content,
+        keyPoints,
+        actionItems,
+        decisions,
+        nextSteps
+      },
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        recorder: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      },
+      where: { id: Number.parseInt(id) }
+    });
+
+    res.json({
+      code: 0,
+      data: record,
+      message: '会议记录更新成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('更新会议记录失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '更新会议记录失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// ==================== 会议总结相关API ====================
+
+// 获取会议总结列表
+router.get('/summaries', async (req, res) => {
+  try {
+    const { current = 1, size = 10, meetingId, creatorId } = req.query;
+
+    const where: any = {};
+    if (meetingId) {
+      where.meetingId = Number.parseInt(meetingId as string);
+    }
+    if (creatorId) {
+      where.creatorId = Number.parseInt(creatorId as string);
+    }
+
+    const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
+    const take = Number.parseInt(size as string);
+
+    const summaries = await prisma.meetingSummary.findMany({
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+      where
+    });
+
+    const total = await prisma.meetingSummary.count({ where });
+
+    res.json({
+      code: 0,
+      data: {
+        current: Number.parseInt(current as string),
+        pages: Math.ceil(total / take),
+        records: summaries,
+        size: Number.parseInt(size as string),
+        total
+      },
+      message: '获取会议总结列表成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('获取会议总结列表失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '获取会议总结列表失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 创建会议总结
+router.post('/summaries', authMiddleware, async (req, res) => {
+  try {
+    const { meetingId, title, content, conclusion, nextSteps, participants, tags } = req.body;
+
+    if (!meetingId || !content) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '会议ID和总结内容不能为空',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 检查会议是否存在
+    const meeting = await prisma.meeting.findUnique({
+      where: { id: meetingId }
+    });
+
+    if (!meeting) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '会议不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    const summary = await prisma.meetingSummary.create({
+      data: {
+        meetingId,
+        title: title || `${meeting.title} - 会议总结`,
+        content,
+        conclusion,
+        nextSteps,
+        participants: participants ? JSON.stringify(participants) : null,
+        tags: tags ? JSON.stringify(tags) : null,
+        creatorId: req.user?.id || 1
+      },
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      code: 0,
+      data: summary,
+      message: '会议总结创建成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('创建会议总结失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '创建会议总结失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 更新会议总结
+router.put('/summaries/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content, conclusion, nextSteps, participants, tags, status } = req.body;
+
+    const summary = await prisma.meetingSummary.update({
+      data: {
+        title,
+        content,
+        conclusion,
+        nextSteps,
+        participants: participants ? JSON.stringify(participants) : undefined,
+        tags: tags ? JSON.stringify(tags) : undefined,
+        status
+      },
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      },
+      where: { id: Number.parseInt(id) }
+    });
+
+    res.json({
+      code: 0,
+      data: summary,
+      message: '会议总结更新成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('更新会议总结失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '更新会议总结失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// ==================== 动态路由（必须放在最后） ====================
+
+// 获取会议详情
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const meeting = await prisma.meeting.findUnique({
+      include: {
+        organizer: {
+          select: {
+            email: true,
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        },
+        participants: {
+          include: {
+            user: {
+              select: {
+                department: {
+                  select: {
+                    name: true
+                  }
+                },
+                email: true,
+                id: true,
+                nickName: true,
+                userName: true
+              }
+            }
+          }
+        },
+        room: true
+      },
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!meeting) {
+      throw new ApiError(404, '会议不存在');
+    }
+
+    res.json({
+      code: 0,
+      data: meeting,
+      message: '获取会议详情成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('获取会议详情失败:', error);
+    if (error instanceof ApiError) {
+      res.status(error.statusCode).json({
+        code: error.statusCode,
+        data: null,
+        message: error.message,
+        path: req.path,
+        timestamp: Date.now()
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        data: null,
+        message: '获取会议详情失败',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
   }
 });
 

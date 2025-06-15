@@ -13,6 +13,7 @@ import {
   Typography,
   message
 } from 'antd';
+import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -157,11 +158,10 @@ const Component: React.FC = () => {
       const values = await recordForm.validateFields();
 
       if (currentMeeting) {
-        // 由于API类型定义中没有meetingRecord字段，这里暂时注释掉或使用其他方式处理
-        // await meetingService.updateMeeting(currentMeeting.id, {
-        //   meetingRecord: values.content
-        // });
-        console.log('保存会议记录:', values.content);
+        await meetingService.createMeetingRecord({
+          meetingId: currentMeeting.id,
+          content: values.content
+        });
         message.success('会议记录保存成功');
         setRecordModalVisible(false);
         fetchMeetings(); // 重新获取列表
@@ -187,11 +187,10 @@ const Component: React.FC = () => {
       const values = await summaryForm.validateFields();
 
       if (currentMeeting) {
-        // 由于API类型定义中没有meetingSummary字段，这里暂时注释掉或使用其他方式处理
-        // await meetingService.updateMeeting(currentMeeting.id, {
-        //   meetingSummary: values.content
-        // });
-        console.log('保存会议总结:', values.content);
+        await meetingService.createMeetingSummary({
+          meetingId: currentMeeting.id,
+          content: values.content
+        });
         message.success('会议总结保存成功');
         setSummaryModalVisible(false);
         fetchMeetings(); // 重新获取列表
@@ -234,13 +233,15 @@ const Component: React.FC = () => {
       dataIndex: 'startTime',
       key: 'startTime',
       title: '开始时间',
-      ...getCenterColumnConfig()
+      ...getCenterColumnConfig(),
+      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm')
     },
     {
       dataIndex: 'endTime',
       key: 'endTime',
       title: '结束时间',
-      ...getCenterColumnConfig()
+      ...getCenterColumnConfig(),
+      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm')
     },
     {
       dataIndex: 'location',

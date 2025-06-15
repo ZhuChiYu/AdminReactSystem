@@ -25,6 +25,7 @@ import {
   Typography,
   message
 } from 'antd';
+import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 
 import { meetingService } from '@/service/api';
@@ -35,22 +36,49 @@ const { Paragraph, Text, Title } = Typography;
 const { TextArea } = Input;
 
 interface MeetingSummary {
-  author: string;
-  conclusion: string;
   content: string;
+  createTime: string;
+  creator: string;
   id: string;
+  meetingDate: string;
   meetingId: string;
   meetingTitle: string;
-  nextSteps: string[];
-  summaryDate: string;
-  tags: string[];
+  participants: string[];
+  status: string;
 }
 
 const MeetingSummaryPage = () => {
   const [summaries, setSummaries] = useState<MeetingSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [createVisible, setCreateVisible] = useState(false);
   const [selectedSummary, setSelectedSummary] = useState<MeetingSummary | null>(null);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [form] = Form.useForm();
+
+  // 获取会议列表
+  const fetchMeetings = async () => {
+    try {
+      console.log('开始获取会议列表...'); // 调试日志
+      const response = await meetingService.getMeetingList({
+        current: 1,
+        size: 1000 // 获取所有会议，暂时不过滤审批状态
+      });
+      console.log('API响应:', response); // 调试日志
+      // response 直接就是 data 部分，包含 records 属性
+      const records = (response as any).records || [];
+      setMeetings(records);
+      console.log('获取到的会议列表:', records); // 调试日志
+      console.log('会议数量:', records.length); // 调试日志
+
+      if (records.length === 0) {
+        console.warn('会议列表为空，可能的原因：权限限制、数据库无数据、API错误');
+      }
+    } catch (error) {
+      console.error('获取会议列表失败:', error);
+      message.error('获取会议列表失败，请检查网络连接或联系管理员');
+    }
+  };
 
   // 获取会议总结列表
   const fetchSummaries = async () => {
@@ -64,13 +92,13 @@ const MeetingSummaryPage = () => {
       // 转换API数据格式
       const formattedSummaries: MeetingSummary[] = response.records.map((summary: any) => ({
         content: summary.content,
-        createTime: summary.createTime,
-        creator: summary.creator?.name || '',
+        createTime: summary.createdAt,
+        creator: summary.creator?.nickName || summary.creator?.userName || '',
         id: summary.id,
-        meetingDate: summary.meetingDate,
+        meetingDate: summary.meeting?.startTime,
         meetingId: summary.meetingId,
-        meetingTitle: summary.meetingTitle,
-        participants: summary.participants || [],
+        meetingTitle: summary.meeting?.title || summary.title,
+        participants: summary.participants ? JSON.parse(summary.participants) : [],
         status: summary.status === 1 ? 'published' : 'draft'
       }));
 
@@ -85,11 +113,35 @@ const MeetingSummaryPage = () => {
 
   useEffect(() => {
     fetchSummaries();
+    fetchMeetings();
   }, []);
 
   const showDetail = (summary: MeetingSummary) => {
     setSelectedSummary(summary);
     setDetailVisible(true);
+  };
+
+  const showCreateModal = () => {
+    form.resetFields();
+    setCreateVisible(true);
+  };
+
+  const handleCreate = async () => {
+    try {
+      const values = await form.validateFields();
+
+      await meetingService.createMeetingSummary({
+        content: values.content,
+        meetingId: values.meetingId
+      });
+
+      message.success('会议总结创建成功');
+      setCreateVisible(false);
+      fetchSummaries(); // 重新获取列表
+    } catch (error) {
+      message.error('创建会议总结失败');
+      console.error('创建会议总结失败:', error);
+    }
   };
 
   const columns = [
@@ -163,6 +215,7 @@ const MeetingSummaryPage = () => {
           <Button
             icon={<PlusOutlined />}
             type="primary"
+            onClick={showCreateModal}
           >
             新建总结
           </Button>
@@ -185,6 +238,65 @@ const MeetingSummaryPage = () => {
         />
       </Card>
 
+      {/* 新建总结弹窗 */}
+      <Modal
+        destroyOnClose
+        open={createVisible}
+        title="新建会议总结"
+        width={800}
+        onCancel={() => setCreateVisible(false)}
+        onOk={handleCreate}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+        >
+          <Form.Item
+            label="选择会议"
+            name="meetingId"
+            rules={[{ message: '请选择会议', required: true }]}
+          >
+            <Select
+              showSearch
+              placeholder="请选择会议"
+              filterOption={(input, option) =>
+                String(option?.label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }
+            >
+              {meetings.map(meeting => (
+                <Select.Option
+                  key={meeting.id}
+                  label={meeting.title}
+                  value={meeting.id}
+                >
+                  {meeting.title} ({dayjs(meeting.startTime).format('YYYY-MM-DD')})
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="总结标题"
+            name="title"
+          >
+            <Input placeholder="请输入总结标题（可选，默认使用会议标题）" />
+          </Form.Item>
+
+          <Form.Item
+            label="总结内容"
+            name="content"
+            rules={[{ message: '请输入总结内容', required: true }]}
+          >
+            <TextArea
+              placeholder="请输入会议总结内容"
+              rows={10}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
       {/* 详情弹窗 */}
       <Modal
         footer={null}
@@ -198,13 +310,13 @@ const MeetingSummaryPage = () => {
             <div className="mb-4">
               <Title level={5}>{selectedSummary.meetingTitle}</Title>
               <div className="mb-2">
-                <Text type="secondary">会议日期：{selectedSummary.meetingDate}</Text>
+                <Text type="secondary">会议日期：{dayjs(selectedSummary.meetingDate).format('YYYY-MM-DD')}</Text>
               </div>
               <div className="mb-2">
                 <Text type="secondary">创建人：{selectedSummary.creator}</Text>
               </div>
               <div className="mb-2">
-                <Text type="secondary">创建时间：{selectedSummary.createTime}</Text>
+                <Text type="secondary">创建时间：{dayjs(selectedSummary.createTime).format('YYYY-MM-DD HH:mm')}</Text>
               </div>
               <div className="mb-4">
                 <Text type="secondary">参与人员：{selectedSummary.participants.join('、')}</Text>

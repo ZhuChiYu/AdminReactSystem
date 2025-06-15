@@ -8,6 +8,7 @@ import {
   UserOutlined
 } from '@ant-design/icons';
 import { Badge, Button, Card, Form, Input, Modal, Radio, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -147,7 +148,8 @@ const Component: React.FC = () => {
       dataIndex: 'startTime',
       key: 'startTime',
       ...getCenterColumnConfig(),
-      title: '开始时间'
+      title: '开始时间',
+      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm')
     },
     {
       dataIndex: 'participantsCount',
@@ -195,7 +197,7 @@ const Component: React.FC = () => {
       dataIndex: 'approvalDate',
       key: 'approvalDate',
       ...getCenterColumnConfig(),
-      render: (text: string) => text || '-',
+      render: (text: string) => text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-',
       title: '审批日期'
     },
     {
@@ -279,7 +281,7 @@ const Component: React.FC = () => {
                   <CalendarOutlined className="mr-2" />
                   <Text strong>会议时间：</Text>
                   <Text className="ml-2">
-                    {currentMeeting.startTime} ~ {currentMeeting.endTime}
+                    {dayjs(currentMeeting.startTime).format('YYYY-MM-DD HH:mm')} ~ {dayjs(currentMeeting.endTime).format('YYYY-MM-DD HH:mm')}
                   </Text>
                 </div>
                 <div className="flex items-center">
@@ -369,7 +371,7 @@ const Component: React.FC = () => {
                   <CalendarOutlined className="mr-2" />
                   <Text strong>会议时间：</Text>
                   <Text className="ml-2">
-                    {currentMeeting.startTime} ~ {currentMeeting.endTime}
+                    {dayjs(currentMeeting.startTime).format('YYYY-MM-DD HH:mm')} ~ {dayjs(currentMeeting.endTime).format('YYYY-MM-DD HH:mm')}
                   </Text>
                 </div>
                 <div className="flex items-center">
