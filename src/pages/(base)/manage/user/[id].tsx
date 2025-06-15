@@ -233,7 +233,7 @@ const SystemInfo: FC<InfoProps> = ({ data }) => (
       {
         children: data.department?.name || '-',
         key: 'department',
-        label: '画'
+        label: '所属部门'
       },
       {
         children: data.position || '-',

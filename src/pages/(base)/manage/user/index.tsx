@@ -11,13 +11,14 @@ import {
   message
 } from 'antd';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { enableStatusRecord, userGenderRecord } from '@/constants/business';
 import { ATG_MAP } from '@/constants/common';
 import { TableHeaderOperation, useTable, useTableOperate, useTableScroll } from '@/features/table';
 import { useMobile } from '@/hooks/common/mobile';
-import { apiClient, employeeService } from '@/service/api';
+import { apiClient, employeeService, fetchGetRoleList } from '@/service/api';
 import { isSuperAdmin } from '@/utils/auth';
 
 import UserSearch from './modules/UserSearch';
@@ -395,7 +396,38 @@ const UserManage = () => {
   const { checkedRowKeys, generalPopupOperation, handleAdd, handleEdit, onBatchDeleted, onDeleted, rowSelection } =
     useTableOperate(data, run, async (res: any, type) => {
       if (type === 'add') {
-        try {
+                try {
+          // 获取所有角色数据，将角色代码转换为角色ID
+          const roleCodes = [res.positionRole, res.permissionRole || 'employee'].filter(Boolean);
+          const roleIds: number[] = [];
+
+          // 获取所有角色数据
+          try {
+            const [positionRolesResponse, permissionRolesResponse] = await Promise.all([
+              fetchGetRoleList({ current: 1, size: 100, roleType: 'position' }),
+              fetchGetRoleList({ current: 1, size: 100, roleType: 'permission' })
+            ]);
+
+            const allRoles = [
+              ...(positionRolesResponse?.records || []),
+              ...(permissionRolesResponse?.records || [])
+            ];
+
+            // 根据角色代码查找角色ID
+            for (const roleCode of roleCodes) {
+              const role = allRoles.find((r: any) => r.roleCode === roleCode);
+              if (role) {
+                roleIds.push(role.id);
+              } else {
+                console.warn(`未找到角色: ${roleCode}`);
+              }
+            }
+          } catch (error) {
+            console.error('获取角色数据失败:', error);
+            window.$message?.error('获取角色数据失败，请重试');
+            return;
+          }
+
           // 转换前端表单数据为后端API格式
           const createData = {
             address: res.address,
@@ -406,8 +438,7 @@ const UserManage = () => {
             nickName: res.nickName,
             password: res.password,
             phone: res.userPhone,
-            // 合并职位角色和权限角色
-            roles: [res.positionRole, res.permissionRole || 'employee'].filter(Boolean),
+            roleIds: roleIds, // 使用角色ID而不是角色代码
             status: getStatusValue(res.status),
             tim: res.tim,
             userName: res.userName,
@@ -415,6 +446,8 @@ const UserManage = () => {
           };
 
           console.log('创建用户数据:', createData);
+          console.log('角色映射:', { roleCodes, roleIds });
+
           await apiClient.post('/system/users', createData);
 
           window.$message?.success('创建成功');

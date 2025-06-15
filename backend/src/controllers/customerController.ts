@@ -17,12 +17,25 @@ class CustomerController {
     // 构建查询条件
     const where: any = {};
 
-    // 权限控制：根据权限角色决定数据范围
-    // 超级管理员：可以看到所有客户数据
-    // 管理员和员工：只能看到自己创建的客户数据
-    if (!user?.roles?.includes('super_admin')) {
-      // 管理员和员工只能查看自己创建的客户
-      where.createdById = user?.id;
+        // 权限控制：根据权限角色决定数据范围
+    if (user?.roles?.includes('super_admin')) {
+      // 超级管理员：可以看到所有客户数据
+      // 不添加任何限制条件
+    } else if (user?.roles?.includes('admin')) {
+      // 管理员：可以看到自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+      const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
+        where: { managerId: user.id },
+        select: { employeeId: true }
+      });
+
+      const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+      where.OR = [
+        { createdById: { in: allowedCreatorIds } },
+        { assignedToId: user.id }
+      ];
+    } else {
+      // 普通员工：只能看到分配给自己的客户
+      where.assignedToId = user?.id;
     }
 
     if (customerName) {
@@ -82,40 +95,48 @@ class CustomerController {
       });
 
       // 格式化返回数据
-      const records = customers.map(customer => ({
-        assignedTime: customer.assignedTime,
-        assignedTo: customer.assignedTo
-          ? {
-              id: customer.assignedTo.id,
-              name: customer.assignedTo.nickName
-            }
-          : null,
-        canDelete: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
-        // 添加权限字段
-        canEdit: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
-        company: customer.company,
-        createdAt: customer.createdAt,
-        createdBy: customer.createdBy
-          ? {
-              id: customer.createdBy.id,
-              name: customer.createdBy.nickName
-            }
-          : null,
-        customerName: customer.customerName,
-        email: customer.email,
-        followStatus: customer.followStatus,
-        id: customer.id,
-        industry: customer.industry,
-        level: customer.level,
-        mobile: customer.mobile,
-        nextFollowTime: customer.nextFollowTime,
-        phone: customer.phone,
-        position: customer.position,
-        remark: customer.remark,
-        source: customer.source,
-        updatedAt: customer.updatedAt,
-        wechat: customer.wechat
-      }));
+      const records = customers.map(customer => {
+        // 判断是否需要脱敏处理
+        const isOwnCustomer = customer.createdById === user?.id;
+        const isSuperAdmin = user?.roles?.includes('super_admin');
+        const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer;
+
+        return {
+          assignedTime: customer.assignedTime,
+          assignedTo: customer.assignedTo
+            ? {
+                id: customer.assignedTo.id,
+                name: customer.assignedTo.nickName
+              }
+            : null,
+          canDelete: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
+          // 添加权限字段
+          canEdit: user?.roles?.includes('super_admin') || customer.createdById === user?.id,
+          company: customer.company,
+          createdAt: customer.createdAt,
+          createdBy: customer.createdBy
+            ? {
+                id: customer.createdBy.id,
+                name: customer.createdBy.nickName
+              }
+            : null,
+          // 对管理员查看其管理员工创建的客户进行脱敏
+          customerName: shouldMaskSensitiveInfo ? '***' : customer.customerName,
+          email: shouldMaskSensitiveInfo ? '***' : customer.email,
+          followStatus: customer.followStatus,
+          id: customer.id,
+          industry: customer.industry,
+          level: customer.level,
+          mobile: shouldMaskSensitiveInfo ? '***' : customer.mobile,
+          nextFollowTime: customer.nextFollowTime,
+          phone: shouldMaskSensitiveInfo ? '***' : customer.phone,
+          position: customer.position,
+          remark: customer.remark,
+          source: customer.source,
+          updatedAt: customer.updatedAt,
+          wechat: shouldMaskSensitiveInfo ? '***' : customer.wechat
+        };
+      });
 
       const pages = Math.ceil(total / pageSize);
 
@@ -147,9 +168,25 @@ class CustomerController {
       // 构建查询条件，添加权限控制
       const where: any = { id: Number(id) };
 
-      // 权限控制：超级管理员可以查看所有客户，其他用户只能查看自己创建的客户
-      if (!user?.roles?.includes('super_admin')) {
-        where.createdById = user?.id;
+            // 权限控制：根据角色决定可访问的客户范围
+      if (user?.roles?.includes('super_admin')) {
+        // 超级管理员：可以查看所有客户
+        // 不添加任何限制条件
+      } else if (user?.roles?.includes('admin')) {
+        // 管理员：可以查看自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+        const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
+          where: { managerId: user.id },
+          select: { employeeId: true }
+        });
+
+        const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+        where.OR = [
+          { createdById: { in: allowedCreatorIds } },
+          { assignedToId: user.id }
+        ];
+      } else {
+        // 普通员工：只能查看分配给自己的客户
+        where.assignedToId = user?.id;
       }
 
       const customer = await prisma.customer.findUnique({
@@ -190,6 +227,11 @@ class CustomerController {
         throw new NotFoundError('客户不存在');
       }
 
+      // 判断是否需要脱敏处理
+      const isOwnCustomer = customer.createdById === user?.id;
+      const isSuperAdmin = user?.roles?.includes('super_admin');
+      const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer;
+
       const result = {
         assignedTime: customer.assignedTime,
         assignedTo: customer.assignedTo
@@ -206,8 +248,9 @@ class CustomerController {
               name: customer.createdBy.nickName
             }
           : null,
-        customerName: customer.customerName,
-        email: customer.email,
+        // 对管理员查看其管理员工创建的客户进行脱敏
+        customerName: shouldMaskSensitiveInfo ? '***' : customer.customerName,
+        email: shouldMaskSensitiveInfo ? '***' : customer.email,
         followRecords: customer.followRecords.map(record => ({
           attachments: record.attachments,
           createdAt: record.createdAt,
@@ -225,14 +268,14 @@ class CustomerController {
         id: customer.id,
         industry: customer.industry,
         level: customer.level,
-        mobile: customer.mobile,
+        mobile: shouldMaskSensitiveInfo ? '***' : customer.mobile,
         nextFollowTime: customer.nextFollowTime,
-        phone: customer.phone,
+        phone: shouldMaskSensitiveInfo ? '***' : customer.phone,
         position: customer.position,
         remark: customer.remark,
         source: customer.source,
         updatedAt: customer.updatedAt,
-        wechat: customer.wechat
+        wechat: shouldMaskSensitiveInfo ? '***' : customer.wechat
       };
 
       res.json(createSuccessResponse(result, '查询成功', req.path));
@@ -275,6 +318,8 @@ class CustomerController {
     try {
       const customer = await prisma.customer.create({
         data: {
+          assignedToId: req.user.id, // 创建者默认成为负责人
+          assignedTime: new Date(), // 设置分配时间
           company,
           createdById: req.user.id,
           customerName,
@@ -521,11 +566,24 @@ class CustomerController {
       const where: any = {};
 
       // 权限控制：根据权限角色决定数据范围
-      // 超级管理员：可以看到所有客户数据
-      // 管理员和员工：只能看到自己创建的客户数据
-      if (!user?.roles?.includes('super_admin')) {
-        // 管理员和员工只能查看自己创建的客户
-        where.createdById = user?.id;
+      if (user?.roles?.includes('super_admin')) {
+        // 超级管理员：可以看到所有客户数据
+        // 不添加任何限制条件
+      } else if (user?.roles?.includes('admin')) {
+        // 管理员：可以看到自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+        const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
+          where: { managerId: user.id },
+          select: { employeeId: true }
+        });
+
+        const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+        where.OR = [
+          { createdById: { in: allowedCreatorIds } },
+          { assignedToId: user.id }
+        ];
+      } else {
+        // 普通员工：只能看到分配给自己的客户
+        where.assignedToId = user?.id;
       }
 
       // 获取各个状态的客户数量
@@ -628,6 +686,8 @@ class CustomerController {
 
           const customerData = {
             // A列：姓名
+            assignedToId: req.user.id, // 导入者默认成为负责人
+            assignedTime: new Date(), // 设置分配时间
             company: row[1]?.toString().trim() || '',
             createdById: req.user.id,
             customerName: row[0]?.toString().trim() || '',

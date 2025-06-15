@@ -123,84 +123,10 @@ const CustomerManagement = () => {
     fetchCustomers();
   }, [pagination.current, pagination.pageSize]);
 
-  // 检查用户是否有权限修改客户信息
+  // 检查用户是否有权限修改客户信息（简化版，主要权限控制在后端）
   const canEditCustomer = (customer: CustomerApi.CustomerListItem) => {
-    // 超级管理员可以修改所有客户信息
-    if (isUserSuperAdmin) return true;
-
-    const currentUserIdNum = Number(currentUserId);
-
-    // 检查是否有特定客户的编辑权限
-    const hasCustomerEditPermission = hasPermission(currentUserIdNum, PermissionType.EDIT_CUSTOMER, customer.id);
-
-    // 检查是否有全局编辑权限
-    const hasGlobalEditPermission = hasPermission(currentUserIdNum, PermissionType.EDIT_CUSTOMER);
-
-    // 管理员是否可以修改自己分配的客户
-    const isAssignedByCurrentAdmin = isUserAdmin && customer.assignedTo?.id === currentUserIdNum;
-
-    return hasCustomerEditPermission || hasGlobalEditPermission || isAssignedByCurrentAdmin;
-  };
-
-  // 检查是否有权限查看客户手机号
-  const canViewMobile = (customer: CustomerApi.CustomerListItem) => {
-    // 超级管理员可以查看所有客户信息
-    if (isUserSuperAdmin) return true;
-
-    const currentUserIdNum = Number(currentUserId);
-
-    // 检查是否有特定客户的查看手机号权限
-    const hasCustomerMobilePermission = hasPermission(
-      currentUserIdNum,
-      PermissionType.VIEW_CUSTOMER_MOBILE,
-      customer.id
-    );
-
-    // 检查是否有全局查看手机号权限
-    const hasGlobalMobilePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_MOBILE);
-
-    // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.assignedTo?.id === currentUserIdNum;
-
-    return hasCustomerMobilePermission || hasGlobalMobilePermission || isOwnCustomer;
-  };
-
-  // 检查是否有权限查看客户电话
-  const canViewPhone = (customer: CustomerApi.CustomerListItem) => {
-    // 超级管理员可以查看所有客户信息
-    if (isUserSuperAdmin) return true;
-
-    const currentUserIdNum = Number(currentUserId);
-
-    // 检查是否有特定客户的查看电话权限
-    const hasCustomerPhonePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_PHONE, customer.id);
-
-    // 检查是否有全局查看电话权限
-    const hasGlobalPhonePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_PHONE);
-
-    // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.assignedTo?.id === currentUserIdNum;
-
-    return hasCustomerPhonePermission || hasGlobalPhonePermission || isOwnCustomer;
-  };
-
-  // 检查是否有权限查看客户姓名
-  const canViewName = (customer: CustomerApi.CustomerListItem) => {
-    // 超级管理员可以查看所有客户信息
-    if (isUserSuperAdmin) return true;
-
-    const currentUserIdNum = Number(currentUserId);
-
-    // 检查是否有特定客户的查看姓名权限
-    const hasCustomerNamePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_NAME, customer.id);
-
-    // 检查是否有全局查看姓名权限
-    const hasGlobalNamePermission = hasPermission(currentUserIdNum, PermissionType.VIEW_CUSTOMER_NAME);
-
-    // 对于员工，只能查看自己负责的客户信息
-    const isOwnCustomer = customer.assignedTo?.id === currentUserIdNum;
-
-    return hasCustomerNamePermission || hasGlobalNamePermission || isOwnCustomer;
+    // 使用后端返回的权限字段
+    return customer.canEdit || false;
   };
 
   // 处理搜索
@@ -334,7 +260,7 @@ const CustomerManagement = () => {
       key: 'customerName',
       title: '客户姓名',
       ...getCenterColumnConfig(),
-      render: (text: string, record: CustomerApi.CustomerListItem) => (canViewName(record) ? text : '***'),
+      render: (text: string) => text || '-',
       width: 120
     },
     {
@@ -356,7 +282,7 @@ const CustomerManagement = () => {
       key: 'phone',
       title: '电话',
       ...getCenterColumnConfig(),
-      render: (text: string, record: CustomerApi.CustomerListItem) => (canViewPhone(record) ? text || '-' : '***'),
+      render: (text: string) => text || '-',
       width: 120
     },
     {
@@ -364,7 +290,7 @@ const CustomerManagement = () => {
       key: 'mobile',
       title: '手机',
       ...getCenterColumnConfig(),
-      render: (text: string, record: CustomerApi.CustomerListItem) => (canViewMobile(record) ? text || '-' : '***'),
+      render: (text: string) => text || '-',
       width: 120
     },
     {
@@ -525,7 +451,7 @@ const CustomerManagement = () => {
           >
             <Form.Item label="客户信息">
               <div>
-                {currentCustomer.name} - {currentCustomer.company}
+                {currentCustomer.customerName} - {currentCustomer.company}
               </div>
             </Form.Item>
             <Form.Item

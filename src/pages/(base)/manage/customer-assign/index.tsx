@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { type CustomerApi, type EmployeeApi, customerService, employeeService } from '@/service/api';
-import { isAdminOrSuperAdmin } from '@/utils/auth';
+import { isSuperAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
@@ -61,8 +61,8 @@ const CustomerAssignManagement = () => {
 
   // 检查权限
   useEffect(() => {
-    if (!isAdminOrSuperAdmin()) {
-      message.error('您没有权限访问此页面');
+    if (!isSuperAdmin()) {
+      message.error('只有超级管理员可以访问此页面');
       navigate('/home');
     }
   }, [navigate]);
@@ -102,13 +102,8 @@ const CustomerAssignManagement = () => {
 
   // 获取当前用户管理的员工
   const getManagedEmployees = () => {
-    // 如果是超级管理员，可以看到所有员工
-    if (Number(currentUserId) === 1) {
-      return employees;
-    }
-    // 如果是管理员，只能看到自己管理的员工
-    // 这里需要根据实际的管理关系来过滤
-    return employees.filter(emp => emp.id !== Number(currentUserId));
+    // 超级管理员可以看到所有员工
+    return employees;
   };
 
   // 获取可分配的客户（未分配的客户）

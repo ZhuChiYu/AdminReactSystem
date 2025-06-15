@@ -99,12 +99,12 @@ const CustomerFollow = () => {
       console.log('📊 统计数据:', statisticsData);
       setStatistics(statisticsData);
 
-      // 获取客户列表数据，客户跟进页面只显示自己的数据
+      // 获取客户列表数据，客户跟进页面只显示分配给自己的客户
       const customerData = await customerService.getCustomerList({
         current: 1,
         // 获取更多数据用于演示
         scope: 'own',
-        size: 100 // 只显示自己创建的客户数据
+        size: 100 // 只显示分配给自己的客户数据
       });
       console.log('📋 客户列表原始数据:', customerData);
 

@@ -23,6 +23,7 @@ const RoleOperateDrawer = lazy(() => import('./modules/role-operate-drawer'));
 interface RoleRecord {
   id: number;
   index?: number;
+  department?: string;
   remark?: string;
   roleCode: string;
   roleName: string;
@@ -256,7 +257,15 @@ const Role = () => {
   }
 
   function edit(id: number) {
-    handleEdit(id);
+    // 自定义数据处理：将数据库字段映射到表单字段
+    const findItem = (data as RoleRecord[]).find(item => item.id === id);
+    if (findItem) {
+      const formData = {
+        ...findItem,
+        roleDesc: findItem.remark, // 将数据库的remark字段映射到表单的roleDesc字段
+      };
+      handleEdit(formData);
+    }
   }
 
   return (
