@@ -174,21 +174,21 @@ const CourseCategory = () => {
         <Space>
           {isSuperAdmin() && (
             <>
-              <Button
-                size="small"
-                type="link"
-                onClick={() => showEditModal(record)}
-              >
-                编辑
-              </Button>
-              <Button
-                danger
-                size="small"
-                type="link"
-                onClick={() => handleDelete(record.id)}
-              >
-                删除
-              </Button>
+          <Button
+            size="small"
+            type="link"
+            onClick={() => showEditModal(record)}
+          >
+            编辑
+          </Button>
+          <Button
+            danger
+            size="small"
+            type="link"
+            onClick={() => handleDelete(record.id)}
+          >
+            删除
+          </Button>
             </>
           )}
         </Space>
@@ -205,13 +205,13 @@ const CourseCategory = () => {
         variant="borderless"
         extra={
           isSuperAdmin() && (
-            <Button
-              icon={<PlusOutlined />}
-              type="primary"
-              onClick={showAddModal}
-            >
-              新增分类
-            </Button>
+          <Button
+            icon={<PlusOutlined />}
+            type="primary"
+            onClick={showAddModal}
+          >
+            新增分类
+          </Button>
           )
         }
       >

@@ -463,20 +463,20 @@ function Component() {
             下载
           </Button>
           {isSuperAdmin() && (
-            <Popconfirm
-              cancelText="取消"
-              okText="确定"
-              title="确定要删除这个文件吗？"
-              onConfirm={() => handleDelete(record.id)}
+          <Popconfirm
+            cancelText="取消"
+            okText="确定"
+            title="确定要删除这个文件吗？"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              type="link"
             >
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                type="link"
-              >
-                删除
-              </Button>
-            </Popconfirm>
+              删除
+            </Button>
+          </Popconfirm>
           )}
         </Space>
       )
@@ -527,13 +527,13 @@ function Component() {
               onSearch={handleSearch}
             />
             {isSuperAdmin() && (
-              <Button
-                icon={<CloudDownloadOutlined />}
-                type="primary"
-                onClick={showUploadModal}
-              >
-                上传文件
-              </Button>
+            <Button
+              icon={<CloudDownloadOutlined />}
+              type="primary"
+              onClick={showUploadModal}
+            >
+              上传文件
+            </Button>
             )}
           </div>
         </div>
