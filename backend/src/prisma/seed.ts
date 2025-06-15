@@ -495,11 +495,36 @@ async function main() {
 
   const createdUsers = [];
   for (const userData of users) {
-    const user = await prisma.user.upsert({
-      create: userData,
-      update: userData,
-      where: { userName: userData.userName }
+    // 先检查用户是否已存在（按userName或email）
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { userName: userData.userName },
+          { email: userData.email }
+        ]
+      }
     });
+
+    let user;
+    if (existingUser) {
+      // 如果用户已存在，只更新非敏感信息
+      user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          nickName: userData.nickName,
+          avatar: userData.avatar,
+          gender: userData.gender,
+          status: userData.status,
+          departmentId: userData.departmentId,
+          position: userData.position
+        }
+      });
+    } else {
+      // 如果用户不存在，创建新用户
+      user = await prisma.user.create({
+        data: userData
+      });
+    }
     createdUsers.push(user);
   }
 

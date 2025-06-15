@@ -287,7 +287,28 @@ router.get('/users/:id', async (req, res) => {
 // 创建用户
 router.post('/users', async (req, res) => {
   try {
-    const { departmentId, email, gender, nickName, password, phone, position, roleIds = [], userName } = req.body;
+    const {
+      address,
+      bankCard,
+      departmentId,
+      email,
+      gender,
+      idCard,
+      nickName,
+      password,
+      phone,
+      position,
+      roleIds = [],
+      status,
+      tim,
+      userName,
+      wechat
+    } = req.body;
+
+    // 检查必需字段
+    if (!userName || !nickName || !password) {
+      throw new ApiError(400, '用户名、昵称和密码为必填项');
+    }
 
     // 检查用户名是否已存在
     const existingUser = await prisma.user.findUnique({
@@ -309,20 +330,59 @@ router.post('/users', async (req, res) => {
       }
     }
 
+    // 检查手机号是否已存在
+    if (phone) {
+      const existingPhone = await prisma.user.findUnique({
+        where: { phone }
+      });
+
+      if (existingPhone) {
+        throw new ApiError(400, '手机号已存在');
+      }
+    }
+
     // 加密密码
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 转换状态值
+    let statusValue = 1; // 默认启用
+    if (status !== undefined) {
+      if (typeof status === 'string') {
+        statusValue = status === 'active' ? 1 : 0;
+      } else {
+        statusValue = Number(status) || 1;
+      }
+    }
+
+    // 转换性别值
+    let genderValue = 0; // 默认未知
+    if (gender !== undefined) {
+      if (typeof gender === 'string') {
+        if (gender === 'male') genderValue = 1;
+        else if (gender === 'female') genderValue = 2;
+        else genderValue = 0;
+      } else {
+        genderValue = Number(gender) || 0;
+      }
+    }
 
     // 创建用户
     const user = await prisma.user.create({
       data: {
+        address,
+        bankCard,
         departmentId,
         email,
-        gender: gender || 0,
+        gender: genderValue,
+        idCard,
         nickName,
         password: hashedPassword,
         phone,
         position,
-        userName
+        status: statusValue,
+        tim,
+        userName,
+        wechat
       },
       include: {
         department: true

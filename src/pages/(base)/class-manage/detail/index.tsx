@@ -2185,14 +2185,14 @@ const ClassDetail = () => {
                             下载
                           </Button>
                           {isSuperAdmin() && (
-                            <Button
-                              danger
-                              icon={<DeleteOutlined />}
-                              size="small"
-                              onClick={() => handleDeleteAttachment(record.id)}
-                            >
-                              删除
-                            </Button>
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            size="small"
+                            onClick={() => handleDeleteAttachment(record.id)}
+                          >
+                            删除
+                          </Button>
                           )}
                         </Space>
                       ),
