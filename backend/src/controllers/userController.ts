@@ -1416,6 +1416,142 @@ class UserController {
       res.status(500).json(createErrorResponse(500, '取消分配失败', null, req.path));
     }
   }
+
+  /** 获取当前管理员管理的员工列表 */
+  async getManagedEmployees(req: Request, res: Response) {
+    const managerId = req.user!.id;
+    const { current = 1, size = 10 } = req.query;
+
+    const page = Number(current);
+    const pageSize = Number(size);
+    const skip = (page - 1) * pageSize;
+
+    try {
+      // 如果是超级管理员，返回所有员工
+      const userRoles = await prisma.userRole.findMany({
+        include: {
+          role: true
+        },
+        where: {
+          userId: managerId
+        }
+      });
+
+      const isSuperAdmin = userRoles.some(ur => ur.role.roleCode === 'super_admin');
+
+      let where: any = {};
+
+      if (!isSuperAdmin) {
+        // 管理员只能看到分配给自己管理的员工
+        const managedRelations = await prisma.employeeManagerRelation.findMany({
+          where: {
+            managerId
+          }
+        });
+
+        const managedEmployeeIds = managedRelations.map(r => r.employeeId);
+
+        if (managedEmployeeIds.length === 0) {
+          // 如果没有管理任何员工，返回空列表
+          return res.json(
+            createSuccessResponse(
+              {
+                current: page,
+                pages: 0,
+                records: [],
+                size: pageSize,
+                total: 0
+              },
+              '查询成功',
+              req.path
+            )
+          );
+        }
+
+        where = {
+          id: {
+            in: managedEmployeeIds
+          }
+        };
+      }
+
+      // 获取总数
+      const total = await prisma.user.count({ where });
+
+      // 获取员工列表
+      const employees = await prisma.user.findMany({
+        include: {
+          department: true,
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: pageSize,
+        where
+      });
+
+      // 格式化返回数据
+      const records = employees.map(employee => ({
+        address: employee.address,
+        bankCard: employee.bankCard,
+        contractEndDate: employee.contractEndDate,
+        contractStartDate: employee.contractStartDate,
+        contractYears: employee.contractYears,
+        createdAt: employee.createdAt,
+        department: employee.department
+          ? {
+              id: employee.department.id,
+              name: employee.department.name
+            }
+          : null,
+        email: employee.email,
+        gender: employee.gender === 1 ? 'male' : employee.gender === 2 ? 'female' : null,
+        id: employee.id,
+        idCard: employee.idCard,
+        nickName: employee.nickName,
+        phone: employee.phone,
+        position: employee.position,
+        roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
+        roles:
+          employee.userRoles.length > 0
+            ? employee.userRoles.map(ur => ({
+                code: ur.role.roleCode,
+                name: ur.role.roleName
+              }))
+            : [{ code: 'no_role', name: '未分配角色' }],
+        status: employee.status === 1 ? 'active' : employee.status === 0 ? 'inactive' : 'active',
+        tim: employee.tim,
+        updatedAt: employee.updatedAt,
+        userName: employee.userName,
+        wechat: employee.wechat
+      }));
+
+      const pages = Math.ceil(total / pageSize);
+
+      res.json(
+        createSuccessResponse(
+          {
+            current: page,
+            pages,
+            records,
+            size: pageSize,
+            total
+          },
+          '查询成功',
+          req.path
+        )
+      );
+    } catch (error) {
+      logger.error('获取管理的员工列表失败:', error);
+      res.status(500).json(createErrorResponse(500, '获取管理的员工列表失败', null, req.path));
+    }
+  }
 }
 
 export const userController = new UserController();

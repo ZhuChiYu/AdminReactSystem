@@ -112,6 +112,34 @@ router.get('/employees', authMiddleware, asyncErrorHandler(userController.getEmp
 
 /**
  * @swagger
+ * /api/users/managed-employees:
+ *   get:
+ *     summary: 获取当前管理员管理的员工列表
+ *     tags: [用户管理]
+ *     parameters:
+ *       - in: query
+ *         name: current
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: 当前页码
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: 每页大小
+ *     responses:
+ *       200:
+ *         description: 查询成功
+ */
+router.get('/managed-employees', authMiddleware, asyncErrorHandler(userController.getManagedEmployees));
+
+/**
+ * @swagger
  * /api/users/{id}/profile:
  *   put:
  *     summary: 更新用户个人资料

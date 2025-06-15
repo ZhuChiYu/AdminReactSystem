@@ -52,6 +52,29 @@ export class EmployeeService {
     }
   }
 
+  /** 获取当前管理员管理的员工列表 */
+  public async getManagedEmployees(params?: { current?: number; size?: number }): Promise<{
+    current: number;
+    pages: number;
+    records: EmployeeApi.EmployeeListItem[];
+    size: number;
+    total: number;
+  }> {
+    try {
+      const response = await this.apiClient.get('/users/managed-employees', { params });
+      return response;
+    } catch (error) {
+      console.error('获取管理的员工列表失败:', error);
+      return {
+        current: params?.current || 1,
+        pages: 0,
+        records: [],
+        size: params?.size || 10,
+        total: 0
+      };
+    }
+  }
+
   /** 获取管理员列表 */
   async getAdminList(): Promise<EmployeeApi.EmployeeListItem[]> {
     try {
