@@ -1,4 +1,4 @@
-import { UserAddOutlined } from '@ant-design/icons';
+import { DownloadOutlined, UserAddOutlined } from '@ant-design/icons';
 import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -74,6 +74,9 @@ const CustomerManagement = () => {
   const [managedEmployees, setManagedEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [selectedCustomersForAssign, setSelectedCustomersForAssign] = useState<number[]>([]);
   const [assignLoading, setAssignLoading] = useState(false);
+
+  // 导出相关状态
+  const [exportLoading, setExportLoading] = useState(false);
 
   // 数据状态
   const [customers, setCustomers] = useState<CustomerApi.CustomerListItem[]>([]);
@@ -293,6 +296,82 @@ const CustomerManagement = () => {
     openAssignModal([customer.id]);
   };
 
+  // 导出客户数据
+  const handleExportCustomers = async () => {
+    if (!isUserSuperAdmin) {
+      message.error('只有超级管理员可以导出客户数据');
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      // 动态导入xlsx库
+      const XLSX = await import('xlsx');
+
+      // 获取所有客户数据
+      const allCustomersData = await customerService.getCustomerList({
+        current: 1,
+        size: 10000, // 获取大量数据
+        ...searchParams
+      });
+
+      // 准备导出的数据
+      const exportData = allCustomersData.records.map((customer, index) => ({
+        '序号': index + 1,
+        '客户姓名': customer.customerName || '',
+        '单位名称': customer.company || '',
+        '职位': customer.position || '',
+        '电话': customer.phone || '',
+        '手机': customer.mobile || '',
+        '邮箱': customer.email || '',
+        '行业': customer.industry || '',
+        '来源': customer.source || '',
+        '跟进状态': followUpStatusNames[customer.followStatus as FollowUpStatus] || customer.followStatus,
+        '负责人': customer.assignedTo?.nickName || '',
+        '备注': customer.remark || '',
+        '创建时间': customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '',
+        '更新时间': customer.updatedAt ? new Date(customer.updatedAt).toLocaleString() : ''
+      }));
+
+      // 创建工作簿
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '客户资料');
+
+      // 设置列宽
+      const colWidths = [
+        { wch: 8 },  // 序号
+        { wch: 15 }, // 客户姓名
+        { wch: 25 }, // 单位名称
+        { wch: 15 }, // 职位
+        { wch: 15 }, // 电话
+        { wch: 15 }, // 手机
+        { wch: 20 }, // 邮箱
+        { wch: 12 }, // 行业
+        { wch: 12 }, // 来源
+        { wch: 12 }, // 跟进状态
+        { wch: 12 }, // 负责人
+        { wch: 30 }, // 备注
+        { wch: 20 }, // 创建时间
+        { wch: 20 }  // 更新时间
+      ];
+      worksheet['!cols'] = colWidths;
+
+      // 生成文件名
+      const fileName = `客户资料_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`;
+
+      // 下载文件
+      XLSX.writeFile(workbook, fileName);
+
+      message.success(`成功导出 ${exportData.length} 条客户数据`);
+    } catch (error) {
+      console.error('导出客户数据失败:', error);
+      message.error('导出失败，请重试');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   // 提交分配
   const handleAssignSubmit = async () => {
     try {
@@ -459,15 +538,13 @@ const CustomerManagement = () => {
         title={isUserAdmin || isUserSuperAdmin ? "客户资料管理" : "我的客户"}
         extra={
           <Space>
-            {(isUserAdmin || isUserSuperAdmin) && (
-              <Button
-                icon={<UserAddOutlined />}
-                type="primary"
-                onClick={addNewCustomer}
-              >
-                添加客户
-              </Button>
-            )}
+            <Button
+              icon={<UserAddOutlined />}
+              type="primary"
+              onClick={addNewCustomer}
+            >
+              添加客户
+            </Button>
             {(isUserAdmin || isUserSuperAdmin) && (
               <Button
                 icon={<UserSwitchOutlined />}
@@ -475,6 +552,15 @@ const CustomerManagement = () => {
                 disabled={selectedCustomersForAssign.length === 0}
               >
                 批量分配
+              </Button>
+            )}
+            {isUserSuperAdmin && (
+              <Button
+                icon={<DownloadOutlined />}
+                loading={exportLoading}
+                onClick={handleExportCustomers}
+              >
+                导出客户
               </Button>
             )}
             <Button onClick={resetSearch}>重置筛选</Button>
