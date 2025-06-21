@@ -90,6 +90,15 @@ const EmployeeManagerManagement = () => {
     try {
       setTargetLoading(true);
       const managedEmployeeList = getManagedEmployees();
+      console.log('🔍 管理的员工列表:', {
+        canManageTargets,
+        isSuperAdminUser,
+        isAdminUser,
+        employeesCount: employees.length,
+        relationsCount: relations.length,
+        managedEmployeeList,
+        currentUserId: getCurrentUserId()
+      });
       setManagedEmployees(managedEmployeeList);
     } catch (error) {
       console.error('获取管理员工数据失败:', error);
@@ -105,10 +114,10 @@ const EmployeeManagerManagement = () => {
   }, []);
 
   useEffect(() => {
-    if (canManageTargets) {
+    if (canManageTargets && employees.length > 0 && relations.length >= 0) {
       fetchManagedEmployees();
     }
-  }, [targetYear, targetMonth, canManageTargets, employees]);
+  }, [targetYear, targetMonth, canManageTargets, employees, relations]);
 
   // 获取可选的员工列表
   const getSelectableEmployees = () => {
@@ -222,8 +231,8 @@ const EmployeeManagerManagement = () => {
       // 构建四种任务类型的目标数据 - 暂时使用原有的API结构
       const targetData: SetEmployeeTargetRequest = {
         employeeId: values.employeeId,
-        targetYear: targetYear,
-        targetMonth: targetMonth,
+        targetYear: values.targetDate.year(),
+        targetMonth: values.targetDate.month() + 1,
         targetAmount: values.consultTarget || 0, // 暂时使用咨询任务目标作为主要目标
         remark: `咨询:${values.consultTarget || 0}, 回访:${values.followUpTarget || 0}, 开发:${values.developTarget || 0}, 报名:${values.registerTarget || 0}`
       };
@@ -249,6 +258,7 @@ const EmployeeManagerManagement = () => {
     // 这里应该获取员工当前的各项任务目标，暂时设置默认值
     targetForm.setFieldsValue({
       employeeId: employee.id,
+      targetDate: dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`),
       consultTarget: 0,
       followUpTarget: 0,
       developTarget: 0,
@@ -302,28 +312,40 @@ const EmployeeManagerManagement = () => {
     {
       align: 'center' as const,
       key: 'consultTarget',
-      render: () => '-', // 这里应该显示员工的咨询任务目标
+      render: (_, record: EmployeeApi.EmployeeListItem) => {
+        // TODO: 从API获取员工的咨询任务目标
+        return '-';
+      },
       title: '咨询任务目标',
       width: 120
     },
     {
       align: 'center' as const,
       key: 'followUpTarget',
-      render: () => '-', // 这里应该显示员工的回访任务目标
+      render: (_, record: EmployeeApi.EmployeeListItem) => {
+        // TODO: 从API获取员工的回访任务目标
+        return '-';
+      },
       title: '回访任务目标',
       width: 120
     },
     {
       align: 'center' as const,
       key: 'developTarget',
-      render: () => '-', // 这里应该显示员工的开发任务目标
+      render: (_, record: EmployeeApi.EmployeeListItem) => {
+        // TODO: 从API获取员工的开发任务目标
+        return '-';
+      },
       title: '开发任务目标',
       width: 120
     },
     {
       align: 'center' as const,
       key: 'registerTarget',
-      render: () => '-', // 这里应该显示员工的报名任务目标
+      render: (_, record: EmployeeApi.EmployeeListItem) => {
+        // TODO: 从API获取员工的报名任务目标
+        return '-';
+      },
       title: '报名任务目标',
       width: 120
     },
@@ -523,23 +545,30 @@ const EmployeeManagerManagement = () => {
             layout="vertical"
           >
             <Form.Item
-              label="员工信息"
               name="employeeId"
+              style={{ display: 'none' }}
+            >
+              <Input type="hidden" />
+            </Form.Item>
+
+            <Form.Item
+              label="员工信息"
             >
               <Input
                 disabled
-                value={editingEmployee ? `${editingEmployee.nickName} (${editingEmployee.userName})` : ''}
+                value={editingEmployee ? `${editingEmployee.nickName || editingEmployee.userName} (${editingEmployee.userName})` : ''}
                 style={{ backgroundColor: '#f5f5f5' }}
               />
             </Form.Item>
 
             <Form.Item
               label="目标月份"
+              name="targetDate"
+              rules={[{ message: '请选择目标月份', required: true }]}
             >
-              <Input
-                disabled
-                value={`${targetYear}年${targetMonth}月`}
-                style={{ backgroundColor: '#f5f5f5' }}
+              <DatePicker.MonthPicker
+                placeholder="选择目标月份"
+                style={{ width: '100%' }}
               />
             </Form.Item>
 
