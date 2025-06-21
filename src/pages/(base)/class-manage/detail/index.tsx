@@ -98,6 +98,9 @@ const ClassDetail = () => {
   const { classId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+
+  // 检查是否为超级管理员
+  const isSuperAdminUser = isSuperAdmin();
   const [classInfo, setClassInfo] = useState<any>(null);
   const [studentList, setStudentList] = useState<any[]>([]);
   const [courseList, setCourseList] = useState<any[]>([]);
@@ -152,6 +155,8 @@ const ClassDetail = () => {
     customerName: '',
     followStatus: ''
   });
+  // 存储每个客户的培训费
+  const [customerTrainingFees, setCustomerTrainingFees] = useState<Record<number, number>>({});
 
   // 计算总培训费
   const calculateTotalTrainingFee = () => {
@@ -273,8 +278,51 @@ const ClassDetail = () => {
     try {
       setLoading(true);
 
-      // 批量导入客户为学员
-      const importPromises = selectedCustomers.map(customer => {
+      // 检查重复学员
+      const existingStudentNames = new Set(studentList.map(student => student.name));
+      const duplicateCustomers: any[] = [];
+      const validCustomers: any[] = [];
+
+      selectedCustomers.forEach(customer => {
+        if (existingStudentNames.has(customer.customerName)) {
+          duplicateCustomers.push(customer);
+        } else {
+          validCustomers.push(customer);
+        }
+      });
+
+      // 如果有重复的学员，给出提示
+      if (duplicateCustomers.length > 0) {
+        const duplicateNames = duplicateCustomers.map(c => c.customerName).join('、');
+
+        if (validCustomers.length === 0) {
+          message.warning(`所选客户 ${duplicateNames} 已经是班级学员，无法重复导入`);
+          return;
+        }
+        message.warning(`客户 ${duplicateNames} 已经是班级学员，将跳过导入`);
+      }
+
+      if (validCustomers.length === 0) {
+        message.warning('没有可导入的客户');
+        return;
+      }
+
+      // 检查是否所有有效客户都填写了培训费
+      const customersWithoutFee: string[] = [];
+      validCustomers.forEach(customer => {
+        const fee = customerTrainingFees[customer.id];
+        if (!fee || fee <= 0) {
+          customersWithoutFee.push(customer.customerName);
+        }
+      });
+
+      if (customersWithoutFee.length > 0) {
+        message.error(`请为以下客户填写培训费：${customersWithoutFee.join('、')}`);
+        return;
+      }
+
+      // 批量导入有效客户为学员
+      const importPromises = validCustomers.map(customer => {
         const studentData = {
           classId: Number.parseInt(classId!, 10),
           company: customer.company,
@@ -286,7 +334,7 @@ const ClassDetail = () => {
           name: customer.customerName,
           phone: customer.phone || customer.mobile || '',
           position: customer.position || '',
-          trainingFee: null
+          trainingFee: customerTrainingFees[customer.id] || 0
         };
 
         return classService.createStudent(studentData);
@@ -294,11 +342,17 @@ const ClassDetail = () => {
 
       await Promise.all(importPromises);
 
-      message.success(`成功导入 ${selectedCustomers.length} 名学员`);
+      const successMessage =
+        duplicateCustomers.length > 0
+          ? `成功导入 ${validCustomers.length} 名学员，跳过 ${duplicateCustomers.length} 名重复学员`
+          : `成功导入 ${validCustomers.length} 名学员`;
+
+      message.success(successMessage);
 
       // 关闭弹窗并重新获取学员列表
       setIsCustomerSelectModalVisible(false);
       setSelectedCustomers([]);
+      setCustomerTrainingFees({});
       await fetchClassInfo();
     } catch (error) {
       console.error('导入学员失败:', error);
@@ -347,8 +401,6 @@ const ClassDetail = () => {
 
   // 处理查看学员详情
   const handleViewStudentDetail = (student: any) => {
-    const isSuperAdminUser = isSuperAdmin();
-
     Modal.info({
       content: (
         <div>
@@ -565,7 +617,6 @@ const ClassDetail = () => {
 
   // 学员列表表格列配置 - 根据权限动态生成
   const getStudentColumns = () => {
-    const isSuperAdminUser = isSuperAdmin();
     const currentUserId = getCurrentUserId();
 
     // 基础列（所有用户都能看到）
@@ -594,6 +645,14 @@ const ClassDetail = () => {
         ),
         title: '姓名',
         width: 120
+      },
+      {
+        align: 'center' as const,
+        dataIndex: 'trainingFee',
+        key: 'trainingFee',
+        render: (fee: string | null) => (fee ? `¥${fee}` : '-'),
+        title: '培训费',
+        width: 100
       },
       {
         align: 'center' as const,
@@ -638,14 +697,6 @@ const ClassDetail = () => {
             key: 'phone',
             title: '电话',
             width: 120
-          },
-          {
-            align: 'center' as const,
-            dataIndex: 'trainingFee',
-            key: 'trainingFee',
-            render: (fee: string | null) => (fee ? `¥${fee}` : '-'),
-            title: '培训费',
-            width: 100
           },
           {
             align: 'center' as const,
@@ -1480,7 +1531,7 @@ const ClassDetail = () => {
             >
               导入学员
             </Button>
-            <Button onClick={handleExportStudents}>导出学员</Button>
+            {isSuperAdminUser && <Button onClick={handleExportStudents}>导出学员</Button>}
             {selectedRowKeys.length > 0 && (
               <Button
                 danger
@@ -1512,7 +1563,7 @@ const ClassDetail = () => {
           dataSource={filteredStudentList}
           loading={loading}
           rowKey="id"
-          scroll={{ x: isSuperAdmin() ? 1200 : 400 }}
+          scroll={{ x: isSuperAdmin() ? 1200 : 500 }}
           pagination={{
             pageSize: 20,
             showQuickJumper: true,
@@ -1587,7 +1638,7 @@ const ClassDetail = () => {
             dataSource={customerList}
             loading={customerLoading}
             rowKey="id"
-            scroll={{ x: 800, y: 400 }}
+            scroll={{ x: 1020, y: 400 }}
             columns={[
               {
                 dataIndex: 'customerName',
@@ -1635,6 +1686,45 @@ const ClassDetail = () => {
                 },
                 title: '跟进状态',
                 width: 100
+              },
+              {
+                key: 'trainingFee',
+                render: (_: any, record: any) => {
+                  const existingStudentNames = new Set(studentList.map(student => student.name));
+                  const isExisting = existingStudentNames.has(record.customerName);
+
+                  if (isExisting) {
+                    return <span style={{ color: '#999' }}>-</span>;
+                  }
+
+                  return (
+                    <InputNumber
+                      min={0}
+                      placeholder="培训费"
+                      size="small"
+                      style={{ width: 100 }}
+                      value={customerTrainingFees[record.id] || undefined}
+                      onChange={value => {
+                        setCustomerTrainingFees(prev => ({
+                          ...prev,
+                          [record.id]: value || 0
+                        }));
+                      }}
+                    />
+                  );
+                },
+                title: '培训费(¥)',
+                width: 120
+              },
+              {
+                key: 'isExistingStudent',
+                render: (_: any, record: any) => {
+                  const existingStudentNames = new Set(studentList.map(student => student.name));
+                  const isExisting = existingStudentNames.has(record.customerName);
+                  return isExisting ? <Tag color="red">已是学员</Tag> : <Tag color="green">可导入</Tag>;
+                },
+                title: '状态',
+                width: 80
               }
             ]}
             pagination={{
@@ -1644,6 +1734,13 @@ const ClassDetail = () => {
               showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
             }}
             rowSelection={{
+              getCheckboxProps: (record: any) => {
+                const existingStudentNames = new Set(studentList.map(student => student.name));
+                const isExisting = existingStudentNames.has(record.customerName);
+                return {
+                  disabled: isExisting
+                };
+              },
               onChange: (keys: React.Key[]) => {
                 const selected = customerList.filter(customer => keys.includes(customer.id));
                 setSelectedCustomers(selected);
@@ -1841,19 +1938,23 @@ const ClassDetail = () => {
             >
               详情
             </Button>
-            <Button
-              type="link"
-              onClick={() => handleEditCourse(record)}
-            >
-              编辑
-            </Button>
-            <Button
-              danger
-              type="link"
-              onClick={() => handleRemoveCourse(record.id)}
-            >
-              移除
-            </Button>
+            {isSuperAdminUser && (
+              <>
+                <Button
+                  type="link"
+                  onClick={() => handleEditCourse(record)}
+                >
+                  编辑
+                </Button>
+                <Button
+                  danger
+                  type="link"
+                  onClick={() => handleRemoveCourse(record.id)}
+                >
+                  移除
+                </Button>
+              </>
+            )}
           </Space>
         );
       },
@@ -1868,12 +1969,14 @@ const ClassDetail = () => {
       <Card
         variant="borderless"
         extra={
-          <Button
-            type="primary"
-            onClick={handleAddCourse}
-          >
-            {courseList.length > 0 ? '更换课程' : '添加课程'}
-          </Button>
+          isSuperAdminUser && (
+            <Button
+              type="primary"
+              onClick={handleAddCourse}
+            >
+              {courseList.length > 0 ? '更换课程' : '添加课程'}
+            </Button>
+          )
         }
         title={
           <div className="flex items-center gap-2">
@@ -1939,13 +2042,15 @@ const ClassDetail = () => {
               <div className="mt-6">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-lg font-medium">课程附件</h3>
-                  <Button
-                    icon={<UploadOutlined />}
-                    type="primary"
-                    onClick={handleUploadFile}
-                  >
-                    上传附件
-                  </Button>
+                  {isSuperAdminUser && (
+                    <Button
+                      icon={<UploadOutlined />}
+                      type="primary"
+                      onClick={handleUploadFile}
+                    >
+                      上传附件
+                    </Button>
+                  )}
                 </div>
                 <Table
                   dataSource={courseAttachments}
@@ -2393,12 +2498,14 @@ const ClassDetail = () => {
         title="通知公告"
         variant="borderless"
         extra={
-          <Button
-            type="primary"
-            onClick={handlePublishAnnounce}
-          >
-            发布通知
-          </Button>
+          isSuperAdminUser && (
+            <Button
+              type="primary"
+              onClick={handlePublishAnnounce}
+            >
+              发布通知
+            </Button>
+          )
         }
       >
         <List
@@ -2415,21 +2522,25 @@ const ClassDetail = () => {
                 >
                   查看
                 </Button>,
-                <Button
-                  key="list-edit"
-                  type="link"
-                  onClick={() => handleEditAnnounce(item)}
-                >
-                  编辑
-                </Button>,
-                <Button
-                  danger
-                  key="list-delete"
-                  type="link"
-                  onClick={() => handleDeleteAnnounce(item.id)}
-                >
-                  删除
-                </Button>
+                ...(isSuperAdminUser
+                  ? [
+                      <Button
+                        key="list-edit"
+                        type="link"
+                        onClick={() => handleEditAnnounce(item)}
+                      >
+                        编辑
+                      </Button>,
+                      <Button
+                        danger
+                        key="list-delete"
+                        type="link"
+                        onClick={() => handleDeleteAnnounce(item.id)}
+                      >
+                        删除
+                      </Button>
+                    ]
+                  : [])
               ]}
             >
               <List.Item.Meta
@@ -2492,13 +2603,15 @@ const ClassDetail = () => {
               <div className="mt-6">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-lg font-medium">通知附件</h3>
-                  <Button
-                    icon={<UploadOutlined />}
-                    type="primary"
-                    onClick={handleUploadAnnounceFile}
-                  >
-                    上传附件
-                  </Button>
+                  {isSuperAdminUser && (
+                    <Button
+                      icon={<UploadOutlined />}
+                      type="primary"
+                      onClick={handleUploadAnnounceFile}
+                    >
+                      上传附件
+                    </Button>
+                  )}
                 </div>
                 <Table
                   dataSource={announceAttachments}
@@ -2617,14 +2730,16 @@ const ClassDetail = () => {
                           >
                             下载
                           </Button>
-                          <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            size="small"
-                            onClick={() => handleDeleteAnnounceAttachment(record.id)}
-                          >
-                            删除
-                          </Button>
+                          {isSuperAdminUser && (
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              size="small"
+                              onClick={() => handleDeleteAnnounceAttachment(record.id)}
+                            >
+                              删除
+                            </Button>
+                          )}
                         </Space>
                       ),
                       title: '操作',
