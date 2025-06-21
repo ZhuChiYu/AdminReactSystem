@@ -156,3 +156,19 @@ export function canAssignCustomerToEmployee(employeeId: number): boolean {
 
   return false;
 }
+
+/**
+ * 检查当前用户是否有新增班级的权限
+ *
+ * @returns 是否可以新增班级
+ */
+export function canCreateClass(): boolean {
+  // 超级管理员默认有权限
+  if (isSuperAdmin()) {
+    return true;
+  }
+
+  // 这个函数需要配合userRolePermissions一起使用
+  // 在组件中会通过API获取具体的权限信息
+  return false;
+}

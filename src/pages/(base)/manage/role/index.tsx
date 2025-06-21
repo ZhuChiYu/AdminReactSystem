@@ -21,9 +21,10 @@ import RoleSearch from './modules/role-search';
 const RoleOperateDrawer = lazy(() => import('./modules/role-operate-drawer'));
 
 interface RoleRecord {
+  canCreateClass?: boolean;
+  department?: string;
   id: number;
   index?: number;
-  department?: string;
   remark?: string;
   roleCode: string;
   roleName: string;
@@ -185,6 +186,7 @@ const Role = () => {
       try {
         // 调用创建角色API
         await createRole({
+          canCreateClass: res.canCreateClass || false,
           department: res.department,
           remark: res.roleDesc,
           roleCode: res.roleName.toLowerCase().replace(/\s+/g, '_'), // 基于角色名生成roleCode
@@ -201,6 +203,7 @@ const Role = () => {
       // 编辑角色
       try {
         await updateRole(editingData!.id, {
+          canCreateClass: res.canCreateClass || false,
           department: res.department,
           remark: res.roleDesc,
           roleCode: res.roleName.toLowerCase().replace(/\s+/g, '_'), // 基于角色名生成roleCode
@@ -262,8 +265,10 @@ const Role = () => {
     if (findItem) {
       const formData = {
         ...findItem,
+        canCreateClass: findItem.canCreateClass || false, // 确保canCreateClass字段被正确映射
         roleDesc: findItem.remark, // 将数据库的remark字段映射到表单的roleDesc字段
       };
+      console.log('编辑角色数据:', formData); // 添加调试日志
       handleEdit(formData);
     }
   }

@@ -113,6 +113,8 @@ declare namespace Api {
 
     /** role */
     type Role = Common.CommonRecord<{
+      /** can create class */
+      canCreateClass?: boolean;
       /** department */
       department?: string;
       /** role code */

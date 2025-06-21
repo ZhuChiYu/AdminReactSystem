@@ -83,6 +83,70 @@ router.get('/', async (req, res) => {
 
     const where: any = {};
 
+    // 用户隔离：只显示当前用户的通知或系统通知
+    const currentUserId = (req as any).user?.id;
+    const userRoles = (req as any).user?.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
+
+    if (currentUserId) {
+            if (isSuperAdmin) {
+        // 超级管理员可以看到自己的通知、系统通知以及审批类通知
+        where.OR = [
+          { userId: currentUserId }, // 当前用户的通知
+          { userId: 0 }, // 系统通知
+          { type: 'expense' }, // 报销审批通知
+          {
+            AND: [
+              { type: 'meeting' },
+              { title: { contains: '审批' } } // 包含"审批"字样的会议通知
+            ]
+          }
+        ];
+      } else {
+        // 普通用户只能看到自己的通知和系统通知，但排除审批类通知
+        where.OR = [
+          {
+            AND: [
+              { userId: currentUserId },
+              {
+                OR: [
+                  { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类通知
+                  {
+                    AND: [
+                      { type: 'meeting' },
+                      { title: { not: { contains: '审批' } } } // 允许非审批的会议通知
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            AND: [
+              { userId: 0 }, // 系统通知
+              {
+                OR: [
+                  { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类系统通知
+                  {
+                    AND: [
+                      { type: 'meeting' },
+                      { title: { not: { contains: '审批' } } } // 允许非审批的会议系统通知
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ];
+      }
+    } else {
+      // 如果没有用户信息，只显示非审批类的系统通知
+      where.AND = [
+        { userId: 0 },
+        { type: { notIn: ['expense', 'meeting_approval'] } }
+      ];
+    }
+
     // 构建查询条件
     if (type) {
       where.type = type as string;
@@ -152,6 +216,38 @@ router.get('/', async (req, res) => {
 router.put('/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUserId = (req as any).user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        code: 401,
+        data: null,
+        message: '用户未认证',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 检查通知是否属于当前用户或是系统通知
+    const notification = await prisma.notification.findFirst({
+      where: {
+        id: Number.parseInt(id),
+        OR: [
+          { userId: currentUserId },
+          { userId: 0 } // 系统通知也可以被标记为已读
+        ]
+      }
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '通知不存在或无权访问',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
 
     await prisma.notification.update({
       data: {
@@ -183,10 +279,30 @@ router.put('/:id/read', async (req, res) => {
 // 标记所有通知为已读
 router.put('/read-all', async (req, res) => {
   try {
+    const currentUserId = (req as any).user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        code: 401,
+        data: null,
+        message: '用户未认证',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 只标记当前用户的通知和系统通知为已读
     await prisma.notification.updateMany({
       data: {
         readStatus: 1,
         readTime: new Date().toISOString()
+      },
+      where: {
+        OR: [
+          { userId: currentUserId },
+          { userId: 0 } // 系统通知
+        ],
+        readStatus: 0 // 只更新未读的通知
       }
     });
 
@@ -274,6 +390,35 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUserId = (req as any).user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        code: 401,
+        data: null,
+        message: '用户未认证',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 检查通知是否属于当前用户（系统通知不允许删除）
+    const notification = await prisma.notification.findFirst({
+      where: {
+        id: Number.parseInt(id),
+        userId: currentUserId // 只能删除自己的通知，不能删除系统通知
+      }
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '通知不存在或无权删除',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
 
     await prisma.notification.delete({
       where: { id: Number.parseInt(id) }
@@ -301,10 +446,80 @@ router.delete('/:id', async (req, res) => {
 // 获取未读通知数量
 router.get('/unread-count', async (req, res) => {
   try {
+    const currentUserId = (req as any).user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        code: 401,
+        data: null,
+        message: '用户未认证',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 获取用户角色信息
+    const userRoles = (req as any).user?.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
+
+    // 根据用户角色统计未读通知数量
+    let whereCondition: any = {
+      readStatus: 0
+    };
+
+        if (isSuperAdmin) {
+      // 超级管理员可以看到自己的通知、系统通知以及审批类通知
+      whereCondition.OR = [
+        { userId: currentUserId },
+        { userId: 0 }, // 系统通知
+        { type: 'expense' }, // 报销审批通知
+        {
+          AND: [
+            { type: 'meeting' },
+            { title: { contains: '审批' } } // 包含"审批"字样的会议通知
+          ]
+        }
+      ];
+    } else {
+      // 普通用户只能看到自己的非审批类通知和非审批类系统通知
+      whereCondition.OR = [
+        {
+          AND: [
+            { userId: currentUserId },
+            {
+              OR: [
+                { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类通知
+                {
+                  AND: [
+                    { type: 'meeting' },
+                    { title: { not: { contains: '审批' } } } // 允许非审批的会议通知
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          AND: [
+            { userId: 0 },
+            {
+              OR: [
+                { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类系统通知
+                {
+                  AND: [
+                    { type: 'meeting' },
+                    { title: { not: { contains: '审批' } } } // 允许非审批的会议系统通知
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ];
+    }
+
     const count = await prisma.notification.count({
-      where: {
-        readStatus: 0
-      }
+      where: whereCondition
     });
 
     res.json({
@@ -330,6 +545,78 @@ router.get('/unread-count', async (req, res) => {
 router.put('/batch-read', async (req, res) => {
   try {
     const { notificationIds } = req.body;
+    const currentUserId = (req as any).user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        code: 401,
+        data: null,
+        message: '用户未认证',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 获取用户角色
+    const userRoles = (req as any).user?.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
+
+    // 构建权限过滤条件
+    let permissionFilter: any;
+    if (isSuperAdmin) {
+      // 超级管理员可以标记自己的通知、系统通知和审批类通知
+      permissionFilter = {
+        OR: [
+          { userId: currentUserId },
+          { userId: 0 }, // 系统通知
+          { type: 'expense' }, // 报销审批通知
+          {
+            AND: [
+              { type: 'meeting' },
+              { title: { contains: '审批' } } // 包含"审批"字样的会议通知
+            ]
+          }
+        ]
+      };
+    } else {
+      // 普通用户只能标记自己的非审批类通知和非审批类系统通知
+      permissionFilter = {
+        OR: [
+          {
+            AND: [
+              { userId: currentUserId },
+              {
+                OR: [
+                  { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类通知
+                  {
+                    AND: [
+                      { type: 'meeting' },
+                      { title: { not: { contains: '审批' } } } // 允许非审批的会议通知
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            AND: [
+              { userId: 0 }, // 系统通知
+              {
+                OR: [
+                  { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类系统通知
+                  {
+                    AND: [
+                      { type: 'meeting' },
+                      { title: { not: { contains: '审批' } } } // 允许非审批的会议系统通知
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+    }
 
     await prisma.notification.updateMany({
       data: {
@@ -339,7 +626,8 @@ router.put('/batch-read', async (req, res) => {
       where: {
         id: {
           in: notificationIds
-        }
+        },
+        AND: [permissionFilter]
       }
     });
 

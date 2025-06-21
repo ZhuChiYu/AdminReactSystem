@@ -483,6 +483,65 @@ router.post('/', authMiddleware, async (req, res) => {
       }
     }
 
+    // 如果会议需要审批，通知超级管理员
+    if (approvalStatus === 1) {
+      try {
+        // 获取所有超级管理员
+        const superAdmins = await prisma.user.findMany({
+          include: {
+            userRoles: {
+              include: {
+                role: true
+              }
+            }
+          },
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleCode: 'super_admin'
+                }
+              }
+            }
+          }
+        });
+
+        // 获取申请人信息
+        const applicant = await prisma.user.findUnique({
+          where: { id: actualOrganizerId },
+          select: { nickName: true, userName: true }
+        });
+
+        const applicantName = applicant?.nickName || applicant?.userName || '未知用户';
+
+        // 为每个超级管理员创建通知
+        const notifications = superAdmins.map(admin => ({
+          content: `${applicantName}申请创建会议"${actualTitle}"，会议时间：${startTime} - ${endTime}，地点：${actualLocation || '待定'}，请及时审核处理。`,
+          createTime: new Date().toISOString(),
+          relatedId: meeting.id,
+          relatedType: 'meeting',
+          title: '新会议申请待审批',
+          type: 'meeting_approval',
+          userId: admin.id,
+          readStatus: 0
+        }));
+
+        if (notifications.length > 0) {
+          await prisma.notification.createMany({
+            data: notifications
+          });
+
+          logger.info(`已为${notifications.length}个超级管理员创建会议审批通知`, {
+            meetingId: meeting.id,
+            meetingTitle: actualTitle
+          });
+        }
+      } catch (notificationError) {
+        logger.error('创建会议审批通知失败:', notificationError);
+        // 不影响主流程，继续执行
+      }
+    }
+
     logger.info(`会议创建成功: ${actualTitle}`);
 
     const message = approvalStatus === 2 ? '会议创建成功，已通知参会人员' : '会议创建成功，等待审批';

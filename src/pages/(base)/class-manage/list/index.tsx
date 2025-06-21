@@ -12,8 +12,9 @@ import {
   type CreateClassParams,
   classService
 } from '@/service/api/class';
+// import { getUserRolePermissions } from '@/service/api/system-manage';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
-import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
+import { getCurrentUserId, getCurrentUserInfo, isSuperAdmin } from '@/utils/auth';
 import { getEndDateDisabledDate, getStartDateDisabledDate, validateDateRange } from '@/utils/dateUtils';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
@@ -60,6 +61,50 @@ const ClassList = () => {
   // 新增：用于存储表单中的开始日期和结束日期
   const [formStartDate, setFormStartDate] = useState<Dayjs | null>(null);
   const [formEndDate, setFormEndDate] = useState<Dayjs | null>(null);
+
+  // 权限状态
+  const [canCreateClass, setCanCreateClass] = useState(false);
+
+  // 获取用户权限
+  const fetchUserPermissions = async () => {
+    // 临时解决方案：直接检查用户角色
+    const userInfo = getCurrentUserInfo();
+    console.log('获取的用户信息:', userInfo);
+
+    if (!userInfo) {
+      console.log('用户信息为空');
+      setCanCreateClass(false);
+      return;
+    }
+
+    // 检查用户是否有人力BP角色
+    const hasHrBpRole = userInfo.roles.some(role => role === 'hr_bp' || role === '人力bp' || role === '人力BP');
+
+    console.log('用户角色:', userInfo.roles);
+    console.log('是否有人力BP角色:', hasHrBpRole);
+
+    // 临时设置：如果是人力BP角色，则有新增班级权限
+    setCanCreateClass(hasHrBpRole);
+
+    // 注释掉原来的API调用，避免用户ID问题
+    /*
+    if (!currentUserId) {
+      console.log('当前用户ID为空');
+      return;
+    }
+
+    try {
+      console.log('正在获取用户权限，用户ID:', currentUserId);
+      const response = await getUserRolePermissions(Number(currentUserId));
+      console.log('用户权限API响应:', response);
+      console.log('canCreateClass权限:', response.data.canCreateClass);
+      setCanCreateClass(response.data.canCreateClass || false);
+    } catch (error) {
+      console.error('获取用户权限失败:', error);
+      setCanCreateClass(false);
+    }
+    */
+  };
 
   // 获取班级分类数据
   const fetchClassCategories = async () => {
@@ -118,7 +163,8 @@ const ClassList = () => {
   // 初始加载数据
   useEffect(() => {
     loadClassList();
-  }, []);
+    fetchUserPermissions(); // 获取用户权限
+  }, [currentUserId]);
 
   // 应用筛选
   const applyFilters = () => {
@@ -456,12 +502,24 @@ const ClassList = () => {
             onChange={dates => setDateRange(dates)}
           />
           <Button onClick={resetFilters}>重置</Button>
-          <Button
-            type="primary"
-            onClick={showAddModal}
-          >
-            新增班级
-          </Button>
+          {/* 调试信息 */}
+          {(() => {
+            console.log('按钮显示逻辑检查:', {
+              canCreateClass,
+              currentUserId,
+              isUserSuperAdmin,
+              shouldShow: isUserSuperAdmin || canCreateClass
+            });
+            return null;
+          })()}
+          {(isUserSuperAdmin || canCreateClass) && (
+            <Button
+              type="primary"
+              onClick={showAddModal}
+            >
+              新增班级
+            </Button>
+          )}
         </div>
 
         <Table

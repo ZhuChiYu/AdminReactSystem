@@ -92,6 +92,7 @@ model Role {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   roleType        String           @default("position") @map("role_type") @db.VarChar(20)
+  canCreateClass  Boolean          @default(false) @map("can_create_class")
   rolePermissions RolePermission[]
   userRoles       UserRole[]
 

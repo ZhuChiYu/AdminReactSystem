@@ -643,6 +643,7 @@ router.get('/roles', async (req, res) => {
     const total = await prisma.role.count({ where });
 
     const records = roles.map(role => ({
+      canCreateClass: role.canCreateClass,
       createdAt: role.createdAt,
       department: role.department,
       id: role.id,
@@ -686,7 +687,7 @@ router.get('/roles', async (req, res) => {
 router.put('/roles/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { department, remark, roleCode, roleName, status } = req.body;
+    const { department, remark, roleCode, roleName, status, canCreateClass } = req.body;
 
     // 检查角色是否存在
     const existingRole = await prisma.role.findUnique({
@@ -724,7 +725,8 @@ router.put('/roles/:id', async (req, res) => {
         remark,
         roleCode,
         roleName,
-        status: status !== undefined ? Number(status) : undefined
+        status: status !== undefined ? Number(status) : undefined,
+        canCreateClass: canCreateClass !== undefined ? Boolean(canCreateClass) : undefined
       },
       where: { id: Number.parseInt(id) }
     });
@@ -873,7 +875,7 @@ router.post('/roles/batch-delete', async (req, res) => {
 // 创建角色
 router.post('/roles', async (req, res) => {
   try {
-    const { department, remark, roleCode, roleName, sort, status } = req.body;
+    const { department, remark, roleCode, roleName, sort, status, canCreateClass } = req.body;
 
     // 检查角色代码是否已存在
     const existingRole = await prisma.role.findUnique({
@@ -892,7 +894,8 @@ router.post('/roles', async (req, res) => {
         roleName,
         roleType: 'position', // 默认创建职务角色
         sort: sort || 0,
-        status: status || 1
+        status: status || 1,
+        canCreateClass: canCreateClass || false
       }
     });
 
@@ -1094,6 +1097,53 @@ router.put('/users/:userId/permission-role', async (req, res) => {
         timestamp: Date.now()
       });
     }
+  }
+});
+
+// 获取用户角色权限
+router.get('/users/:userId/role-permissions', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // 获取用户的所有角色
+    const userRoles = await prisma.userRole.findMany({
+      include: {
+        role: true
+      },
+      where: {
+        userId: Number(userId)
+      }
+    });
+
+    // 提取权限信息
+    const permissions = {
+      canCreateClass: userRoles.some(userRole => userRole.role.canCreateClass),
+      isSuperAdmin: userRoles.some(userRole => userRole.role.roleCode === 'super_admin'),
+      roles: userRoles.map(userRole => ({
+        canCreateClass: userRole.role.canCreateClass,
+        department: userRole.role.department,
+        roleCode: userRole.role.roleCode,
+        roleName: userRole.role.roleName,
+        roleType: userRole.role.roleType
+      }))
+    };
+
+    res.json({
+      code: 0,
+      data: permissions,
+      message: '获取用户角色权限成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('获取用户角色权限失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '获取用户角色权限失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
   }
 });
 

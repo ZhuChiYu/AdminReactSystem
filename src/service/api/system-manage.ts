@@ -20,6 +20,7 @@ export function fetchGetRoleList(params?: Api.SystemManage.RoleSearchParams) {
 
 /** create role */
 export function createRole(data: {
+  canCreateClass?: boolean;
   department?: string;
   remark?: string;
   roleCode: string;
@@ -37,6 +38,7 @@ export function createRole(data: {
 export function updateRole(
   id: number,
   data: {
+    canCreateClass?: boolean;
     department?: string;
     remark?: string;
     roleCode?: string;
@@ -226,4 +228,9 @@ export function fetchGetSystemStatistics() {
 /** update employee permission role */
 export function updateEmployeePermissionRole(userId: number, roleCode: string) {
   return apiClient.put(`/system/users/${userId}/permission-role`, { roleCode });
+}
+
+/** get user role permissions */
+export function getUserRolePermissions(userId: number) {
+  return apiClient.get(`/system/users/${userId}/role-permissions`);
 }

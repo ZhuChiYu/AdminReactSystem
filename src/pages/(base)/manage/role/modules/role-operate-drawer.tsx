@@ -1,13 +1,13 @@
-import { Button as AButton, Drawer as ADrawer, Flex as AFlex, Form as AForm, Input as AInput, Radio as ARadio } from 'antd';
+import { Button as AButton, Drawer as ADrawer, Flex as AFlex, Form as AForm, Input as AInput, Radio as ARadio, Switch as ASwitch } from 'antd';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { enableStatusOptions } from '@/constants/business';
 import { useFormRules } from '@/features/form';
 
-type Model = Pick<Api.SystemManage.Role, 'department' | 'roleDesc' | 'roleName' | 'status'>;
+type Model = Pick<Api.SystemManage.Role, 'canCreateClass' | 'department' | 'roleDesc' | 'roleName' | 'status'>;
 
-type RuleKey = Exclude<keyof Model, 'roleDesc'>;
+type RuleKey = Exclude<keyof Model, 'canCreateClass' | 'roleDesc'>;
 
 const RoleOperateDrawer: FC<Page.OperateDrawerProps> = memo(({ form, handleSubmit, onClose, open, operateType }) => {
   const { t } = useTranslation();
@@ -72,6 +72,14 @@ const RoleOperateDrawer: FC<Page.OperateDrawerProps> = memo(({ form, handleSubmi
               </ARadio>
             ))}
           </ARadio.Group>
+        </AForm.Item>
+
+        <AForm.Item
+          label="新增班级权限"
+          name="canCreateClass"
+          valuePropName="checked"
+        >
+          <ASwitch checkedChildren="开启" unCheckedChildren="关闭" />
         </AForm.Item>
 
         <AForm.Item
