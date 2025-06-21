@@ -371,18 +371,6 @@ const FinanceDashboard = () => {
       title: '部门'
     },
     {
-      dataIndex: 'target',
-      key: 'target',
-      render: (value: number) => `¥${value.toLocaleString()}`,
-      title: '目标'
-    },
-    {
-      dataIndex: 'totalPerformance',
-      key: 'totalPerformance',
-      render: (value: number) => `¥${value.toLocaleString()}`,
-      title: '总业绩'
-    },
-    {
       dataIndex: 'trainingFeeAmount',
       key: 'trainingFeeAmount',
       render: (value: number) => `¥${value.toLocaleString()}`,
@@ -395,10 +383,10 @@ const FinanceDashboard = () => {
       title: '项目收入'
     },
     {
-      dataIndex: 'ratio',
-      key: 'ratio',
-      render: (value: number) => `${value}%`,
-      title: '完成率'
+      dataIndex: 'totalPerformance',
+      key: 'totalPerformance',
+      render: (value: number) => `¥${value.toLocaleString()}`,
+      title: '总业绩'
     }
   ];
 
