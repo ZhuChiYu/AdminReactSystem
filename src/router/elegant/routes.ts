@@ -465,16 +465,16 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   order: 1
                 }
               },
-              {
-                matchedFiles: [null, '/src/pages/(base)/manage/employee-manager/index.tsx', null, null],
-                name: '(base)_manage_employee-manager',
-                path: '/manage/employee-manager',
-                handle: {
-                  i18nKey: 'route.(base)_manage_employee-manager',
-                  title: '(base)_manage_employee-manager',
-                  hideInMenu: true
-                }
-              },
+                        {
+            matchedFiles: [null, '/src/pages/(base)/manage/employee-manager/index.tsx', null, null],
+            name: '(base)_employee-manager',
+            path: '/employee-manager',
+            handle: {
+              i18nKey: 'route.(base)_employee-manager',
+              title: '(base)_employee-manager',
+              hideInMenu: true
+            }
+          },
               {
                 matchedFiles: [null, '/src/pages/(base)/manage/permission/index.tsx', null, null],
                 name: '(base)_manage_permission',

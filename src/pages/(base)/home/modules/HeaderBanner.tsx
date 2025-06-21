@@ -80,7 +80,7 @@ const HeaderBanner = () => {
           <AButton
             type="primary"
             icon={<TeamOutlined />}
-            onClick={() => navigate('/manage/employee-manager')}
+            onClick={() => navigate('/employee-manager')}
           >
             团队管理
           </AButton>

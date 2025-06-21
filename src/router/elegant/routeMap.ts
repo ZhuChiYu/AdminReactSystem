@@ -69,7 +69,7 @@ export const routeMap: RouteMap = {
  "(base)_home": "/home",
  "(base)_manage": "/manage",
  "(base)_manage_customer-assign": "/manage/customer-assign",
- "(base)_manage_employee-manager": "/manage/employee-manager",
+ "(base)_employee-manager": "/employee-manager",
  "(base)_manage_permission": "/manage/permission",
  "(base)_manage_role": "/manage/role",
  "(base)_manage_role_[...slug]": "/manage/role/*",
