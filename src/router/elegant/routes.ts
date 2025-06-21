@@ -472,8 +472,7 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 handle: {
                   i18nKey: 'route.(base)_manage_employee-manager',
                   title: '(base)_manage_employee-manager',
-                  icon: 'mdi:account-group',
-                  order: 3
+                  hideInMenu: true
                 }
               },
               {
