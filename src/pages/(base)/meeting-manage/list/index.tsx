@@ -197,9 +197,8 @@ const Component: React.FC = () => {
 
   // 查看会议详情
   const handleView = (record: MeetingItem) => {
-    // 可以跳转到详情页或者显示详情弹窗
-    console.log('查看会议详情:', record);
-    // navigate(`/meeting-manage/detail/${record.id}`);
+    setCurrentMeeting(record);
+    setDetailModalVisible(true);
   };
 
   // 编辑会议
@@ -547,6 +546,102 @@ const Component: React.FC = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 会议详情查看弹窗 */}
+      <Modal
+        destroyOnClose
+        open={detailModalVisible}
+        title="会议详情"
+        width={700}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => setDetailModalVisible(false)}
+          >
+            关闭
+          </Button>
+        ]}
+        onCancel={() => setDetailModalVisible(false)}
+      >
+        {currentMeeting && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <strong className="text-gray-600">会议标题：</strong>
+                <p className="mt-1">{currentMeeting.title}</p>
+              </div>
+              <div>
+                <strong className="text-gray-600">组织者：</strong>
+                <p className="mt-1">{currentMeeting.organizer}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <strong className="text-gray-600">开始时间：</strong>
+                <p className="mt-1">{dayjs(currentMeeting.startTime).format('YYYY-MM-DD HH:mm')}</p>
+              </div>
+              <div>
+                <strong className="text-gray-600">结束时间：</strong>
+                <p className="mt-1">{dayjs(currentMeeting.endTime).format('YYYY-MM-DD HH:mm')}</p>
+              </div>
+            </div>
+
+            <div>
+              <strong className="text-gray-600">会议地点：</strong>
+              <p className="mt-1">{currentMeeting.location}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <strong className="text-gray-600">审批状态：</strong>
+                <div className="mt-1">{getApprovalStatusTag(currentMeeting.approvalStatus)}</div>
+              </div>
+              <div>
+                <strong className="text-gray-600">会议状态：</strong>
+                <div className="mt-1">
+                  {(() => {
+                    let color = 'blue';
+                    let text = '待开始';
+
+                    if (currentMeeting.status === 1) {
+                      color = 'green';
+                      text = '进行中';
+                    } else if (currentMeeting.status === 2) {
+                      color = 'gray';
+                      text = '已结束';
+                    } else if (currentMeeting.status === -1) {
+                      color = 'red';
+                      text = '已取消';
+                    }
+
+                    return <Tag color={color}>{text}</Tag>;
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <strong className="text-gray-600">参与人数：</strong>
+              <p className="mt-1">{currentMeeting.participants.length} 人</p>
+            </div>
+
+            {currentMeeting.record && (
+              <div>
+                <strong className="text-gray-600">会议记录：</strong>
+                <div className="mt-1 rounded bg-gray-50 p-3">{currentMeeting.record}</div>
+              </div>
+            )}
+
+            {currentMeeting.summary && (
+              <div>
+                <strong className="text-gray-600">会议总结：</strong>
+                <div className="mt-1 rounded bg-gray-50 p-3">{currentMeeting.summary}</div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );
