@@ -7,6 +7,7 @@ import { type EmployeeApi, employeeService, employeeTargetService } from '@/serv
 import type { EmployeeTarget, SetEmployeeTargetRequest } from '@/service/api/employeeTarget';
 import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { getFullTableConfig } from '@/utils/table';
+import { localStg } from '@/utils/storage';
 
 interface EmployeeManagerRelation {
   assignedById: number;
@@ -70,8 +71,8 @@ const EmployeeManagerManagement = () => {
         );
         setManagers(managerList);
 
-      // 只有超级管理员才获取员工-管理员关系记录
-      if (isSuperAdminUser) {
+      // 获取员工-管理员关系记录（所有管理员都需要）
+      if (canManageTargets) {
         const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
         setRelations(relationsResponse.records || []);
       }
@@ -97,7 +98,9 @@ const EmployeeManagerManagement = () => {
         employeesCount: employees.length,
         relationsCount: relations.length,
         managedEmployeeList,
-        currentUserId: getCurrentUserId()
+        currentUserId: getCurrentUserId(),
+        currentUserInfo: localStg.get('userInfo'),
+        relations: relations
       });
       setManagedEmployees(managedEmployeeList);
     } catch (error) {
@@ -270,17 +273,40 @@ const EmployeeManagerManagement = () => {
 
   // 获取管理的员工列表（用于目标设置）
   const getManagedEmployees = () => {
+    console.log('🔍 getManagedEmployees执行:', {
+      isSuperAdminUser,
+      isAdminUser,
+      getCurrentUserId: getCurrentUserId(),
+      relationsLength: relations.length
+    });
+
     if (isSuperAdminUser) {
       // 超级管理员可以管理所有员工
-      return employees.filter(emp =>
+      const result = employees.filter(emp =>
         !emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
       );
+      console.log('🔍 超级管理员可管理的员工:', result);
+      return result;
     } else if (isAdminUser) {
       // 管理员只能管理分配给自己的员工
+      const currentUserId = getCurrentUserId();
+      const currentUserIdNum = Number(currentUserId);
+
+      console.log('🔍 当前管理员信息:', { currentUserId, currentUserIdNum });
+      console.log('🔍 所有关系数据:', relations);
+
       const managedEmployeeIds = relations
-        .filter(relation => relation.managerId === getCurrentUserId())
+        .filter(relation => {
+          console.log('🔍 检查关系:', { relationManagerId: relation.managerId, currentUserIdNum });
+          return relation.managerId === currentUserIdNum;
+        })
         .map(relation => relation.employeeId);
-      return employees.filter(emp => managedEmployeeIds.includes(emp.id));
+
+      console.log('🔍 管理的员工ID列表:', managedEmployeeIds);
+
+      const result = employees.filter(emp => managedEmployeeIds.includes(emp.id));
+      console.log('🔍 管理员可管理的员工:', result);
+      return result;
     }
     return [];
   };
