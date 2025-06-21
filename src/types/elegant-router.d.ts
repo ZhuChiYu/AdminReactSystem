@@ -50,6 +50,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_employee-manage_contact": "/employee-manage/contact";
     "(base)_employee-manage_identity": "/employee-manage/identity";
     "(base)_employee-manage_list": "/employee-manage/list";
+    "(base)_employee-manager": "/employee-manager";
     "(base)_expense-process": "/expense-process";
     "(base)_expense-process_apply": "/expense-process/apply";
     "(base)_expense-process_approve": "/expense-process/approve";
@@ -70,7 +71,6 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_home": "/home";
     "(base)_manage": "/manage";
     "(base)_manage_customer-assign": "/manage/customer-assign";
-    "(base)_employee-manager": "/employee-manager";
     "(base)_manage_permission": "/manage/permission";
     "(base)_manage_role": "/manage/role";
     "(base)_manage_role_[...slug]": "/manage/role/*";
@@ -195,6 +195,7 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_employee-manage_contact"
     | "(base)_employee-manage_identity"
     | "(base)_employee-manage_list"
+    | "(base)_employee-manager"
     | "(base)_expense-process_apply"
     | "(base)_expense-process_approve"
     | "(base)_expense-process_history"
@@ -214,7 +215,6 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_home"
     | "(base)"
     | "(base)_manage_customer-assign"
-    | "(base)_employee-manager"
     | "(base)_manage"
     | "(base)_manage_permission"
     | "(base)_manage_role_[...slug]"
