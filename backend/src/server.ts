@@ -23,6 +23,7 @@ import classRoutes from '@/routes/class';
 import courseRoutes from '@/routes/course';
 import customerRoutes from '@/routes/customer';
 import employeeTargetRoutes from '@/routes/employeeTarget';
+import taskStatsRoutes from '@/routes/taskStats';
 import expenseRoutes from '@/routes/expense';
 import meetingRoutes from '@/routes/meeting';
 import notificationRoutes from '@/routes/notification';
@@ -203,6 +204,7 @@ app.use('/api/attachments', authMiddleware, attachmentRoutes);
 app.use('/api/expense', authMiddleware, expenseRoutes);
 app.use('/api/task-attachments', authMiddleware, taskAttachmentRoutes);
 app.use('/api/employee-targets', authMiddleware, employeeTargetRoutes);
+app.use('/api/task-stats', authMiddleware, taskStatsRoutes);
 
 // API文档
 if (process.env.API_DOC_ENABLED === 'true') {

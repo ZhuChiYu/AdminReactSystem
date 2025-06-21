@@ -86,7 +86,10 @@ class EmployeeTargetController {
         departmentName: target.employee.department?.name || '未分配',
         targetYear: target.targetYear,
         targetMonth: target.targetMonth,
-        targetAmount: Number(target.targetAmount),
+        consultTarget: target.consultTarget || 0,
+        followUpTarget: target.followUpTarget || 0,
+        developTarget: target.developTarget || 0,
+        registerTarget: target.registerTarget || 0,
         managerId: target.managerId,
         managerName: target.manager.nickName || target.manager.userName,
         remark: target.remark,
@@ -112,13 +115,13 @@ class EmployeeTargetController {
    */
   async setEmployeeTarget(req: Request, res: Response) {
     try {
-      const { employeeId, targetYear, targetMonth, targetAmount, remark } = req.body;
+      const { employeeId, targetYear, targetMonth, consultTarget, followUpTarget, developTarget, registerTarget, remark } = req.body;
       const currentUserId = (req as any).user?.id;
       const userRoles = (req as any).user?.roles || [];
 
       // 验证必需字段
-      if (!employeeId || !targetYear || !targetMonth || !targetAmount) {
-        return res.status(400).json(createErrorResponse(400, '员工ID、年份、月份和目标金额不能为空', null, req.path));
+      if (!employeeId || !targetYear || !targetMonth) {
+        return res.status(400).json(createErrorResponse(400, '员工ID、年份和月份不能为空', null, req.path));
       }
 
       // 权限检查
@@ -167,7 +170,10 @@ class EmployeeTargetController {
         result = await prisma.employeeTarget.update({
           where: { id: existingTarget.id },
           data: {
-            targetAmount: parseFloat(targetAmount),
+            consultTarget: consultTarget ? parseInt(consultTarget) : 0,
+            followUpTarget: followUpTarget ? parseInt(followUpTarget) : 0,
+            developTarget: developTarget ? parseInt(developTarget) : 0,
+            registerTarget: registerTarget ? parseInt(registerTarget) : 0,
             managerId: currentUserId,
             remark,
             updatedAt: new Date()
@@ -180,7 +186,10 @@ class EmployeeTargetController {
             employeeId: parseInt(employeeId),
             targetYear: parseInt(targetYear),
             targetMonth: parseInt(targetMonth),
-            targetAmount: parseFloat(targetAmount),
+            consultTarget: consultTarget ? parseInt(consultTarget) : 0,
+            followUpTarget: followUpTarget ? parseInt(followUpTarget) : 0,
+            developTarget: developTarget ? parseInt(developTarget) : 0,
+            registerTarget: registerTarget ? parseInt(registerTarget) : 0,
             managerId: currentUserId,
             remark
           }
@@ -253,7 +262,7 @@ class EmployeeTargetController {
 
       const results = [];
       for (const targetData of targets) {
-        const { employeeId, targetYear, targetMonth, targetAmount, remark } = targetData;
+        const { employeeId, targetYear, targetMonth, consultTarget, followUpTarget, developTarget, registerTarget, remark } = targetData;
 
         // 管理员权限检查
         if (!userRoles.includes('super_admin')) {
@@ -293,7 +302,10 @@ class EmployeeTargetController {
             result = await prisma.employeeTarget.update({
               where: { id: existingTarget.id },
               data: {
-                targetAmount: parseFloat(targetAmount),
+                consultTarget: consultTarget ? parseInt(consultTarget) : 0,
+                followUpTarget: followUpTarget ? parseInt(followUpTarget) : 0,
+                developTarget: developTarget ? parseInt(developTarget) : 0,
+                registerTarget: registerTarget ? parseInt(registerTarget) : 0,
                 managerId: currentUserId,
                 remark,
                 updatedAt: new Date()
@@ -306,7 +318,10 @@ class EmployeeTargetController {
                 employeeId: parseInt(employeeId),
                 targetYear: parseInt(targetYear),
                 targetMonth: parseInt(targetMonth),
-                targetAmount: parseFloat(targetAmount),
+                consultTarget: consultTarget ? parseInt(consultTarget) : 0,
+                followUpTarget: followUpTarget ? parseInt(followUpTarget) : 0,
+                developTarget: developTarget ? parseInt(developTarget) : 0,
+                registerTarget: registerTarget ? parseInt(registerTarget) : 0,
                 managerId: currentUserId,
                 remark
               }

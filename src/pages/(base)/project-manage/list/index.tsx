@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 import type { CustomerApi } from '@/service/api';
 import { customerService } from '@/service/api';
+import { taskStatsService } from '@/service/api/taskStats';
 import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
 // 暂时注释掉未使用的导入
 // import { getCurrentUserId, getCurrentUserName, isAdmin } from '@/utils/auth';
@@ -309,21 +310,30 @@ const TaskManagement = () => {
   // 加载任务目标数据
   const loadTaskTargets = async () => {
     try {
-      // 实际调用后端API加载目标数据
-      // const targetData = await taskService.getTaskTargets();
+      // 调用新的API获取用户的任务目标和统计
+      const currentDate = new Date();
+      const stats = await taskStatsService.getUserTaskStats(currentDate.getFullYear(), currentDate.getMonth() + 1);
 
-      // 暂时使用本地存储模拟持久化
-      const savedTargets = localStorage.getItem('taskTargets');
-      if (savedTargets) {
-        const parsedTargets = JSON.parse(savedTargets);
-        setTaskTargets(parsedTargets);
-        return parsedTargets;
-      }
+      const newTargets = {
+        [TaskType.CONSULT]: stats.targets.consultTarget,
+        [TaskType.FOLLOW_UP]: stats.targets.followUpTarget,
+        [TaskType.DEVELOP]: stats.targets.developTarget,
+        [TaskType.REGISTER]: stats.targets.registerTarget
+      };
 
-      return taskTargets;
+      setTaskTargets(newTargets);
+      return newTargets;
     } catch (error) {
       console.error('❌ 加载目标数据失败:', error);
-      return taskTargets;
+      // 如果API调用失败，使用默认值
+      const defaultTargets = {
+        [TaskType.CONSULT]: 50,
+        [TaskType.DEVELOP]: 50,
+        [TaskType.FOLLOW_UP]: 50,
+        [TaskType.REGISTER]: 50
+      };
+      setTaskTargets(defaultTargets);
+      return defaultTargets;
     }
   };
 

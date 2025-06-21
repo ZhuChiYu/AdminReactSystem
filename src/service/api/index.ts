@@ -25,6 +25,7 @@ export { customerService } from './customer';
 export * from './employee';
 
 export { employeeTargetService } from './employeeTarget';
+export { taskStatsService } from './taskStats';
 
 export { expenseService } from './expense';
 

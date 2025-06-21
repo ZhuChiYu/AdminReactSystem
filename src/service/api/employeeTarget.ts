@@ -9,7 +9,10 @@ export interface EmployeeTarget {
   departmentName: string;
   targetYear: number;
   targetMonth: number;
-  targetAmount: number;
+  consultTarget: number;
+  followUpTarget: number;
+  developTarget: number;
+  registerTarget: number;
   managerId: number;
   managerName: string;
   remark?: string;
@@ -30,7 +33,10 @@ export interface SetEmployeeTargetRequest {
   employeeId: number;
   targetYear: number;
   targetMonth: number;
-  targetAmount: number;
+  consultTarget?: number;
+  followUpTarget?: number;
+  developTarget?: number;
+  registerTarget?: number;
   remark?: string;
 }
 

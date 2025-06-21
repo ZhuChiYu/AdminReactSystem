@@ -1,13 +1,16 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { validationResult } from 'express-validator';
+import { prisma } from '@/config/database';
+import { createSuccessResponse, createErrorResponse } from '@/utils/response';
+import { logger } from '@/utils/logger';
 
-const prisma = new PrismaClient();
+const prismaClient = new PrismaClient();
 
 // 项目阶段枚举
 enum ProjectStage {
   CUSTOMER_INQUIRY = 'customer_inquiry',
-  PROPOSAL_SUBMISSION = 'proposal_submission', 
+  PROPOSAL_SUBMISSION = 'proposal_submission',
   TEACHER_CONFIRMATION = 'teacher_confirmation',
   PROJECT_APPROVAL = 'project_approval',
   CONTRACT_SIGNING = 'contract_signing',
@@ -51,18 +54,18 @@ const getCurrentExecutorId = (stage: string, task: any): number | null => {
  */
 export const getTasks = async (req: Request, res: Response) => {
   try {
-    const { 
-      current = 1, 
-      size = 10, 
-      keyword = '', 
-      currentStage, 
+    const {
+      current = 1,
+      size = 10,
+      keyword = '',
+      currentStage,
       priority,
       responsiblePersonId,
-      isArchived = 'false' 
+      isArchived = 'false'
     } = req.query;
 
     const skip = (Number(current) - 1) * Number(size);
-    
+
     // 构建查询条件
     const where: any = {
       isArchived: String(isArchived) === 'true'
@@ -90,7 +93,7 @@ export const getTasks = async (req: Request, res: Response) => {
 
     // 查询数据
     const [tasks, total] = await Promise.all([
-      prisma.task.findMany({
+      prismaClient.task.findMany({
         where,
         skip,
         take: Number(size),
@@ -110,7 +113,7 @@ export const getTasks = async (req: Request, res: Response) => {
         },
         orderBy: { createTime: 'desc' }
       }),
-      prisma.task.count({ where })
+      prismaClient.task.count({ where })
     ]);
 
     res.json({
@@ -141,7 +144,7 @@ export const getTaskById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const task = await prisma.task.findUnique({
+    const task = await prismaClient.task.findUnique({
       where: { id: Number(id) },
       include: {
         responsiblePerson: {
@@ -237,7 +240,7 @@ export const createTask = async (req: Request, res: Response) => {
     taskData.executorId = getCurrentExecutorId(ProjectStage.CUSTOMER_INQUIRY, taskData);
 
     // 创建项目事项
-    const task = await prisma.task.create({
+    const task = await prismaClient.task.create({
       data: taskData,
       include: {
         responsiblePerson: {
@@ -290,7 +293,7 @@ export const updateTask = async (req: Request, res: Response) => {
     } = req.body;
 
     // 检查项目事项是否存在
-    const existingTask = await prisma.task.findUnique({
+    const existingTask = await prismaClient.task.findUnique({
       where: { id: Number(id) }
     });
 
@@ -302,7 +305,7 @@ export const updateTask = async (req: Request, res: Response) => {
       });
     }
 
-    const task = await prisma.task.update({
+    const task = await prismaClient.task.update({
       where: { id: Number(id) },
       data: {
         projectType,
@@ -355,7 +358,7 @@ export const deleteTask = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     // 检查项目事项是否存在
-    const existingTask = await prisma.task.findUnique({
+    const existingTask = await prismaClient.task.findUnique({
       where: { id: Number(id) }
     });
 
@@ -367,7 +370,7 @@ export const deleteTask = async (req: Request, res: Response) => {
       });
     }
 
-    await prisma.task.delete({
+    await prismaClient.task.delete({
       where: { id: Number(id) }
     });
 
@@ -393,7 +396,7 @@ export const advanceStage = async (req: Request, res: Response) => {
   try {
     const { taskId, comment, operatorId } = req.body;
 
-    const task = await prisma.task.findUnique({
+    const task = await prismaClient.task.findUnique({
       where: { id: Number(taskId) }
     });
 
@@ -406,7 +409,7 @@ export const advanceStage = async (req: Request, res: Response) => {
     }
 
     const nextStage = STAGE_FLOW[task.currentStage as ProjectStage];
-    
+
     if (!nextStage) {
       return res.status(400).json({
         code: 400,
@@ -425,7 +428,7 @@ export const advanceStage = async (req: Request, res: Response) => {
       comment
     });
 
-    const updatedTask = await prisma.task.update({
+    const updatedTask = await prismaClient.task.update({
       where: { id: Number(taskId) },
       data: {
         currentStage: nextStage,
@@ -469,7 +472,7 @@ export const archiveTask = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const task = await prisma.task.findUnique({
+    const task = await prismaClient.task.findUnique({
       where: { id: Number(id) }
     });
 
@@ -481,7 +484,7 @@ export const archiveTask = async (req: Request, res: Response) => {
       });
     }
 
-    const updatedTask = await prisma.task.update({
+    const updatedTask = await prismaClient.task.update({
       where: { id: Number(id) },
       data: {
         isArchived: true,
@@ -527,7 +530,7 @@ export const getMyTasks = async (req: Request, res: Response) => {
     const { current = 1, size = 10, currentStage } = req.query;
 
     const skip = (Number(current) - 1) * Number(size);
-    
+
     const where: any = {
       isArchived: false,
       OR: [
@@ -543,7 +546,7 @@ export const getMyTasks = async (req: Request, res: Response) => {
     }
 
     const [tasks, total] = await Promise.all([
-      prisma.task.findMany({
+      prismaClient.task.findMany({
         where,
         skip,
         take: Number(size),
@@ -563,7 +566,7 @@ export const getMyTasks = async (req: Request, res: Response) => {
         },
         orderBy: { createTime: 'desc' }
       }),
-      prisma.task.count({ where })
+      prismaClient.task.count({ where })
     ]);
 
     res.json({
@@ -592,11 +595,11 @@ export const getMyTasks = async (req: Request, res: Response) => {
  */
 export const getArchivedTasks = async (req: Request, res: Response) => {
   try {
-    const { 
-      current = 1, 
-      size = 10, 
-      keyword = '', 
-      projectType, 
+    const {
+      current = 1,
+      size = 10,
+      keyword = '',
+      projectType,
       priority,
       responsiblePersonId,
       completionTimeStart,
@@ -604,7 +607,7 @@ export const getArchivedTasks = async (req: Request, res: Response) => {
     } = req.query;
 
     const skip = (Number(current) - 1) * Number(size);
-    
+
     // 构建查询条件 - 只查询已完成且已归档的项目
     const where: any = {
       isCompleted: true,
@@ -644,7 +647,7 @@ export const getArchivedTasks = async (req: Request, res: Response) => {
 
     // 查询数据
     const [tasks, total] = await Promise.all([
-      prisma.task.findMany({
+      prismaClient.task.findMany({
         where,
         skip,
         take: Number(size),
@@ -664,7 +667,7 @@ export const getArchivedTasks = async (req: Request, res: Response) => {
         },
         orderBy: { completionTime: 'desc' } // 按完成时间倒序
       }),
-      prisma.task.count({ where })
+      prismaClient.task.count({ where })
     ]);
 
     res.json({
@@ -702,22 +705,22 @@ export const getProjectStatistics = async (req: Request, res: Response) => {
       thisYearCompleted
     ] = await Promise.all([
       // 总项目数（包括已归档）
-      prisma.task.count(),
+      prismaClient.task.count(),
       // 进行中的项目（未完成且未归档）
-      prisma.task.count({
+      prismaClient.task.count({
         where: {
           isCompleted: false,
           isArchived: false
         }
       }),
       // 已完成的项目
-      prisma.task.count({
+      prismaClient.task.count({
         where: {
           isCompleted: true
         }
       }),
       // 本月完成的项目
-      prisma.task.count({
+      prismaClient.task.count({
         where: {
           isCompleted: true,
           completionTime: {
@@ -727,7 +730,7 @@ export const getProjectStatistics = async (req: Request, res: Response) => {
         }
       }),
       // 今年完成的项目
-      prisma.task.count({
+      prismaClient.task.count({
         where: {
           isCompleted: true,
           completionTime: {
@@ -739,7 +742,7 @@ export const getProjectStatistics = async (req: Request, res: Response) => {
     ]);
 
     // 按项目类型统计
-    const projectTypeStats = await prisma.task.groupBy({
+    const projectTypeStats = await prismaClient.task.groupBy({
       by: ['projectType'],
       _count: {
         id: true
@@ -756,8 +759,8 @@ export const getProjectStatistics = async (req: Request, res: Response) => {
       date.setMonth(date.getMonth() - i);
       const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
       const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-      
-      const count = await prisma.task.count({
+
+      const count = await prismaClient.task.count({
         where: {
           isCompleted: true,
           completionTime: {
@@ -800,4 +803,104 @@ export const getProjectStatistics = async (req: Request, res: Response) => {
       data: null
     });
   }
-}; 
+};
+
+class TaskController {
+  /**
+   * 获取用户任务统计和目标
+   */
+  async getUserTaskStats(req: Request, res: Response) {
+    try {
+      const currentUserId = (req as any).user?.id;
+      const { year, month } = req.query;
+
+      if (!currentUserId) {
+        return res.status(401).json(createErrorResponse(401, '用户未登录', null, req.path));
+      }
+
+      // 解析年月参数
+      const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+      const targetMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
+
+      // 获取用户的任务目标
+      const employeeTarget = await prisma.employeeTarget.findFirst({
+        where: {
+          employeeId: currentUserId,
+          targetYear,
+          targetMonth,
+          status: 1
+        }
+      });
+
+      // 获取用户任务完成情况统计（这里需要根据实际的任务统计逻辑）
+      // 假设任务表有 taskType 字段来区分任务类型
+      const currentDate = new Date();
+      const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
+      const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+
+      // 获取各类型任务的完成数量
+      const consultCount = await this.getTaskCount(currentUserId, '咨询任务', startOfMonth, endOfMonth);
+      const followUpCount = await this.getTaskCount(currentUserId, '回访任务', startOfMonth, endOfMonth);
+      const developCount = await this.getTaskCount(currentUserId, '开发任务', startOfMonth, endOfMonth);
+      const registerCount = await this.getTaskCount(currentUserId, '报名任务', startOfMonth, endOfMonth);
+
+      // 构建返回数据
+      const result = {
+        targets: {
+          consultTarget: employeeTarget?.consultTarget || 50,
+          followUpTarget: employeeTarget?.followUpTarget || 50,
+          developTarget: employeeTarget?.developTarget || 50,
+          registerTarget: employeeTarget?.registerTarget || 50
+        },
+        completions: {
+          consultCount,
+          followUpCount,
+          developCount,
+          registerCount
+        },
+        progress: {
+          consultProgress: employeeTarget?.consultTarget ? Math.round((consultCount / employeeTarget.consultTarget) * 100) : 0,
+          followUpProgress: employeeTarget?.followUpTarget ? Math.round((followUpCount / employeeTarget.followUpTarget) * 100) : 0,
+          developProgress: employeeTarget?.developTarget ? Math.round((developCount / employeeTarget.developTarget) * 100) : 0,
+          registerProgress: employeeTarget?.registerTarget ? Math.round((registerCount / employeeTarget.registerTarget) * 100) : 0
+        }
+      };
+
+      res.json(createSuccessResponse(result, '获取任务统计成功', req.path));
+    } catch (error) {
+      logger.error('获取任务统计失败:', error);
+      res.status(500).json(createErrorResponse(500, '获取任务统计失败', null, req.path));
+    }
+  }
+
+  /**
+   * 获取指定类型任务的完成数量
+   */
+  private async getTaskCount(userId: number, taskType: string, startDate: Date, endDate: Date): Promise<number> {
+    try {
+      // 根据实际的数据库表结构查询任务数量
+      // 这里需要根据实际的任务表结构进行调整
+      const count = await prisma.task.count({
+        where: {
+          OR: [
+            { responsiblePersonId: userId },
+            { executorId: userId }
+          ],
+          projectType: taskType, // 假设 projectType 存储任务类型
+          isCompleted: true,
+          completionTime: {
+            gte: startDate,
+            lte: endDate
+          }
+        }
+      });
+
+      return count;
+    } catch (error) {
+      logger.error(`获取${taskType}数量失败:`, error);
+      return 0;
+    }
+  }
+}
+
+export default new TaskController();

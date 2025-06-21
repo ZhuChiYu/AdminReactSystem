@@ -1,13 +1,26 @@
 import { AimOutlined, DeleteOutlined, EditOutlined, UserOutlined } from '@ant-design/icons';
-import { Button as AButton, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, message } from 'antd';
+import {
+  Button as AButton,
+  Card,
+  DatePicker,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tabs,
+  message
+} from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 
 import { type EmployeeApi, employeeService, employeeTargetService } from '@/service/api';
 import type { EmployeeTarget, SetEmployeeTargetRequest } from '@/service/api/employeeTarget';
 import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
-import { getFullTableConfig } from '@/utils/table';
 import { localStg } from '@/utils/storage';
+import { getFullTableConfig } from '@/utils/table';
 
 interface EmployeeManagerRelation {
   assignedById: number;
@@ -44,6 +57,7 @@ const EmployeeManagerManagement = () => {
   // 员工目标管理相关状态
   const [managedEmployees, setManagedEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [targetLoading, setTargetLoading] = useState(false);
+  const [employeeTargets, setEmployeeTargets] = useState<Record<number, EmployeeTarget>>({});
   const [isTargetModalVisible, setIsTargetModalVisible] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeApi.EmployeeListItem | null>(null);
   const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear());
@@ -51,38 +65,71 @@ const EmployeeManagerManagement = () => {
 
   // 加载基础数据
   const fetchBasicData = async () => {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        // 获取所有员工列表
-        const employeeResponse = await employeeService.getEmployeeList({
-          current: 1,
-          size: 1000,
-          status: 'active' // 只获取有效的员工
-        });
-        const allEmployees = employeeResponse.records || [];
+      // 获取所有员工列表
+      const employeeResponse = await employeeService.getEmployeeList({
+        current: 1,
+        size: 1000,
+        status: 'active' // 只获取有效的员工
+      });
+      const allEmployees = employeeResponse.records || [];
 
-        // 设置所有员工数据
-        setEmployees(allEmployees);
+      // 设置所有员工数据
+      setEmployees(allEmployees);
 
-        // 过滤出管理员角色的员工
-        const managerList = allEmployees.filter(emp =>
-          emp.roles?.some(role => role.code === 'admin' || role.code === '管理员')
-        );
-        setManagers(managerList);
+      // 调试：查找当前用户在员工列表中的信息
+      const userInfo = localStg.get('userInfo');
+      const currentUserInEmployees = allEmployees.find(
+        emp => emp.userName === userInfo?.userName || emp.userName === 'manager1'
+      );
+      console.log('🔍 在员工列表中找到当前用户:', {
+        currentUserInEmployees,
+        searchForManager1: allEmployees.find(emp => emp.userName === 'manager1'),
+        userInfoUserName: userInfo?.userName
+      });
+
+      // 过滤出管理员角色的员工
+      const managerList = allEmployees.filter(emp =>
+        emp.roles?.some(role => role.code === 'admin' || role.code === '管理员')
+      );
+      setManagers(managerList);
 
       // 获取员工-管理员关系记录（所有管理员都需要）
       if (canManageTargets) {
         const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
         setRelations(relationsResponse.records || []);
       }
-      } catch (error) {
-        console.error('获取数据失败:', error);
-        message.error('获取数据失败');
-      } finally {
-        setLoading(false);
-      }
-    };
+    } catch (error) {
+      console.error('获取数据失败:', error);
+      message.error('获取数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 获取员工目标数据
+  const fetchEmployeeTargets = async () => {
+    try {
+      const targetData = await employeeTargetService.getEmployeeTargets({
+        current: 1,
+        month: targetMonth,
+        size: 1000,
+        year: targetYear
+      });
+
+      // 将目标数据转换为以员工ID为键的对象
+      const targetsMap: Record<number, EmployeeTarget> = {};
+      targetData.records.forEach(target => {
+        targetsMap[target.employeeId] = target;
+      });
+
+      setEmployeeTargets(targetsMap);
+    } catch (error) {
+      console.error('获取员工目标数据失败:', error);
+    }
+  };
 
   // 加载管理的员工数据
   const fetchManagedEmployees = async () => {
@@ -91,18 +138,23 @@ const EmployeeManagerManagement = () => {
     try {
       setTargetLoading(true);
       const managedEmployeeList = getManagedEmployees();
+      const userInfo = localStg.get('userInfo');
       console.log('🔍 管理的员工列表:', {
         canManageTargets,
-        isSuperAdminUser,
-        isAdminUser,
-        employeesCount: employees.length,
-        relationsCount: relations.length,
-        managedEmployeeList,
         currentUserId: getCurrentUserId(),
-        currentUserInfo: localStg.get('userInfo'),
-        relations: relations
+        currentUserInfo: userInfo,
+        currentUserInfoKeys: userInfo ? Object.keys(userInfo) : [],
+        employeesCount: employees.length,
+        isAdminUser,
+        isSuperAdminUser,
+        managedEmployeeList,
+        relations,
+        relationsCount: relations.length
       });
       setManagedEmployees(managedEmployeeList);
+
+      // 获取员工目标数据
+      await fetchEmployeeTargets();
     } catch (error) {
       console.error('获取管理员工数据失败:', error);
       message.error('获取管理员工数据失败');
@@ -231,13 +283,16 @@ const EmployeeManagerManagement = () => {
       const values = await targetForm.validateFields();
       setTargetLoading(true);
 
-      // 构建四种任务类型的目标数据 - 暂时使用原有的API结构
+      // 构建四种任务类型的目标数据
       const targetData: SetEmployeeTargetRequest = {
+        consultTarget: values.consultTarget || 0,
+        developTarget: values.developTarget || 0,
         employeeId: values.employeeId,
-        targetYear: values.targetDate.year(),
+        followUpTarget: values.followUpTarget || 0,
+        registerTarget: values.registerTarget || 0,
+        remark: values.remark || '',
         targetMonth: values.targetDate.month() + 1,
-        targetAmount: values.consultTarget || 0, // 暂时使用咨询任务目标作为主要目标
-        remark: `咨询:${values.consultTarget || 0}, 回访:${values.followUpTarget || 0}, 开发:${values.developTarget || 0}, 报名:${values.registerTarget || 0}`
+        targetYear: values.targetDate.year()
       };
 
       await employeeTargetService.setEmployeeTarget(targetData);
@@ -258,15 +313,18 @@ const EmployeeManagerManagement = () => {
   // 编辑员工目标
   const handleEditEmployeeTarget = (employee: EmployeeApi.EmployeeListItem) => {
     setEditingEmployee(employee);
-    // 这里应该获取员工当前的各项任务目标，暂时设置默认值
+
+    // 获取员工当前的目标数据
+    const currentTarget = employeeTargets[employee.id];
+
     targetForm.setFieldsValue({
+      consultTarget: currentTarget?.consultTarget || 0,
+      developTarget: currentTarget?.developTarget || 0,
       employeeId: employee.id,
-      targetDate: dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`),
-      consultTarget: 0,
-      followUpTarget: 0,
-      developTarget: 0,
-      registerTarget: 0,
-      remark: ''
+      followUpTarget: currentTarget?.followUpTarget || 0,
+      registerTarget: currentTarget?.registerTarget || 0,
+      remark: currentTarget?.remark || '',
+      targetDate: dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`)
     });
     setIsTargetModalVisible(true);
   };
@@ -274,30 +332,63 @@ const EmployeeManagerManagement = () => {
   // 获取管理的员工列表（用于目标设置）
   const getManagedEmployees = () => {
     console.log('🔍 getManagedEmployees执行:', {
-      isSuperAdminUser,
-      isAdminUser,
       getCurrentUserId: getCurrentUserId(),
+      isAdminUser,
+      isSuperAdminUser,
       relationsLength: relations.length
     });
 
     if (isSuperAdminUser) {
       // 超级管理员可以管理所有员工
-      const result = employees.filter(emp =>
-        !emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
+      const result = employees.filter(
+        emp => !emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
       );
       console.log('🔍 超级管理员可管理的员工:', result);
       return result;
     } else if (isAdminUser) {
       // 管理员只能管理分配给自己的员工
-      const currentUserId = getCurrentUserId();
+      const userInfo = localStg.get('userInfo');
+      let currentUserId = getCurrentUserId() || userInfo?.userId || userInfo?.id;
+
+      // 如果还是没找到，尝试从员工列表中查找
+      if (!currentUserId) {
+        const currentUserInEmployees = employees.find(
+          emp => emp.userName === userInfo?.userName || emp.userName === 'manager1'
+        );
+        currentUserId = currentUserInEmployees?.id;
+      }
+
+      // 如果通过ID匹配不到，尝试通过用户名匹配关系数据中的managerName
+      if (!currentUserId && userInfo?.userName) {
+        const relationWithCurrentUser = relations.find(
+          rel => rel.managerName === userInfo.userName || rel.managerName.includes(userInfo.userName)
+        );
+        if (relationWithCurrentUser) {
+          currentUserId = relationWithCurrentUser.managerId;
+        }
+      }
+
+      // 临时方案：如果是manager1用户，直接使用ID=2（从关系数据看到的）
+      if (!currentUserId && (userInfo?.userName === 'manager1' || userInfo?.email?.includes('manager1'))) {
+        currentUserId = 2;
+      }
+
       const currentUserIdNum = Number(currentUserId);
 
-      console.log('🔍 当前管理员信息:', { currentUserId, currentUserIdNum });
+      console.log('🔍 当前管理员信息:', {
+        currentUserIdNum,
+        finalCurrentUserId: currentUserId,
+        getCurrentUserId: getCurrentUserId(),
+        userInfo,
+        userInfoId: userInfo?.id,
+        userInfoUserId: userInfo?.userId,
+        userInfoUserName: userInfo?.userName
+      });
       console.log('🔍 所有关系数据:', relations);
 
       const managedEmployeeIds = relations
         .filter(relation => {
-          console.log('🔍 检查关系:', { relationManagerId: relation.managerId, currentUserIdNum });
+          console.log('🔍 检查关系:', { currentUserIdNum, relationManagerId: relation.managerId });
           return relation.managerId === currentUserIdNum;
         })
         .map(relation => relation.employeeId);
@@ -338,9 +429,9 @@ const EmployeeManagerManagement = () => {
     {
       align: 'center' as const,
       key: 'consultTarget',
-      render: (_, record: EmployeeApi.EmployeeListItem) => {
-        // TODO: 从API获取员工的咨询任务目标
-        return '-';
+      render: (_: any, record: EmployeeApi.EmployeeListItem) => {
+        const target = employeeTargets[record.id];
+        return target?.consultTarget ?? '-';
       },
       title: '咨询任务目标',
       width: 120
@@ -348,9 +439,9 @@ const EmployeeManagerManagement = () => {
     {
       align: 'center' as const,
       key: 'followUpTarget',
-      render: (_, record: EmployeeApi.EmployeeListItem) => {
-        // TODO: 从API获取员工的回访任务目标
-        return '-';
+      render: (_: any, record: EmployeeApi.EmployeeListItem) => {
+        const target = employeeTargets[record.id];
+        return target?.followUpTarget ?? '-';
       },
       title: '回访任务目标',
       width: 120
@@ -358,9 +449,9 @@ const EmployeeManagerManagement = () => {
     {
       align: 'center' as const,
       key: 'developTarget',
-      render: (_, record: EmployeeApi.EmployeeListItem) => {
-        // TODO: 从API获取员工的开发任务目标
-        return '-';
+      render: (_: any, record: EmployeeApi.EmployeeListItem) => {
+        const target = employeeTargets[record.id];
+        return target?.developTarget ?? '-';
       },
       title: '开发任务目标',
       width: 120
@@ -368,9 +459,9 @@ const EmployeeManagerManagement = () => {
     {
       align: 'center' as const,
       key: 'registerTarget',
-      render: (_, record: EmployeeApi.EmployeeListItem) => {
-        // TODO: 从API获取员工的报名任务目标
-        return '-';
+      render: (_: any, record: EmployeeApi.EmployeeListItem) => {
+        const target = employeeTargets[record.id];
+        return target?.registerTarget ?? '-';
       },
       title: '报名任务目标',
       width: 120
@@ -473,74 +564,82 @@ const EmployeeManagerManagement = () => {
   // 构建Tab项
   const tabItems = [
     // 员工目标管理Tab - 管理员和超级管理员可见
-    ...(canManageTargets ? [{
-      key: 'targets',
-      label: '员工目标管理',
-      children: (
-        <Card
-          title={
-            <Space>
-              <span>员工目标管理</span>
-              <DatePicker.MonthPicker
-                value={dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`)}
-                onChange={(date) => {
-                  if (date) {
-                    setTargetYear(date.year());
-                    setTargetMonth(date.month() + 1);
-                  }
-                }}
-                placeholder="选择月份"
-              />
-            </Space>
+    ...(canManageTargets
+      ? [
+          {
+            children: (
+              <Card
+                title={
+                  <Space>
+                    <span>员工目标管理</span>
+                    <DatePicker.MonthPicker
+                      placeholder="选择月份"
+                      value={dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`)}
+                      onChange={date => {
+                        if (date) {
+                          setTargetYear(date.year());
+                          setTargetMonth(date.month() + 1);
+                        }
+                      }}
+                    />
+                  </Space>
+                }
+              >
+                <Table
+                  columns={managedEmployeeColumns}
+                  dataSource={managedEmployees}
+                  loading={targetLoading}
+                  rowKey="id"
+                  scroll={{ x: 'max-content' }}
+                  {...getFullTableConfig(10)}
+                />
+              </Card>
+            ),
+            key: 'targets',
+            label: '员工目标管理'
           }
-        >
-          <Table
-            columns={managedEmployeeColumns}
-            dataSource={managedEmployees}
-            loading={targetLoading}
-            rowKey="id"
-            scroll={{ x: 'max-content' }}
-            {...getFullTableConfig(10)}
-          />
-        </Card>
-      )
-    }] : []),
+        ]
+      : []),
 
     // 员工分配管理Tab - 只有超级管理员可见
-    ...(isSuperAdminUser ? [{
-      key: 'relations',
-      label: '员工分配管理',
-      children: (
-      <Card
-          title="员工分配管理"
-        extra={
-          <AButton
-            icon={<UserOutlined />}
-            type="primary"
-            onClick={() => {
-              setEditingRelation(null);
-              setSelectedEmployees([]);
-              setSelectedManager(undefined);
-              setAssignRemark('');
-              form.resetFields();
-              setIsModalVisible(true);
-            }}
-          >
-            分配员工
-          </AButton>
-        }
-      >
-        <Table
-            columns={relationColumns}
-          dataSource={relations}
-          loading={loading}
-          rowKey="id"
-          scroll={{ x: 'max-content' }}
-          {...getFullTableConfig(10)}
-        />
-      </Card>
-      )
-    }] : [])
+    ...(isSuperAdminUser
+      ? [
+          {
+            children: (
+              <Card
+                title="员工分配管理"
+                extra={
+                  <AButton
+                    icon={<UserOutlined />}
+                    type="primary"
+                    onClick={() => {
+                      setEditingRelation(null);
+                      setSelectedEmployees([]);
+                      setSelectedManager(undefined);
+                      setAssignRemark('');
+                      form.resetFields();
+                      setIsModalVisible(true);
+                    }}
+                  >
+                    分配员工
+                  </AButton>
+                }
+              >
+                <Table
+                  columns={relationColumns}
+                  dataSource={relations}
+                  loading={loading}
+                  rowKey="id"
+                  scroll={{ x: 'max-content' }}
+                  {...getFullTableConfig(10)}
+                />
+              </Card>
+            ),
+            key: 'relations',
+            label: '员工分配管理'
+          }
+        ]
+      : [])
   ];
 
   return (
@@ -577,13 +676,15 @@ const EmployeeManagerManagement = () => {
               <Input type="hidden" />
             </Form.Item>
 
-            <Form.Item
-              label="员工信息"
-            >
+            <Form.Item label="员工信息">
               <Input
                 disabled
-                value={editingEmployee ? `${editingEmployee.nickName || editingEmployee.userName} (${editingEmployee.userName})` : ''}
                 style={{ backgroundColor: '#f5f5f5' }}
+                value={
+                  editingEmployee
+                    ? `${editingEmployee.nickName || editingEmployee.userName} (${editingEmployee.userName})`
+                    : ''
+                }
               />
             </Form.Item>
 
@@ -598,15 +699,15 @@ const EmployeeManagerManagement = () => {
               />
             </Form.Item>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
               <Form.Item
                 label="咨询任务目标"
                 name="consultTarget"
                 rules={[{ message: '咨询任务目标必须大于等于0', min: 0, type: 'number' }]}
               >
                 <InputNumber
-                  min={0}
                   max={1000}
+                  min={0}
                   placeholder="咨询任务数量"
                   style={{ width: '100%' }}
                 />
@@ -618,8 +719,8 @@ const EmployeeManagerManagement = () => {
                 rules={[{ message: '回访任务目标必须大于等于0', min: 0, type: 'number' }]}
               >
                 <InputNumber
-                  min={0}
                   max={1000}
+                  min={0}
                   placeholder="回访任务数量"
                   style={{ width: '100%' }}
                 />
@@ -631,8 +732,8 @@ const EmployeeManagerManagement = () => {
                 rules={[{ message: '开发任务目标必须大于等于0', min: 0, type: 'number' }]}
               >
                 <InputNumber
-                  min={0}
                   max={1000}
+                  min={0}
                   placeholder="开发任务数量"
                   style={{ width: '100%' }}
                 />
@@ -644,8 +745,8 @@ const EmployeeManagerManagement = () => {
                 rules={[{ message: '报名任务目标必须大于等于0', min: 0, type: 'number' }]}
               >
                 <InputNumber
-                  min={0}
                   max={1000}
+                  min={0}
                   placeholder="报名任务数量"
                   style={{ width: '100%' }}
                 />
@@ -657,8 +758,8 @@ const EmployeeManagerManagement = () => {
               name="remark"
             >
               <Input.TextArea
-                rows={3}
                 placeholder="请输入备注信息（可选）"
+                rows={3}
               />
             </Form.Item>
 
@@ -679,113 +780,113 @@ const EmployeeManagerManagement = () => {
 
       {/* 分配员工模态框 */}
       {isSuperAdminUser && (
-      <Modal
-        confirmLoading={loading}
-        open={isModalVisible}
-        title={editingRelation ? '编辑分配关系' : '分配员工给管理员'}
-        width={600}
-        onOk={handleAssign}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setEditingRelation(null);
-          form.resetFields();
-          setSelectedEmployees([]);
-          setSelectedManager(undefined);
-          setAssignRemark('');
-        }}
-      >
-        <Form
-          form={form}
-          layout="vertical"
+        <Modal
+          confirmLoading={loading}
+          open={isModalVisible}
+          title={editingRelation ? '编辑分配关系' : '分配员工给管理员'}
+          width={600}
+          onOk={handleAssign}
+          onCancel={() => {
+            setIsModalVisible(false);
+            setEditingRelation(null);
+            form.resetFields();
+            setSelectedEmployees([]);
+            setSelectedManager(undefined);
+            setAssignRemark('');
+          }}
         >
-          <Form.Item
-            label="选择管理员"
-            name="managerId"
-            rules={[{ message: '请选择管理员', required: true }]}
+          <Form
+            form={form}
+            layout="vertical"
           >
-            <Select
-              showSearch
-              placeholder="请选择管理员"
-              value={selectedManager}
-              filterOption={(input, option) => {
-                const manager = managers.find(m => m.id === option?.value);
-                if (!manager) return false;
-
-                const searchText = input.toLowerCase();
-                const nickName = manager.nickName?.toLowerCase() || '';
-                const userName = manager.userName?.toLowerCase() || '';
-
-                return nickName.includes(searchText) || userName.includes(searchText);
-              }}
-              onChange={setSelectedManager}
+            <Form.Item
+              label="选择管理员"
+              name="managerId"
+              rules={[{ message: '请选择管理员', required: true }]}
             >
-              {managers.map(manager => (
-                <Select.Option
-                  key={manager.id}
-                  value={manager.id}
-                >
-                  {manager.nickName} ({manager.userName})
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+              <Select
+                showSearch
+                placeholder="请选择管理员"
+                value={selectedManager}
+                filterOption={(input, option) => {
+                  const manager = managers.find(m => m.id === option?.value);
+                  if (!manager) return false;
 
-          <Form.Item
-            label="选择员工"
-            name="employeeIds"
-            rules={[{ message: '请选择员工', required: true }]}
-          >
-            <Select
-              showSearch
-              mode={editingRelation ? undefined : 'multiple'}
-              placeholder="请选择员工"
-              value={selectedEmployees}
-              filterOption={(input, option) => {
-                const employee = getSelectableEmployees().find(emp => emp.id === option?.value);
-                if (!employee) return false;
+                  const searchText = input.toLowerCase();
+                  const nickName = manager.nickName?.toLowerCase() || '';
+                  const userName = manager.userName?.toLowerCase() || '';
 
-                const searchText = input.toLowerCase();
-                const nickName = employee.nickName?.toLowerCase() || '';
-                const userName = employee.userName?.toLowerCase() || '';
+                  return nickName.includes(searchText) || userName.includes(searchText);
+                }}
+                onChange={setSelectedManager}
+              >
+                {managers.map(manager => (
+                  <Select.Option
+                    key={manager.id}
+                    value={manager.id}
+                  >
+                    {manager.nickName} ({manager.userName})
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
 
-                return nickName.includes(searchText) || userName.includes(searchText);
-              }}
-              onChange={value => setSelectedEmployees(Array.isArray(value) ? value : [value])}
+            <Form.Item
+              label="选择员工"
+              name="employeeIds"
+              rules={[{ message: '请选择员工', required: true }]}
             >
-              {getSelectableEmployees().map(employee => (
-                <Select.Option
-                  key={employee.id}
-                  value={employee.id}
-                >
-                  {employee.nickName} ({employee.userName})
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+              <Select
+                showSearch
+                mode={editingRelation ? undefined : 'multiple'}
+                placeholder="请选择员工"
+                value={selectedEmployees}
+                filterOption={(input, option) => {
+                  const employee = getSelectableEmployees().find(emp => emp.id === option?.value);
+                  if (!employee) return false;
 
-          <Form.Item
-            label="备注"
-            name="remark"
-            rules={[{ message: '请输入备注', required: true }]}
-          >
-            <Input
-              value={assignRemark}
-              onChange={e => setAssignRemark(e.target.value)}
-            />
-          </Form.Item>
+                  const searchText = input.toLowerCase();
+                  const nickName = employee.nickName?.toLowerCase() || '';
+                  const userName = employee.userName?.toLowerCase() || '';
 
-          <Form.Item>
-            <div style={{ background: '#f6f6f6', borderRadius: '4px', padding: '12px' }}>
-              <h4>分配说明：</h4>
-              <ul>
-                <li>管理员可以查看和管理分配给他们的员工</li>
-                <li>管理员可以为所属员工分配客户</li>
-                <li>员工只能查看分配给自己的客户</li>
-              </ul>
-            </div>
-          </Form.Item>
-        </Form>
-      </Modal>
+                  return nickName.includes(searchText) || userName.includes(searchText);
+                }}
+                onChange={value => setSelectedEmployees(Array.isArray(value) ? value : [value])}
+              >
+                {getSelectableEmployees().map(employee => (
+                  <Select.Option
+                    key={employee.id}
+                    value={employee.id}
+                  >
+                    {employee.nickName} ({employee.userName})
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              label="备注"
+              name="remark"
+              rules={[{ message: '请输入备注', required: true }]}
+            >
+              <Input
+                value={assignRemark}
+                onChange={e => setAssignRemark(e.target.value)}
+              />
+            </Form.Item>
+
+            <Form.Item>
+              <div style={{ background: '#f6f6f6', borderRadius: '4px', padding: '12px' }}>
+                <h4>分配说明：</h4>
+                <ul>
+                  <li>管理员可以查看和管理分配给他们的员工</li>
+                  <li>管理员可以为所属员工分配客户</li>
+                  <li>员工只能查看分配给自己的客户</li>
+                </ul>
+              </div>
+            </Form.Item>
+          </Form>
+        </Modal>
       )}
     </div>
   );

@@ -644,6 +644,7 @@ router.get('/roles', async (req, res) => {
 
     const records = roles.map(role => ({
       createdAt: role.createdAt,
+      department: role.department,
       id: role.id,
       permissionCount: role._count.rolePermissions,
       remark: role.remark,
