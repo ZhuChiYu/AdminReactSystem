@@ -37,12 +37,9 @@ export interface CustomerInfo {
 // 任务类型枚举
 export enum TaskType {
   CONSULT = 'consult', // 咨询
-  // 报名
-  DEVELOP = 'develop', // 报名
-  // 开发
-  FOLLOW_UP = 'follow_up', // 开发
-  // 咨询
-  REGISTER = 'register' // 回访
+  DEVELOP = 'develop', // 开发
+  FOLLOW_UP = 'follow_up', // 回访
+  REGISTER = 'register' // 报名
 }
 
 // 任务跟进状态枚举

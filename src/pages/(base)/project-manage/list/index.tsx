@@ -67,10 +67,8 @@ const customerSourceNames = {
 /** 任务类型枚举 */
 enum TaskType {
   CONSULT = 'consult', // 咨询任务
-  // 开发任务
-  FOLLOW_UP = 'effective_visit', // 开发任务
-  // 咨询任务
-  DEVELOP = 'new_develop', // 回访任务
+  FOLLOW_UP = 'effective_visit', // 回访任务
+  DEVELOP = 'new_develop', // 开发任务
   REGISTER = 'registered' // 报名任务
 }
 
