@@ -1,23 +1,8 @@
-import {
-  App,
-  Button,
-  Card,
-  DatePicker,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  message
-} from 'antd';
+import { App, Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
-import { meetingService, fetchGetUserList } from '@/service/api';
+import { fetchGetUserList, meetingService } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
@@ -43,9 +28,9 @@ interface MeetingItem {
 const Component: React.FC = () => {
   const [form] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const navigate = useNavigate();
   const [recordModalVisible, setRecordModalVisible] = useState(false);
   const [summaryModalVisible, setSummaryModalVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [currentMeeting, setCurrentMeeting] = useState<MeetingItem | null>(null);
   const [recordForm] = Form.useForm();
   const [summaryForm] = Form.useForm();
@@ -53,9 +38,6 @@ const Component: React.FC = () => {
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const { message } = App.useApp();
-
-  // 当前用户角色，在实际应用中应该从认证上下文中获取
-  const currentUserRole = 'employee'; // 可能的值: 'super-admin', 'admin', 'employee'
 
   // 获取用户列表
   const fetchUsers = async () => {
@@ -114,10 +96,11 @@ const Component: React.FC = () => {
   // 显示创建会议弹窗
   const showModal = () => {
     form.resetFields();
+    setCurrentMeeting(null);
     setIsModalVisible(true);
   };
 
-  // 创建会议
+  // 创建或更新会议
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
@@ -133,13 +116,24 @@ const Component: React.FC = () => {
         startTime: values.time[0].format('YYYY-MM-DD HH:mm:ss')
       };
 
-      await meetingService.createMeeting(meetingData);
-      message.success('会议创建成功，等待审批');
+      if (currentMeeting) {
+        // 编辑模式
+        await meetingService.updateMeeting(currentMeeting.id, meetingData);
+        message.success('会议更新成功');
+      } else {
+        // 创建模式
+        await meetingService.createMeeting(meetingData);
+        message.success('会议创建成功，等待审批');
+      }
+
       setIsModalVisible(false);
+      setCurrentMeeting(null);
+      form.resetFields();
       fetchMeetings(); // 重新获取列表
     } catch (error) {
-      message.error('创建会议失败');
-      console.error('创建会议失败:', error);
+      const errorMsg = currentMeeting ? '更新会议失败' : '创建会议失败';
+      message.error(errorMsg);
+      console.error(errorMsg, error);
     }
   };
 
@@ -159,8 +153,8 @@ const Component: React.FC = () => {
 
       if (currentMeeting) {
         await meetingService.createMeetingRecord({
-          meetingId: currentMeeting.id,
-          content: values.content
+          content: values.content,
+          meetingId: currentMeeting.id
         });
         message.success('会议记录保存成功');
         setRecordModalVisible(false);
@@ -188,8 +182,8 @@ const Component: React.FC = () => {
 
       if (currentMeeting) {
         await meetingService.createMeetingSummary({
-          meetingId: currentMeeting.id,
-          content: values.content
+          content: values.content,
+          meetingId: currentMeeting.id
         });
         message.success('会议总结保存成功');
         setSummaryModalVisible(false);
@@ -199,6 +193,44 @@ const Component: React.FC = () => {
       message.error('保存会议总结失败');
       console.error('保存会议总结失败:', error);
     }
+  };
+
+  // 查看会议详情
+  const handleView = (record: MeetingItem) => {
+    // 可以跳转到详情页或者显示详情弹窗
+    console.log('查看会议详情:', record);
+    // navigate(`/meeting-manage/detail/${record.id}`);
+  };
+
+  // 编辑会议
+  const handleEdit = (record: MeetingItem) => {
+    // 设置表单值并打开编辑弹窗
+    form.setFieldsValue({
+      location: record.location,
+      participants: record.participants,
+      time: [dayjs(record.startTime), dayjs(record.endTime)],
+      title: record.title
+    });
+    setCurrentMeeting(record);
+    setIsModalVisible(true);
+  };
+
+  // 删除会议
+  const handleDelete = (record: MeetingItem) => {
+    Modal.confirm({
+      content: `确定要删除会议"${record.title}"吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          await meetingService.deleteMeeting(record.id);
+          message.success('会议删除成功');
+          fetchMeetings(); // 重新获取列表
+        } catch (error) {
+          message.error('删除会议失败');
+          console.error('删除会议失败:', error);
+        }
+      },
+      title: '确认删除'
+    });
   };
 
   // 获取审批状态标签
@@ -289,9 +321,41 @@ const Component: React.FC = () => {
     {
       key: 'action',
       title: '操作',
-      ...getActionColumnConfig(200),
+      ...getActionColumnConfig(300),
       render: (_: any, record: MeetingItem) => (
-        <Space>
+        <Space size="small">
+          {/* 基本操作按钮 */}
+          <Button
+            size="small"
+            type="link"
+            onClick={() => handleView(record)}
+          >
+            查看
+          </Button>
+
+          {/* 只有审批中或未审批的会议才能编辑 */}
+          {(record.approvalStatus === 1 || record.approvalStatus === 0) && (
+            <Button
+              size="small"
+              type="link"
+              onClick={() => handleEdit(record)}
+            >
+              编辑
+            </Button>
+          )}
+
+          {/* 只有未开始的会议才能删除 */}
+          {record.status === 0 && (
+            <Button
+              danger
+              size="small"
+              type="link"
+              onClick={() => handleDelete(record)}
+            >
+              删除
+            </Button>
+          )}
+
           {/* 只有会议被批准且已结束才能添加记录和总结 */}
           {record.approvalStatus === 2 && record.status === 2 && (
             <>
@@ -311,10 +375,6 @@ const Component: React.FC = () => {
               </Button>
             </>
           )}
-
-          {/* 显示审批状态消息 */}
-          {record.approvalStatus === 1 && <Tag color="orange">等待审批</Tag>}
-          {record.approvalStatus === -1 && <Tag color="red">审批拒绝</Tag>}
         </Space>
       )
     }
@@ -341,13 +401,17 @@ const Component: React.FC = () => {
         />
       </Card>
 
-      {/* 创建会议弹窗 */}
+      {/* 创建/编辑会议弹窗 */}
       <Modal
         destroyOnClose
         open={isModalVisible}
-        title="创建会议"
-        onCancel={() => setIsModalVisible(false)}
+        title={currentMeeting ? '编辑会议' : '创建会议'}
         onOk={handleOk}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setCurrentMeeting(null);
+          form.resetFields();
+        }}
       >
         <Form
           form={form}
@@ -386,12 +450,10 @@ const Component: React.FC = () => {
             rules={[{ message: '请选择参会人员', required: true }]}
           >
             <Select
+              showSearch
+              filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
               mode="multiple"
               placeholder="请选择参会人员"
-              showSearch
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
               options={users.map(user => ({
                 label: `${user.nickName || user.userName} (${user.userName})`,
                 value: user.id

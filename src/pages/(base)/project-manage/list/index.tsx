@@ -75,10 +75,10 @@ enum TaskType {
 
 /** 任务类型名称 */
 const taskTypeNames = {
-  [TaskType.CONSULT]: '咨询任务',
-  [TaskType.REGISTER]: '报名任务',
-  [TaskType.DEVELOP]: '开发任务',
-  [TaskType.FOLLOW_UP]: '回访任务'
+  [TaskType.CONSULT]: '咨询',
+  [TaskType.REGISTER]: '报名',
+  [TaskType.DEVELOP]: '开发',
+  [TaskType.FOLLOW_UP]: '回访'
 };
 
 /** 任务类型颜色 */
@@ -149,10 +149,10 @@ const TaskManagement = () => {
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
   const [remark, setRemark] = useState('');
   const [taskTargets, setTaskTargets] = useState<Record<TaskType, number>>({
-    [TaskType.CONSULT]: 50,
-    [TaskType.DEVELOP]: 50,
-    [TaskType.FOLLOW_UP]: 50,
-    [TaskType.REGISTER]: 50
+    [TaskType.CONSULT]: 0,
+    [TaskType.DEVELOP]: 0,
+    [TaskType.FOLLOW_UP]: 0,
+    [TaskType.REGISTER]: 0
   });
   const [followUpForm] = Form.useForm();
 
@@ -327,10 +327,10 @@ const TaskManagement = () => {
       console.error('❌ 加载目标数据失败:', error);
       // 如果API调用失败，使用默认值
       const defaultTargets = {
-        [TaskType.CONSULT]: 50,
-        [TaskType.DEVELOP]: 50,
-        [TaskType.FOLLOW_UP]: 50,
-        [TaskType.REGISTER]: 50
+        [TaskType.CONSULT]: 0,
+        [TaskType.DEVELOP]: 0,
+        [TaskType.FOLLOW_UP]: 0,
+        [TaskType.REGISTER]: 0
       };
       setTaskTargets(defaultTargets);
       return defaultTargets;
@@ -444,10 +444,10 @@ const TaskManagement = () => {
 
   const resetSearch = () => {
     setSearchParams({
-      keyword: '',
-      type: '',
       followUpStatus: '',
-      timeRange: null
+      keyword: '',
+      timeRange: null,
+      type: ''
     });
     setFilteredTasks(tasks);
     // 重置分页
@@ -868,14 +868,14 @@ const TaskManagement = () => {
           rowKey="id"
           pagination={{
             current: pagination.current,
+            onChange: handleTableChange,
+            onShowSizeChange: handleTableChange,
             pageSize: pagination.pageSize,
-            total: pagination.total,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showQuickJumper: true,
             showSizeChanger: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            onChange: handleTableChange,
-            onShowSizeChange: handleTableChange
+            total: pagination.total
           }}
         />
 
@@ -915,10 +915,10 @@ const TaskManagement = () => {
             rowKey="id"
             pagination={{
               pageSize: 10,
+              pageSizeOptions: ['10', '20', '50', '100'],
               showQuickJumper: true,
               showSizeChanger: true,
-              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
-              pageSizeOptions: ['10', '20', '50', '100']
+              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
             }}
           />
         </Modal>
