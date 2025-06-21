@@ -41,10 +41,10 @@ const EmployeeManagerManagement = () => {
   const [editingRelation, setEditingRelation] = useState<EmployeeManagerRelation | null>(null);
 
   // 员工目标管理相关状态
-  const [targets, setTargets] = useState<EmployeeTarget[]>([]);
+  const [managedEmployees, setManagedEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [targetLoading, setTargetLoading] = useState(false);
   const [isTargetModalVisible, setIsTargetModalVisible] = useState(false);
-  const [editingTarget, setEditingTarget] = useState<EmployeeTarget | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeApi.EmployeeListItem | null>(null);
   const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear());
   const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
 
@@ -83,22 +83,17 @@ const EmployeeManagerManagement = () => {
       }
     };
 
-  // 加载员工目标数据
-  const fetchTargetData = async () => {
+  // 加载管理的员工数据
+  const fetchManagedEmployees = async () => {
     if (!canManageTargets) return;
 
     try {
       setTargetLoading(true);
-      const response = await employeeTargetService.getEmployeeTargets({
-        year: targetYear,
-        month: targetMonth,
-        current: 1,
-        size: 1000
-      });
-      setTargets(response.records || []);
+      const managedEmployeeList = getManagedEmployees();
+      setManagedEmployees(managedEmployeeList);
     } catch (error) {
-      console.error('获取目标数据失败:', error);
-      message.error('获取目标数据失败');
+      console.error('获取管理员工数据失败:', error);
+      message.error('获取管理员工数据失败');
     } finally {
       setTargetLoading(false);
     }
@@ -111,9 +106,9 @@ const EmployeeManagerManagement = () => {
 
   useEffect(() => {
     if (canManageTargets) {
-      fetchTargetData();
+      fetchManagedEmployees();
     }
-  }, [targetYear, targetMonth, canManageTargets]);
+  }, [targetYear, targetMonth, canManageTargets, employees]);
 
   // 获取可选的员工列表
   const getSelectableEmployees = () => {
@@ -218,54 +213,49 @@ const EmployeeManagerManagement = () => {
   };
 
   // 员工目标管理相关函数
+  // 设置员工任务目标
   const handleSetTarget = async () => {
     try {
       const values = await targetForm.validateFields();
       setTargetLoading(true);
 
+      // 构建四种任务类型的目标数据 - 暂时使用原有的API结构
       const targetData: SetEmployeeTargetRequest = {
         employeeId: values.employeeId,
-        targetYear: values.targetDate.year(),
-        targetMonth: values.targetDate.month() + 1,
-        targetAmount: values.targetAmount,
-        remark: values.remark
+        targetYear: targetYear,
+        targetMonth: targetMonth,
+        targetAmount: values.consultTarget || 0, // 暂时使用咨询任务目标作为主要目标
+        remark: `咨询:${values.consultTarget || 0}, 回访:${values.followUpTarget || 0}, 开发:${values.developTarget || 0}, 报名:${values.registerTarget || 0}`
       };
 
       await employeeTargetService.setEmployeeTarget(targetData);
-      message.success(editingTarget ? '更新目标成功' : '设置目标成功');
+      message.success('设置员工任务目标成功');
 
       setIsTargetModalVisible(false);
-      setEditingTarget(null);
+      setEditingEmployee(null);
       targetForm.resetFields();
-      fetchTargetData();
+      fetchManagedEmployees();
     } catch (error) {
-      console.error('设置目标失败:', error);
-      message.error('设置目标失败');
+      console.error('设置员工任务目标失败:', error);
+      message.error('设置员工任务目标失败');
     } finally {
       setTargetLoading(false);
     }
   };
 
-  const handleEditTarget = (record: EmployeeTarget) => {
-    setEditingTarget(record);
+  // 编辑员工目标
+  const handleEditEmployeeTarget = (employee: EmployeeApi.EmployeeListItem) => {
+    setEditingEmployee(employee);
+    // 这里应该获取员工当前的各项任务目标，暂时设置默认值
     targetForm.setFieldsValue({
-      employeeId: record.employeeId,
-      targetDate: dayjs(`${record.targetYear}-${record.targetMonth.toString().padStart(2, '0')}-01`),
-      targetAmount: record.targetAmount,
-      remark: record.remark
+      employeeId: employee.id,
+      consultTarget: 0,
+      followUpTarget: 0,
+      developTarget: 0,
+      registerTarget: 0,
+      remark: ''
     });
     setIsTargetModalVisible(true);
-  };
-
-  const handleDeleteTarget = async (id: number) => {
-    try {
-      await employeeTargetService.deleteEmployeeTarget(id);
-      message.success('删除目标成功');
-      fetchTargetData();
-    } catch (error) {
-      console.error('删除目标失败:', error);
-      message.error('删除目标失败');
-    }
   };
 
   // 获取管理的员工列表（用于目标设置）
@@ -285,85 +275,76 @@ const EmployeeManagerManagement = () => {
     return [];
   };
 
-  // 员工目标表格列定义
-  const targetColumns = [
+  // 管理员工列表表格列定义
+  const managedEmployeeColumns = [
     {
       align: 'center' as const,
-      dataIndex: 'employeeName',
-      key: 'employeeName',
+      dataIndex: 'nickName',
+      key: 'nickName',
       title: '员工姓名',
       width: 120
     },
     {
       align: 'center' as const,
-      dataIndex: 'departmentName',
-      key: 'departmentName',
+      dataIndex: 'department',
+      key: 'department',
+      render: (dept: any) => dept?.name || '-',
       title: '部门',
       width: 120
     },
     {
       align: 'center' as const,
       key: 'targetPeriod',
-      render: (_: any, record: EmployeeTarget) => `${record.targetYear}年${record.targetMonth}月`,
+      render: () => `${targetYear}年${targetMonth}月`,
       title: '目标月份',
       width: 120
     },
     {
       align: 'center' as const,
-      dataIndex: 'targetAmount',
-      key: 'targetAmount',
-      render: (value: number) => `¥${value.toLocaleString()}`,
-      title: '目标金额',
-      width: 150
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'managerName',
-      key: 'managerName',
-      title: '设置人',
+      key: 'consultTarget',
+      render: () => '-', // 这里应该显示员工的咨询任务目标
+      title: '咨询任务目标',
       width: 120
     },
     {
       align: 'center' as const,
-      dataIndex: 'remark',
-      key: 'remark',
-      render: (text: string) => text || '-',
-      title: '备注',
-      width: 200
+      key: 'followUpTarget',
+      render: () => '-', // 这里应该显示员工的回访任务目标
+      title: '回访任务目标',
+      width: 120
+    },
+    {
+      align: 'center' as const,
+      key: 'developTarget',
+      render: () => '-', // 这里应该显示员工的开发任务目标
+      title: '开发任务目标',
+      width: 120
+    },
+    {
+      align: 'center' as const,
+      key: 'registerTarget',
+      render: () => '-', // 这里应该显示员工的报名任务目标
+      title: '报名任务目标',
+      width: 120
     },
     {
       align: 'center' as const,
       fixed: 'right' as const,
       key: 'action',
-      render: (_: any, record: EmployeeTarget) => (
+      render: (_: any, record: EmployeeApi.EmployeeListItem) => (
         <Space>
           <AButton
-            icon={<EditOutlined />}
+            icon={<AimOutlined />}
             size="small"
             type="link"
-            onClick={() => handleEditTarget(record)}
+            onClick={() => handleEditEmployeeTarget(record)}
           >
-            编辑
-          </AButton>
-          <AButton
-            danger
-            icon={<DeleteOutlined />}
-            size="small"
-            type="link"
-            onClick={() => {
-              Modal.confirm({
-                content: `确定要删除 ${record.employeeName} 的目标吗？`,
-                onOk: () => handleDeleteTarget(record.id),
-                title: '确认删除'
-              });
-            }}
-          >
-            删除
+            设置目标
           </AButton>
         </Space>
       ),
       title: '操作',
-      width: 150
+      width: 120
     }
   ];
 
@@ -464,23 +445,10 @@ const EmployeeManagerManagement = () => {
               />
             </Space>
           }
-          extra={
-            <AButton
-              icon={<AimOutlined />}
-              type="primary"
-              onClick={() => {
-                setEditingTarget(null);
-                targetForm.resetFields();
-                setIsTargetModalVisible(true);
-              }}
-            >
-              设置目标
-            </AButton>
-          }
         >
           <Table
-            columns={targetColumns}
-            dataSource={targets}
+            columns={managedEmployeeColumns}
+            dataSource={managedEmployees}
             loading={targetLoading}
             rowKey="id"
             scroll={{ x: 'max-content' }}
@@ -536,17 +504,17 @@ const EmployeeManagerManagement = () => {
         />
       </Card>
 
-      {/* 员工目标设置模态框 */}
+      {/* 员工任务目标设置模态框 */}
       {canManageTargets && (
         <Modal
           confirmLoading={targetLoading}
           open={isTargetModalVisible}
-          title={editingTarget ? '编辑员工目标' : '设置员工目标'}
+          title="设置员工任务目标"
           width={600}
           onOk={handleSetTarget}
           onCancel={() => {
             setIsTargetModalVisible(false);
-            setEditingTarget(null);
+            setEditingEmployee(null);
             targetForm.resetFields();
           }}
         >
@@ -555,64 +523,79 @@ const EmployeeManagerManagement = () => {
             layout="vertical"
           >
             <Form.Item
-              label="选择员工"
+              label="员工信息"
               name="employeeId"
-              rules={[{ message: '请选择员工', required: true }]}
             >
-              <Select
-                showSearch
-                placeholder="请选择员工"
-                filterOption={(input, option) => {
-                  const employee = getManagedEmployees().find(emp => emp.id === option?.value);
-                  if (!employee) return false;
-
-                  const searchText = input.toLowerCase();
-                  const nickName = employee.nickName?.toLowerCase() || '';
-                  const userName = employee.userName?.toLowerCase() || '';
-
-                  return nickName.includes(searchText) || userName.includes(searchText);
-                }}
-              >
-                {getManagedEmployees().map(employee => (
-                  <Select.Option
-                    key={employee.id}
-                    value={employee.id}
-                  >
-                    {employee.nickName} ({employee.userName})
-                  </Select.Option>
-                ))}
-              </Select>
+              <Input
+                disabled
+                value={editingEmployee ? `${editingEmployee.nickName} (${editingEmployee.userName})` : ''}
+                style={{ backgroundColor: '#f5f5f5' }}
+              />
             </Form.Item>
 
             <Form.Item
               label="目标月份"
-              name="targetDate"
-              rules={[{ message: '请选择目标月份', required: true }]}
             >
-              <DatePicker.MonthPicker
-                placeholder="选择目标月份"
-                style={{ width: '100%' }}
+              <Input
+                disabled
+                value={`${targetYear}年${targetMonth}月`}
+                style={{ backgroundColor: '#f5f5f5' }}
               />
             </Form.Item>
 
-            <Form.Item
-              label="目标金额（元）"
-              name="targetAmount"
-              rules={[
-                { message: '请输入目标金额', required: true },
-                { message: '目标金额必须大于0', min: 1, type: 'number' }
-              ]}
-            >
-              <InputNumber
-                min={0}
-                max={10000000}
-                step={1000}
-                placeholder="请输入目标金额"
-                style={{ width: '100%' }}
-                formatter={value => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={value => value!.replace(/\$\s?|(,*)/g, '')}
-              />
-            </Form.Item>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <Form.Item
+                label="咨询任务目标"
+                name="consultTarget"
+                rules={[{ message: '咨询任务目标必须大于等于0', min: 0, type: 'number' }]}
+              >
+                <InputNumber
+                  min={0}
+                  max={1000}
+                  placeholder="咨询任务数量"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="回访任务目标"
+                name="followUpTarget"
+                rules={[{ message: '回访任务目标必须大于等于0', min: 0, type: 'number' }]}
+              >
+                <InputNumber
+                  min={0}
+                  max={1000}
+                  placeholder="回访任务数量"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="开发任务目标"
+                name="developTarget"
+                rules={[{ message: '开发任务目标必须大于等于0', min: 0, type: 'number' }]}
+              >
+                <InputNumber
+                  min={0}
+                  max={1000}
+                  placeholder="开发任务数量"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="报名任务目标"
+                name="registerTarget"
+                rules={[{ message: '报名任务目标必须大于等于0', min: 0, type: 'number' }]}
+              >
+                <InputNumber
+                  min={0}
+                  max={1000}
+                  placeholder="报名任务数量"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </div>
 
             <Form.Item
               label="备注"
@@ -626,12 +609,12 @@ const EmployeeManagerManagement = () => {
 
             <Form.Item>
               <div style={{ background: '#f6f6f6', borderRadius: '4px', padding: '12px' }}>
-                <h4>目标设置说明：</h4>
+                <h4>任务目标设置说明：</h4>
                 <ul>
-                  <li>按月设置员工的业绩目标</li>
-                  <li>系统将根据员工的培训费收入和项目收入计算实际业绩</li>
-                  <li>管理员只能设置自己管理的员工目标</li>
-                  <li>超级管理员可以设置所有员工的目标</li>
+                  <li>咨询任务：处理新客户咨询课程情况</li>
+                  <li>回访任务：进行客户回访和跟进</li>
+                  <li>开发任务：开发新课程计划</li>
+                  <li>报名任务：培训课程报名审核</li>
                 </ul>
               </div>
             </Form.Item>
