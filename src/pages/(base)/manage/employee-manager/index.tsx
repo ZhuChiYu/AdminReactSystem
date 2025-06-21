@@ -590,7 +590,7 @@ const EmployeeManagerManagement = () => {
                   dataSource={managedEmployees}
                   loading={targetLoading}
                   rowKey="id"
-                  scroll={{ x: 'max-content' }}
+                  scroll={{ x: 'max-content', y: 500 }}
                   {...getFullTableConfig(10)}
                 />
               </Card>
@@ -630,7 +630,7 @@ const EmployeeManagerManagement = () => {
                   dataSource={relations}
                   loading={loading}
                   rowKey="id"
-                  scroll={{ x: 'max-content' }}
+                  scroll={{ x: 'max-content', y: 500 }}
                   {...getFullTableConfig(10)}
                 />
               </Card>
@@ -643,7 +643,7 @@ const EmployeeManagerManagement = () => {
   ];
 
   return (
-    <div className="h-full min-h-500px flex-col-stretch gap-16px overflow-hidden">
+    <div className="h-full min-h-500px flex-col-stretch gap-16px">
       <Card title="团队管理">
         <Tabs
           defaultActiveKey={canManageTargets ? 'targets' : 'relations'}
