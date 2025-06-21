@@ -256,6 +256,12 @@ export const generatedRoutes: ElegantConstRoute[] = [
             ]
           },
           {
+            matchedFiles: [null, '/src/pages/(base)/employee-manager/index.tsx', null, null],
+            name: '(base)_employee-manager',
+            path: '/employee-manager',
+            handle: { i18nKey: 'route.(base)_employee-manager', title: '(base)_employee-manager', hideInMenu: true }
+          },
+          {
             matchedFiles: [null, null, null, null],
             name: '(base)_expense-process',
             path: '/expense-process',
@@ -441,16 +447,6 @@ export const generatedRoutes: ElegantConstRoute[] = [
             name: '(base)_home',
             path: '/home',
             handle: { i18nKey: 'route.(base)_home', icon: 'mdi:monitor-dashboard', order: 0, title: 'home' }
-          },
-          {
-            matchedFiles: [null, '/src/pages/(base)/manage/employee-manager/index.tsx', null, null],
-            name: '(base)_employee-manager',
-            path: '/employee-manager',
-            handle: {
-              i18nKey: 'route.(base)_employee-manager',
-              title: '(base)_employee-manager',
-              hideInMenu: true
-            }
           },
           {
             matchedFiles: [null, '/src/pages/(base)/manage/index.tsx', null, null],
