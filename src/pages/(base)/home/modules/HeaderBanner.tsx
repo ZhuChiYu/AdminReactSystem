@@ -1,10 +1,14 @@
+import { TeamOutlined } from '@ant-design/icons';
+import { Button as AButton, Card as ACard } from 'antd';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo } from '@/features/auth/authStore';
 import { useAppSelector } from '@/hooks/business/useStore';
+import { isAdminOrSuperAdmin } from '@/utils/auth';
 import 'dayjs/locale/zh-cn';
 
 dayjs.extend(duration);
@@ -12,9 +16,13 @@ dayjs.locale('zh-cn');
 
 const HeaderBanner = () => {
   const userInfo = useAppSelector(selectUserInfo);
+  const navigate = useNavigate();
 
   // 用户注册时间，模拟数据
   const [joinTime, setJoinTime] = useState<string>('');
+
+  // 检查是否为管理员或超级管理员
+  const showTeamManagement = isAdminOrSuperAdmin();
 
   useEffect(() => {
     // 实际项目中，这个时间应该从userInfo中获取
@@ -52,6 +60,7 @@ const HeaderBanner = () => {
       className="card-wrapper"
       variant="borderless"
     >
+      <div className="flex-y-center justify-between">
       <div className="flex-y-center">
         <div className="size-72px flex shrink-0 items-center justify-center overflow-hidden rd-1/2">
           <UserAvatar
@@ -65,6 +74,17 @@ const HeaderBanner = () => {
             {userInfo.userName}你好，你已加入一品华信{joinTime}，新的一天继续加油！
           </h3>
         </div>
+        </div>
+
+        {showTeamManagement && (
+          <AButton
+            type="primary"
+            icon={<TeamOutlined />}
+            onClick={() => navigate('/manage/employee-manager')}
+          >
+            团队管理
+          </AButton>
+        )}
       </div>
     </ACard>
   );

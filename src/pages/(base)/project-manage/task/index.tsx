@@ -1476,7 +1476,7 @@ const ItemList = () => {
                   break;
                 case 'confirm_payment':
                   const receivedPayment = values.paymentReceived !== false;
-                  const paymentAmount = values.paymentAmount ? Number(values.paymentAmount) : undefined;
+                  const paymentAmount = values.amount ? Number(values.amount) : undefined;
 
                   await projectService.confirmPayment(currentTask.id, receivedPayment, paymentAmount, values.comment);
 
@@ -1516,6 +1516,35 @@ const ItemList = () => {
             >
               <Input />
             </Form.Item>
+
+            {/* 款项金额字段 - 只在确认收款时显示，位于操作和备注之间 */}
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) => prevValues.actionKey !== currentValues.actionKey}
+            >
+              {({ getFieldValue }) => {
+                const actionKey = getFieldValue('actionKey');
+
+                if (actionKey === 'confirm_payment') {
+                  return (
+                    <Form.Item
+                      label="款项金额"
+                      name="amount"
+                      rules={[{ message: '请输入款项金额', required: true }]}
+                    >
+                      <Input
+                        placeholder="请输入款项金额"
+                        prefix="¥"
+                        type="number"
+                      />
+                    </Form.Item>
+                  );
+                }
+
+                return null;
+              }}
+            </Form.Item>
+
             <Form.Item
               label="备注"
               name="comment"
@@ -1526,13 +1555,12 @@ const ItemList = () => {
               />
             </Form.Item>
 
-            {/* 根据操作类型显示不同的字段 */}
+            {/* 根据操作类型显示其他特殊字段 */}
             <Form.Item
               noStyle
-              shouldUpdate={(prevValues, currentValues) => prevValues.action !== currentValues.action}
+              shouldUpdate={(prevValues, currentValues) => prevValues.actionKey !== currentValues.actionKey}
             >
               {({ getFieldValue }) => {
-                const action = getFieldValue('action');
                 const actionKey = getFieldValue('actionKey');
 
                 // 上传方案操作显示文件上传
@@ -1568,7 +1596,7 @@ const ItemList = () => {
                   );
                 }
 
-                if (action === 'confirm_teacher') {
+                if (actionKey === 'confirm_teacher') {
                   return (
                     <>
                       <Form.Item
@@ -1585,22 +1613,6 @@ const ItemList = () => {
                         <Input placeholder="请输入老师联系方式" />
                       </Form.Item>
                     </>
-                  );
-                }
-
-                if (action === 'confirm_payment') {
-                  return (
-                    <Form.Item
-                      label="收款金额"
-                      name="amount"
-                      rules={[{ message: '请输入收款金额', required: true }]}
-                    >
-                      <Input
-                        placeholder="请输入收款金额"
-                        prefix="¥"
-                        type="number"
-                      />
-                    </Form.Item>
                   );
                 }
 

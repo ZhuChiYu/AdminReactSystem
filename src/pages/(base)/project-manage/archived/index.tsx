@@ -227,6 +227,18 @@ const ArchivedProjectPage: React.FC = () => {
     },
     {
       align: 'center' as const,
+      dataIndex: 'paymentAmount',
+      key: 'paymentAmount',
+      render: (amount: any) => {
+        if (!amount) return '-';
+        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+        return `¥${numAmount.toFixed(2)}`;
+      },
+      title: '项目金额',
+      width: 120
+    },
+    {
+      align: 'center' as const,
       dataIndex: 'completionTime',
       key: 'completionTime',
       render: (_time: string, record: TaskApi.TaskListItem) => {
@@ -340,10 +352,15 @@ const ArchivedProjectPage: React.FC = () => {
                 <Descriptions.Item label="结束时间">
                   {currentTask.endTime ? dayjs(currentTask.endTime).format('YYYY-MM-DD HH:mm') : '-'}
                 </Descriptions.Item>
-                <Descriptions.Item
-                  label="完成时间"
-                  span={2}
-                >
+                <Descriptions.Item label="项目金额">
+                  {(() => {
+                    const amount = (currentTask as any).paymentAmount;
+                    if (!amount) return '-';
+                    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+                    return `¥${numAmount.toFixed(2)}`;
+                  })()}
+                </Descriptions.Item>
+                <Descriptions.Item label="完成时间">
                   {(() => {
                     const displayTime = (currentTask as any).completionTime || currentTask.updateTime;
                     return displayTime ? dayjs(displayTime).format('YYYY-MM-DD HH:mm') : '-';

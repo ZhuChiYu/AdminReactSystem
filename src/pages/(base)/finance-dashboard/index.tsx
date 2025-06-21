@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useEcharts } from '@/hooks/common/echarts';
 import { expenseService, statisticsService } from '@/service/api';
+import type { EmployeePerformance } from '@/service/api/statistics';
 import { isSuperAdmin } from '@/utils/auth';
 
 // 报销类型数据
@@ -40,49 +41,24 @@ const FinanceDashboard = () => {
   // 当前选中的月份，默认为当前月份
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
 
-  // 示例员工业绩数据（按业绩从高到低排序）
-  const employeeData = [
-    {
-      department: '研发部',
-      id: 5,
-      name: '孙七',
-      performance: 200000,
-      ratio: 100,
-      target: 200000
-    },
-    {
-      department: '咨询部',
-      id: 4,
-      name: '赵六',
-      performance: 150000,
-      ratio: 125,
-      target: 120000
-    },
-    {
-      department: '销售部',
-      id: 1,
-      name: '张三',
-      performance: 125000,
-      ratio: 110,
-      target: 100000
-    },
-    {
-      department: '销售部',
-      id: 2,
-      name: '李四',
-      performance: 98000,
-      ratio: 98,
-      target: 100000
-    },
-    {
-      department: '市场部',
-      id: 3,
-      name: '王五',
-      performance: 88000,
-      ratio: 110,
-      target: 80000
+  // 员工业绩数据状态
+  const [employeeData, setEmployeeData] = useState<EmployeePerformance[]>([]);
+  const [employeeDataLoading, setEmployeeDataLoading] = useState(false);
+
+  // 获取员工业绩数据
+  const fetchEmployeePerformance = async () => {
+    setEmployeeDataLoading(true);
+    try {
+      const data = await statisticsService.getEmployeePerformance({
+        timeRange: 'year' // 默认获取年度业绩
+      });
+      setEmployeeData(data);
+    } catch (error) {
+      console.error('获取员工业绩数据失败:', error);
+    } finally {
+      setEmployeeDataLoading(false);
     }
-  ];
+  };
 
   // 根据年份生成模拟数据的函数
   const generateChartDataByYear = (year: number) => {
@@ -390,16 +366,33 @@ const FinanceDashboard = () => {
       title: '姓名'
     },
     {
+      dataIndex: 'department',
+      key: 'department',
+      title: '部门'
+    },
+    {
       dataIndex: 'target',
       key: 'target',
       render: (value: number) => `¥${value.toLocaleString()}`,
       title: '目标'
     },
     {
-      dataIndex: 'performance',
-      key: 'performance',
+      dataIndex: 'totalPerformance',
+      key: 'totalPerformance',
       render: (value: number) => `¥${value.toLocaleString()}`,
-      title: '业绩'
+      title: '总业绩'
+    },
+    {
+      dataIndex: 'trainingFeeAmount',
+      key: 'trainingFeeAmount',
+      render: (value: number) => `¥${value.toLocaleString()}`,
+      title: '培训费收入'
+    },
+    {
+      dataIndex: 'taskAmount',
+      key: 'taskAmount',
+      render: (value: number) => `¥${value.toLocaleString()}`,
+      title: '项目收入'
     },
     {
       dataIndex: 'ratio',
@@ -584,6 +577,10 @@ const FinanceDashboard = () => {
     if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
       initChart();
     }
+    // 获取员工业绩数据
+    if (activeTab === 'employee') {
+      fetchEmployeePerformance();
+    }
     return undefined;
   }, [isSuperAdminUser, activeTab]);
 
@@ -619,6 +616,7 @@ const FinanceDashboard = () => {
                 <Table
                   columns={employeeColumns}
                   dataSource={employeeData}
+                  loading={employeeDataLoading}
                   pagination={false}
                   rowKey="id"
                 />

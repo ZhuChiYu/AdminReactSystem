@@ -3,22 +3,17 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
   DownloadOutlined,
-  EditOutlined,
-  ExclamationCircleOutlined,
-  EyeOutlined,
   InboxOutlined,
   LoadingOutlined,
   PaperClipOutlined,
-  PlusOutlined,
   UploadOutlined,
-  UserOutlined
+  UserAddOutlined
 } from '@ant-design/icons';
 import {
   Button,
   Card,
   DatePicker,
   Descriptions,
-  Divider,
   Empty,
   Form,
   Input,
@@ -36,16 +31,14 @@ import {
   Upload,
   message
 } from 'antd';
-import type { UploadFile } from 'antd/es/upload/interface';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import UserAvatar from '@/components/common/UserAvatar';
-import { attachmentService, classService, courseService, notificationService } from '@/service/api';
-import type { AttachmentApi, ClassApi, NotificationApi } from '@/service/api/types';
-import { isSuperAdmin } from '@/utils/auth';
-import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
+import { attachmentService, classService, courseService, customerService, notificationService } from '@/service/api';
+import type { AttachmentApi, NotificationApi } from '@/service/api/types';
+import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 
 const { Text } = Typography;
 
@@ -119,10 +112,6 @@ const ClassDetail = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarFileList, setAvatarFileList] = useState<any[]>([]);
 
-  // 添加学员弹窗状态
-  const [addModalVisible, setAddModalVisible] = useState(false);
-  const [addForm] = Form.useForm();
-
   // 课程相关状态
   const [courseModalVisible, setCourseModalVisible] = useState(false);
   const [courseDetailVisible, setCourseDetailVisible] = useState(false);
@@ -145,12 +134,6 @@ const ClassDetail = () => {
   const [announceUploading, setAnnounceUploading] = useState(false);
   const [announceUploadProgress, setAnnounceUploadProgress] = useState(0);
 
-  // 批量导入学员相关状态
-  const [importModalVisible, setImportModalVisible] = useState(false);
-  const [importFileList, setImportFileList] = useState<any[]>([]);
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-
   // 搜索相关状态
   const [searchText, setSearchText] = useState('');
   const [filteredStudentList, setFilteredStudentList] = useState<any[]>([]);
@@ -159,12 +142,52 @@ const ClassDetail = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // 客户导入相关状态
+  const [isCustomerSelectModalVisible, setIsCustomerSelectModalVisible] = useState(false);
+  const [customerList, setCustomerList] = useState<any[]>([]);
+  const [selectedCustomers, setSelectedCustomers] = useState<any[]>([]);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerSearchParams, setCustomerSearchParams] = useState({
+    company: '',
+    customerName: '',
+    followStatus: ''
+  });
+
   // 计算总培训费
   const calculateTotalTrainingFee = () => {
     return studentList.reduce((total, student) => {
       const fee = student.trainingFee ? Number.parseFloat(student.trainingFee) : 0;
       return total + fee;
     }, 0);
+  };
+
+  // 获取客户列表用于导入学员
+  const fetchCustomerList = async () => {
+    try {
+      setCustomerLoading(true);
+      const params = {
+        company: customerSearchParams.company || undefined,
+        current: 1,
+        customerName: customerSearchParams.customerName || undefined,
+        followStatus: customerSearchParams.followStatus || undefined,
+        size: 1000
+      };
+
+      const response = await customerService.getCustomerList(params);
+      setCustomerList(response.records);
+    } catch (error) {
+      console.error('获取客户列表失败:', error);
+      message.error('获取客户列表失败');
+    } finally {
+      setCustomerLoading(false);
+    }
+  };
+
+  // 打开客户选择弹窗
+  const openCustomerSelectModal = () => {
+    setIsCustomerSelectModalVisible(true);
+    setSelectedCustomers([]);
+    fetchCustomerList();
   };
 
   // 获取班级数据
@@ -211,10 +234,11 @@ const ClassDetail = () => {
         phone: student.phone || '',
         position: student.position || '',
         studentId: student.studentId || '',
-        trainingFee: student.trainingFee || 0 // 确保培训费有默认值
+        trainingFee: student.trainingFee || 0
       }));
 
       setStudentList(formattedStudents);
+      setFilteredStudentList(formattedStudents);
 
       // 获取课程列表
       const coursesResponse = await courseService.getClassCourseList({
@@ -223,81 +247,62 @@ const ClassDetail = () => {
         size: 1000
       });
 
-      const formattedCourses = coursesResponse.records.map((course: any) => ({
-        classroom: course.classroom || '',
-        endDate: course.endDate || '',
-        id: course.id,
-        name: course.courseName,
-        schedule: course.schedule || '',
-        startDate: course.startDate || '',
-        status: course.status || 1,
-        teacher: course.instructor || ''
-      }));
+      setCourseList(coursesResponse.records);
 
-      setCourseList(formattedCourses);
-
-      // 获取公告列表
-      const announcementsResponse = await notificationService.getNotificationList({
+      // 获取通知公告列表
+      const announceResponse = await notificationService.getNotificationList({
         current: 1,
-        relatedId: Number.parseInt(classId, 10),
-        size: 1000,
-        type: 'class_announcement'
+        size: 1000
       });
 
-      const formattedAnnouncements = announcementsResponse.records.map(
-        (announcement: NotificationApi.NotificationListItem) => ({
-          content: announcement.content,
-          id: announcement.id,
-          importance: 1,
-          publishDate: announcement.createTime,
-          status: 1,
-          title: announcement.title
-        })
-      );
-
-      setAnnounceList(formattedAnnouncements);
-
-      // 获取课程附件 - 使用班级关联的实际课程ID
-      if (classResponse.courseId) {
-        const courseAttachmentsResponse = await attachmentService.getAttachmentList({
-          courseId: classResponse.courseId,
-          current: 1,
-          size: 1000
-        });
-
-        console.log('课程附件API响应 (课程ID:', classResponse.courseId, '):', courseAttachmentsResponse);
-
-        // API客户端自动提取data字段，这里得到的是PageResponse.data的内容
-        const attachmentRecords = (courseAttachmentsResponse as any)?.records || [];
-        console.log('提取的附件记录:', attachmentRecords);
-
-        if (Array.isArray(attachmentRecords)) {
-          const formattedCourseAttachments = attachmentRecords.map((attachment: AttachmentApi.AttachmentListItem) => {
-            console.log('格式化附件:', attachment);
-            return {
-              id: attachment.id,
-              name: attachment.originalName || attachment.fileName, // 优先使用原始文件名
-              size: attachment.fileSize,
-              type: attachment.fileType?.toUpperCase() || 'UNKNOWN',
-              uploader: attachment.uploader?.name || '未知',
-              uploadTime: attachment.uploadTime,
-              url: attachment.downloadUrl || '#'
-            };
-          });
-
-          console.log('格式化后的附件列表:', formattedCourseAttachments);
-          setCourseAttachments(formattedCourseAttachments);
-        } else {
-          console.warn('附件列表数据格式不正确:', courseAttachmentsResponse);
-          setCourseAttachments([]);
-        }
-      } else {
-        console.log('班级暂无关联课程，无法获取课程附件');
-        setCourseAttachments([]);
-      }
+      setAnnounceList(announceResponse.records);
     } catch (error) {
-      message.error('获取班级数据失败');
       console.error('获取班级数据失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 导入选中的客户为学员
+  const handleImportCustomers = async () => {
+    if (selectedCustomers.length === 0) {
+      message.warning('请选择要导入的客户');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // 批量导入客户为学员
+      const importPromises = selectedCustomers.map(customer => {
+        const studentData = {
+          classId: Number.parseInt(classId!, 10),
+          company: customer.company,
+          email: customer.email || '',
+          gender: '',
+          // 客户数据中可能没有性别字段
+          joinDate: dayjs().format('YYYY-MM-DD'),
+          landline: customer.landline || '',
+          name: customer.customerName,
+          phone: customer.phone || customer.mobile || '',
+          position: customer.position || '',
+          trainingFee: null
+        };
+
+        return classService.createStudent(studentData);
+      });
+
+      await Promise.all(importPromises);
+
+      message.success(`成功导入 ${selectedCustomers.length} 名学员`);
+
+      // 关闭弹窗并重新获取学员列表
+      setIsCustomerSelectModalVisible(false);
+      setSelectedCustomers([]);
+      await fetchClassInfo();
+    } catch (error) {
+      console.error('导入学员失败:', error);
+      message.error('导入学员失败');
     } finally {
       setLoading(false);
     }
@@ -561,6 +566,7 @@ const ClassDetail = () => {
   // 学员列表表格列配置 - 根据权限动态生成
   const getStudentColumns = () => {
     const isSuperAdminUser = isSuperAdmin();
+    const currentUserId = getCurrentUserId();
 
     // 基础列（所有用户都能看到）
     const basicColumns = [
@@ -597,7 +603,7 @@ const ClassDetail = () => {
           if (!createdBy) return '-';
           return <span title={`用户名: ${createdBy.userName}`}>{createdBy.nickName || createdBy.userName}</span>;
         },
-        title: '报名人',
+        title: '导入人',
         width: 100
       }
     ];
@@ -663,197 +669,47 @@ const ClassDetail = () => {
       align: 'center' as const,
       fixed: 'right' as const,
       key: 'action',
-      render: (_: unknown, record: any) => (
-        <Space size={[4, 0]}>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => handleViewStudentDetail(record)}
-          >
-            详情
-          </Button>
-          {isSuperAdminUser && (
-            <>
-              <Button
-                size="small"
-                type="link"
-                onClick={() => handleEditStudent(record)}
-              >
-                编辑
-              </Button>
-              <Button
-                danger
-                size="small"
-                type="link"
-                onClick={() => handleRemoveStudent(record.id)}
-              >
-                删除
-              </Button>
-            </>
-          )}
-        </Space>
-      ),
+      render: (_: unknown, record: any) => {
+        // 检查是否是学员的创建者或超级管理员
+        const isCreator = record.createdBy && record.createdBy.id === currentUserId;
+        const canEdit = isSuperAdminUser || isCreator;
+
+        return (
+          <Space size={[4, 0]}>
+            <Button
+              size="small"
+              type="link"
+              onClick={() => handleViewStudentDetail(record)}
+            >
+              详情
+            </Button>
+            {canEdit && (
+              <>
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={() => handleEditStudent(record)}
+                >
+                  编辑
+                </Button>
+                <Button
+                  danger
+                  size="small"
+                  type="link"
+                  onClick={() => handleRemoveStudent(record.id)}
+                >
+                  删除
+                </Button>
+              </>
+            )}
+          </Space>
+        );
+      },
       title: '操作',
-      width: isSuperAdminUser ? 160 : 80
+      width: 160
     };
 
     return [...basicColumns, ...adminColumns, actionColumn];
-  };
-
-  // 显示添加学员弹窗
-  const handleShowAddModal = () => {
-    addForm.resetFields();
-    setAddModalVisible(true);
-  };
-
-  // 保存新增学员
-  const handleAddStudent = async () => {
-    try {
-      setLoading(true);
-      const values = await addForm.validateFields();
-
-      // 准备提交数据
-      const studentData = {
-        classId: Number.parseInt(classId!, 10),
-        company: values.company,
-        email: values.email || '',
-        gender: values.gender,
-        joinDate: values.joinDate ? values.joinDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
-        landline: values.landline || '',
-        name: values.name,
-        phone: values.phone,
-        position: values.position || '',
-        trainingFee: values.trainingFee || null
-      };
-
-      // 调用后端API创建学员
-      const newStudent = await classService.createStudent(studentData);
-
-      // 重新获取学员列表以确保数据同步
-      await fetchClassInfo();
-
-      // 关闭弹窗并清空表单
-      setAddModalVisible(false);
-      addForm.resetFields();
-
-      message.success('学员添加成功');
-    } catch (error) {
-      console.error('添加学员失败:', error);
-      message.error('添加学员失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 显示批量导入弹窗
-  const handleShowImportModal = () => {
-    setImportFileList([]);
-    setImportProgress(0);
-    setImportModalVisible(true);
-  };
-
-  // 下载导入模板
-  const handleDownloadTemplate = async () => {
-    try {
-      const blob = await classService.downloadStudentTemplate();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = '学员导入模板.xlsx';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      message.success('模板下载成功');
-    } catch (error) {
-      message.error('模板下载失败');
-      console.error('下载模板失败:', error);
-    }
-  };
-
-  // 批量导入学员
-  const handleImportStudents = async () => {
-    if (importFileList.length === 0) {
-      message.warning('请选择要导入的文件');
-      return;
-    }
-
-    const file = importFileList[0].originFileObj || importFileList[0];
-
-    try {
-      setImporting(true);
-      setImportProgress(30);
-
-      const result = await classService.importStudentsBatch(Number.parseInt(classId!, 10), file);
-
-      setImportProgress(100);
-
-      // 检查导入结果 - 根据后端实际返回的数据结构
-      if (result && result.importedCount !== undefined) {
-        message.success(`导入成功：${result.importedCount} 条记录`);
-
-        // 重新获取学员列表
-        const studentsResponse = await classService.getClassStudentList({
-          classId: Number.parseInt(classId!, 10),
-          current: 1,
-          size: 1000
-        });
-
-        const formattedStudents = studentsResponse.records.map((student: any) => ({
-          attendance: student.attendanceRate || 0,
-          avatar: null, // 使用默认头像
-          company: student.company || '',
-          email: student.email || '',
-          gender: student.gender || '',
-          id: student.id,
-          joinDate: student.joinDate || student.enrollmentDate || '',
-          landline: student.landline || '',
-          name: student.name,
-          phone: student.phone || '',
-          position: student.position || '',
-          studentId: student.studentId || '',
-          trainingFee: student.trainingFee || 0 // 确保培训费有默认值
-        }));
-
-        setStudentList(formattedStudents);
-      } else {
-        message.error(`导入失败：${result?.errorMessage || '未知错误'}`);
-      }
-
-      // 关闭弹窗
-      setImportModalVisible(false);
-      setImportFileList([]);
-      setImportProgress(0);
-    } catch (error) {
-      message.error('导入失败，请检查文件格式');
-      console.error('批量导入失败:', error);
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  // 文件上传前的验证
-  const beforeUpload = (file: File) => {
-    const isExcel =
-      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.type === 'application/vnd.ms-excel';
-    if (!isExcel) {
-      message.error('只能上传 Excel 文件！');
-      return false;
-    }
-
-    const isLt5M = file.size / 1024 / 1024 < 5;
-    if (!isLt5M) {
-      message.error('文件大小不能超过 5MB！');
-      return false;
-    }
-
-    return false; // 阻止自动上传
-  };
-
-  // 文件列表变化处理
-  const handleFileChange = ({ fileList: newFileList }: any) => {
-    setImportFileList(newFileList);
   };
 
   // 查看课程详情
@@ -1617,37 +1473,23 @@ const ClassDetail = () => {
         variant="borderless"
         extra={
           <Space>
-            {isSuperAdmin() && (
-              <>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleDownloadTemplate}
-                >
-                  下载模板
-                </Button>
-                <Button
-                  icon={<UploadOutlined />}
-                  type="default"
-                  onClick={handleShowImportModal}
-                >
-                  批量导入
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={handleShowAddModal}
-                >
-                  添加学员
-                </Button>
-                <Button onClick={handleExportStudents}>导出学员</Button>
-                <Button
-                  danger
-                  disabled={selectedRowKeys.length === 0}
-                  loading={deleteLoading}
-                  onClick={handleBatchDelete}
-                >
-                  批量删除
-                </Button>
-              </>
+            <Button
+              icon={<UserAddOutlined />}
+              type="primary"
+              onClick={openCustomerSelectModal}
+            >
+              导入学员
+            </Button>
+            <Button onClick={handleExportStudents}>导出学员</Button>
+            {selectedRowKeys.length > 0 && (
+              <Button
+                danger
+                disabled={selectedRowKeys.length === 0}
+                loading={deleteLoading}
+                onClick={handleBatchDelete}
+              >
+                批量删除 ({selectedRowKeys.length})
+              </Button>
             )}
           </Space>
         }
@@ -1677,158 +1519,138 @@ const ClassDetail = () => {
             showSizeChanger: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
           }}
-          rowSelection={
-            isSuperAdmin()
-              ? {
-                  onChange: onSelectChange,
-                  selectedRowKeys
-                }
-              : undefined
-          }
+          rowSelection={{
+            getCheckboxProps: (record: any) => {
+              // 只允许选择自己导入的学员或超级管理员可以选择所有学员
+              const currentUserId = getCurrentUserId();
+              const isCreator = record.createdBy && record.createdBy.id === currentUserId;
+              const canSelect = isSuperAdmin() || isCreator;
+
+              return {
+                disabled: !canSelect
+              };
+            },
+            onChange: onSelectChange,
+            selectedRowKeys
+          }}
         />
 
-        {/* 批量导入弹窗 */}
+        {/* 客户选择弹窗 */}
         <Modal
-          confirmLoading={importing}
-          open={importModalVisible}
-          title="批量导入学员"
-          width={600}
-          onOk={handleImportStudents}
-          onCancel={() => {
-            setImportModalVisible(false);
-            setImportFileList([]);
-            setImportProgress(0);
-          }}
+          okButtonProps={{ disabled: selectedCustomers.length === 0 }}
+          okText={`导入选中的客户 (${selectedCustomers.length})`}
+          open={isCustomerSelectModalVisible}
+          title="从客户资料中导入学员"
+          width={1200}
+          onCancel={() => setIsCustomerSelectModalVisible(false)}
+          onOk={handleImportCustomers}
         >
-          <div style={{ padding: '20px 0' }}>
-            <Space
-              direction="vertical"
-              size="large"
-              style={{ width: '100%' }}
+          {/* 客户搜索区域 */}
+          <div className="mb-4 flex items-center gap-4">
+            <Input
+              allowClear
+              placeholder="客户姓名"
+              style={{ width: 150 }}
+              value={customerSearchParams.customerName}
+              onChange={e => setCustomerSearchParams({ ...customerSearchParams, customerName: e.target.value })}
+            />
+            <Input
+              allowClear
+              placeholder="单位名称"
+              style={{ width: 200 }}
+              value={customerSearchParams.company}
+              onChange={e => setCustomerSearchParams({ ...customerSearchParams, company: e.target.value })}
+            />
+            <Select
+              allowClear
+              placeholder="跟进状态"
+              style={{ width: 150 }}
+              value={customerSearchParams.followStatus}
+              onChange={value => setCustomerSearchParams({ ...customerSearchParams, followStatus: value })}
             >
-              <div>
-                <Typography.Title level={5}>导入说明：</Typography.Title>
-                <Typography.Text type="secondary">
-                  1. 请先下载模板文件，按照模板格式填写学员信息
-                  <br />
-                  2. 支持 .xlsx 和 .xls 格式的Excel文件
-                  <br />
-                  3. 文件大小不能超过 5MB
-                  <br />
-                  4. 必填字段：姓名、性别、单位、电话
-                </Typography.Text>
-              </div>
-
-              <Upload.Dragger
-                accept=".xlsx,.xls"
-                beforeUpload={beforeUpload}
-                fileList={importFileList}
-                multiple={false}
-                name="file"
-                onChange={handleFileChange}
-              >
-                <p className="ant-upload-drag-icon">
-                  <InboxOutlined />
-                </p>
-                <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-                <p className="ant-upload-hint">支持单个文件上传，仅支持 .xlsx 和 .xls 格式</p>
-              </Upload.Dragger>
-
-              {importing && (
-                <div>
-                  <Typography.Text>导入进度：</Typography.Text>
-                  <Progress
-                    percent={importProgress}
-                    status="active"
-                  />
-                </div>
-              )}
-            </Space>
+              <Select.Option value="consult">咨询</Select.Option>
+              <Select.Option value="new_develop">新开发</Select.Option>
+              <Select.Option value="effective_visit">有效回访</Select.Option>
+              <Select.Option value="registered">已报名</Select.Option>
+              <Select.Option value="vip">大客户</Select.Option>
+            </Select>
+            <Button
+              type="primary"
+              onClick={fetchCustomerList}
+            >
+              搜索
+            </Button>
           </div>
-        </Modal>
 
-        {/* 添加学员弹窗 */}
-        <Modal
-          confirmLoading={loading}
-          open={addModalVisible}
-          title="添加学员"
-          onCancel={() => setAddModalVisible(false)}
-          onOk={handleAddStudent}
-        >
-          <Form
-            form={addForm}
-            labelCol={{ span: 6 }}
-            style={{ marginTop: 20 }}
-            wrapperCol={{ span: 16 }}
-          >
-            <Form.Item
-              label="姓名"
-              name="name"
-              rules={[{ message: '请输入学员姓名', required: true }]}
-            >
-              <Input placeholder="请输入学员姓名" />
-            </Form.Item>
-            <Form.Item
-              label="性别"
-              name="gender"
-              rules={[{ message: '请选择性别', required: true }]}
-            >
-              <Select placeholder="请选择性别">
-                <Select.Option value="男">男</Select.Option>
-                <Select.Option value="女">女</Select.Option>
-              </Select>
-            </Form.Item>
-            <Form.Item
-              label="单位"
-              name="company"
-              rules={[{ message: '请输入单位', required: true }]}
-            >
-              <Input placeholder="请输入单位" />
-            </Form.Item>
-            <Form.Item
-              label="职务"
-              name="position"
-            >
-              <Input placeholder="请输入职务" />
-            </Form.Item>
-            <Form.Item
-              label="电话"
-              name="phone"
-              rules={[{ message: '请输入电话', required: true }]}
-            >
-              <Input placeholder="请输入电话" />
-            </Form.Item>
-            <Form.Item
-              label="培训费"
-              name="trainingFee"
-            >
-              <InputNumber
-                addonBefore="¥"
-                min={0}
-                placeholder="请输入培训费"
-                precision={2}
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="座机号"
-              name="landline"
-            >
-              <Input placeholder="请输入座机号" />
-            </Form.Item>
-            <Form.Item
-              label="邮箱"
-              name="email"
-            >
-              <Input placeholder="请输入邮箱" />
-            </Form.Item>
-            <Form.Item
-              label="加入日期"
-              name="joinDate"
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
-          </Form>
+          {/* 客户列表表格 */}
+          <Table
+            dataSource={customerList}
+            loading={customerLoading}
+            rowKey="id"
+            scroll={{ x: 800, y: 400 }}
+            columns={[
+              {
+                dataIndex: 'customerName',
+                key: 'customerName',
+                title: '客户姓名',
+                width: 120
+              },
+              {
+                dataIndex: 'company',
+                key: 'company',
+                title: '单位名称',
+                width: 200
+              },
+              {
+                dataIndex: 'position',
+                key: 'position',
+                title: '职位',
+                width: 120
+              },
+              {
+                dataIndex: 'phone',
+                key: 'phone',
+                title: '电话',
+                width: 120
+              },
+              {
+                dataIndex: 'mobile',
+                key: 'mobile',
+                title: '手机',
+                width: 120
+              },
+              {
+                dataIndex: 'followStatus',
+                key: 'followStatus',
+                render: (status: string) => {
+                  const statusMap: Record<string, { color: string; text: string }> = {
+                    consult: { color: 'blue', text: '咨询' },
+                    effective_visit: { color: 'orange', text: '有效回访' },
+                    new_develop: { color: 'green', text: '新开发' },
+                    registered: { color: 'purple', text: '已报名' },
+                    vip: { color: 'red', text: '大客户' }
+                  };
+                  const config = statusMap[status] || { color: 'default', text: status };
+                  return <Tag color={config.color}>{config.text}</Tag>;
+                },
+                title: '跟进状态',
+                width: 100
+              }
+            ]}
+            pagination={{
+              pageSize: 10,
+              showQuickJumper: true,
+              showSizeChanger: true,
+              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
+            }}
+            rowSelection={{
+              onChange: (keys: React.Key[]) => {
+                const selected = customerList.filter(customer => keys.includes(customer.id));
+                setSelectedCustomers(selected);
+              },
+              selectedRowKeys: selectedCustomers.map(c => c.id)
+            }}
+          />
         </Modal>
 
         {/* 编辑学员弹窗 */}
@@ -1909,18 +1731,6 @@ const ClassDetail = () => {
               <Input placeholder="请输入电话" />
             </Form.Item>
             <Form.Item
-              label="培训费"
-              name="trainingFee"
-            >
-              <InputNumber
-                addonBefore="¥"
-                min={0}
-                placeholder="请输入培训费"
-                precision={2}
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-            <Form.Item
               label="座机号"
               name="landline"
             >
@@ -1937,7 +1747,19 @@ const ClassDetail = () => {
               label="加入日期"
               name="joinDate"
             >
-              <DatePicker className="w-full" />
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              label="培训费"
+              name="trainingFee"
+            >
+              <InputNumber
+                addonAfter="元"
+                min={0}
+                placeholder="请输入培训费"
+                precision={2}
+                style={{ width: '100%' }}
+              />
             </Form.Item>
           </Form>
         </Modal>

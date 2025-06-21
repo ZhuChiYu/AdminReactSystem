@@ -1,6 +1,25 @@
 import { apiClient } from './client';
 import type { ApiResponse } from './types';
 
+export interface EmployeePerformance {
+  id: number;
+  name: string;
+  department: string;
+  trainingFeeAmount: number;
+  taskAmount: number;
+  totalPerformance: number;
+  target: number;
+  ratio: number;
+}
+
+export interface PerformanceTrend {
+  period: string;
+  targetPerformance: number;
+  actualPerformance: number;
+  trainingFeeIncome: number;
+  projectIncome: number;
+}
+
 /** 统计服务 */
 class StatisticsService {
   private readonly baseURL = '/statistics';
@@ -190,6 +209,28 @@ class StatisticsService {
       params
     });
     return response.data;
+  }
+
+  /** 获取员工业绩统计 */
+  async getEmployeePerformance(params?: {
+    timeRange?: 'month' | 'quarter' | 'year';
+    userId?: number;
+  }): Promise<EmployeePerformance[]> {
+    const response = await apiClient.get<EmployeePerformance[]>(`${this.baseURL}/employee-performance`, {
+      params
+    });
+    return response;
+  }
+
+  /** 获取业绩趋势统计 */
+  async getPerformanceTrend(params?: {
+    period?: 'month' | 'quarter' | 'year';
+    year?: number;
+  }): Promise<PerformanceTrend[]> {
+    const response = await apiClient.get<PerformanceTrend[]>(`${this.baseURL}/performance-trend`, {
+      params
+    });
+    return response;
   }
 }
 

@@ -24,6 +24,8 @@ export { customerService } from './customer';
 // 员工相关导出
 export * from './employee';
 
+export { employeeTargetService } from './employeeTarget';
+
 export { expenseService } from './expense';
 
 export { meetingService } from './meeting';

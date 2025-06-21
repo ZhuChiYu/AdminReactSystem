@@ -22,9 +22,11 @@ import avatarRoutes from '@/routes/avatar';
 import classRoutes from '@/routes/class';
 import courseRoutes from '@/routes/course';
 import customerRoutes from '@/routes/customer';
+import employeeTargetRoutes from '@/routes/employeeTarget';
 import expenseRoutes from '@/routes/expense';
 import meetingRoutes from '@/routes/meeting';
 import notificationRoutes from '@/routes/notification';
+import statisticsRoutes from '@/routes/statistics';
 import systemRoutes from '@/routes/system';
 import taskAttachmentRoutes from '@/routes/taskAttachment';
 import tasksRoutes from '@/routes/tasks';
@@ -194,11 +196,13 @@ app.use('/api/courses', authMiddleware, courseRoutes);
 app.use('/api/classes', authMiddleware, classRoutes);
 app.use('/api/meetings', authMiddleware, meetingRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
+app.use('/api/statistics', authMiddleware, statisticsRoutes);
 app.use('/api/tasks', authMiddleware, tasksRoutes);
 app.use('/api/system', authMiddleware, systemRoutes);
 app.use('/api/attachments', authMiddleware, attachmentRoutes);
 app.use('/api/expense', authMiddleware, expenseRoutes);
 app.use('/api/task-attachments', authMiddleware, taskAttachmentRoutes);
+app.use('/api/employee-targets', authMiddleware, employeeTargetRoutes);
 
 // API文档
 if (process.env.API_DOC_ENABLED === 'true') {

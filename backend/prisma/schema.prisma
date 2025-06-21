@@ -56,6 +56,8 @@ model User {
   uploadedTaskAttachments         TaskAttachment[]          @relation("TaskAttachmentUploader")
   userRoles                       UserRole[]
   createdClassStudents            ClassStudent[]            @relation("ClassStudentCreatedBy")
+  employeeTargets                 EmployeeTarget[]          @relation("EmployeeTargets")
+  managedTargets                  EmployeeTarget[]          @relation("ManagerTargets")
   department                      Department?               @relation(fields: [departmentId], references: [id])
 
   @@map("users")
@@ -599,6 +601,24 @@ model EmployeeManagerRelation {
 
   @@unique([employeeId, managerId])
   @@map("employee_manager_relations")
+}
+
+model EmployeeTarget {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int      @map("employee_id")
+  targetYear  Int      @map("target_year")
+  targetMonth Int      @map("target_month")
+  targetAmount Decimal @map("target_amount") @db.Decimal(12, 2)
+  managerId   Int      @map("manager_id")
+  remark      String?
+  status      Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  employee    User     @relation("EmployeeTargets", fields: [employeeId], references: [id], onDelete: Cascade)
+  manager     User     @relation("ManagerTargets", fields: [managerId], references: [id])
+
+  @@unique([employeeId, targetYear, targetMonth])
+  @@map("employee_targets")
 }
 
 model CustomerAssignment {

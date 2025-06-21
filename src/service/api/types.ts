@@ -460,7 +460,7 @@ export namespace TaskApi {
     projectName: string;
     currentStage: ProjectStage;
     stageHistory?: any[];
-    
+
     // 人员信息
     responsiblePerson: {
       id: number;
@@ -482,11 +482,11 @@ export namespace TaskApi {
       nickName: string;
       userName: string;
     };
-    
+
     priority: Priority;
     startTime: string;
     endTime: string;
-    
+
     // 各阶段状态
     customerInquiryStatus?: string;
     proposalStatus?: string;
@@ -497,7 +497,8 @@ export namespace TaskApi {
     contractSigned: boolean;
     projectCompleted: boolean;
     paymentReceived: boolean;
-    
+    paymentAmount?: number | string;
+
     remark?: string;
     createTime: string;
     updateTime: string;
