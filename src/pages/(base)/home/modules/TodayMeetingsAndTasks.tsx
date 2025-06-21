@@ -13,6 +13,7 @@ interface MeetingItem {
   id: number;
   location?: string;
   status: number;
+  approvalStatus: number;
   time: string;
   title: string;
   type: string;
@@ -51,29 +52,40 @@ const TodayMeetingsAndTasks = () => {
   const userInfo = localStg.get('userInfo');
   const currentUserId = userInfo?.userId ? Number(userInfo.userId) : undefined;
 
-  // 获取今日会议
-  const fetchTodayMeetings = async () => {
+  // 获取会议列表
+  const fetchMeetings = async () => {
     try {
-      const today = dayjs().format('YYYY-MM-DD');
-      const response = await meetingService.getMeetingList({
-        current: 1,
-        size: 5,
-        startTimeBegin: `${today} 00:00:00`,
-        startTimeEnd: `${today} 23:59:59`
-      });
+      const today = dayjs();
+      const weekStart = today.startOf('week').format('YYYY-MM-DD');
+      const weekEnd = today.endOf('week').format('YYYY-MM-DD');
 
-      const todayMeetings: MeetingItem[] = response.records.map((meeting: MeetingApi.MeetingListItem) => ({
+      console.log('🔍 开始获取会议列表，时间范围:', `${weekStart} - ${weekEnd}`);
+
+      const params = {
+        current: 1,
+        size: 10, // 增加显示数量
+        startTimeBegin: `${weekStart} 00:00:00`,
+        startTimeEnd: `${weekEnd} 23:59:59`
+      };
+      console.log('📋 会议查询参数:', params);
+
+      const response = await meetingService.getMeetingList(params);
+      console.log('📊 会议API响应:', response);
+
+      const recentMeetings: MeetingItem[] = response.records.map((meeting: any) => ({
         id: meeting.id,
-        location: meeting.meetingRoom || meeting.meetingUrl,
-        status: meeting.meetingStatus,
+        location: meeting.location || meeting.room?.name || '未指定',
+        status: meeting.status || 0,
+        approvalStatus: meeting.approvalStatus || 0,
         time: meeting.startTime,
-        title: meeting.meetingTitle,
-        type: meeting.meetingType
+        title: meeting.title,
+        type: meeting.meetingType || 'meeting'
       }));
 
-      setMeetings(todayMeetings);
+      console.log('✅ 处理后的会议数据:', recentMeetings);
+      setMeetings(recentMeetings);
     } catch (error) {
-      console.error('获取今日会议失败:', error);
+      console.error('❌ 获取会议列表失败:', error);
       setMeetings([]);
     }
   };
@@ -116,7 +128,7 @@ const TodayMeetingsAndTasks = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        await Promise.all([fetchTodayMeetings(), fetchMyProjectTasks()]);
+        await Promise.all([fetchMeetings(), fetchMyProjectTasks()]);
       } finally {
         setLoading(false);
       }
@@ -125,8 +137,22 @@ const TodayMeetingsAndTasks = () => {
     fetchData();
   }, [currentUserId]);
 
-  // 获取会议状态标签
-  const getMeetingStatusTag = (status: number) => {
+  // 获取会议状态标签（审批状态）
+  const getMeetingStatusTag = (approvalStatus: number) => {
+    switch (approvalStatus) {
+      case 2:
+        return <Tag color="success">已批准</Tag>;
+      case 1:
+        return <Tag color="processing">审批中</Tag>;
+      case -1:
+        return <Tag color="error">已拒绝</Tag>;
+      default:
+        return <Tag color="default">待审批</Tag>;
+    }
+  };
+
+  // 获取会议进行状态标签
+  const getMeetingProgressTag = (status: number) => {
     switch (status) {
       case 0:
         return <Tag color="default">待开始</Tag>;
@@ -134,6 +160,8 @@ const TodayMeetingsAndTasks = () => {
         return <Tag color="processing">进行中</Tag>;
       case 2:
         return <Tag color="success">已完成</Tag>;
+      case -1:
+        return <Tag color="error">已取消</Tag>;
       default:
         return <Tag color="default">未知</Tag>;
     }
@@ -172,17 +200,38 @@ const TodayMeetingsAndTasks = () => {
     navigate('/project-manage/task');
   };
 
+  // 跳转到会议列表
+  const handleViewAllMeetings = () => {
+    navigate('/meeting-manage/list');
+  };
+
+  // 点击会议项跳转到会议列表
+  const handleMeetingClick = () => {
+    navigate('/meeting-manage/list');
+  };
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {/* 今日会议 */}
+      {/* 会议列表 */}
       <Card
         loading={loading}
         size="small"
         title={
           <div className="flex items-center gap-2">
             <CalendarOutlined />
-            <span>今日会议</span>
+            <span>会议列表</span>
           </div>
+        }
+        extra={
+          meetings.length > 0 && (
+            <Button
+              size="small"
+              type="link"
+              onClick={handleViewAllMeetings}
+            >
+              查看全部
+            </Button>
+          )
         }
       >
         {meetings.length > 0 ? (
@@ -190,18 +239,33 @@ const TodayMeetingsAndTasks = () => {
             dataSource={meetings}
             size="small"
             renderItem={meeting => (
-              <List.Item>
-                <div className="w-full flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="font-medium">{meeting.title}</div>
-                    <div className="text-sm text-gray-500">
-                      <ClockCircleOutlined className="mr-1" />
-                      {dayjs(meeting.time).format('HH:mm')}
-                      {meeting.location && ` | ${meeting.location}`}
-                    </div>
-                    <div className="text-xs text-gray-400">{meeting.type}</div>
+              <List.Item
+                className="cursor-pointer hover:bg-gray-50"
+                onClick={handleMeetingClick}
+              >
+                <div className="w-full">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-base text-gray-800">{meeting.title}</div>
+                    <div className="ml-2">{getMeetingStatusTag(meeting.approvalStatus)}</div>
                   </div>
-                  <div className="ml-2">{getMeetingStatusTag(meeting.status)}</div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <ClockCircleOutlined className="mr-2" />
+                      <span>{dayjs(meeting.time).format('MM-DD HH:mm')}</span>
+                    </div>
+
+                    <div className="flex items-center text-sm text-gray-600">
+                      <span className="mr-2">📍</span>
+                      <span>{meeting.location || '待定'}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-500">
+                        会议状态: {getMeetingProgressTag(meeting.status)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </List.Item>
             )}
@@ -209,7 +273,15 @@ const TodayMeetingsAndTasks = () => {
         ) : (
           <div className="py-8 text-center text-gray-500">
             <CalendarOutlined className="text-2xl" />
-            <div className="mt-2">今日暂无会议</div>
+            <div className="mt-2">暂无会议</div>
+            <Button
+              className="mt-2"
+              size="small"
+              type="link"
+              onClick={handleViewAllMeetings}
+            >
+              查看会议列表
+            </Button>
           </div>
         )}
       </Card>
