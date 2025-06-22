@@ -1387,6 +1387,209 @@ router.put('/students/:id', async (req, res) => {
 
 /**
  * @swagger
+ * /api/classes/students/batch:
+ *   delete:
+ *     summary: 批量删除学员
+ *     tags: [班级管理]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - studentIds
+ *             properties:
+ *               studentIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: 学员ID列表
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ *       400:
+ *         description: 参数错误
+ */
+router.delete('/students/batch', async (req, res) => {
+  console.log('🚨🚨🚨 BATCH DELETE ROUTE HIT 🚨🚨🚨');
+  try {
+    console.log('🔥🔥🔥 批量删除学员请求开始 🔥🔥🔥');
+    console.log('请求体:', JSON.stringify(req.body, null, 2));
+
+    const { studentIds } = req.body;
+
+    console.log('提取的studentIds:', studentIds);
+    console.log('studentIds类型:', typeof studentIds);
+    console.log('是否为数组:', Array.isArray(studentIds));
+    console.log('长度:', studentIds?.length);
+
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '请提供要删除的学员ID列表',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 验证并转换所有ID为有效数字
+    const validIds: number[] = [];
+    console.log('开始验证学员ID...');
+    for (const id of studentIds) {
+      const numId = typeof id === 'string' ? Number.parseInt(id, 10) : Number(id);
+      console.log('处理ID:', {
+        原始ID: id,
+        原始类型: typeof id,
+        转换后ID: numId,
+        是否为整数: Number.isInteger(numId),
+        是否大于0: numId > 0
+      });
+      if (Number.isInteger(numId) && numId > 0) {
+        validIds.push(numId);
+      }
+    }
+
+    console.log('验证结果:', {
+      原始长度: studentIds.length,
+      有效长度: validIds.length,
+      有效IDs: validIds
+    });
+
+    if (validIds.length !== studentIds.length) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '学员ID列表包含无效值',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 检查学员是否存在
+    const existingStudents = await prisma.classStudent.findMany({
+      where: { id: { in: validIds } },
+      select: { id: true, name: true }
+    });
+
+    if (existingStudents.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '未找到要删除的学员',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 批量删除学员
+    const deleteResult = await prisma.classStudent.deleteMany({
+      where: { id: { in: validIds } }
+    });
+
+    logger.info(`批量删除学员成功，共删除 ${deleteResult.count} 名学员:`,
+      existingStudents.map(s => `${s.name}(ID:${s.id})`).join(', ')
+    );
+
+    res.json({
+      code: 0,
+      data: {
+        deletedCount: deleteResult.count,
+        requestedCount: validIds.length
+      },
+      message: `成功删除 ${deleteResult.count} 名学员`,
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    logger.error('批量删除学员失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '批量删除学员失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/classes/students/{id}:
+ *   delete:
+ *     summary: 删除学员
+ *     tags: [班级管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 学员ID
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ *       404:
+ *         description: 学员不存在
+ */
+router.delete('/students/:id', async (req, res) => {
+  try {
+    const studentId = Number.parseInt(req.params.id);
+
+    if (Number.isNaN(studentId)) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '无效的学员ID',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 检查学员是否存在
+    const existingStudent = await prisma.classStudent.findUnique({
+      where: { id: studentId }
+    });
+
+    if (!existingStudent) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '学员不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 删除学员
+    await prisma.classStudent.delete({
+      where: { id: studentId }
+    });
+
+    logger.info(`学员删除成功: ${existingStudent.name} (ID: ${studentId})`);
+
+    res.json({
+      code: 0,
+      data: null,
+      message: '学员删除成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    logger.error('删除学员失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '删除学员失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/classes/students/:id/avatar:
  *   post:
  *     summary: 上传学员头像

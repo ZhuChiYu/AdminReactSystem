@@ -180,8 +180,7 @@ const ClassDetail = () => {
 
       const response = await customerService.getCustomerList(params);
       setCustomerList(response.records);
-    } catch (error) {
-      console.error('获取客户列表失败:', error);
+    } catch {
       message.error('获取客户列表失败');
     } finally {
       setCustomerLoading(false);
@@ -1448,7 +1447,13 @@ const ClassDetail = () => {
       onOk: async () => {
         try {
           setDeleteLoading(true);
-          await classService.deleteStudentsBatch(selectedRowKeys as number[]);
+          const studentIdsToDelete = selectedRowKeys.map(key => Number(key));
+          console.log('准备批量删除学员:', {
+            selectedRowKeys,
+            studentIdsToDelete,
+            types: studentIdsToDelete.map(id => typeof id)
+          });
+          await classService.deleteStudentsBatch(studentIdsToDelete);
           message.success(`成功删除 ${selectedRowKeys.length} 名学员`);
           setSelectedRowKeys([]);
           // 重新获取学员列表

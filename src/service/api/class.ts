@@ -108,13 +108,8 @@ export interface UpdateCategoryRequest {
 export const classService = {
   /** 创建班级分类 */
   async createCategory(data: CreateCategoryRequest): Promise<ClassCategory> {
-    try {
-      const response = await apiClient.post('/classes/categories', data);
-      return response;
-    } catch (error) {
-      console.error('创建班级分类失败:', error);
-      throw error;
-    }
+    const response = await apiClient.post('/classes/categories', data);
+    return response;
   },
 
   /** 创建班级 */
@@ -123,14 +118,15 @@ export const classService = {
     return response;
   },
 
+  /** 添加学员 */
+  async createStudent(data: any): Promise<any> {
+    const response = await apiClient.post('/classes/students', data);
+    return response;
+  },
+
   /** 删除班级分类 */
   async deleteCategory(id: number): Promise<void> {
-    try {
-      await apiClient.delete(`/classes/categories/${id}`);
-    } catch (error) {
-      console.error('删除班级分类失败:', error);
-      throw error;
-    }
+    await apiClient.delete(`/classes/categories/${id}`);
   },
 
   /** 删除班级 */
@@ -138,17 +134,26 @@ export const classService = {
     await apiClient.delete(`/classes/${id}`);
   },
 
+  /** 删除学员 */
+  async deleteStudent(studentId: number): Promise<any> {
+    const response = await apiClient.delete(`/classes/students/${studentId}`);
+    return response;
+  },
+
+  /** 批量删除学员 */
+  async deleteStudentsBatch(studentIds: number[]): Promise<any> {
+    const response = await apiClient.delete('/classes/students/batch', {
+      data: { studentIds }
+    });
+    return response;
+  },
+
   /** 下载学员导入模板 */
   async downloadStudentTemplate(): Promise<Blob> {
-    try {
-      const response = await apiClient.get('/classes/students/template', {
-        responseType: 'blob'
-      });
-      return response;
-    } catch (error) {
-      console.error('下载模板失败:', error);
-      throw error;
-    }
+    const response = await apiClient.get('/classes/students/template', {
+      responseType: 'blob'
+    });
+    return response;
   },
 
   /** 获取班级分类列表 */
@@ -156,21 +161,15 @@ export const classService = {
     try {
       const response = await apiClient.get('/classes/categories/list');
       return response;
-    } catch (error) {
-      console.error('获取班级分类失败:', error);
+    } catch {
       return [];
     }
   },
 
   /** 获取班级详情 */
   async getClassDetail(classId: number) {
-    try {
-      const response = await apiClient.get(`/classes/${classId}`);
-      return response;
-    } catch (error) {
-      console.error('获取班级详情失败:', error);
-      throw error;
-    }
+    const response = await apiClient.get(`/classes/${classId}`);
+    return response;
   },
 
   /** 获取班级列表 */
@@ -192,8 +191,7 @@ export const classService = {
         params
       });
       return response;
-    } catch (error) {
-      console.error('获取班级教职工列表失败:', error);
+    } catch {
       return [];
     }
   },
@@ -205,8 +203,7 @@ export const classService = {
         params
       });
       return response;
-    } catch (error) {
-      console.error('获取班级学生列表失败:', error);
+    } catch {
       return {
         current: params?.current || 1,
         pages: 0,
@@ -229,19 +226,7 @@ export const classService = {
       });
       return response?.records || [];
     } catch (error) {
-      console.error('获取课程列表失败:', error);
       return [];
-    }
-  },
-
-  /** 添加学员 */
-  async createStudent(data: any): Promise<any> {
-    try {
-      const response = await apiClient.post('/classes/students', data);
-      return response;
-    } catch (error) {
-      console.error('添加学员失败:', error);
-      throw error;
     }
   },
 
@@ -259,7 +244,6 @@ export const classService = {
       });
       return response;
     } catch (error) {
-      console.error('批量导入学员失败:', error);
       throw error;
     }
   },
@@ -270,7 +254,6 @@ export const classService = {
       const response = await apiClient.put(`/classes/categories/${id}`, data);
       return response;
     } catch (error) {
-      console.error('更新班级分类失败:', error);
       throw error;
     }
   },
@@ -287,7 +270,6 @@ export const classService = {
       const response = await apiClient.put(`/classes/students/${studentId}`, data);
       return response;
     } catch (error) {
-      console.error('更新学员信息失败:', error);
       throw error;
     }
   },
@@ -305,31 +287,6 @@ export const classService = {
       });
       return response;
     } catch (error) {
-      console.error('上传学员头像失败:', error);
-      throw error;
-    }
-  },
-
-  /** 删除学员 */
-  async deleteStudent(studentId: number): Promise<any> {
-    try {
-      const response = await apiClient.delete(`/classes/students/${studentId}`);
-      return response;
-    } catch (error) {
-      console.error('删除学员失败:', error);
-      throw error;
-    }
-  },
-
-  /** 批量删除学员 */
-  async deleteStudentsBatch(studentIds: number[]): Promise<any> {
-    try {
-      const response = await apiClient.delete('/classes/students/batch', {
-        data: { studentIds }
-      });
-      return response;
-    } catch (error) {
-      console.error('批量删除学员失败:', error);
       throw error;
     }
   }
