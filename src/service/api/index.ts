@@ -29,6 +29,8 @@ export { taskStatsService } from './taskStats';
 
 export { expenseService } from './expense';
 
+export { financialService } from './financial';
+
 export { meetingService } from './meeting';
 
 export { notificationService } from './notification';

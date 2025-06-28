@@ -1,26 +1,48 @@
-import { Card, Col, DatePicker, Progress, Row, Space, Spin, Statistic, Table, Tabs } from 'antd';
+import { Button, Card, Col, DatePicker, Popconfirm, Progress, Row, Space, Spin, Statistic, Table, Tabs, message } from 'antd';
 import type { TabsProps } from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useEcharts } from '@/hooks/common/echarts';
-import { expenseService, statisticsService } from '@/service/api';
+import { expenseService, financialService, statisticsService } from '@/service/api';
 import type { EmployeePerformance } from '@/service/api/statistics';
+import type { ExtractedPageData, FinancialRecord } from '@/service/api/financial';
 import { isSuperAdmin } from '@/utils/auth';
 
-// 报销类型数据
+import FinancialRecordModal from './components/FinancialRecordModal';
+
+// 支出类型数据
 const expenseTypes = [
   { color: '#5470c6', label: '差旅费', value: 'travel' },
-  { color: '#91cc75', label: '交通费', value: 'transportation' },
   { color: '#fac858', label: '住宿费', value: 'accommodation' },
-  { color: '#ee6666', label: '办公用品', value: 'office' },
+  { color: '#ee6666', label: '办公费', value: 'office_supplies' },
   { color: '#73c0de', label: '餐费', value: 'meal' },
   { color: '#3ba272', label: '招待费', value: 'entertainment' },
   { color: '#fc8452', label: '培训费', value: 'training' },
-  { color: '#9a60b4', label: '通讯费', value: 'communication' },
+  { color: '#9a60b4', label: '话费', value: 'phone' },
   { color: '#ea7ccc', label: '物业费', value: 'property' },
-  { color: '#5d6c8c', label: '其他', value: 'other' }
+  { color: '#5d6c8c', label: '其他', value: 'other' },
+  // 新增支出类型
+  { color: '#f5222d', label: '房租', value: 'rent' },
+  { color: '#faad14', label: '水电费', value: 'utilities' },
+  { color: '#52c41a', label: '团建', value: 'team_building' },
+  { color: '#1890ff', label: '工资', value: 'salary' },
+  { color: '#722ed1', label: '社保', value: 'social_insurance' },
+  { color: '#13c2c2', label: '补培训费', value: 'training_supplement' },
+  // 添加数据库中存在的中文分类
+  { color: '#eb2f96', label: '设备采购', value: '设备采购' }
+];
+
+// 收入类型数据
+const incomeTypes = [
+  { color: '#52c41a', label: '培训收入', value: 'training_income' },
+  { color: '#1890ff', label: '项目收入', value: 'project_income' },
+  { color: '#722ed1', label: '咨询收入', value: 'consulting_income' },
+  { color: '#faad14', label: '其他收入', value: 'other_income' },
+  // 新增收入类型
+  { color: '#eb2f96', label: '返佣费', value: 'commission_income' }
 ];
 
 /** 财务看板组件 */
@@ -45,6 +67,33 @@ const FinanceDashboard = () => {
   const [employeeData, setEmployeeData] = useState<EmployeePerformance[]>([]);
   const [employeeDataLoading, setEmployeeDataLoading] = useState(false);
 
+  // 真实财务数据状态
+  const [realChartData, setRealChartData] = useState<any[]>([]);
+  const [realExpenseTypeData, setRealExpenseTypeData] = useState<any[]>([]);
+  const [realIncomeTypeData, setRealIncomeTypeData] = useState<any[]>([]);
+  const [realMonthlyExpenseData, setRealMonthlyExpenseData] = useState<any[]>([]);
+  const [expenseRecords, setExpenseRecords] = useState<FinancialRecord[]>([]);
+  const [incomeRecords, setIncomeRecords] = useState<FinancialRecord[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // 弹窗状态
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [modalRecordType, setModalRecordType] = useState<1 | 2>(2); // 1: 收入, 2: 支出
+  const [editRecord, setEditRecord] = useState<FinancialRecord | null>(null);
+
+  // 分页状态
+  const [incomePagination, setIncomePagination] = useState({
+    current: 1,
+    pageSize: 5,
+    total: 0
+  });
+  const [expensePagination, setExpensePagination] = useState({
+    current: 1,
+    pageSize: 5,
+    total: 0
+  });
+
   // 获取员工业绩数据
   const fetchEmployeePerformance = async () => {
     setEmployeeDataLoading(true);
@@ -60,99 +109,211 @@ const FinanceDashboard = () => {
     }
   };
 
-  // 根据年份生成模拟数据的函数
-  const generateChartDataByYear = (year: number) => {
-    // 使用年份作为随机种子，确保同一年份数据相同但不同年份数据不同
-    const seed = year - 2020;
+  // 获取真实财务数据
+  const fetchRealFinancialData = async () => {
+    setDataLoading(true);
+    try {
+      console.log('🔄 开始获取财务数据，年份:', selectedYear, '月份:', selectedMonth);
 
-    return Array.from({ length: 12 }, (_, index) => {
-      // 根据年份和月份生成不同的数据，模拟不同年份的增长趋势
-      const monthFactor = (index + 1) / 12;
-      const yearFactor = 1 + (year - 2020) * 0.1; // 每年增长10%
-      const randomFactor = (Math.sin(seed * index) + 1) * 0.2; // 添加一些随机波动
+      const [monthlyTrendResponse, expenseDistributionResponse, incomeDistributionResponse, expenseRecordsResponse, incomeRecordsResponse] = await Promise.all([
+        financialService.getMonthlyTrend({ year: selectedYear }),
+        financialService.getExpenseTypeDistribution({ year: selectedYear, month: selectedMonth }),
+        // 获取收入分布数据
+        financialService.getIncomeTypeDistribution({ year: selectedYear, month: selectedMonth }),
+        // 获取支出记录
+        financialService.getFinancialRecords({
+          type: 2,
+          current: expensePagination.current,
+          size: expensePagination.pageSize
+        }),
+        // 获取收入记录
+        financialService.getFinancialRecords({
+          type: 1,
+          current: incomePagination.current,
+          size: incomePagination.pageSize
+        })
+      ]);
 
-      const baseIncome = 300000 * yearFactor * (1 + monthFactor + randomFactor);
-      const baseSpending = 200000 * yearFactor * (1 + monthFactor * 0.7 + randomFactor * 0.5);
+      console.log('📊 API响应数据:');
+      console.log('- 月度趋势:', monthlyTrendResponse);
+      console.log('- 支出分布:', expenseDistributionResponse);
+      console.log('- 收入分布:', incomeDistributionResponse);
+      console.log('- 支出记录:', expenseRecordsResponse);
+      console.log('- 收入记录:', incomeRecordsResponse);
 
-      return {
-        income: Math.round(baseIncome),
-        month: `${index + 1}月`,
-        profit: Math.round(baseIncome - baseSpending),
-        spending: Math.round(baseSpending)
-      };
-    });
-  };
+      // 处理月度趋势数据
+      if (monthlyTrendResponse && Array.isArray(monthlyTrendResponse)) {
+        console.log('✅ 设置月度趋势数据:', monthlyTrendResponse);
+        setRealChartData(monthlyTrendResponse);
+        setRealMonthlyExpenseData(monthlyTrendResponse);
+      } else {
+        console.log('❌ 月度趋势数据为空或格式错误:', monthlyTrendResponse);
+        setRealChartData([]);
+        setRealMonthlyExpenseData([]);
+      }
 
-  // 生成支出类型数据的函数
-  const generateExpenseTypeData = (year: number, month: number) => {
-    // 使用年份和月份生成随机数据，但保持一致性
-    const seed = year * 100 + month;
-    const seedRand = (idx: number) => Math.abs(Math.sin(seed + idx * 20)) * 0.8 + 0.2;
+      // 处理支出类型分布数据
+      if (expenseDistributionResponse && Array.isArray(expenseDistributionResponse)) {
+        const formattedExpenseData = expenseDistributionResponse.map(item => ({
+          name: item.category,
+          value: item.amount,
+          amount: item.amount,
+          type: item.category,
+          itemStyle: {
+            color: item.color
+          }
+        }));
+        console.log('✅ 格式化后的支出分布数据:', formattedExpenseData);
+        setRealExpenseTypeData(formattedExpenseData);
+      } else {
+        console.log('❌ 支出分布响应为空:', expenseDistributionResponse);
+        setRealExpenseTypeData([]);
+      }
 
-    return expenseTypes.map((type, index) => {
-      // 为每种支出类型生成随机金额，但保持同年同月的一致性
-      const baseAmount = 20000 + index * 5000;
-      const randomFactor = seedRand(index);
-
-      return {
-        amount: Math.round(baseAmount * randomFactor),
+      // 处理收入类型分布数据
+      if (incomeDistributionResponse && Array.isArray(incomeDistributionResponse)) {
+        const formattedIncomeData = incomeDistributionResponse.map(item => ({
+          name: item.category,
+          value: item.amount,
+          amount: item.amount,
+          type: item.category,
         itemStyle: {
-          color: type.color
-        },
-        name: type.label,
-        type: type.value,
-        value: Math.round(baseAmount * randomFactor)
-      };
-    });
+            color: item.color
+          }
+        }));
+        console.log('✅ 格式化后的收入分布数据:', formattedIncomeData);
+        setRealIncomeTypeData(formattedIncomeData);
+      } else {
+        console.log('❌ 收入分布响应为空:', incomeDistributionResponse);
+        setRealIncomeTypeData([]);
+      }
+
+      // 处理支出记录数据
+      if (expenseRecordsResponse && expenseRecordsResponse.records) {
+        console.log('✅ 支出记录数据:', expenseRecordsResponse.records.length, expenseRecordsResponse.records);
+        setExpenseRecords(expenseRecordsResponse.records);
+        setExpensePagination(prev => ({
+          ...prev,
+          total: expenseRecordsResponse.total
+        }));
+      } else {
+        console.log('❌ 支出记录响应为空:', expenseRecordsResponse);
+        setExpenseRecords([]);
+        setExpensePagination(prev => ({ ...prev, total: 0 }));
+      }
+
+      // 处理收入记录数据
+      if (incomeRecordsResponse && incomeRecordsResponse.records) {
+        console.log('✅ 收入记录数据:', incomeRecordsResponse.records.length, incomeRecordsResponse.records);
+        setIncomeRecords(incomeRecordsResponse.records);
+        setIncomePagination(prev => ({
+          ...prev,
+          total: incomeRecordsResponse.total
+        }));
+      } else {
+        console.log('❌ 收入记录响应为空:', incomeRecordsResponse);
+        setIncomeRecords([]);
+        setIncomePagination(prev => ({ ...prev, total: 0 }));
+      }
+    } catch (error) {
+      console.error('❌ 获取财务数据失败:', error);
+      // 如果获取失败，设置空数据
+      setRealChartData([]);
+      setRealExpenseTypeData([]);
+      setRealIncomeTypeData([]);
+      setRealMonthlyExpenseData([]);
+      // 设置空的记录数组
+      setExpenseRecords([]);
+      setIncomeRecords([]);
+    } finally {
+      setDataLoading(false);
+    }
   };
 
-  // 生成支出类型月度趋势数据
-  const generateMonthlyExpenseData = (year: number) => {
-    // 为每个月生成各类型支出数据
-    return Array.from({ length: 12 }, (_, monthIndex) => {
-      const month = monthIndex + 1;
-      const typesData = {};
-
-      // 使用年份和月份生成随机数据，但保持一致性
-      const seed = year * 100 + month;
-      const seedRand = (idx: number, subIdx: number = 0) => Math.abs(Math.sin(seed + idx * 20 + subIdx)) * 0.8 + 0.2;
-
-      // 为每种支出类型生成随机金额
-      expenseTypes.forEach((type, index) => {
-        const baseAmount = 20000 + index * 5000;
-        // 添加月份因子，使数据有季节性变化
-        const monthFactor = 1 + Math.sin((monthIndex / 12) * Math.PI * 2) * 0.3;
-        const randomFactor = seedRand(index, monthIndex);
-
-        typesData[type.value] = Math.round(baseAmount * randomFactor * monthFactor);
-      });
-
-      return {
-        month: `${month}月`,
-        ...typesData
-      };
-    });
+  // 弹窗操作函数
+  const handleCreateIncomeRecord = () => {
+    setModalMode('create');
+    setModalRecordType(1); // 收入
+    setEditRecord(null);
+    setModalVisible(true);
   };
 
-  // 使用useMemo生成按年计算的月度支出趋势数据
-  const monthlyExpenseData = useMemo(() => generateMonthlyExpenseData(selectedYear), [selectedYear]);
+  const handleCreateExpenseRecord = () => {
+    setModalMode('create');
+    setModalRecordType(2); // 支出
+    setEditRecord(null);
+    setModalVisible(true);
+  };
 
-  // 使用useMemo根据选中的年份生成图表数据
-  const chartData = useMemo(() => generateChartDataByYear(selectedYear), [selectedYear]);
+  const handleEditRecord = (record: FinancialRecord) => {
+    setModalMode('edit');
+    setModalRecordType(record.type as 1 | 2);
+    setEditRecord(record);
+    setModalVisible(true);
+  };
 
-  // 使用useMemo根据选中的年份和月份生成支出类型数据
-  const expenseTypeData = useMemo(
-    () => generateExpenseTypeData(selectedYear, selectedMonth),
-    [selectedYear, selectedMonth]
-  );
+  const handleDeleteRecord = async (id: number) => {
+    try {
+      await financialService.deleteFinancialRecord(id);
+      message.success('删除成功');
+      // 重新获取数据
+      await fetchRealFinancialData();
+    } catch (error) {
+      console.error('删除失败:', error);
+      message.error('删除失败');
+    }
+  };
+
+  const handleModalSuccess = async () => {
+    // 重新获取数据
+    await fetchRealFinancialData();
+  };
+
+  // 分页处理函数
+  const handleIncomePageChange = (page: number, pageSize?: number) => {
+    setIncomePagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: pageSize || prev.pageSize
+    }));
+  };
+
+  const handleExpensePageChange = (page: number, pageSize?: number) => {
+    setExpensePagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: pageSize || prev.pageSize
+    }));
+  };
+
+  // 使用真实月度支出数据
+  const monthlyExpenseData = realMonthlyExpenseData;
+
+  // 使用真实数据（仅当月数据）
+  const chartData = realChartData;
+  const expenseTypeData = realExpenseTypeData;
+  const incomeTypeData = realIncomeTypeData;
 
   // 计算当月总支出
-  const totalExpense = useMemo(() => expenseTypeData.reduce((sum, item) => sum + item.value, 0), [expenseTypeData]);
+  const totalExpense = useMemo(() => {
+    const total = expenseTypeData.reduce((sum, item) => sum + item.value, 0);
+    console.log('计算的总支出:', total, '支出数据:', expenseTypeData);
+    return total;
+  }, [expenseTypeData]);
+
+  // 计算当月总收入
+  const totalIncome = useMemo(() => {
+    const total = incomeTypeData.reduce((sum, item) => sum + item.value, 0);
+    console.log('计算的总收入:', total, '收入数据:', incomeTypeData);
+    return total;
+  }, [incomeTypeData]);
 
   // 饼图配置 - 支出类型分布
-  const { domRef: expenseTypePieRef, updateOptions: updateExpenseTypePie } = useEcharts(() => ({
+  const { domRef: expenseTypePieRef, updateOptions: updateExpenseTypePie } = useEcharts(() => {
+    console.log('🍰 支出饼图配置更新，当前数据:', expenseTypeData);
+    return {
     legend: {
-      data: expenseTypes.map(type => type.label),
+        data: expenseTypeData.map(item => item.name),
       orient: 'vertical',
       right: 10,
       top: 'center'
@@ -181,13 +342,56 @@ const FinanceDashboard = () => {
       }
     ],
     tooltip: {
-      formatter: '{a} <br/>{b}: {c} ({d}%)',
+        formatter: '{a} <br/>{b}: ¥{c} ({d}%)',
       trigger: 'item'
     }
-  }));
+    };
+  });
+
+  // 饼图配置 - 收入类型分布
+  const { domRef: incomeTypePieRef, updateOptions: updateIncomeTypePie } = useEcharts(() => {
+    console.log('🍰 收入饼图配置更新，当前数据:', incomeTypeData);
+    return {
+      legend: {
+        data: incomeTypeData.map(item => item.name),
+        orient: 'vertical',
+        right: 10,
+        top: 'center'
+      },
+      series: [
+        {
+          avoidLabelOverlap: false,
+          data: incomeTypeData,
+          emphasis: {
+            label: {
+              fontSize: '14',
+              fontWeight: 'bold',
+              show: true
+            }
+          },
+          label: {
+            position: 'center',
+            show: false
+          },
+          labelLine: {
+            show: false
+          },
+          name: '收入类型',
+          radius: ['50%', '70%'],
+          type: 'pie'
+        }
+      ],
+      tooltip: {
+        formatter: '{a} <br/>{b}: ¥{c} ({d}%)',
+        trigger: 'item'
+      }
+    };
+  });
 
   // 月度支出趋势堆叠折线图
-  const { domRef: monthlyExpenseTrendRef, updateOptions: updateMonthlyTrend } = useEcharts(() => ({
+  const { domRef: monthlyExpenseTrendRef, updateOptions: updateMonthlyTrend } = useEcharts(() => {
+    console.log('📈 月度支出趋势图表配置更新，当前数据:', realChartData);
+    return {
     grid: {
       bottom: '10%',
       containLabel: true,
@@ -203,7 +407,7 @@ const FinanceDashboard = () => {
       areaStyle: {
         opacity: 0.6
       },
-      data: monthlyExpenseData.map(item => item[type.value]),
+        data: realChartData.map(item => item[type.value] || 0),
       emphasis: {
         focus: 'series'
       },
@@ -219,18 +423,18 @@ const FinanceDashboard = () => {
       text: `${selectedYear}年月度支出趋势`
     },
     tooltip: {
-      formatter: params => {
+        formatter: (params: any) => {
         let result = `${params[0].name}<br/>`;
         let sum = 0;
 
         // 先计算总和
-        params.forEach(param => {
+          params.forEach((param: any) => {
           sum += param.value;
         });
 
         // 然后添加每个类型的值和百分比
-        params.forEach(param => {
-          const percentage = ((param.value / sum) * 100).toFixed(1);
+          params.forEach((param: any) => {
+            const percentage = sum > 0 ? ((param.value / sum) * 100).toFixed(1) : '0.0';
           result += `${param.marker} ${param.seriesName}: ¥${param.value.toLocaleString()} (${percentage}%)<br/>`;
         });
 
@@ -242,121 +446,17 @@ const FinanceDashboard = () => {
     },
     xAxis: {
       boundaryGap: false,
-      data: monthlyExpenseData.map(item => item.month),
+        data: realChartData.map(item => item.month),
       type: 'category'
     },
     yAxis: {
       axisLabel: {
-        formatter: value => `¥${value.toLocaleString()}`
+          formatter: (value: number) => `¥${value.toLocaleString()}`
       },
       type: 'value'
     }
-  }));
-
-  // 历史支出与收入对比折线图
-  const { domRef: incomeExpenseCompareRef, updateOptions: updateIncomeExpenseCompare } = useEcharts(() => ({
-    grid: {
-      bottom: '10%',
-      containLabel: true,
-      left: '3%',
-      right: '4%',
-      top: '15%'
-    },
-    legend: {
-      bottom: '0%',
-      data: ['收入', '支出', '利润率']
-    },
-    series: [
-      {
-        data: chartData.map(item => item.income),
-        emphasis: {
-          focus: 'series'
-        },
-        itemStyle: {
-          color: '#3f8600'
-        },
-        lineStyle: {
-          width: 3
-        },
-        name: '收入',
-        type: 'line'
-      },
-      {
-        data: chartData.map(item => item.spending),
-        emphasis: {
-          focus: 'series'
-        },
-        itemStyle: {
-          color: '#cf1322'
-        },
-        lineStyle: {
-          width: 3
-        },
-        name: '支出',
-        type: 'line'
-      },
-      {
-        data: chartData.map(item => Math.round(((item.income - item.spending) / item.income) * 100)),
-        itemStyle: {
-          color: '#1890ff'
-        },
-        name: '利润率',
-        symbol: 'circle',
-        symbolSize: 8,
-        type: 'line',
-        yAxisIndex: 1
-      }
-    ],
-    title: {
-      left: 'center',
-      text: `${selectedYear}年收支趋势`
-    },
-    tooltip: {
-      axisPointer: {
-        label: {
-          backgroundColor: '#6a7985'
-        },
-        type: 'cross'
-      },
-      formatter: params => {
-        const income = params.find(p => p.seriesName === '收入')?.value || 0;
-        const expense = params.find(p => p.seriesName === '支出')?.value || 0;
-        const profit = income - expense;
-        const profitColor = profit >= 0 ? 'green' : 'red';
-
-        return `${params[0].name}<br/>
-                ${params[0].marker} 收入: ¥${income.toLocaleString()}<br/>
-                ${params[1].marker} 支出: ¥${expense.toLocaleString()}<br/>
-                <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${profitColor};"></span>
-                利润: <span style="color:${profitColor}">¥${profit.toLocaleString()}</span>`;
-      },
-      trigger: 'axis'
-    },
-    xAxis: {
-      boundaryGap: false,
-      data: chartData.map(item => item.month),
-      type: 'category'
-    },
-    yAxis: [
-      {
-        axisLabel: {
-          formatter: value => `¥${value.toLocaleString()}`
-        },
-        name: '金额',
-        type: 'value'
-      },
-      {
-        axisLabel: {
-          formatter: '{value}%'
-        },
-        interval: 20,
-        max: 100,
-        min: 0,
-        name: '利润率',
-        type: 'value'
-      }
-    ]
-  }));
+    };
+  });
 
   // 员工业绩列
   const employeeColumns = [
@@ -393,22 +493,29 @@ const FinanceDashboard = () => {
   // 支出类型明细表格列
   const expenseTypeColumns = [
     {
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string, record: any) => (
+      dataIndex: 'category',
+      key: 'category',
+      render: (category: string) => {
+        // 先尝试通过value匹配，再尝试通过label匹配
+        let expenseType = expenseTypes.find(type => type.value === category);
+        if (!expenseType) {
+          expenseType = expenseTypes.find(type => type.label === category);
+        }
+        return (
         <div style={{ alignItems: 'center', display: 'flex' }}>
           <div
             style={{
-              backgroundColor: record.itemStyle.color,
+                backgroundColor: expenseType?.color || '#ee6666',
               borderRadius: '50%',
               height: 10,
               marginRight: 8,
               width: 10
             }}
           />
-          {text}
+            {expenseType?.label || category}
         </div>
-      ),
+        );
+      },
       title: '支出类型'
     },
     {
@@ -419,30 +526,139 @@ const FinanceDashboard = () => {
       title: '金额'
     },
     {
-      dataIndex: 'value',
-      key: 'percentage',
-      render: (value: number) => {
-        const percentage = Math.round((value / totalExpense) * 100);
-        return (
-          <div style={{ width: '100%' }}>
-            <Progress
-              percent={percentage}
+      dataIndex: 'recordDate',
+      key: 'recordDate',
+      render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
+      sorter: (a: any, b: any) => dayjs(a.recordDate).valueOf() - dayjs(b.recordDate).valueOf(),
+      title: '支出日期',
+      width: 150
+    },
+    {
+      dataIndex: 'description',
+      key: 'description',
+      title: '描述'
+    },
+    {
+      key: 'action',
+      render: (text: string, record: FinancialRecord) => (
+        <Space size="small">
+          <Button
+            type="link"
               size="small"
-              status="active"
-              strokeColor={
-                expenseTypes.find(t => t.label === expenseTypeData.find(d => d.value === value)?.name)?.color
-              }
+            icon={<EditOutlined />}
+            onClick={() => handleEditRecord(record)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="确定要删除这条记录吗？"
+            onConfirm={() => handleDeleteRecord(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+      title: '操作',
+      width: 120
+    }
+  ];
+
+  // 收入类型明细表格列
+  const incomeTypeColumns = [
+    {
+      dataIndex: 'category',
+      key: 'category',
+      render: (category: string) => {
+        // 先尝试通过value匹配，再尝试通过label匹配
+        let incomeType = incomeTypes.find(type => type.value === category);
+        if (!incomeType) {
+          incomeType = incomeTypes.find(type => type.label === category);
+        }
+        return (
+          <div style={{ alignItems: 'center', display: 'flex' }}>
+            <div
+              style={{
+                backgroundColor: incomeType?.color || '#52c41a',
+                borderRadius: '50%',
+                height: 10,
+                marginRight: 8,
+                width: 10
+              }}
             />
+            {incomeType?.label || category}
           </div>
         );
       },
-      title: '占比'
+      title: '收入类型'
+    },
+    {
+      dataIndex: 'amount',
+      key: 'amount',
+      render: (value: number) => `¥${value.toLocaleString()}`,
+      sorter: (a: any, b: any) => a.amount - b.amount,
+      title: '金额'
+    },
+    {
+      dataIndex: 'recordDate',
+      key: 'recordDate',
+      render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
+      sorter: (a: any, b: any) => dayjs(a.recordDate).valueOf() - dayjs(b.recordDate).valueOf(),
+      title: '收入日期',
+      width: 150
+    },
+    {
+      dataIndex: 'description',
+      key: 'description',
+      title: '描述'
+    },
+    {
+      key: 'action',
+      render: (text: string, record: FinancialRecord) => (
+        <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEditRecord(record)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="确定要删除这条记录吗？"
+            onConfirm={() => handleDeleteRecord(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+      title: '操作',
+      width: 120
     }
   ];
 
   // 财务图表
   const { domRef: financialChartRef, updateOptions } = useEcharts(
-    () => ({
+    () => {
+      console.log('📊 年度财务图表配置更新，当前数据:', realChartData);
+      return {
       grid: {
         bottom: '3%',
         containLabel: true,
@@ -454,7 +670,7 @@ const FinanceDashboard = () => {
       },
       series: [
         {
-          data: chartData.map(item => item.income),
+            data: realChartData.map(item => item.income),
           emphasis: {
             focus: 'series'
           },
@@ -462,7 +678,7 @@ const FinanceDashboard = () => {
           type: 'bar'
         },
         {
-          data: chartData.map(item => item.spending),
+            data: realChartData.map(item => item.expense),
           emphasis: {
             focus: 'series'
           },
@@ -470,7 +686,7 @@ const FinanceDashboard = () => {
           type: 'bar'
         },
         {
-          data: chartData.map(item => item.profit),
+            data: realChartData.map(item => item.profit),
           emphasis: {
             focus: 'series'
           },
@@ -486,7 +702,7 @@ const FinanceDashboard = () => {
       },
       xAxis: [
         {
-          data: chartData.map(item => item.month),
+            data: realChartData.map(item => item.month),
           type: 'category'
         }
       ],
@@ -495,7 +711,8 @@ const FinanceDashboard = () => {
           type: 'value'
         }
       ]
-    }),
+      };
+    },
     {
       onUpdated: instance => {
         // 隐藏echarts自带的loading
@@ -511,11 +728,65 @@ const FinanceDashboard = () => {
     // 使用更长的延迟确保图表容器完全就绪
     setTimeout(() => {
       if (activeTab === 'dataChart') {
-        updateOptions();
+        console.log('🎯 初始化年度财务图表');
+        updateOptions(() => ({
+          grid: {
+            bottom: '3%',
+            containLabel: true,
+            left: '3%',
+            right: '4%'
+          },
+          legend: {
+            data: ['收入', '支出', '利润']
+          },
+          series: [
+            {
+              data: realChartData.map(item => item.income),
+              emphasis: {
+                focus: 'series'
+              },
+              name: '收入',
+              type: 'bar'
+            },
+            {
+              data: realChartData.map(item => item.expense),
+              emphasis: {
+                focus: 'series'
+              },
+              name: '支出',
+              type: 'bar'
+            },
+            {
+              data: realChartData.map(item => item.profit),
+              emphasis: {
+                focus: 'series'
+              },
+              name: '利润',
+              type: 'bar'
+            }
+          ],
+          tooltip: {
+            axisPointer: {
+              type: 'shadow'
+            },
+            trigger: 'axis'
+          },
+          xAxis: [
+            {
+              data: realChartData.map(item => item.month),
+              type: 'category'
+            }
+          ],
+          yAxis: [
+            {
+              type: 'value'
+            }
+          ]
+        }));
       } else if (activeTab === 'analysis') {
         updateExpenseTypePie();
+        updateIncomeTypePie();
         updateMonthlyTrend();
-        updateIncomeExpenseCompare();
       }
       chartInitialized.current = true;
       setChartLoading(false);
@@ -553,8 +824,8 @@ const FinanceDashboard = () => {
           initChart();
         } else {
           updateExpenseTypePie();
+          updateIncomeTypePie();
           updateMonthlyTrend();
-          updateIncomeExpenseCompare();
         }
       }
     }
@@ -563,7 +834,10 @@ const FinanceDashboard = () => {
   // 组件首次挂载和激活标签变化时初始化图表
   useEffect(() => {
     if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
+      // 获取真实财务数据
+      fetchRealFinancialData().then(() => {
       initChart();
+      });
     }
     // 获取员工业绩数据
     if (activeTab === 'employee') {
@@ -571,6 +845,13 @@ const FinanceDashboard = () => {
     }
     return undefined;
   }, [isSuperAdminUser, activeTab]);
+
+  // 年份或月份变化时重新获取数据
+  useEffect(() => {
+    if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
+      fetchRealFinancialData();
+    }
+  }, [selectedYear, selectedMonth, isSuperAdminUser, activeTab]);
 
   // 年份或月份变化时更新图表
   useEffect(() => {
@@ -585,13 +866,259 @@ const FinanceDashboard = () => {
         setChartLoading(true);
         setTimeout(() => {
           updateExpenseTypePie();
+          updateIncomeTypePie();
           updateMonthlyTrend();
-          updateIncomeExpenseCompare();
           setChartLoading(false);
         }, 300);
       }
     }
   }, [selectedYear, selectedMonth, activeTab]);
+
+  // 分页状态变化时重新获取数据
+  useEffect(() => {
+    if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
+      fetchRealFinancialData();
+    }
+  }, [incomePagination.current, incomePagination.pageSize, expensePagination.current, expensePagination.pageSize]);
+
+  // 当真实数据变化时更新图表
+  useEffect(() => {
+    if (activeTab === 'analysis') {
+      console.log('📊 数据变化，更新图表...');
+      console.log('- 支出数据:', realExpenseTypeData);
+      console.log('- 收入数据:', realIncomeTypeData);
+      console.log('- 年度数据:', realChartData);
+
+      // 强制更新饼图
+      setTimeout(() => {
+        // 更新支出饼图
+        if (realExpenseTypeData.length > 0) {
+          console.log('🔄 更新支出饼图');
+          updateExpenseTypePie(() => ({
+            legend: {
+              data: realExpenseTypeData.map(item => item.name),
+              orient: 'vertical',
+              right: 10,
+              top: 'center'
+            },
+            series: [
+              {
+                avoidLabelOverlap: false,
+                data: realExpenseTypeData,
+                emphasis: {
+                  label: {
+                    fontSize: '14',
+                    fontWeight: 'bold',
+                    show: true
+                  }
+                },
+                label: {
+                  position: 'center',
+                  show: false
+                },
+                labelLine: {
+                  show: false
+                },
+                name: '支出类型',
+                radius: ['50%', '70%'],
+                type: 'pie'
+              }
+            ],
+            tooltip: {
+              formatter: '{a} <br/>{b}: ¥{c} ({d}%)',
+              trigger: 'item'
+            }
+          }));
+        }
+
+        // 更新收入饼图
+        if (realIncomeTypeData.length > 0) {
+          console.log('🔄 更新收入饼图');
+          updateIncomeTypePie(() => ({
+            legend: {
+              data: realIncomeTypeData.map(item => item.name),
+              orient: 'vertical',
+              right: 10,
+              top: 'center'
+            },
+            series: [
+              {
+                avoidLabelOverlap: false,
+                data: realIncomeTypeData,
+                emphasis: {
+                  label: {
+                    fontSize: '14',
+                    fontWeight: 'bold',
+                    show: true
+                  }
+                },
+                label: {
+                  position: 'center',
+                  show: false
+                },
+                labelLine: {
+                  show: false
+                },
+                name: '收入类型',
+                radius: ['50%', '70%'],
+                type: 'pie'
+              }
+            ],
+            tooltip: {
+              formatter: '{a} <br/>{b}: ¥{c} ({d}%)',
+              trigger: 'item'
+            }
+          }));
+        }
+
+        // 更新月度支出趋势图表
+        if (realChartData.length > 0) {
+          console.log('🔄 更新月度支出趋势图表');
+          updateMonthlyTrend(() => ({
+            grid: {
+              bottom: '10%',
+              containLabel: true,
+              left: '3%',
+              right: '4%',
+              top: '15%'
+            },
+            legend: {
+              bottom: '0%',
+              data: expenseTypes.map(type => type.label)
+            },
+            series: expenseTypes.map(type => ({
+              areaStyle: {
+                opacity: 0.6
+              },
+              data: realChartData.map(item => item[type.value] || 0),
+              emphasis: {
+                focus: 'series'
+              },
+              itemStyle: {
+                color: type.color
+              },
+              name: type.label,
+              stack: '总量',
+              type: 'line'
+            })),
+            title: {
+              left: 'center',
+              text: `${selectedYear}年月度支出趋势`
+            },
+                        tooltip: {
+              confine: true,
+              enterable: true,
+              extraCssText: 'max-height: 300px; overflow-y: auto; max-width: 350px;',
+              formatter: (params: any) => {
+                let result = `<div style="padding: 8px;"><strong>${params[0].name}</strong><br/>`;
+                let sum = 0;
+
+                // 先计算总和
+                params.forEach((param: any) => {
+                  sum += param.value;
+                });
+
+                // 只显示有值的类型，限制最多显示6个
+                const validParams = params.filter((param: any) => param.value > 0);
+                const displayParams = validParams.slice(0, 6);
+
+                displayParams.forEach((param: any) => {
+                  const percentage = sum > 0 ? ((param.value / sum) * 100).toFixed(1) : '0.0';
+                  result += `<div style="margin: 2px 0;">${param.marker} ${param.seriesName}: ¥${param.value.toLocaleString()} (${percentage}%)</div>`;
+                });
+
+                // 如果有更多项目，显示省略提示
+                if (validParams.length > 6) {
+                  result += `<div style="margin: 4px 0; color: #999; font-style: italic;">...及其他${validParams.length - 6}项</div>`;
+                }
+
+                // 添加总额
+                result += `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;"><strong>总计: ¥${sum.toLocaleString()}</strong></div></div>`;
+                return result;
+              },
+              position: ['50%', '10%'],
+              trigger: 'axis'
+            },
+            xAxis: {
+              boundaryGap: false,
+              data: realChartData.map(item => item.month),
+              type: 'category'
+            },
+            yAxis: {
+              axisLabel: {
+                formatter: (value: number) => `¥${value.toLocaleString()}`
+              },
+              type: 'value'
+            }
+          }));
+        }
+      }, 100);
+    } else if (activeTab === 'dataChart') {
+      console.log('📊 年度数据变化，更新年度图表...');
+      console.log('- 年度数据:', realChartData);
+
+      // 更新年度财务图表
+      if (realChartData.length > 0) {
+        setTimeout(() => {
+          console.log('🔄 更新年度财务图表');
+          updateOptions(() => ({
+            grid: {
+              bottom: '3%',
+              containLabel: true,
+              left: '3%',
+              right: '4%'
+            },
+            legend: {
+              data: ['收入', '支出', '利润']
+            },
+            series: [
+              {
+                data: realChartData.map(item => item.income),
+                emphasis: {
+                  focus: 'series'
+                },
+                name: '收入',
+                type: 'bar'
+              },
+              {
+                data: realChartData.map(item => item.expense),
+                emphasis: {
+                  focus: 'series'
+                },
+                name: '支出',
+                type: 'bar'
+              },
+              {
+                data: realChartData.map(item => item.profit),
+                emphasis: {
+                  focus: 'series'
+                },
+                name: '利润',
+                type: 'bar'
+              }
+            ],
+            tooltip: {
+              axisPointer: {
+                type: 'shadow'
+              },
+              trigger: 'axis'
+            },
+            xAxis: [
+              {
+                data: realChartData.map(item => item.month),
+                type: 'category'
+              }
+            ],
+            yAxis: [
+              {
+                type: 'value'
+              }
+            ]
+          }));
+        }, 100);
+      }
+    }
+  }, [realExpenseTypeData, realIncomeTypeData, realChartData, activeTab]);
 
   // 财务看板Tab页配置
   const tabItems: TabsProps['items'] = [
@@ -683,20 +1210,12 @@ const FinanceDashboard = () => {
                 title={`${selectedYear}年${selectedMonth}月财务分析`}
                 variant="borderless"
                 extra={
-                  <Space>
-                    <DatePicker
-                      allowClear={false}
-                      picker="year"
-                      value={selectedYear ? dayjs(selectedYear.toString()) : undefined}
-                      onChange={handleYearChange}
-                    />
                     <DatePicker
                       allowClear={false}
                       picker="month"
                       value={dayjs(`${selectedYear}-${selectedMonth}`)}
                       onChange={handleMonthChange}
                     />
-                  </Space>
                 }
               >
                 <Row gutter={16}>
@@ -705,7 +1224,7 @@ const FinanceDashboard = () => {
                       precision={2}
                       prefix="¥"
                       title="本月收入"
-                      value={chartData[selectedMonth - 1]?.income || 0}
+                      value={totalIncome}
                       valueStyle={{ color: '#3f8600' }}
                     />
                   </Col>
@@ -723,11 +1242,46 @@ const FinanceDashboard = () => {
                       precision={2}
                       prefix="¥"
                       title="本月利润"
-                      value={(chartData[selectedMonth - 1]?.income || 0) - totalExpense}
+                      value={totalIncome - totalExpense}
                       valueStyle={{ color: '#3f8600' }}
                     />
                   </Col>
                 </Row>
+              </Card>
+            </Col>
+
+            <Col span={12}>
+              <Card
+                title="收入类型分布"
+                variant="borderless"
+              >
+                <div style={{ height: '400px', position: 'relative' }}>
+                  {chartLoading && (
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                        bottom: 0,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        left: 0,
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        zIndex: 10
+                      }}
+                    >
+                      <Spin
+                        size="large"
+                        tip="图表加载中..."
+                      />
+                    </div>
+                  )}
+                  <div
+                    ref={incomeTypePieRef}
+                    style={{ height: '100%', width: '100%' }}
+                  />
+                </div>
               </Card>
             </Col>
 
@@ -768,14 +1322,67 @@ const FinanceDashboard = () => {
 
             <Col span={12}>
               <Card
+                title="收入类型明细"
+                variant="borderless"
+                extra={
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={handleCreateIncomeRecord}
+                  >
+                    新增收入记录
+                  </Button>
+                }
+              >
+                <Table
+                  columns={incomeTypeColumns}
+                  dataSource={incomeRecords}
+                  pagination={{
+                    current: incomePagination.current,
+                    pageSize: incomePagination.pageSize,
+                    total: incomePagination.total,
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    showTotal: (total, range) => `共 ${total} 条，第 ${range[0]}-${range[1]} 条`,
+                    pageSizeOptions: ['5', '10', '20', '50'],
+                    onChange: handleIncomePageChange,
+                    onShowSizeChange: handleIncomePageChange
+                  }}
+                  rowKey="id"
+                  size="middle"
+                />
+              </Card>
+            </Col>
+
+            <Col span={12}>
+              <Card
                 title="支出类型明细"
                 variant="borderless"
+                extra={
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={handleCreateExpenseRecord}
+                  >
+                    新增支出记录
+                  </Button>
+                }
               >
                 <Table
                   columns={expenseTypeColumns}
-                  dataSource={expenseTypeData}
-                  pagination={false}
-                  rowKey="type"
+                  dataSource={expenseRecords}
+                  pagination={{
+                    current: expensePagination.current,
+                    pageSize: expensePagination.pageSize,
+                    total: expensePagination.total,
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    showTotal: (total, range) => `共 ${total} 条，第 ${range[0]}-${range[1]} 条`,
+                    pageSizeOptions: ['5', '10', '20', '50'],
+                    onChange: handleExpensePageChange,
+                    onShowSizeChange: handleExpensePageChange
+                  }}
+                  rowKey="id"
                   size="middle"
                 />
               </Card>
@@ -816,40 +1423,6 @@ const FinanceDashboard = () => {
               </Card>
             </Col>
 
-            <Col span={24}>
-              <Card
-                title="收支趋势分析"
-                variant="borderless"
-              >
-                <div style={{ height: '400px', position: 'relative' }}>
-                  {chartLoading && (
-                    <div
-                      style={{
-                        alignItems: 'center',
-                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                        bottom: 0,
-                        display: 'flex',
-                        justifyContent: 'center',
-                        left: 0,
-                        position: 'absolute',
-                        right: 0,
-                        top: 0,
-                        zIndex: 10
-                      }}
-                    >
-                      <Spin
-                        size="large"
-                        tip="图表加载中..."
-                      />
-                    </div>
-                  )}
-                  <div
-                    ref={incomeExpenseCompareRef}
-                    style={{ height: '100%', width: '100%' }}
-                  />
-                </div>
-              </Card>
-            </Col>
           </Row>
         </div>
       ),
@@ -871,6 +1444,16 @@ const FinanceDashboard = () => {
           onChange={handleTabChange}
         />
       </Card>
+
+      {/* 财务记录弹窗 */}
+      <FinancialRecordModal
+        visible={modalVisible}
+        mode={modalMode}
+        recordType={modalRecordType}
+        record={editRecord}
+        onCancel={() => setModalVisible(false)}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };

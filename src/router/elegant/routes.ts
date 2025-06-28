@@ -472,6 +472,12 @@ export const generatedRoutes: ElegantConstRoute[] = [
                 }
               },
               {
+                matchedFiles: [null, '/src/pages/(base)/manage/employee-manager/index.tsx', null, null],
+                name: '(base)_manage_employee-manager',
+                path: '/manage/employee-manager',
+                handle: { i18nKey: 'route.(base)_manage_employee-manager', title: '(base)_manage_employee-manager' }
+              },
+              {
                 matchedFiles: [null, '/src/pages/(base)/manage/permission/index.tsx', null, null],
                 name: '(base)_manage_permission',
                 path: '/manage/permission',
