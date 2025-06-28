@@ -184,17 +184,6 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   icon: 'ic:round-file-upload',
                   order: 2
                 }
-              },
-              {
-                matchedFiles: [null, '/src/pages/(base)/customer-manage/info/index.tsx', null, null],
-                name: '(base)_customer-manage_info',
-                path: '/customer-manage/info',
-                handle: {
-                  i18nKey: 'route.(base)_customer-manage_info',
-                  title: '客户资料',
-                  icon: 'ic:round-contacts',
-                  order: 3
-                }
               }
             ]
           },
@@ -470,12 +459,6 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   icon: 'mdi:account-arrow-right',
                   order: 1
                 }
-              },
-              {
-                matchedFiles: [null, '/src/pages/(base)/manage/employee-manager/index.tsx', null, null],
-                name: '(base)_manage_employee-manager',
-                path: '/manage/employee-manager',
-                handle: { i18nKey: 'route.(base)_manage_employee-manager', title: '(base)_manage_employee-manager' }
               },
               {
                 matchedFiles: [null, '/src/pages/(base)/manage/permission/index.tsx', null, null],

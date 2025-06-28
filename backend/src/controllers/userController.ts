@@ -68,10 +68,24 @@ class UserController {
     }
 
     try {
-      // 获取总数
-      const total = await prisma.user.count({ where });
+      // 获取总数 - 排除超级管理员
+      const total = await prisma.user.count({
+        where: {
+          ...where,
+          // 排除超级管理员用户
+          NOT: {
+            userRoles: {
+              some: {
+                role: {
+                  roleCode: 'super_admin'
+                }
+              }
+            }
+          }
+        }
+      });
 
-      // 获取员工列表
+      // 获取员工列表 - 排除超级管理员
       const employees = await prisma.user.findMany({
         include: {
           department: true,
@@ -86,7 +100,19 @@ class UserController {
         },
         skip,
         take: pageSize,
-        where
+        where: {
+          ...where,
+          // 排除超级管理员用户
+          NOT: {
+            userRoles: {
+              some: {
+                role: {
+                  roleCode: 'super_admin'
+                }
+              }
+            }
+          }
+        }
       });
 
       // 格式化返回数据
@@ -719,6 +745,9 @@ class UserController {
         address,
         avatar,
         bankCard,
+        contractEndDate,
+        contractStartDate,
+        contractYears,
         department,
         email,
         gender,
@@ -794,6 +823,9 @@ class UserController {
       if (idCard !== undefined) updateData.idCard = idCard;
       if (wechat !== undefined) updateData.wechat = wechat;
       if (tim !== undefined) updateData.tim = tim;
+      if (contractYears !== undefined) updateData.contractYears = contractYears;
+      if (contractStartDate !== undefined) updateData.contractStartDate = contractStartDate ? new Date(contractStartDate) : null;
+      if (contractEndDate !== undefined) updateData.contractEndDate = contractEndDate ? new Date(contractEndDate) : null;
 
       // 处理性别转换
       if (gender !== undefined) {

@@ -191,7 +191,7 @@ export class EmployeeService {
     const response = await this.apiClient.get('/users/template', {
       responseType: 'blob'
     });
-    return response.data;
+    return response; // 响应拦截器已经返回了response.data，所以这里直接返回response
   }
 
   /** 删除员工 */

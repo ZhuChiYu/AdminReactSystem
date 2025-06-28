@@ -16,7 +16,7 @@ const route: App.I18n.Schema['translation']['route'] = {
   '(base)_customer-manage_assign': 'Customer Assignment',
   '(base)_customer-manage_follow': 'Customer Follow-up',
   '(base)_customer-manage_import': 'Customer Import',
-  '(base)_customer-manage_info': 'Customer Information',
+
   '(base)_expense-process': 'Expense Process',
   '(base)_expense-process_apply': 'Expense Application',
   '(base)_expense-process_approve': 'Expense Approval',
@@ -98,7 +98,7 @@ const route: App.I18n.Schema['translation']['route'] = {
   'route.(base)_customer-manage_assign': 'Customer Assignment',
   'route.(base)_customer-manage_follow': 'Customer Follow-up',
   'route.(base)_customer-manage_import': 'Customer Import',
-  'route.(base)_customer-manage_info': 'Customer Information',
+
   'route.(base)_expense-process': 'Expense Process',
   'route.(base)_expense-process_apply': 'Expense Application',
   'route.(base)_expense-process_approve': 'Expense Approval',

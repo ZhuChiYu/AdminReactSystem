@@ -192,11 +192,16 @@ export namespace CustomerApi {
       id: number;
       name: string;
     };
+    canEdit?: boolean;
     canViewEmail?: boolean;
     canViewMobile?: boolean;
     // 权限相关字段（前端计算）
     canViewPhone?: boolean;
     canViewRealName?: boolean;
+    // 新增权限字段
+    canViewName?: boolean;
+    canViewInfo?: boolean;
+    canEditCustomer?: boolean;
     company: string;
     createdAt: string;
     createdBy?: {
@@ -767,6 +772,9 @@ export namespace EmployeeApi {
   }
 
   export interface CreateEmployeeRequest {
+    contractEndDate?: string;
+    contractStartDate?: string;
+    contractYears?: number;
     departmentId?: number;
     email?: string;
     gender?: string;
@@ -778,13 +786,21 @@ export namespace EmployeeApi {
   }
 
   export interface UpdateEmployeeRequest {
+    address?: string;
+    bankCard?: string;
+    contractEndDate?: string;
+    contractStartDate?: string;
+    contractYears?: number;
     departmentId?: number;
     email?: string;
     gender?: string;
+    idCard?: string;
     nickName?: string;
     phone?: string;
     roles?: string[];
     status?: string;
+    tim?: string;
+    wechat?: string;
   }
 
   /** 员工-管理员关系 */

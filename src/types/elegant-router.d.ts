@@ -44,7 +44,6 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_customer-manage_assign": "/customer-manage/assign";
     "(base)_customer-manage_follow": "/customer-manage/follow";
     "(base)_customer-manage_import": "/customer-manage/import";
-    "(base)_customer-manage_info": "/customer-manage/info";
     "(base)_employee-manage": "/employee-manage";
     "(base)_employee-manage_address": "/employee-manage/address";
     "(base)_employee-manage_contact": "/employee-manage/contact";
@@ -71,7 +70,6 @@ declare module "@soybean-react/vite-plugin-react-router" {
     "(base)_home": "/home";
     "(base)_manage": "/manage";
     "(base)_manage_customer-assign": "/manage/customer-assign";
-    "(base)_manage_employee-manager": "/manage/employee-manager";
     "(base)_manage_permission": "/manage/permission";
     "(base)_manage_role": "/manage/role";
     "(base)_manage_role_[...slug]": "/manage/role/*";
@@ -190,7 +188,6 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_customer-manage_assign"
     | "(base)_customer-manage_follow"
     | "(base)_customer-manage_import"
-    | "(base)_customer-manage_info"
     | "(base)_customer-manage"
     | "(base)_employee-manage_address"
     | "(base)_employee-manage_contact"
@@ -216,7 +213,6 @@ declare module "@soybean-react/vite-plugin-react-router" {
     | "(base)_home"
     | "(base)"
     | "(base)_manage_customer-assign"
-    | "(base)_manage_employee-manager"
     | "(base)_manage"
     | "(base)_manage_permission"
     | "(base)_manage_role_[...slug]"

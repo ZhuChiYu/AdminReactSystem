@@ -10,6 +10,7 @@ import {
   Select,
   message
 } from 'antd';
+import dayjs from 'dayjs';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +36,9 @@ interface Role {
 interface UserRecord {
   address?: string;
   bankCard?: string;
+  contractEndDate?: string;
+  contractStartDate?: string;
+  contractYears?: number;
   createBy: string;
   createTime: string;
   email?: string;
@@ -73,9 +77,8 @@ const tagUserGenderMap: Record<Api.SystemManage.UserGender, string> = {
   2: 'error'
 };
 
-// 权限角色选项
+// 权限角色选项 - 移除超级管理员选项
 const permissionRoleOptions = [
-  { label: '超级管理员', value: 'super_admin' },
   { label: '管理员', value: 'admin' },
   { label: '员工', value: 'employee' }
 ];
@@ -228,10 +231,11 @@ const UserManage = () => {
             return (
               <ATag
                 color={roleColor}
-                style={{ cursor: isSuperAdmin() ? 'pointer' : 'default' }}
+                style={{ cursor: isSuperAdmin() && currentRole !== 'super_admin' ? 'pointer' : 'default' }}
                 onClick={e => {
                   e.stopPropagation();
-                  if (isSuperAdmin()) {
+                  // 超级管理员角色不能被编辑，且只有超级管理员能编辑其他角色
+                  if (isSuperAdmin() && currentRole !== 'super_admin') {
                     setEditingPermissionRole({ currentRole, id: record.id });
                   }
                 }}
@@ -432,6 +436,9 @@ const UserManage = () => {
           const createData = {
             address: res.address,
             bankCard: res.bankCard,
+            contractEndDate: res.contractEndDate?.format?.('YYYY-MM-DD') || res.contractEndDate,
+            contractStartDate: res.contractStartDate?.format?.('YYYY-MM-DD') || res.contractStartDate,
+            contractYears: res.contractYears,
             email: res.email || res.userEmail,
             gender: getGenderValue(res.userGender),
             idCard: res.idCard,
@@ -473,6 +480,9 @@ const UserManage = () => {
           const updateData = {
             address: res.address,
             bankCard: res.bankCard,
+            contractEndDate: res.contractEndDate?.format?.('YYYY-MM-DD') || res.contractEndDate,
+            contractStartDate: res.contractStartDate?.format?.('YYYY-MM-DD') || res.contractStartDate,
+            contractYears: res.contractYears,
             email: res.email || res.userEmail,
             gender: getGenderValue(res.userGender),
             idCard: res.idCard,
@@ -549,6 +559,8 @@ const UserManage = () => {
 
       const formData = {
         ...findItem,
+        contractEndDate: findItem.contractEndDate ? dayjs(findItem.contractEndDate) : undefined,
+        contractStartDate: findItem.contractStartDate ? dayjs(findItem.contractStartDate) : undefined,
         id: findItem.id,
         permissionRole,
         positionRole
@@ -685,6 +697,9 @@ const UserManage = () => {
             return {
               address: record.address,
               bankCard: record.bankCard,
+              contractEndDate: record.contractEndDate,
+              contractStartDate: record.contractStartDate,
+              contractYears: record.contractYears,
               createBy: 'system',
               createTime: record.createdAt,
               email: record.email,

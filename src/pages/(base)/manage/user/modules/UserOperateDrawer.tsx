@@ -1,5 +1,6 @@
-import { Button, Drawer, Flex, Form, Input, Radio, Select } from 'antd';
+import { Button, DatePicker, Drawer, Flex, Form, Input, InputNumber, Radio, Select } from 'antd';
 import { type FC, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { enableStatusOptions, userGenderOptions } from '@/constants/business';
 import { useFormRules } from '@/features/form';
@@ -12,6 +13,9 @@ interface OptionsProps {
 
 // 扩展用户类型以包含新的角色字段
 interface ExtendedUser extends Api.SystemManage.User {
+  contractEndDate?: string;
+  contractStartDate?: string;
+  contractYears?: number;
   permissionRole?: string;
   positionRole?: string;
 }
@@ -20,6 +24,9 @@ type Model = Pick<
   ExtendedUser,
   | 'address'
   | 'bankCard'
+  | 'contractEndDate'
+  | 'contractStartDate'
+  | 'contractYears'
   | 'idCard'
   | 'nickName'
   | 'permissionRole'
@@ -35,9 +42,8 @@ type Model = Pick<
 
 type RuleKey = Extract<keyof Model, 'status' | 'userName'>;
 
-// 权限角色选项
+// 权限角色选项 - 移除超级管理员选项
 const permissionRoleOptions = [
-  { label: '超级管理员', value: 'super_admin' },
   { label: '管理员', value: 'admin' },
   { label: '员工', value: 'employee' }
 ];
@@ -69,7 +75,7 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
       try {
         const response = await fetchGetRoleList({ current: 1, roleType: 'position', size: 100 });
         console.log('获取职位角色响应:', response);
-        
+
         if (response && response.records) {
           const options = response.records.map((role: Api.SystemManage.Role) => ({
             label: role.roleName || role.roleCode,
@@ -212,6 +218,40 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
           name="tim"
         >
           <Input placeholder="请输入TIM号" />
+        </Form.Item>
+
+        <Form.Item
+          label="合同年限"
+          name="contractYears"
+        >
+          <InputNumber
+            addonAfter="年"
+            max={50}
+            min={0}
+            placeholder="请输入合同年限"
+            precision={0}
+            style={{ width: '100%' }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="合同开始时间"
+          name="contractStartDate"
+        >
+          <DatePicker
+            placeholder="请选择合同开始时间"
+            style={{ width: '100%' }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="合同结束时间"
+          name="contractEndDate"
+        >
+          <DatePicker
+            placeholder="请选择合同结束时间"
+            style={{ width: '100%' }}
+          />
         </Form.Item>
 
         <Form.Item

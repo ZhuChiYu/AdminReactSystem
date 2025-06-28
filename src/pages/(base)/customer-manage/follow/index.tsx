@@ -1,10 +1,11 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 
 import type { CustomerApi } from '@/service/api';
 import { customerService } from '@/service/api';
+import { isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 /** 跟进状态枚举 */
@@ -85,8 +86,15 @@ const CustomerFollow = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerApi.CustomerListItem | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [selectedRows, setSelectedRows] = useState<CustomerApi.CustomerListItem[]>([]);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+
+  // 检查是否为超级管理员
+  const isSuper = isSuperAdmin();
 
   // 获取跟进数据
   const fetchFollowData = async () => {
@@ -128,6 +136,10 @@ const CustomerFollow = () => {
 
       setFollowRecords(formattedRecords);
       setFilteredRecords(formattedRecords);
+
+      // 清空选择状态
+      setSelectedRowKeys([]);
+      setSelectedRows([]);
     } catch (error) {
       console.error('❌ 获取跟进数据失败:', error);
       message.error('获取数据失败');
@@ -139,6 +151,11 @@ const CustomerFollow = () => {
   // 筛选数据
   const filterData = (status: string) => {
     setSelectedFollowStatus(status);
+
+    // 清空选择状态
+    setSelectedRowKeys([]);
+    setSelectedRows([]);
+
     if (status === 'all') {
       setFilteredRecords(followRecords);
     } else {
@@ -261,6 +278,122 @@ const CustomerFollow = () => {
         }
       },
       title: '确认删除'
+    });
+  };
+
+  // 表格行选择配置
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (selectedRowKeys: React.Key[], selectedRows: CustomerApi.CustomerListItem[]) => {
+      setSelectedRowKeys(selectedRowKeys);
+      setSelectedRows(selectedRows);
+    },
+    onSelect: (record: CustomerApi.CustomerListItem, selected: boolean, selectedRows: CustomerApi.CustomerListItem[]) => {
+      console.log('选择行:', record, selected, selectedRows);
+    },
+    onSelectAll: (selected: boolean, selectedRows: CustomerApi.CustomerListItem[], changeRows: CustomerApi.CustomerListItem[]) => {
+      console.log('全选状态:', selected, selectedRows, changeRows);
+    },
+  };
+
+  // 客户数据导出功能
+  const handleExport = async () => {
+    if (!isSuper) {
+      message.error('只有超级管理员可以导出客户数据');
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      console.log('📤 开始导出客户数据...');
+
+      // 准备导出数据
+      const exportData = filteredRecords.map((record, index) => ({
+        序号: index + 1,
+        客户姓名: record.customerName,
+        公司: record.company,
+        职位: record.position || '-',
+        电话: record.phone || '-',
+        手机: record.mobile || '-',
+        跟进状态: getStatusLabel(record.followStatus),
+        跟进内容: record.remark || '暂无跟进内容',
+        负责人: record.assignedTo?.name || '未分配',
+        创建时间: record.createdAt ? new Date(record.createdAt).toLocaleString('zh-CN') : '-'
+      }));
+
+      // 转换为CSV格式
+      const headers = Object.keys(exportData[0] || {});
+      const csvContent = [
+        headers.join(','),
+        ...exportData.map(row => headers.map(header => `"${row[header as keyof typeof row] || ''}"`).join(','))
+      ].join('\n');
+
+      // 创建下载链接
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+
+      // 生成文件名
+      const fileName = `客户跟进数据_${selectedFollowStatus === 'all' ? '全部' : getStatusLabel(selectedFollowStatus)}_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = fileName;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      message.success(`成功导出 ${exportData.length} 条客户数据`);
+      console.log('✅ 导出完成:', fileName);
+    } catch (error) {
+      console.error('❌ 导出失败:', error);
+      message.error('导出失败');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  // 批量删除功能
+  const handleBatchDelete = () => {
+    if (!isSuper) {
+      message.error('只有超级管理员可以批量删除客户');
+      return;
+    }
+
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先选择要删除的客户');
+      return;
+    }
+
+    Modal.confirm({
+      title: '批量删除确认',
+      content: `确定要删除选中的 ${selectedRowKeys.length} 条客户记录吗？删除后无法恢复。`,
+      icon: <DeleteOutlined />,
+      okText: '确认删除',
+      okType: 'danger',
+      onOk: async () => {
+        setDeleteLoading(true);
+        try {
+          console.log('🗑️ 批量删除客户:', selectedRowKeys);
+
+          // 并发删除所有选中的客户
+          const deletePromises = selectedRowKeys.map(id =>
+            customerService.deleteCustomer(Number(id))
+          );
+
+          await Promise.all(deletePromises);
+
+          message.success(`成功删除 ${selectedRowKeys.length} 条客户记录`);
+
+          // 清空选择并重新获取数据
+          setSelectedRowKeys([]);
+          setSelectedRows([]);
+          fetchFollowData();
+        } catch (error) {
+          console.error('❌ 批量删除失败:', error);
+          message.error('批量删除失败');
+        } finally {
+          setDeleteLoading(false);
+        }
+      }
     });
   };
 
@@ -442,8 +575,35 @@ const CustomerFollow = () => {
       </Row>
 
       {/* 操作栏 */}
-      <div style={{ marginBottom: 16, textAlign: 'right' }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          {isSuper && selectedRowKeys.length > 0 && (
+            <span style={{ color: '#666' }}>
+              已选择 {selectedRowKeys.length} 条记录
+            </span>
+          )}
+        </div>
         <Space>
+          {isSuper && (
+            <>
+              <Button
+                danger
+                disabled={selectedRowKeys.length === 0}
+                icon={<DeleteOutlined />}
+                loading={deleteLoading}
+                onClick={handleBatchDelete}
+              >
+                批量删除 {selectedRowKeys.length > 0 ? `(${selectedRowKeys.length})` : ''}
+              </Button>
+              <Button
+                icon={<DownloadOutlined />}
+                loading={exportLoading}
+                onClick={handleExport}
+              >
+                导出数据
+              </Button>
+            </>
+          )}
           <Button
             icon={<PlusOutlined />}
             type="primary"
@@ -460,6 +620,7 @@ const CustomerFollow = () => {
         dataSource={filteredRecords}
         loading={loading}
         rowKey="id"
+        rowSelection={isSuper ? rowSelection : undefined}
         {...getFullTableConfig(10)}
       />
 

@@ -290,6 +290,9 @@ router.post('/users', async (req, res) => {
     const {
       address,
       bankCard,
+      contractEndDate,
+      contractStartDate,
+      contractYears,
       departmentId,
       email,
       gender,
@@ -371,6 +374,9 @@ router.post('/users', async (req, res) => {
       data: {
         address,
         bankCard,
+        contractEndDate: contractEndDate ? new Date(contractEndDate) : null,
+        contractStartDate: contractStartDate ? new Date(contractStartDate) : null,
+        contractYears,
         departmentId,
         email,
         gender: genderValue,

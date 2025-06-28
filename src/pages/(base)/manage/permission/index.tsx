@@ -3,8 +3,7 @@ import { Button, Card, Checkbox, Col, Form, Input, Modal, Row, Select, Space, Ta
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { type EmployeeApi, employeeService } from '@/service/api';
-import useCustomerStore from '@/store/customerStore';
+import { type EmployeeApi, employeeService, customerService } from '@/service/api';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { UserRole, getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
@@ -57,8 +56,9 @@ const PermissionManagement = () => {
     revokeGlobalPermission
   } = usePermissionStore();
 
-  // 从客户状态管理器获取客户数据
-  const { customers } = useCustomerStore();
+  // 客户列表数据
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customerLoading, setCustomerLoading] = useState(false);
 
   // 员工列表数据
   const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
@@ -109,6 +109,25 @@ const PermissionManagement = () => {
     fetchEmployees();
   }, [employeePagination.current, employeePagination.size]);
 
+  // 加载客户数据
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        setCustomerLoading(true);
+        const { customerService } = await import('@/service/api/customer');
+        const response = await customerService.getCustomerList({ current: 1, size: 1000 });
+        setCustomers(response.records || []);
+      } catch (error) {
+        console.error('获取客户列表失败:', error);
+        message.error('获取客户列表失败');
+      } finally {
+        setCustomerLoading(false);
+      }
+    };
+
+    fetchCustomers();
+  }, []);
+
   // 加载班级数据 - 新增
   useEffect(() => {
     const fetchClasses = async () => {
@@ -146,6 +165,10 @@ const PermissionManagement = () => {
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isClassModalVisible, setIsClassModalVisible] = useState(false);
 
+  // 编辑状态
+  const [isEditingPermission, setIsEditingPermission] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+
   // 员工搜索关键字
   const [userSearchKey, setUserSearchKey] = useState('');
 
@@ -154,6 +177,49 @@ const PermissionManagement = () => {
 
   // 员工权限列表
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
+
+  // 刷新权限列表的通用函数
+  const refreshUserPermissions = () => {
+    if (!selectedUser) return;
+
+    const permissions = getUserPermissions(selectedUser.id);
+    const groupedPermissions = new Map();
+
+    permissions.forEach(permission => {
+      let scope = '全局';
+      let scopeKey = 'global';
+
+      if (permission.customerId) {
+        const customer = customers.find(c => c.id === permission.customerId);
+        scope = `客户: ${customer?.customerName || 'Unknown'}`;
+        scopeKey = `customer_${permission.customerId}`;
+      } else if (permission.classId) {
+        const classItem = classes.find(c => c.id === permission.classId);
+        scope = `班级: ${classItem?.name || 'Unknown'}`;
+        scopeKey = `class_${permission.classId}`;
+      }
+
+      if (!groupedPermissions.has(scopeKey)) {
+        groupedPermissions.set(scopeKey, {
+          key: scopeKey,
+          scope,
+          permissions: [],
+          customerId: permission.customerId,
+          classId: permission.classId,
+          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
+          grantedBy: permission.grantedBy
+        });
+      }
+
+      groupedPermissions.get(scopeKey).permissions.push({
+        type: permission.permissionType,
+        name: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames]
+      });
+    });
+
+    const formattedPermissions = Array.from(groupedPermissions.values());
+    setUserPermissions(formattedPermissions);
+  };
 
   // 过滤员工列表
   useEffect(() => {
@@ -191,31 +257,50 @@ const PermissionManagement = () => {
     // 获取员工权限
     const permissions = getUserPermissions(selectedUser.id);
 
-    // 格式化权限数据用于显示
-    const formattedPermissions = permissions.map(permission => {
+    // 按权限范围分组
+    const groupedPermissions = new Map();
+
+    permissions.forEach(permission => {
       let scope = '全局';
+      let scopeKey = 'global';
+
       if (permission.customerId) {
         const customer = customers.find(c => c.id === permission.customerId);
-        scope = `客户: ${customer?.name || 'Unknown'}`;
+        scope = `客户: ${customer?.customerName || 'Unknown'}`;
+        scopeKey = `customer_${permission.customerId}`;
       } else if (permission.classId) {
         const classItem = classes.find(c => c.id === permission.classId);
         scope = `班级: ${classItem?.name || 'Unknown'}`;
+        scopeKey = `class_${permission.classId}`;
       }
 
-      return {
-        ...permission,
-        grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-        key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-        permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
-        scope
-      };
+      if (!groupedPermissions.has(scopeKey)) {
+        groupedPermissions.set(scopeKey, {
+          key: scopeKey,
+          scope,
+          permissions: [],
+          customerId: permission.customerId,
+          classId: permission.classId,
+          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
+          grantedBy: permission.grantedBy
+        });
+      }
+
+      groupedPermissions.get(scopeKey).permissions.push({
+        type: permission.permissionType,
+        name: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames]
+      });
     });
+
+    // 转换为数组格式
+    const formattedPermissions = Array.from(groupedPermissions.values());
 
     setUserPermissions(formattedPermissions);
   }, [selectedUser, getUserPermissions, customers, classes]);
 
   // 处理选择员工
   const handleUserSelect = (user: { id: string; name: string; role: string }) => {
+    console.log('👤 选择员工调试信息:', user);
     setSelectedUser(user);
   };
 
@@ -237,6 +322,8 @@ const PermissionManagement = () => {
 
     // 初始化表单
     form.resetFields();
+    setIsEditingPermission(false);
+    setEditingRecord(null);
 
     // 预设已有权限
     const userPerms = getUserPermissions(selectedUser.id)
@@ -259,6 +346,8 @@ const PermissionManagement = () => {
 
     // 初始化表单
     customerForm.resetFields();
+    setIsEditingPermission(false);
+    setEditingRecord(null);
     setIsCustomerModalVisible(true);
   };
 
@@ -271,6 +360,8 @@ const PermissionManagement = () => {
 
     // 初始化表单
     classForm.resetFields();
+    setIsEditingPermission(false);
+    setEditingRecord(null);
     setIsClassModalVisible(true);
   };
 
@@ -284,52 +375,39 @@ const PermissionManagement = () => {
         return;
       }
 
-      // 获取已有的全局权限
-      const existingPermissions = getUserPermissions(selectedUser.id)
-        .filter(p => !p.customerId && !p.classId)
-        .map(p => p.permissionType);
+      if (isEditingPermission && editingRecord) {
+        // 编辑模式：先撤销原有权限，再授予新权限
+        const oldPermissionTypes = editingRecord.permissions.map((p: any) => p.type);
+        revokeGlobalPermission(selectedUser.id, oldPermissionTypes, currentUserId);
+      } else {
+        // 新建模式：获取已有的全局权限
+        const existingPermissions = getUserPermissions(selectedUser.id)
+          .filter(p => !p.customerId && !p.classId)
+          .map(p => p.permissionType);
 
-      // 需要添加的权限
-      const permissionsToAdd = values.permissions.filter((p: PermissionType) => !existingPermissions.includes(p));
+        // 需要移除的权限
+        const permissionsToRemove = existingPermissions.filter(p => !values.permissions.includes(p));
 
-      // 需要移除的权限
-      const permissionsToRemove = existingPermissions.filter(p => !values.permissions.includes(p));
-
-      // 添加权限
-      if (permissionsToAdd.length > 0) {
-        grantGlobalPermission(selectedUser.id, permissionsToAdd, currentUserId);
-      }
-
-      // 移除权限
-      if (permissionsToRemove.length > 0) {
-        revokeGlobalPermission(selectedUser.id, permissionsToRemove, currentUserId);
-      }
-
-      message.success('权限设置成功');
-      setIsGlobalModalVisible(false);
-
-      // 刷新员工权限列表
-      const permissions = getUserPermissions(selectedUser.id);
-      const formattedPermissions = permissions.map(permission => {
-        let scope = '全局';
-        if (permission.customerId) {
-          const customer = customers.find(c => c.id === permission.customerId);
-          scope = `客户: ${customer?.name || 'Unknown'}`;
-        } else if (permission.classId) {
-          const classItem = classes.find(c => c.id === permission.classId);
-          scope = `班级: ${classItem?.name || 'Unknown'}`;
+        // 移除权限
+        if (permissionsToRemove.length > 0) {
+          revokeGlobalPermission(selectedUser.id, permissionsToRemove, currentUserId);
         }
+      }
 
-        return {
-          ...permission,
-          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-          key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-          permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
-          scope
-        };
-      });
+      // 授予权限
+      if (values.permissions.length > 0) {
+        grantGlobalPermission(selectedUser.id, values.permissions, currentUserId);
+      }
 
-      setUserPermissions(formattedPermissions);
+      message.success(isEditingPermission ? '全局权限修改成功' : '全局权限设置成功');
+      setIsGlobalModalVisible(false);
+      setIsEditingPermission(false);
+      setEditingRecord(null);
+
+      // 立即刷新权限列表显示
+      setTimeout(() => {
+        refreshUserPermissions();
+      }, 100);
     } catch (error) {
       console.error('Form validation failed:', error);
     }
@@ -345,34 +423,67 @@ const PermissionManagement = () => {
         return;
       }
 
+      if (isEditingPermission && editingRecord) {
+        // 编辑模式：先撤销原有权限，再授予新权限
+        const oldPermissionTypes = editingRecord.permissions.map((p: any) => p.type);
+        revokeCustomerPermission(selectedUser.id, values.customerId, oldPermissionTypes, currentUserId);
+      }
+
       // 授予客户权限
       grantCustomerPermission(selectedUser.id, values.customerId, values.permissions, currentUserId);
 
-      message.success('客户权限设置成功');
-      setIsCustomerModalVisible(false);
-
-      // 刷新员工权限列表
-      const permissions = getUserPermissions(selectedUser.id);
-      const formattedPermissions = permissions.map(permission => {
-        let scope = '全局';
-        if (permission.customerId) {
-          const customer = customers.find(c => c.id === permission.customerId);
-          scope = `客户: ${customer?.name || 'Unknown'}`;
-        } else if (permission.classId) {
-          const classItem = classes.find(c => c.id === permission.classId);
-          scope = `班级: ${classItem?.name || 'Unknown'}`;
-        }
-
-        return {
-          ...permission,
-          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-          key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-          permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
-          scope
-        };
+      console.log('🔧 权限设置调试信息:', {
+        selectedUserId: selectedUser.id,
+        selectedUserIdType: typeof selectedUser.id,
+        customerId: values.customerId,
+        customerIdType: typeof values.customerId,
+        permissions: values.permissions,
+        grantedBy: currentUserId,
+        grantedByType: typeof currentUserId,
+        isEditingMode: isEditingPermission
       });
 
-      setUserPermissions(formattedPermissions);
+      // 关键修复：调用后端API真正分配客户给员工
+      try {
+        await customerService.assignCustomers({
+          assignedToId: parseInt(selectedUser.id), // 确保是数字类型
+          customerIds: [values.customerId],
+          remark: `权限管理分配 - ${new Date().toLocaleString()}`
+        });
+        console.log('✅ 客户分配成功:', {
+          employeeId: selectedUser.id,
+          customerId: values.customerId
+        });
+      } catch (error) {
+        console.error('❌ 客户分配失败:', error);
+        // 如果分配失败，显示警告但不阻止权限设置
+        message.warning('权限设置成功，但客户分配可能失败，请检查该客户是否已分配给其他员工');
+      }
+
+      // 验证权限是否正确保存
+      setTimeout(() => {
+        const savedPermissions = getUserPermissions(selectedUser.id);
+        const allPermissions = usePermissionStore.getState().permissions;
+        console.log('📝 保存后的权限验证:', {
+          userId: selectedUser.id,
+          userIdType: typeof selectedUser.id,
+          allPermissions: allPermissions,
+          savedPermissions: savedPermissions,
+          customerPermissions: savedPermissions.filter(p => p.customerId === values.customerId),
+          // 额外检查：查找所有包含该用户ID的权限
+          permissionsContainingUserId: allPermissions.filter(p => p.userId === selectedUser.id)
+        });
+      }, 50);
+
+      message.success(isEditingPermission ? '客户权限修改成功' : '客户权限设置成功');
+      setIsCustomerModalVisible(false);
+      setIsEditingPermission(false);
+      setEditingRecord(null);
+
+      // 立即刷新权限列表显示
+      setTimeout(() => {
+        refreshUserPermissions();
+      }, 100);
     } catch (error) {
       console.error('Form validation failed:', error);
     }
@@ -388,81 +499,110 @@ const PermissionManagement = () => {
         return;
       }
 
+      if (isEditingPermission && editingRecord) {
+        // 编辑模式：先撤销原有权限，再授予新权限
+        const oldPermissionTypes = editingRecord.permissions.map((p: any) => p.type);
+        revokeClassPermission(selectedUser.id, values.classId, oldPermissionTypes, currentUserId);
+      }
+
       // 授予班级权限
       grantClassPermission(selectedUser.id, values.classId, values.permissions, currentUserId);
 
-      message.success('班级权限设置成功');
+      message.success(isEditingPermission ? '班级权限修改成功' : '班级权限设置成功');
       setIsClassModalVisible(false);
+      setIsEditingPermission(false);
+      setEditingRecord(null);
 
-      // 刷新员工权限列表
-      const permissions = getUserPermissions(selectedUser.id);
-      const formattedPermissions = permissions.map(permission => {
-        let scope = '全局';
-        if (permission.customerId) {
-          const customer = customers.find(c => c.id === permission.customerId);
-          scope = `客户: ${customer?.name || 'Unknown'}`;
-        } else if (permission.classId) {
-          const classItem = classes.find(c => c.id === permission.classId);
-          scope = `班级: ${classItem?.name || 'Unknown'}`;
-        }
-
-        return {
-          ...permission,
-          grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-          key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-          permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
-          scope
-        };
-      });
-
-      setUserPermissions(formattedPermissions);
+      // 立即刷新权限列表显示
+      setTimeout(() => {
+        refreshUserPermissions();
+      }, 100);
     } catch (error) {
       console.error('Form validation failed:', error);
     }
   };
 
-  // 撤销权限
-  const handleRevokePermission = (record: any) => {
+  // 编辑权限
+  const handleEditPermission = (record: any) => {
     if (!selectedUser) {
       message.error('未选择员工');
       return;
     }
 
+    setEditingRecord(record);
+    setIsEditingPermission(true);
+
+    if (record.customerId) {
+      // 编辑客户权限
+      customerForm.setFieldsValue({
+        customerId: record.customerId,
+        permissions: record.permissions.map((p: any) => p.type)
+      });
+      setIsCustomerModalVisible(true);
+    } else if (record.classId) {
+      // 编辑班级权限
+      classForm.setFieldsValue({
+        classId: record.classId,
+        permissions: record.permissions.map((p: any) => p.type)
+      });
+      setIsClassModalVisible(true);
+    } else {
+      // 编辑全局权限
+      form.setFieldsValue({
+        permissions: record.permissions.map((p: any) => p.type)
+      });
+      setIsGlobalModalVisible(true);
+    }
+  };
+
+  // 撤销权限
+  const handleRevokePermission = async (record: any) => {
+    if (!selectedUser) {
+      message.error('未选择员工');
+      return;
+    }
+
+    const permissionTypes = record.permissions.map((p: any) => p.type);
+
     if (record.customerId) {
       // 撤销客户权限
-      revokeCustomerPermission(selectedUser.id, record.customerId, [record.permissionType], currentUserId);
+      revokeCustomerPermission(selectedUser.id, record.customerId, permissionTypes, currentUserId);
+
+      // 同时取消客户分配 - 查找并删除对应的分配关系
+      try {
+        const assignments = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
+        const targetAssignment = assignments.records.find(
+          (assignment: any) =>
+            assignment.customerId === record.customerId &&
+            assignment.assignedToId === parseInt(selectedUser.id)
+        );
+
+        if (targetAssignment) {
+          await customerService.removeCustomerAssignment(targetAssignment.id);
+          console.log('✅ 客户分配已取消:', {
+            assignmentId: targetAssignment.id,
+            employeeId: selectedUser.id,
+            customerId: record.customerId
+          });
+        }
+      } catch (error) {
+        console.error('❌ 取消客户分配失败:', error);
+        message.warning('权限已撤销，但取消客户分配可能失败');
+      }
     } else if (record.classId) {
       // 撤销班级权限
-      revokeClassPermission(selectedUser.id, record.classId, [record.permissionType], currentUserId);
+      revokeClassPermission(selectedUser.id, record.classId, permissionTypes, currentUserId);
     } else {
       // 撤销全局权限
-      revokeGlobalPermission(selectedUser.id, [record.permissionType], currentUserId);
+      revokeGlobalPermission(selectedUser.id, permissionTypes, currentUserId);
     }
 
     message.success('权限已撤销');
 
-    // 刷新员工权限列表
-    const permissions = getUserPermissions(selectedUser.id);
-    const formattedPermissions = permissions.map(permission => {
-      let scope = '全局';
-      if (permission.customerId) {
-        const customer = customers.find(c => c.id === permission.customerId);
-        scope = `客户: ${customer?.name || 'Unknown'}`;
-      } else if (permission.classId) {
-        const classItem = classes.find(c => c.id === permission.classId);
-        scope = `班级: ${classItem?.name || 'Unknown'}`;
-      }
-
-      return {
-        ...permission,
-        grantTime: permission.grantedTime ? new Date(permission.grantedTime).toLocaleString() : '-',
-        key: `${permission.permissionType}_${permission.customerId || 'global'}_${permission.classId || 'global'}`,
-        permissionName: permissionTypeNames[permission.permissionType as keyof typeof permissionTypeNames],
-        scope
-      };
-    });
-
-    setUserPermissions(formattedPermissions);
+    // 立即刷新权限列表显示
+    setTimeout(() => {
+      refreshUserPermissions();
+    }, 100);
   };
 
   // 员工表格列定义
@@ -504,13 +644,15 @@ const PermissionManagement = () => {
       render: (_: unknown, record: EmployeeApi.EmployeeListItem) => (
         <Button
           type="link"
-          onClick={() =>
-            handleUserSelect({
+          onClick={() => {
+            const userToSelect = {
               id: String(record.id),
               name: record.nickName,
               role: record.roles?.[0]?.code || ''
-            })
-          }
+            };
+            console.log('👥 员工记录信息:', { record, userToSelect });
+            handleUserSelect(userToSelect);
+          }}
         >
           选择
         </Button>
@@ -522,11 +664,20 @@ const PermissionManagement = () => {
   // 权限表格列定义
   const permissionColumns = [
     {
-      dataIndex: 'permissionName',
-      key: 'permissionName',
+      dataIndex: 'permissions',
+      key: 'permissions',
       ...getCenterColumnConfig(),
       title: '权限类型',
-      width: 150
+      width: 250,
+      render: (permissions: Array<{type: string, name: string}>) => (
+        <div className="space-y-1">
+          {permissions.map((perm, index) => (
+            <Tag key={index} color="blue">
+              {perm.name}
+            </Tag>
+          ))}
+        </div>
+      )
     },
     {
       dataIndex: 'scope',
@@ -551,15 +702,23 @@ const PermissionManagement = () => {
     },
     {
       key: 'action',
-      ...getActionColumnConfig(100),
+      ...getActionColumnConfig(150),
       render: (_: any, record: any) => (
-        <Button
-          danger
-          type="link"
-          onClick={() => handleRevokePermission(record)}
-        >
-          撤销
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            onClick={() => handleEditPermission(record)}
+          >
+            编辑
+          </Button>
+          <Button
+            danger
+            type="link"
+            onClick={() => handleRevokePermission(record)}
+          >
+            撤销
+          </Button>
+        </Space>
       ),
       title: '操作'
     }
@@ -662,8 +821,12 @@ const PermissionManagement = () => {
 
       <Modal
         open={isGlobalModalVisible}
-        title="设置全局权限"
-        onCancel={() => setIsGlobalModalVisible(false)}
+        title={isEditingPermission ? "编辑全局权限" : "设置全局权限"}
+        onCancel={() => {
+          setIsGlobalModalVisible(false);
+          setIsEditingPermission(false);
+          setEditingRecord(null);
+        }}
         onOk={handleGlobalPermissionSubmit}
       >
         <Form
@@ -693,8 +856,12 @@ const PermissionManagement = () => {
 
       <Modal
         open={isCustomerModalVisible}
-        title="设置客户权限"
-        onCancel={() => setIsCustomerModalVisible(false)}
+        title={isEditingPermission ? "编辑客户权限" : "设置客户权限"}
+        onCancel={() => {
+          setIsCustomerModalVisible(false);
+          setIsEditingPermission(false);
+          setEditingRecord(null);
+        }}
         onOk={handleCustomerPermissionSubmit}
       >
         <Form
@@ -706,15 +873,28 @@ const PermissionManagement = () => {
             name="customerId"
             rules={[{ message: '请选择客户', required: true }]}
           >
-            <Select placeholder="请选择客户">
-              {customers.map(customer => (
-                <Select.Option
-                  key={customer.id}
-                  value={customer.id}
-                >
-                  {customer.name} - {customer.company}
-                </Select.Option>
-              ))}
+            <Select
+              placeholder="请选择客户"
+              disabled={isEditingPermission}
+              loading={customerLoading}
+            >
+              {customers.map(customer => {
+                // 检查该客户是否已设置过权限
+                const hasExistingPermission = selectedUser && getUserPermissions(selectedUser.id)
+                  .some(p => p.customerId === customer.id && (!isEditingPermission || editingRecord?.customerId !== customer.id));
+
+                return (
+                  <Select.Option
+                    key={customer.id}
+                    value={customer.id}
+                    disabled={hasExistingPermission}
+                    title={hasExistingPermission ? '该客户已设置权限' : ''}
+                  >
+                    {customer.customerName} - {customer.company}
+                    {hasExistingPermission && <span style={{ color: '#ff4d4f' }}> (已设置)</span>}
+                  </Select.Option>
+                );
+              })}
             </Select>
           </Form.Item>
           <Form.Item
@@ -747,8 +927,12 @@ const PermissionManagement = () => {
 
       <Modal
         open={isClassModalVisible}
-        title="设置班级权限"
-        onCancel={() => setIsClassModalVisible(false)}
+        title={isEditingPermission ? "编辑班级权限" : "设置班级权限"}
+        onCancel={() => {
+          setIsClassModalVisible(false);
+          setIsEditingPermission(false);
+          setEditingRecord(null);
+        }}
         onOk={handleClassPermissionSubmit}
       >
         <Form
@@ -763,15 +947,25 @@ const PermissionManagement = () => {
             <Select
               loading={classLoading}
               placeholder="请选择班级"
+              disabled={isEditingPermission}
             >
-              {classes.map(classItem => (
-                <Select.Option
-                  key={classItem.id}
-                  value={classItem.id}
-                >
-                  {classItem.name} - {classItem.categoryName || '未分类'}
-                </Select.Option>
-              ))}
+              {classes.map(classItem => {
+                // 检查该班级是否已设置过权限
+                const hasExistingPermission = selectedUser && getUserPermissions(selectedUser.id)
+                  .some(p => p.classId === classItem.id && (!isEditingPermission || editingRecord?.classId !== classItem.id));
+
+                return (
+                  <Select.Option
+                    key={classItem.id}
+                    value={classItem.id}
+                    disabled={hasExistingPermission}
+                    title={hasExistingPermission ? '该班级已设置权限' : ''}
+                  >
+                    {classItem.name} - {classItem.categoryName || '未分类'}
+                    {hasExistingPermission && <span style={{ color: '#ff4d4f' }}> (已设置)</span>}
+                  </Select.Option>
+                );
+              })}
             </Select>
           </Form.Item>
           <Form.Item
