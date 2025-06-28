@@ -526,23 +526,59 @@ export const archiveTask = async (req: Request, res: Response) => {
  */
 export const getMyTasks = async (req: Request, res: Response) => {
   try {
-    const { id: userId } = req.user as any; // 从JWT中获取用户ID
-    const { current = 1, size = 10, currentStage } = req.query;
+    const { id: userId, roles } = req.user as any; // 从JWT中获取用户ID和角色
+    const {
+      current = 1,
+      size = 10,
+      currentStage,
+      keyword = '',
+      priority,
+      responsiblePersonId
+    } = req.query;
 
     const skip = (Number(current) - 1) * Number(size);
 
+    // 检查是否是超级管理员
+    const isSuperAdmin = roles.includes('super_admin');
+
     const where: any = {
-      isArchived: false,
-      OR: [
+      isArchived: false
+    };
+
+    // 超级管理员可以看到所有项目事项，普通用户只能看到相关的项目事项
+    if (!isSuperAdmin) {
+      where.OR = [
         { responsiblePersonId: userId },
         { executorId: userId },
         { consultantId: userId },
         { marketManagerId: userId }
-      ]
-    };
+      ];
+    }
+
+    // 添加搜索条件
+    if (keyword) {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { projectName: { contains: String(keyword), mode: 'insensitive' } },
+            { projectType: { contains: String(keyword), mode: 'insensitive' } },
+            { remark: { contains: String(keyword), mode: 'insensitive' } }
+          ]
+        }
+      ];
+    }
 
     if (currentStage) {
       where.currentStage = String(currentStage);
+    }
+
+    if (priority) {
+      where.priority = Number(priority);
+    }
+
+    if (responsiblePersonId) {
+      where.responsiblePersonId = Number(responsiblePersonId);
     }
 
     const [tasks, total] = await Promise.all([

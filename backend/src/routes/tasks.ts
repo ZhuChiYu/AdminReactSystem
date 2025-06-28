@@ -1,11 +1,11 @@
 import express from 'express';
 import { body, param, query } from 'express-validator';
-import { 
-  getTasks, 
-  getTaskById, 
-  createTask, 
-  updateTask, 
-  deleteTask, 
+import {
+  getTasks,
+  getTaskById,
+  createTask,
+  updateTask,
+  deleteTask,
   advanceStage,
   archiveTask,
   getMyTasks,
@@ -35,7 +35,7 @@ const prisma = new PrismaClient();
  * @desc 获取项目事项列表
  * @access Private
  */
-router.get('/', 
+router.get('/',
   authMiddleware,
   [
     query('current').optional().isInt({ min: 1 }).withMessage('页码必须是正整数'),
@@ -62,10 +62,13 @@ router.get('/my',
   [
     query('current').optional().isInt({ min: 1 }).withMessage('页码必须是正整数'),
     query('size').optional().isInt({ min: 1, max: 100 }).withMessage('页面大小必须在1-100之间'),
+    query('keyword').optional().isString().withMessage('关键词必须是字符串'),
     query('currentStage').optional().isIn([
       'customer_inquiry', 'proposal_submission', 'teacher_confirmation',
       'project_approval', 'contract_signing', 'project_execution', 'project_settlement'
-    ]).withMessage('阶段参数无效')
+    ]).withMessage('阶段参数无效'),
+    query('priority').optional().isInt({ min: 1, max: 3 }).withMessage('优先级必须是1-3'),
+    query('responsiblePersonId').optional().isInt().withMessage('负责人ID必须是整数')
   ],
   getMyTasks
 );
@@ -85,7 +88,7 @@ router.get('/statistics',
  * @desc 获取历史项目列表
  * @access Private
  */
-router.get('/archived', 
+router.get('/archived',
   authMiddleware,
   [
     query('current').optional().isInt({ min: 1 }).withMessage('页码必须是正整数'),
@@ -321,4 +324,4 @@ router.post('/:id/archive',
   archiveTask
 );
 
-export default router; 
+export default router;

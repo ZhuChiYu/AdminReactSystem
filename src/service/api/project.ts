@@ -39,8 +39,8 @@ export const projectService = {
   /** 确认方案（客户同意方案） */
   async confirmProposal(data: { taskId: number; approved?: boolean; remark?: string }): Promise<TaskApi.TaskListItem> {
     try {
-      const response = await apiClient.post('/tasks/confirm-proposal', { 
-        ...data, 
+      const response = await apiClient.post('/tasks/confirm-proposal', {
+        ...data,
         approved: data.approved !== false // 默认为true，除非明确传false
       });
       return response;
@@ -64,10 +64,10 @@ export const projectService = {
   /** 确认收款 */
   async confirmPayment(taskId: number, received: boolean, amount?: number, comment?: string): Promise<TaskApi.TaskListItem> {
     try {
-      const response = await apiClient.post(`/tasks/${taskId}/confirm-payment`, { 
-        comment, 
+      const response = await apiClient.post(`/tasks/${taskId}/confirm-payment`, {
+        comment,
         received,
-        amount 
+        amount
       });
       return response;
     } catch (error) {
@@ -154,6 +154,9 @@ export const projectService = {
     current?: number;
     currentStage?: TaskApi.ProjectStage;
     size?: number;
+    keyword?: string;
+    priority?: number;
+    responsiblePersonId?: number;
   }): Promise<PageResponse<TaskApi.TaskListItem>['data']> {
     try {
       const response = await apiClient.get('/tasks/my', { params });

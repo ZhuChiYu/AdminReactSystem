@@ -294,7 +294,6 @@ const ItemList = () => {
   // 基础状态
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<TaskApi.TaskListItem[]>([]);
-  const [filteredTasks, setFilteredTasks] = useState<TaskApi.TaskListItem[]>([]);
   const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
 
   // 分页状态
@@ -339,19 +338,18 @@ const ItemList = () => {
     }
   };
 
-  // 获取项目事项列表
+  // 获取项目事项列表（只获取当前用户相关的项目事项）
   const fetchTasks = async (params?: any) => {
     setLoading(true);
     try {
       const requestParams = {
         current: pagination.current,
-        isArchived: false,
-        size: pagination.pageSize, // 只显示未归档的项目
+        size: pagination.pageSize,
         ...params
       };
-      const response = await projectService.getTaskList(requestParams);
+      // 使用 getMyTasks 获取当前用户相关的项目事项
+      const response = await projectService.getMyTasks(requestParams);
       setTasks(response.records || []);
-      setFilteredTasks(response.records || []);
 
       // 更新分页信息
       setPagination(prev => ({
@@ -474,41 +472,39 @@ const ItemList = () => {
     fetchEmployees();
   }, []);
 
-  // 搜索处理
+  // 搜索处理 - 调用后端API进行搜索
   const handleSearch = () => {
-    let filtered = [...tasks];
+    // 构建搜索参数
+    const searchQueryParams: any = {
+      current: 1, // 搜索时重置到第一页
+      size: pagination.pageSize
+    };
 
     if (searchParams.keyword) {
-      filtered = filtered.filter(
-        task =>
-          task.projectName.includes(searchParams.keyword) ||
-          task.projectType.includes(searchParams.keyword) ||
-          task.responsiblePerson?.nickName?.includes(searchParams.keyword) ||
-          task.remark?.includes(searchParams.keyword)
-      );
+      searchQueryParams.keyword = searchParams.keyword;
     }
 
     if (searchParams.currentStage) {
-      filtered = filtered.filter(task => task.currentStage === searchParams.currentStage);
+      searchQueryParams.currentStage = searchParams.currentStage;
     }
 
     if (searchParams.priority) {
-      filtered = filtered.filter(task => task.priority === searchParams.priority);
+      searchQueryParams.priority = searchParams.priority;
     }
 
     if (searchParams.responsiblePersonId) {
-      filtered = filtered.filter(task => task.responsiblePerson.id === searchParams.responsiblePersonId);
+      searchQueryParams.responsiblePersonId = searchParams.responsiblePersonId;
     }
 
-    if (searchParams.timeRange && searchParams.timeRange.length === 2) {
-      const [start, end] = searchParams.timeRange;
-      filtered = filtered.filter(task => {
-        const startTime = dayjs(task.startTime);
-        return startTime.isAfter(start) && startTime.isBefore(end);
-      });
-    }
+    // 注意：时间范围搜索暂时不支持，因为后端getMyTasks接口还没有实现时间范围查询
+    // if (searchParams.timeRange && searchParams.timeRange.length === 2) {
+    //   const [start, end] = searchParams.timeRange;
+    //   searchQueryParams.startTime = dayjs(start).toISOString();
+    //   searchQueryParams.endTime = dayjs(end).toISOString();
+    // }
 
-    setFilteredTasks(filtered);
+    // 重新获取数据
+    fetchTasks(searchQueryParams);
   };
 
   // 重置搜索
@@ -520,7 +516,8 @@ const ItemList = () => {
       responsiblePersonId: undefined,
       timeRange: null
     });
-    setFilteredTasks(tasks);
+    // 重置搜索后重新获取所有数据
+    fetchTasks();
   };
 
   // 打开新增/编辑弹窗
@@ -721,10 +718,27 @@ const ItemList = () => {
       pageSize
     }));
 
-    fetchTasks({
+    // 构建包含当前搜索条件的参数
+    const queryParams: any = {
       current: page,
       size: pageSize
-    });
+    };
+
+    // 保持当前的搜索条件
+    if (searchParams.keyword) {
+      queryParams.keyword = searchParams.keyword;
+    }
+    if (searchParams.currentStage) {
+      queryParams.currentStage = searchParams.currentStage;
+    }
+    if (searchParams.priority) {
+      queryParams.priority = searchParams.priority;
+    }
+    if (searchParams.responsiblePersonId) {
+      queryParams.responsiblePersonId = searchParams.responsiblePersonId;
+    }
+
+    fetchTasks(queryParams);
   };
 
   // 表格列定义
@@ -886,11 +900,14 @@ const ItemList = () => {
     }
   ];
 
+  // 检查当前用户是否是超级管理员
+  const isSuperAdmin = currentUser?.roles?.includes('super_admin') || currentUser?.roles?.includes('SUPER_ADMIN');
+
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
         className="h-full"
-        title="项目事项列表"
+        title={isSuperAdmin ? "项目事项列表（全部）" : "我的项目事项"}
         variant="borderless"
         extra={
           <Space>
@@ -984,7 +1001,7 @@ const ItemList = () => {
         {/* 数据表格 */}
         <Table
           columns={columns}
-          dataSource={filteredTasks}
+          dataSource={tasks}
           loading={loading}
           rowKey="id"
           rowSelection={rowSelection}
