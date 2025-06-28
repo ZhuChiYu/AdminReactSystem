@@ -144,7 +144,7 @@ cd backend
 npm install
 npx prisma generate
 npx prisma db push
-npm run seed 2>/dev/null || echo "种子数据可能已存在"
+npm run db:seed 2>/dev/null || echo "种子数据可能已存在"
 cd ..
 
 # 停止现有服务

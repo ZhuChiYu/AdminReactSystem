@@ -6,8 +6,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { attachmentService, courseService } from '@/service/api';
 import type { CourseApi } from '@/service/api/types';
+import { getCurrentUserId, getCurrentUserInfo, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
-import { isSuperAdmin } from '@/utils/auth';
 
 const { RangePicker } = DatePicker;
 
@@ -48,6 +48,32 @@ const CourseList = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
   const [currentCourse, setCurrentCourse] = useState<CourseItem | null>(null);
+
+  // 权限状态
+  const [canCreateCourse, setCanCreateCourse] = useState(false);
+  const currentUserId = getCurrentUserId();
+
+  // 获取用户权限
+  const fetchUserPermissions = async () => {
+    // 临时解决方案：直接检查用户角色
+    const userInfo = getCurrentUserInfo();
+    console.log('获取的用户信息:', userInfo);
+
+    if (!userInfo) {
+      console.log('用户信息为空');
+      setCanCreateCourse(false);
+      return;
+    }
+
+    // 检查用户是否有人力BP角色
+    const hasHrBpRole = userInfo.roles.some(role => role === 'hr_bp' || role === '人力bp' || role === '人力BP');
+
+    console.log('用户角色:', userInfo.roles);
+    console.log('是否有人力BP角色:', hasHrBpRole);
+
+    // 临时设置：如果是人力BP角色，则有新增课程权限
+    setCanCreateCourse(hasHrBpRole);
+  };
 
   // 获取课程列表
   const fetchCourseList = async () => {
@@ -132,7 +158,8 @@ const CourseList = () => {
   useEffect(() => {
     fetchCourseList();
     fetchCategories();
-  }, []);
+    fetchUserPermissions(); // 获取用户权限
+  }, [currentUserId]);
 
   // 应用筛选
   const applyFilters = () => {
@@ -414,24 +441,6 @@ const CourseList = () => {
     }
   ];
 
-  // 批量删除
-  const handleBatchDelete = async () => {
-    if (selectedRowKeys.length === 0) {
-      message.warning('请选择要删除的课程');
-      return;
-    }
-
-    try {
-      await courseService.batchDeleteCourses(selectedRowKeys as number[]);
-      message.success('批量删除成功');
-      setSelectedRowKeys([]);
-      fetchCourseList(); // 重新获取数据
-    } catch (error) {
-      console.error('批量删除失败:', error);
-      message.error('批量删除失败');
-    }
-  };
-
   return (
     <div className="p-4">
       <Card title="课程管理">
@@ -476,7 +485,7 @@ const CourseList = () => {
               搜索
             </Button>
             <Button onClick={resetFilters}>重置</Button>
-            {isSuperAdmin() && (
+            {(canCreateCourse || isSuperAdmin()) && (
               <Button
                 icon={<PlusOutlined />}
                 type="primary"
