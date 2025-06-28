@@ -135,6 +135,7 @@ class UserController {
         id: employee.id,
         idCard: employee.idCard,
         nickName: employee.nickName,
+        password: employee.displayPassword || '123456',
         phone: employee.phone,
         position: employee.position,
         roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
@@ -358,6 +359,7 @@ class UserController {
                 ...userData,
                 createdAt: new Date(),
                 password: hashedPassword,
+                displayPassword: defaultPassword,
                 updatedAt: new Date()
               }
             });
@@ -1020,6 +1022,7 @@ class UserController {
       await prisma.user.update({
         data: {
           password: hashedNewPassword,
+          displayPassword: newPassword,
           updatedAt: new Date()
         },
         where: { id: Number(id) }
@@ -1557,6 +1560,7 @@ class UserController {
         id: employee.id,
         idCard: employee.idCard,
         nickName: employee.nickName,
+        password: employee.displayPassword || '123456',
         phone: employee.phone,
         position: employee.position,
         roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],

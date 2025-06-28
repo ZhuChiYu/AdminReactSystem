@@ -95,6 +95,7 @@ class AuthController {
     const userInfo = {
       avatar: user.avatar,
       buttons: permissions,
+      contractStartDate: user.contractStartDate ? user.contractStartDate.toISOString() : null,
       department: user.department?.name || '',
       email: user.email,
       gender: user.gender,
@@ -274,6 +275,7 @@ class AuthController {
     const userInfo = {
       avatar: user.avatar,
       buttons: permissions,
+      contractStartDate: user.contractStartDate ? user.contractStartDate.toISOString() : null,
       department: user.department?.name || '',
       email: user.email,
       gender: user.gender,

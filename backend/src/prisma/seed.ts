@@ -406,6 +406,7 @@ async function main() {
       gender: 1,
       nickName: '超级管理员',
       password: await bcrypt.hash('123456', 10),
+      displayPassword: '123456',
       phone: '13800000001', // 总公司
       position: '超级管理员', // 1-男
       status: 1,
@@ -420,6 +421,7 @@ async function main() {
       gender: 1,
       nickName: '技术部经理',
       password: await bcrypt.hash('123456', 10),
+      displayPassword: '123456',
       phone: '13800000002', // 技术部
       position: '部门经理', // 1-男
       status: 1,
@@ -433,6 +435,7 @@ async function main() {
       gender: 2,
       nickName: '市场部经理',
       password: await bcrypt.hash('123456', 10),
+      displayPassword: '123456',
       phone: '13800000003', // 市场部
       position: '部门经理', // 2-女
       status: 1,
@@ -447,6 +450,7 @@ async function main() {
       gender: 1,
       nickName: '前端开发工程师',
       password: await bcrypt.hash('123456', 10),
+      displayPassword: '123456',
       phone: '13800000004', // 技术部
       position: '前端工程师', // 1-男
       status: 1,
@@ -460,6 +464,7 @@ async function main() {
       gender: 1,
       nickName: '后端开发工程师',
       password: await bcrypt.hash('123456', 10),
+      displayPassword: '123456',
       phone: '13800000005', // 技术部
       position: '后端工程师', // 1-男
       status: 1,
@@ -473,6 +478,7 @@ async function main() {
       gender: 2,
       nickName: '市场专员',
       password: await bcrypt.hash('123456', 10),
+      displayPassword: '123456',
       phone: '13800000006', // 市场部
       position: '市场专员', // 2-女
       status: 1,
@@ -486,6 +492,7 @@ async function main() {
       gender: 2,
       nickName: '销售代表',
       password: await bcrypt.hash('123456', 10),
+      displayPassword: '123456',
       phone: '13800000007', // 销售部
       position: '销售代表', // 2-女
       status: 1,

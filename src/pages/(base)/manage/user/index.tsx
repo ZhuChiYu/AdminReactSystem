@@ -707,7 +707,7 @@ const UserManage = () => {
               idCard: record.idCard,
               index: (response.current - 1) * response.size + index + 1,
               nickName: record.nickName,
-              password: '123456',
+              password: record.password || '123456',
               phone: record.phone,
               roleCode: record.roles?.[0]?.code,
               roles,

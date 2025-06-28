@@ -61,6 +61,7 @@ declare namespace Api {
     interface UserInfo {
       avatar?: string;
       buttons: string[];
+      contractStartDate?: string;
       department?: string;
       email?: string;
       gender?: number;

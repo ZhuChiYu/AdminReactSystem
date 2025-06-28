@@ -63,6 +63,7 @@ export function useInitAuth() {
         const userInfo: Api.Auth.UserInfo = {
           avatar: info.avatar,
           buttons: info.buttons,
+          contractStartDate: info.contractStartDate,
           department: info.department,
           email: info.email,
           gender: info.gender,

@@ -12,6 +12,7 @@ import { localStg } from '@/utils/storage';
 // 扩展用户信息接口以包含更多属性
 interface ExtendedUserInfo extends Api.Auth.UserInfo {
   avatar?: string;
+  contractStartDate?: string;
   department?: string;
   email?: string;
   gender?: number;
@@ -89,6 +90,7 @@ const UserCenter = () => {
         // 扩展属性
         avatar: latestUserInfo.avatar || '',
         buttons: latestUserInfo.buttons || [],
+        contractStartDate: latestUserInfo.contractStartDate,
         department: userDepartment,
         email: latestUserInfo.email || '',
         gender: latestUserInfo.gender || undefined,
@@ -127,6 +129,7 @@ const UserCenter = () => {
         setUserInfo({
           avatar: convertedUserInfo.avatar,
           buttons: convertedUserInfo.buttons,
+          contractStartDate: convertedUserInfo.contractStartDate,
           department: convertedUserInfo.department,
           email: convertedUserInfo.email,
           gender: convertedUserInfo.gender,
@@ -141,6 +144,7 @@ const UserCenter = () => {
       localStg.set('userInfo', {
         avatar: convertedUserInfo.avatar,
         buttons: convertedUserInfo.buttons,
+        contractStartDate: convertedUserInfo.contractStartDate,
         department: convertedUserInfo.department,
         email: convertedUserInfo.email,
         gender: convertedUserInfo.gender,
