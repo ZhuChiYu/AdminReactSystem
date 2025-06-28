@@ -98,6 +98,9 @@ const UserCenter = () => {
         roles: latestUserInfo.roles?.map((role: any) => role.roleCode || role) || [],
         userId: (() => {
           // 尝试多种方式获取用户ID
+          if (latestUserInfo.userId) {
+            return latestUserInfo.userId.toString();
+          }
           if (latestUserInfo.id) {
             return latestUserInfo.id.toString();
           }
@@ -113,9 +116,8 @@ const UserCenter = () => {
             return storedUserInfo.userId;
           }
 
-          // 默认值（通常超级管理员是1）
-          console.warn('无法从API获取用户ID，使用默认值');
-          return '1';
+          // 如果都获取不到，抛出错误
+          throw new Error('无法获取用户ID，用户信息异常');
         })(),
         userName: latestUserInfo.userName || ''
       };
@@ -157,9 +159,13 @@ const UserCenter = () => {
         phone: convertedUserInfo.phone,
         userName: convertedUserInfo.userName
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('加载用户信息失败:', error);
-      message.error('加载用户信息失败');
+      if (error.message === '无法获取用户ID，用户信息异常') {
+        message.error('用户信息异常，请重新登录');
+      } else {
+        message.error('加载用户信息失败');
+      }
     } finally {
       setLoading(false);
     }
@@ -174,15 +180,15 @@ const UserCenter = () => {
     try {
       setSubmitting(true);
 
-      // 获取用户ID - 多种方式尝试
+      // 获取用户ID - 改进的获取逻辑
       let userId: number | undefined;
 
-      // 首先尝试从currentUserData获取
+      // 1. 首先尝试从currentUserData获取
       if (currentUserData.userId) {
         userId = Number.parseInt(String(currentUserData.userId), 10);
       }
 
-      // 如果没有，尝试从localStorage获取
+      // 2. 如果没有，尝试从localStorage获取
       if (!userId || Number.isNaN(userId)) {
         const storedUserInfo = localStg.get('userInfo');
         if (storedUserInfo?.userId) {
@@ -190,10 +196,23 @@ const UserCenter = () => {
         }
       }
 
-      // 如果还是没有，使用默认值（通常超级管理员是1）
+      // 3. 如果还是没有，从后端API重新获取当前用户信息
       if (!userId || Number.isNaN(userId)) {
-        console.warn('无法获取用户ID，使用默认值');
-        userId = 1;
+        console.warn('无法从本地获取用户ID，尝试从后端重新获取用户信息');
+        try {
+          const freshUserInfo = await authService.getUserInfo();
+          if (freshUserInfo.userId || freshUserInfo.id) {
+            userId = Number.parseInt(String(freshUserInfo.userId || freshUserInfo.id), 10);
+            console.log('🔍 从后端重新获取的用户ID:', userId);
+          }
+        } catch (error) {
+          console.error('从后端获取用户信息失败:', error);
+        }
+      }
+
+      // 4. 如果仍然无法获取用户ID，抛出错误而不是使用默认值
+      if (!userId || Number.isNaN(userId)) {
+        throw new Error('无法获取用户ID，请重新登录');
       }
 
       console.log('🔍 保存个人信息使用的用户ID:', userId);
@@ -208,7 +227,11 @@ const UserCenter = () => {
       await loadUserInfo();
     } catch (error: any) {
       console.error('保存个人信息失败:', error);
-      message.error(error.response?.data?.message || '保存失败');
+      if (error.message === '无法获取用户ID，请重新登录') {
+        message.error('用户信息异常，请重新登录');
+      } else {
+        message.error(error.response?.data?.message || '保存失败');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -219,15 +242,15 @@ const UserCenter = () => {
     try {
       setSubmitting(true);
 
-      // 获取用户ID - 多种方式尝试
+      // 获取用户ID - 改进的获取逻辑
       let userId: number | undefined;
 
-      // 首先尝试从currentUserData获取
+      // 1. 首先尝试从currentUserData获取
       if (currentUserData.userId) {
         userId = Number.parseInt(String(currentUserData.userId), 10);
       }
 
-      // 如果没有，尝试从localStorage获取
+      // 2. 如果没有，尝试从localStorage获取
       if (!userId || Number.isNaN(userId)) {
         const storedUserInfo = localStg.get('userInfo');
         if (storedUserInfo?.userId) {
@@ -235,10 +258,23 @@ const UserCenter = () => {
         }
       }
 
-      // 如果还是没有，使用默认值（通常超级管理员是1）
+      // 3. 如果还是没有，从后端API重新获取当前用户信息
       if (!userId || Number.isNaN(userId)) {
-        console.warn('无法获取用户ID，使用默认值');
-        userId = 1;
+        console.warn('无法从本地获取用户ID，尝试从后端重新获取用户信息');
+        try {
+          const freshUserInfo = await authService.getUserInfo();
+          if (freshUserInfo.userId || freshUserInfo.id) {
+            userId = Number.parseInt(String(freshUserInfo.userId || freshUserInfo.id), 10);
+            console.log('🔍 从后端重新获取的用户ID:', userId);
+          }
+        } catch (error) {
+          console.error('从后端获取用户信息失败:', error);
+        }
+      }
+
+      // 4. 如果仍然无法获取用户ID，抛出错误而不是使用默认值
+      if (!userId || Number.isNaN(userId)) {
+        throw new Error('无法获取用户ID，请重新登录');
       }
 
       console.log('🔍 修改密码使用的用户ID:', userId);
@@ -253,7 +289,11 @@ const UserCenter = () => {
       passwordForm.resetFields();
     } catch (error: any) {
       console.error('修改密码失败:', error);
-      message.error(error.response?.data?.message || '修改密码失败');
+      if (error.message === '无法获取用户ID，请重新登录') {
+        message.error('用户信息异常，请重新登录');
+      } else {
+        message.error(error.response?.data?.message || '修改密码失败');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -334,26 +374,39 @@ const UserCenter = () => {
     try {
       setUploading(true);
 
-      // 获取用户ID - 多种方式尝试
+      // 获取用户ID - 改进的获取逻辑
       let userId: number | undefined;
 
-      // 首先尝试从currentUserData获取
+      // 1. 首先尝试从currentUserData获取
       if (currentUserData.userId) {
-        userId = Number.parseInt(currentUserData.userId, 10);
+        userId = Number.parseInt(String(currentUserData.userId), 10);
       }
 
-      // 如果没有，尝试从localStorage获取
-      if (!userId) {
+      // 2. 如果没有，尝试从localStorage获取
+      if (!userId || Number.isNaN(userId)) {
         const storedUserInfo = localStg.get('userInfo');
         if (storedUserInfo?.userId) {
-          userId = Number.parseInt(storedUserInfo.userId, 10);
+          userId = Number.parseInt(String(storedUserInfo.userId), 10);
         }
       }
 
-      // 如果还是没有，使用默认值（通常超级管理员是1）
+      // 3. 如果还是没有，从后端API重新获取当前用户信息
       if (!userId || Number.isNaN(userId)) {
-        console.warn('无法获取用户ID，使用默认值');
-        userId = 1;
+        console.warn('无法从本地获取用户ID，尝试从后端重新获取用户信息');
+        try {
+          const freshUserInfo = await authService.getUserInfo();
+          if (freshUserInfo.userId || freshUserInfo.id) {
+            userId = Number.parseInt(String(freshUserInfo.userId || freshUserInfo.id), 10);
+            console.log('🔍 从后端重新获取的用户ID:', userId);
+          }
+        } catch (error) {
+          console.error('从后端获取用户信息失败:', error);
+        }
+      }
+
+      // 4. 如果仍然无法获取用户ID，抛出错误而不是使用默认值
+      if (!userId || Number.isNaN(userId)) {
+        throw new Error('无法获取用户ID，请重新登录');
       }
 
       console.log('🔍 头像上传使用的用户ID:', userId);
@@ -366,9 +419,13 @@ const UserCenter = () => {
       } else {
         message.error('头像上传失败');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('头像上传失败:', error);
-      message.error('头像上传失败');
+      if (error.message === '无法获取用户ID，请重新登录') {
+        message.error('用户信息异常，请重新登录');
+      } else {
+        message.error('头像上传失败');
+      }
     } finally {
       setUploading(false);
     }
