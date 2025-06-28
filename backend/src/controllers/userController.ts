@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import { prisma } from '@/config/database';
 import { ErrorCode, NotFoundError, ValidationError, createErrorResponse, createSuccessResponse } from '@/utils/errors';
 import { logger } from '@/utils/logger';
+import { redisUtils } from '@/config/redis';
 
 const prismaClient = new PrismaClient();
 
@@ -1023,6 +1024,15 @@ class UserController {
         },
         where: { id: Number(id) }
       });
+
+      // 清除用户缓存，确保下次访问时重新从数据库获取信息
+      try {
+        await redisUtils.del(`user:${id}`);
+        logger.info('用户缓存已清除:', { userId: id });
+      } catch (cacheError) {
+        // 缓存清除失败不应该影响密码修改的成功
+        logger.warn('清除用户缓存失败:', { userId: id, error: cacheError });
+      }
 
       logger.info('用户密码修改成功:', {
         updatedBy: currentUser?.id,
