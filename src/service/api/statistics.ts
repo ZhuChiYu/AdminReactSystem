@@ -16,7 +16,6 @@ export interface PerformanceTrend {
   actualPerformance: number;
   period: string;
   projectIncome: number;
-  targetPerformance: number;
   trainingFeeIncome: number;
 }
 
@@ -226,6 +225,7 @@ class StatisticsService {
 
   /** 获取业绩趋势统计 */
   async getPerformanceTrend(params?: {
+    month?: number;
     period?: 'month' | 'quarter' | 'year';
     year?: number;
   }): Promise<PerformanceTrend[]> {

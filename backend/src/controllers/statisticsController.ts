@@ -226,29 +226,42 @@ class StatisticsController {
 
   /**
    * 获取业绩趋势统计（月度/季度/年度）
+   * 月度：显示当前月每天的业绩
+   * 季度：显示本年的季度业绩
+   * 年度：显示近三年的年度业绩
    */
   async getPerformanceTrend(req: Request, res: Response) {
     try {
-      const { period = 'month', year = new Date().getFullYear() } = req.query;
+      const { period = 'month', year, month } = req.query;
       const currentUserId = (req as any).user?.id;
 
       let periods: any[] = [];
-      const targetYear = parseInt(year as string);
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
 
       // 根据周期类型生成时间段
       if (period === 'month') {
-        // 生成12个月的数据
-        for (let i = 0; i < 12; i++) {
-          const startDate = new Date(targetYear, i, 1);
-          const endDate = new Date(targetYear, i + 1, 0, 23, 59, 59);
+        // 月度业绩：显示指定月份或当前月份的每天业绩
+        const targetYear = year ? parseInt(year as string) : currentYear;
+        const targetMonth = month ? parseInt(month as string) : currentMonth;
+
+        // 获取该月的天数
+        const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const startDate = new Date(targetYear, targetMonth - 1, day, 0, 0, 0);
+          const endDate = new Date(targetYear, targetMonth - 1, day, 23, 59, 59);
           periods.push({
-            label: `${i + 1}月`,
+            label: `${day}日`,
             startDate,
             endDate
           });
         }
       } else if (period === 'quarter') {
-        // 生成4个季度的数据
+        // 季度业绩：显示本年的季度业绩
+        const targetYear = year ? parseInt(year as string) : currentYear;
+
         for (let i = 0; i < 4; i++) {
           const startDate = new Date(targetYear, i * 3, 1);
           const endDate = new Date(targetYear, (i + 1) * 3, 0, 23, 59, 59);
@@ -259,9 +272,9 @@ class StatisticsController {
           });
         }
       } else if (period === 'year') {
-        // 生成最近5年的数据
-        for (let i = 4; i >= 0; i--) {
-          const year = targetYear - i;
+        // 年度业绩：显示近三年的年度业绩
+        for (let i = 2; i >= 0; i--) {
+          const year = currentYear - i;
           const startDate = new Date(year, 0, 1);
           const endDate = new Date(year, 11, 31, 23, 59, 59);
           periods.push({
@@ -275,10 +288,10 @@ class StatisticsController {
       // 计算每个时间段的业绩数据
       const trendData = await Promise.all(
         periods.map(async (period) => {
-          // 获取该时间段内的培训费收入
+          // 获取该时间段内的培训费收入（按班级学员加入日期）
           const trainingFeeIncome = await prisma.classStudent.aggregate({
             where: {
-              createdAt: {
+              joinDate: {
                 gte: period.startDate,
                 lte: period.endDate
               }
@@ -288,7 +301,7 @@ class StatisticsController {
             }
           });
 
-          // 获取该时间段内的项目收入
+          // 获取该时间段内的项目收入（按项目完成时间）
           const projectIncome = await prisma.task.aggregate({
             where: {
               completionTime: {
@@ -311,7 +324,6 @@ class StatisticsController {
 
           return {
             period: period.label,
-            targetPerformance: 300000, // 目标业绩，可以后续配置化
             actualPerformance: totalActual,
             trainingFeeIncome: trainingTotal,
             projectIncome: projectTotal

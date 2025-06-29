@@ -97,13 +97,18 @@ const PerformanceChart = () => {
   // 获取业绩趋势数据
   const fetchPerformanceTrendData = async () => {
     try {
-      const currentYear = new Date().getFullYear();
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
 
       // 并行获取月度、季度、年度数据
       const [monthData, quarterData, yearData] = await Promise.all([
-        statisticsService.getPerformanceTrend({ period: 'month', year: currentYear }),
+        // 月度：显示当前月每天的业绩
+        statisticsService.getPerformanceTrend({ month: currentMonth, period: 'month', year: currentYear }),
+        // 季度：显示本年的季度业绩
         statisticsService.getPerformanceTrend({ period: 'quarter', year: currentYear }),
-        statisticsService.getPerformanceTrend({ period: 'year', year: currentYear })
+        // 年度：显示近三年的年度业绩
+        statisticsService.getPerformanceTrend({ period: 'year' })
       ]);
 
       setPerformanceTrendData({
@@ -214,143 +219,161 @@ const PerformanceChart = () => {
     };
   });
 
-  // 业绩趋势图 - 月度
+  // 业绩趋势图 - 月度（当前月每天的业绩）
   const { domRef: monthPerformanceRef, updateOptions: updateMonthChart } = useEcharts(() => {
     const monthData = performanceTrendData.month;
     return {
-    grid: {
-      bottom: '3%',
-      containLabel: true,
-      left: '3%',
-      right: '4%'
-    },
-    legend: {
-      data: ['目标业绩', '实际业绩']
-    },
-    series: [
-      {
-          data: monthData.map(item => item.targetPerformance),
-        emphasis: {
-          focus: 'series'
-        },
-        name: '目标业绩',
-        type: 'bar'
+      grid: {
+        bottom: '3%',
+        containLabel: true,
+        left: '3%',
+        right: '4%'
       },
-      {
+      legend: {
+        data: ['培训费收入', '项目收入', '总业绩']
+      },
+      series: [
+        {
+          data: monthData.map(item => item.trainingFeeIncome),
+          emphasis: {
+            focus: 'series'
+          },
+          name: '培训费收入',
+          stack: 'total',
+          type: 'bar'
+        },
+        {
+          data: monthData.map(item => item.projectIncome),
+          emphasis: {
+            focus: 'series'
+          },
+          name: '项目收入',
+          stack: 'total',
+          type: 'bar'
+        },
+        {
           data: monthData.map(item => item.actualPerformance),
-        emphasis: {
-          focus: 'series'
+          emphasis: {
+            focus: 'series'
+          },
+          name: '总业绩',
+          type: 'line'
+        }
+      ],
+      tooltip: {
+        axisPointer: {
+          type: 'cross'
         },
-        name: '实际业绩',
-        type: 'bar'
-      }
-    ],
-    tooltip: {
-      axisPointer: {
-        type: 'shadow'
-      },
         formatter: (params: any) => {
           if (Array.isArray(params)) {
             const period = params[0]?.name;
             const dataItem = monthData.find(item => item.period === period);
             if (dataItem) {
               return `${period}<br/>
-                      目标业绩: ¥${params[0]?.value?.toLocaleString()}<br/>
-                      实际业绩: ¥${params[1]?.value?.toLocaleString()}<br/>
                       培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
-                      项目收入: ¥${dataItem.projectIncome.toLocaleString()}`;
+                      项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
+                      总业绩: ¥${dataItem.actualPerformance.toLocaleString()}`;
             }
           }
           return '';
         },
-      trigger: 'axis'
-    },
-    xAxis: [
-      {
+        trigger: 'axis'
+      },
+      xAxis: [
+        {
           data: monthData.map(item => item.period),
-        type: 'category'
-      }
-    ],
-    yAxis: [
-      {
-        axisLabel: {
-          formatter: '¥{value}'
-        },
-        type: 'value'
-      }
-    ]
+          type: 'category'
+        }
+      ],
+      yAxis: [
+        {
+          axisLabel: {
+            formatter: '¥{value}'
+          },
+          type: 'value'
+        }
+      ]
     };
   });
 
-  // 业绩趋势图 - 季度
+  // 业绩趋势图 - 季度（本年度各季度业绩）
   const { domRef: quarterPerformanceRef, updateOptions: updateQuarterChart } = useEcharts(() => {
     const quarterData = performanceTrendData.quarter;
     return {
-    grid: {
-      bottom: '3%',
-      containLabel: true,
-      left: '3%',
-      right: '4%'
-    },
-    legend: {
-      data: ['目标业绩', '实际业绩']
-    },
-    series: [
-      {
-          data: quarterData.map(item => item.targetPerformance),
-        emphasis: {
-          focus: 'series'
-        },
-        name: '目标业绩',
-        type: 'bar'
+      grid: {
+        bottom: '3%',
+        containLabel: true,
+        left: '3%',
+        right: '4%'
       },
-      {
+      legend: {
+        data: ['培训费收入', '项目收入', '总业绩']
+      },
+      series: [
+        {
+          data: quarterData.map(item => item.trainingFeeIncome),
+          emphasis: {
+            focus: 'series'
+          },
+          name: '培训费收入',
+          stack: 'total',
+          type: 'bar'
+        },
+        {
+          data: quarterData.map(item => item.projectIncome),
+          emphasis: {
+            focus: 'series'
+          },
+          name: '项目收入',
+          stack: 'total',
+          type: 'bar'
+        },
+        {
           data: quarterData.map(item => item.actualPerformance),
-        emphasis: {
-          focus: 'series'
+          emphasis: {
+            focus: 'series'
+          },
+          name: '总业绩',
+          type: 'line'
+        }
+      ],
+      tooltip: {
+        axisPointer: {
+          type: 'cross'
         },
-        name: '实际业绩',
-        type: 'bar'
-      }
-    ],
-    tooltip: {
-      axisPointer: {
-        type: 'shadow'
-      },
         formatter: (params: any) => {
           if (Array.isArray(params)) {
             const period = params[0]?.name;
             const dataItem = quarterData.find(item => item.period === period);
             if (dataItem) {
               return `${period}<br/>
-                      目标业绩: ¥${params[0]?.value?.toLocaleString()}<br/>
-                      实际业绩: ¥${params[1]?.value?.toLocaleString()}<br/>
                       培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
-                      项目收入: ¥${dataItem.projectIncome.toLocaleString()}`;
+                      项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
+                      总业绩: ¥${dataItem.actualPerformance.toLocaleString()}`;
             }
           }
           return '';
         },
-      trigger: 'axis'
-    },
-    xAxis: [
-      {
+        trigger: 'axis'
+      },
+      xAxis: [
+        {
           data: quarterData.map(item => item.period),
-        type: 'category'
-      }
-    ],
-    yAxis: [
-      {
-        axisLabel: {
-          formatter: '¥{value}'
-        },
-        type: 'value'
-      }
-    ]
+          type: 'category'
+        }
+      ],
+      yAxis: [
+        {
+          axisLabel: {
+            formatter: '¥{value}'
+          },
+          type: 'value'
+        }
+      ]
     };
   });
 
-  // 业绩趋势图 - 年度
+  // 业绩趋势图 - 年度（近三年的年度业绩）
   const { domRef: yearPerformanceRef, updateOptions: updateYearChart } = useEcharts(() => {
     const yearData = performanceTrendData.year;
     // 计算增长率
@@ -358,50 +381,60 @@ const PerformanceChart = () => {
       if (index === 0) return 0;
       const prevActual = yearData[index - 1].actualPerformance;
       const currentActual = item.actualPerformance;
-      return prevActual > 0 ? ((currentActual - prevActual) / prevActual * 100) : 0;
+      return prevActual > 0 ? ((currentActual - prevActual) / prevActual) * 100 : 0;
     });
 
     return {
-    grid: {
-      bottom: '3%',
-      containLabel: true,
-      left: '3%',
-      right: '4%'
-    },
-    legend: {
-      data: ['目标业绩', '实际业绩', '增长率']
-    },
-    series: [
-      {
-          data: yearData.map(item => item.targetPerformance),
-        emphasis: {
-          focus: 'series'
-        },
-        name: '目标业绩',
-        type: 'bar'
+      grid: {
+        bottom: '3%',
+        containLabel: true,
+        left: '3%',
+        right: '4%'
       },
-      {
+      legend: {
+        data: ['培训费收入', '项目收入', '总业绩', '增长率']
+      },
+      series: [
+        {
+          data: yearData.map(item => item.trainingFeeIncome),
+          emphasis: {
+            focus: 'series'
+          },
+          name: '培训费收入',
+          stack: 'total',
+          type: 'bar'
+        },
+        {
+          data: yearData.map(item => item.projectIncome),
+          emphasis: {
+            focus: 'series'
+          },
+          name: '项目收入',
+          stack: 'total',
+          type: 'bar'
+        },
+        {
           data: yearData.map(item => item.actualPerformance),
-        emphasis: {
-          focus: 'series'
+          emphasis: {
+            focus: 'series'
+          },
+          name: '总业绩',
+          type: 'line'
         },
-        name: '实际业绩',
-        type: 'bar'
-      },
-      {
+        {
           data: growthRates,
-        emphasis: {
-          focus: 'series'
+          emphasis: {
+            focus: 'series'
+          },
+          name: '增长率',
+          type: 'line',
+          yAxisIndex: 1
+        }
+      ],
+      tooltip: {
+        axisPointer: {
+          type: 'cross'
         },
-        name: '增长率',
-        type: 'line',
-        yAxisIndex: 1
-      }
-    ],
-    tooltip: {
-      axisPointer: {
-        type: 'line'
-      },
         formatter: (params: any) => {
           if (Array.isArray(params)) {
             const period = params[0]?.name;
@@ -409,40 +442,39 @@ const PerformanceChart = () => {
             const growthRate = growthRates[yearData.findIndex(item => item.period === period)];
             if (dataItem) {
               return `${period}<br/>
-                      目标业绩: ¥${params[0]?.value?.toLocaleString()}<br/>
-                      实际业绩: ¥${params[1]?.value?.toLocaleString()}<br/>
                       培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
                       项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
+                      总业绩: ¥${dataItem.actualPerformance.toLocaleString()}<br/>
                       增长率: ${growthRate.toFixed(1)}%`;
             }
           }
           return '';
         },
-      trigger: 'axis'
-    },
-    xAxis: [
-      {
-          data: yearData.map(item => item.period),
-        type: 'category'
-      }
-    ],
-    yAxis: [
-      {
-        axisLabel: {
-          formatter: '¥{value}'
-        },
-        name: '业绩',
-        type: 'value'
+        trigger: 'axis'
       },
-      {
-        axisLabel: {
-          formatter: '{value}%'
+      xAxis: [
+        {
+          data: yearData.map(item => item.period),
+          type: 'category'
+        }
+      ],
+      yAxis: [
+        {
+          axisLabel: {
+            formatter: '¥{value}'
+          },
+          name: '业绩',
+          type: 'value'
         },
-        name: '增长率',
-        position: 'right',
-        type: 'value'
-      }
-    ]
+        {
+          axisLabel: {
+            formatter: '{value}%'
+          },
+          name: '增长率',
+          position: 'right',
+          type: 'value'
+        }
+      ]
     };
   });
 
@@ -518,17 +550,17 @@ const PerformanceChart = () => {
         break;
       case 'month':
         if (performanceTrendData.month.length > 0) {
-        updateMonthChart();
+          updateMonthChart();
         }
         break;
       case 'quarter':
         if (performanceTrendData.quarter.length > 0) {
-        updateQuarterChart();
+          updateQuarterChart();
         }
         break;
       case 'year':
         if (performanceTrendData.year.length > 0) {
-        updateYearChart();
+          updateYearChart();
         }
         break;
       default:
