@@ -82,12 +82,32 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
   try {
     const { taskId, description, stage } = req.body;
 
+    console.log('📤 项目事项附件上传请求:', {
+      taskId,
+      description,
+      stage,
+      user: req.user,
+      file: req.file ? {
+        originalname: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      } : null
+    });
+
     if (!req.file) {
+      console.error('❌ 附件上传失败: 未选择文件');
       return res.status(400).json(createErrorResponse(400, '请选择要上传的文件', null, req.path));
     }
 
     if (!taskId) {
+      console.error('❌ 附件上传失败: 项目事项ID为空');
       return res.status(400).json(createErrorResponse(400, '项目事项ID不能为空', null, req.path));
+    }
+
+    // 验证用户认证信息
+    if (!req.user || !req.user.id) {
+      console.error('❌ 附件上传失败: 用户认证信息缺失', req.user);
+      return res.status(401).json(createErrorResponse(401, '用户认证信息缺失', null, req.path));
     }
 
     // 检查项目事项是否存在
@@ -96,11 +116,17 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
     });
 
     if (!task) {
+      console.error('❌ 附件上传失败: 项目事项不存在', { taskId });
       return res.status(404).json(createErrorResponse(404, '项目事项不存在', null, req.path));
     }
 
     // 获取当前用户ID
-    const uploaderId = (req as any).user?.id || 1;
+    const uploaderId = req.user.id;
+    console.log('📋 上传用户信息:', {
+      uploaderId,
+      userName: req.user.userName,
+      nickName: req.user.nickName
+    });
 
     // 创建附件记录
     const attachment = await prisma.taskAttachment.create({
@@ -145,12 +171,20 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       uploadTime: attachment.uploadTime.toISOString()
     };
 
+    console.log('✅ 项目事项附件上传成功:', {
+      fileName: req.file.originalname,
+      taskId,
+      attachmentId: attachment.id,
+      uploader: result.uploader
+    });
+
     logger.info(`项目事项附件上传成功: ${req.file.originalname}, 项目事项ID: ${taskId}`);
 
     res.json(createSuccessResponse(result, '文件上传成功', req.path));
   } catch (error) {
+    console.error('❌ 上传项目事项附件失败:', error);
     logger.error('上传项目事项附件失败:', error);
-    res.status(500).json(createErrorResponse(500, '上传项目事项附件失败', null, req.path));
+    res.status(500).json(createErrorResponse(500, '上传项目事项附件失败', error, req.path));
   }
 });
 
@@ -381,4 +415,4 @@ router.get('/task/:taskId/stats', authMiddleware, async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

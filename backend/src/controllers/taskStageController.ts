@@ -59,6 +59,13 @@ export const uploadProposal = async (req: Request, res: Response) => {
     const { taskId, comment } = req.body;
     const { id: userId } = req.user as any;
 
+    console.log('📤 方案上传请求:', {
+      taskId,
+      comment,
+      user: req.user,
+      userId
+    });
+
     const task = await prisma.task.findUnique({
       where: { id: Number(taskId) },
       include: {
@@ -70,6 +77,7 @@ export const uploadProposal = async (req: Request, res: Response) => {
     });
 
     if (!task) {
+      console.error('❌ 方案上传失败: 项目事项不存在', { taskId });
       return res.status(404).json({
         code: 404,
         message: '项目事项不存在',
@@ -78,6 +86,10 @@ export const uploadProposal = async (req: Request, res: Response) => {
     }
 
     if (task.currentStage !== 'proposal_submission') {
+      console.error('❌ 方案上传失败: 当前阶段不允许上传方案', {
+        taskId,
+        currentStage: task.currentStage
+      });
       return res.status(400).json({
         code: 400,
         message: '当前阶段不允许上传方案',
@@ -87,15 +99,26 @@ export const uploadProposal = async (req: Request, res: Response) => {
 
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
-    const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-    console.log('📝 保存操作历史 - 用户信息:', req.user);
-    console.log('📝 操作人姓名:', operatorName);
-    
+
+    // 获取操作人姓名 - 优先使用nickName，其次userName
+    const operatorName = req.user?.nickName || req.user?.userName;
+
+    console.log('📝 保存操作历史 - 用户信息:', {
+      user: req.user,
+      operatorName,
+      userId
+    });
+
+    if (!operatorName) {
+      console.error('❌ 警告: 无法获取操作人姓名', { user: req.user });
+    }
+
+    // 方案申报阶段的操作记录
     stageHistory.push({
       stage: 'proposal_submission',
       timestamp: new Date().toISOString(),
       operator: userId,
-      operatorName,
+      operatorName: operatorName || '未知用户',
       action: '上传方案',
       comment
     });
@@ -117,15 +140,21 @@ export const uploadProposal = async (req: Request, res: Response) => {
     });
 
     // 发送通知给负责人
-    if (task.responsiblePerson) {
+    if (updatedTask.responsiblePerson) {
       await createProjectNotification(
         Number(taskId),
-        task.responsiblePerson.id,
+        updatedTask.responsiblePerson.id,
         '项目方案已上传',
-        `项目"${task.projectName}"的方案已上传，请查看并跟进客户确认。`,
+        `项目"${updatedTask.projectName}"的方案已上传，请查看并跟进客户确认。`,
         'info'
       );
     }
+
+    console.log('✅ 方案上传成功:', {
+      taskId,
+      operatorName,
+      historyCount: stageHistory.length
+    });
 
     res.json({
       code: 0,
@@ -133,7 +162,7 @@ export const uploadProposal = async (req: Request, res: Response) => {
       data: updatedTask
     });
   } catch (error) {
-    console.error('上传方案失败:', error);
+    console.error('❌ 上传方案失败:', error);
     res.status(500).json({
       code: 500,
       message: '上传方案失败',
@@ -181,7 +210,7 @@ export const confirmProposal = async (req: Request, res: Response) => {
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
     console.log('📝 保存操作历史 - 用户信息:', req.user);
     console.log('📝 操作人姓名:', operatorName);
-    
+
     stageHistory.push({
       stage: 'proposal_submission',
       timestamp: new Date().toISOString(),
@@ -284,7 +313,7 @@ export const confirmTeacher = async (req: Request, res: Response) => {
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
     console.log('📝 保存操作历史 - 用户信息:', req.user);
     console.log('📝 操作人姓名:', operatorName);
-    
+
     stageHistory.push({
       stage: 'teacher_confirmation',
       timestamp: new Date().toISOString(),
@@ -379,7 +408,7 @@ export const approveProject = async (req: Request, res: Response) => {
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
     console.log('📝 保存操作历史 - 用户信息:', req.user);
     console.log('📝 操作人姓名:', operatorName);
-    
+
     stageHistory.push({
       stage: 'project_approval',
       timestamp: new Date().toISOString(),
@@ -400,6 +429,22 @@ export const approveProject = async (req: Request, res: Response) => {
       updateData.currentStage = 'contract_signing';
       // 自动更新办理人为咨询部人员
       updateData.executorId = getCurrentExecutorId('contract_signing', task);
+    } else {
+      // 审批拒绝，打回到师资确定阶段
+      updateData.currentStage = 'teacher_confirmation';
+      updateData.executorId = getCurrentExecutorId('teacher_confirmation', task);
+
+      // 添加打回记录到历史中
+      stageHistory.push({
+        stage: 'teacher_confirmation',
+        timestamp: new Date().toISOString(),
+        operator: userId,
+        operatorName,
+        action: '打回重新确认师资',
+        comment: '由于审批拒绝，项目已打回到师资确定阶段，请重新确认师资信息。'
+      });
+
+      updateData.stageHistory = JSON.stringify(stageHistory);
     }
 
     const updatedTask = await prisma.task.update({
@@ -422,11 +467,20 @@ export const approveProject = async (req: Request, res: Response) => {
         `项目"${task.projectName}"已通过审批，请跟进客户签订合同。`,
         'info'
       );
+    } else if (!approved && task.consultant) {
+      // 审批拒绝，发送通知给咨询部人员重新确认师资
+      await createProjectNotification(
+        Number(taskId),
+        task.consultant.id,
+        '项目已打回，需要重新确认师资',
+        `项目"${task.projectName}"审批被拒绝，已打回到师资确定阶段，请重新确认师资信息。审批意见：${comment || '无'}`,
+        'warning'
+      );
     }
 
     res.json({
       code: 0,
-      message: approved ? '项目审批通过，已推进到合同签订阶段' : '项目审批被拒绝',
+      message: approved ? '项目审批通过，已推进到合同签订阶段' : '项目审批被拒绝，已打回到师资确定阶段',
       data: updatedTask
     });
   } catch (error) {
@@ -478,7 +532,7 @@ export const confirmContract = async (req: Request, res: Response) => {
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
     console.log('📝 保存操作历史 - 用户信息:', req.user);
     console.log('📝 操作人姓名:', operatorName);
-    
+
     stageHistory.push({
       stage: 'contract_signing',
       timestamp: new Date().toISOString(),
@@ -577,7 +631,7 @@ export const confirmProjectCompletion = async (req: Request, res: Response) => {
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
     console.log('📝 保存操作历史 - 用户信息:', req.user);
     console.log('📝 操作人姓名:', operatorName);
-    
+
     stageHistory.push({
       stage: 'project_execution',
       timestamp: new Date().toISOString(),
@@ -676,7 +730,7 @@ export const confirmPayment = async (req: Request, res: Response) => {
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
     console.log('📝 保存操作历史 - 用户信息:', req.user);
     console.log('📝 操作人姓名:', operatorName);
-    
+
     stageHistory.push({
       stage: 'project_settlement',
       timestamp: new Date().toISOString(),
@@ -724,8 +778,8 @@ export const confirmPayment = async (req: Request, res: Response) => {
       ].filter(person => person && person.id !== userId); // 过滤掉空值和当前操作人
 
       // 去重处理，避免同一人收到多条通知
-      const uniqueTargets = notificationTargets.filter((person, index, arr) => 
-        arr.findIndex(p => p.id === person.id) === index
+      const uniqueTargets = notificationTargets.filter((person, index, arr) =>
+        person && arr.findIndex(p => p && p.id === person.id) === index
       );
 
       for (const person of uniqueTargets) {
@@ -839,4 +893,4 @@ export const getProjectStatistics = async (req: Request, res: Response) => {
       data: null
     });
   }
-}; 
+};
