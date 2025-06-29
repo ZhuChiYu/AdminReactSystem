@@ -1,14 +1,14 @@
-import { Button, Card, Col, DatePicker, Popconfirm, Progress, Row, Space, Spin, Statistic, Table, Tabs, message } from 'antd';
-import type { TabsProps } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Col, DatePicker, Popconfirm, Row, Space, Spin, Statistic, Table, Tabs, message } from 'antd';
+import type { TabsProps } from 'antd';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useEcharts } from '@/hooks/common/echarts';
-import { expenseService, financialService, statisticsService } from '@/service/api';
+import { financialService, statisticsService } from '@/service/api';
+import type { FinancialRecord } from '@/service/api/financial';
 import type { EmployeePerformance } from '@/service/api/statistics';
-import type { ExtractedPageData, FinancialRecord } from '@/service/api/financial';
 import { isSuperAdmin } from '@/utils/auth';
 
 import FinancialRecordModal from './components/FinancialRecordModal';
@@ -74,7 +74,6 @@ const FinanceDashboard = () => {
   const [realMonthlyExpenseData, setRealMonthlyExpenseData] = useState<any[]>([]);
   const [expenseRecords, setExpenseRecords] = useState<FinancialRecord[]>([]);
   const [incomeRecords, setIncomeRecords] = useState<FinancialRecord[]>([]);
-  const [dataLoading, setDataLoading] = useState(false);
 
   // 弹窗状态
   const [modalVisible, setModalVisible] = useState(false);
@@ -99,7 +98,9 @@ const FinanceDashboard = () => {
     setEmployeeDataLoading(true);
     try {
       const data = await statisticsService.getEmployeePerformance({
-        timeRange: 'year' // 默认获取年度业绩
+        month: selectedMonth,
+        timeRange: 'month',
+        year: selectedYear
       });
       setEmployeeData(data);
     } catch (error) {
@@ -111,26 +112,32 @@ const FinanceDashboard = () => {
 
   // 获取真实财务数据
   const fetchRealFinancialData = async () => {
-    setDataLoading(true);
+    setChartLoading(true);
     try {
       console.log('🔄 开始获取财务数据，年份:', selectedYear, '月份:', selectedMonth);
 
-      const [monthlyTrendResponse, expenseDistributionResponse, incomeDistributionResponse, expenseRecordsResponse, incomeRecordsResponse] = await Promise.all([
+      const [
+        monthlyTrendResponse,
+        expenseDistributionResponse,
+        incomeDistributionResponse,
+        expenseRecordsResponse,
+        incomeRecordsResponse
+      ] = await Promise.all([
         financialService.getMonthlyTrend({ year: selectedYear }),
-        financialService.getExpenseTypeDistribution({ year: selectedYear, month: selectedMonth }),
+        financialService.getExpenseTypeDistribution({ month: selectedMonth, year: selectedYear }),
         // 获取收入分布数据
-        financialService.getIncomeTypeDistribution({ year: selectedYear, month: selectedMonth }),
+        financialService.getIncomeTypeDistribution({ month: selectedMonth, year: selectedYear }),
         // 获取支出记录
         financialService.getFinancialRecords({
-          type: 2,
           current: expensePagination.current,
-          size: expensePagination.pageSize
+          size: expensePagination.pageSize,
+          type: 2
         }),
         // 获取收入记录
         financialService.getFinancialRecords({
-          type: 1,
           current: incomePagination.current,
-          size: incomePagination.pageSize
+          size: incomePagination.pageSize,
+          type: 1
         })
       ]);
 
@@ -155,13 +162,13 @@ const FinanceDashboard = () => {
       // 处理支出类型分布数据
       if (expenseDistributionResponse && Array.isArray(expenseDistributionResponse)) {
         const formattedExpenseData = expenseDistributionResponse.map(item => ({
-          name: item.category,
-          value: item.amount,
           amount: item.amount,
-          type: item.category,
           itemStyle: {
             color: item.color
-          }
+          },
+          name: item.category,
+          type: item.category,
+          value: item.amount
         }));
         console.log('✅ 格式化后的支出分布数据:', formattedExpenseData);
         setRealExpenseTypeData(formattedExpenseData);
@@ -173,13 +180,13 @@ const FinanceDashboard = () => {
       // 处理收入类型分布数据
       if (incomeDistributionResponse && Array.isArray(incomeDistributionResponse)) {
         const formattedIncomeData = incomeDistributionResponse.map(item => ({
-          name: item.category,
-          value: item.amount,
           amount: item.amount,
-          type: item.category,
-        itemStyle: {
+          itemStyle: {
             color: item.color
-          }
+          },
+          name: item.category,
+          type: item.category,
+          value: item.amount
         }));
         console.log('✅ 格式化后的收入分布数据:', formattedIncomeData);
         setRealIncomeTypeData(formattedIncomeData);
@@ -226,7 +233,7 @@ const FinanceDashboard = () => {
       setExpenseRecords([]);
       setIncomeRecords([]);
     } finally {
-      setDataLoading(false);
+      setChartLoading(false);
     }
   };
 
@@ -287,10 +294,10 @@ const FinanceDashboard = () => {
   };
 
   // 使用真实月度支出数据
-  const monthlyExpenseData = realMonthlyExpenseData;
+  const _monthlyExpenseData = realMonthlyExpenseData;
 
   // 使用真实数据（仅当月数据）
-  const chartData = realChartData;
+  const _chartData = realChartData;
   const expenseTypeData = realExpenseTypeData;
   const incomeTypeData = realIncomeTypeData;
 
@@ -312,39 +319,39 @@ const FinanceDashboard = () => {
   const { domRef: expenseTypePieRef, updateOptions: updateExpenseTypePie } = useEcharts(() => {
     console.log('🍰 支出饼图配置更新，当前数据:', expenseTypeData);
     return {
-    legend: {
+      legend: {
         data: expenseTypeData.map(item => item.name),
-      orient: 'vertical',
-      right: 10,
-      top: 'center'
-    },
-    series: [
-      {
-        avoidLabelOverlap: false,
-        data: expenseTypeData,
-        emphasis: {
+        orient: 'vertical',
+        right: 10,
+        top: 'center'
+      },
+      series: [
+        {
+          avoidLabelOverlap: false,
+          data: expenseTypeData,
+          emphasis: {
+            label: {
+              fontSize: '14',
+              fontWeight: 'bold',
+              show: true
+            }
+          },
           label: {
-            fontSize: '14',
-            fontWeight: 'bold',
-            show: true
-          }
-        },
-        label: {
-          position: 'center',
-          show: false
-        },
-        labelLine: {
-          show: false
-        },
-        name: '支出类型',
-        radius: ['50%', '70%'],
-        type: 'pie'
-      }
-    ],
-    tooltip: {
+            position: 'center',
+            show: false
+          },
+          labelLine: {
+            show: false
+          },
+          name: '支出类型',
+          radius: ['50%', '70%'],
+          type: 'pie'
+        }
+      ],
+      tooltip: {
         formatter: '{a} <br/>{b}: ¥{c} ({d}%)',
-      trigger: 'item'
-    }
+        trigger: 'item'
+      }
     };
   });
 
@@ -392,69 +399,69 @@ const FinanceDashboard = () => {
   const { domRef: monthlyExpenseTrendRef, updateOptions: updateMonthlyTrend } = useEcharts(() => {
     console.log('📈 月度支出趋势图表配置更新，当前数据:', realChartData);
     return {
-    grid: {
-      bottom: '10%',
-      containLabel: true,
-      left: '3%',
-      right: '4%',
-      top: '15%'
-    },
-    legend: {
-      bottom: '0%',
-      data: expenseTypes.map(type => type.label)
-    },
-    series: expenseTypes.map(type => ({
-      areaStyle: {
-        opacity: 0.6
+      grid: {
+        bottom: '10%',
+        containLabel: true,
+        left: '3%',
+        right: '4%',
+        top: '15%'
       },
+      legend: {
+        bottom: '0%',
+        data: expenseTypes.map(type => type.label)
+      },
+      series: expenseTypes.map(type => ({
+        areaStyle: {
+          opacity: 0.6
+        },
         data: realChartData.map(item => item[type.value] || 0),
-      emphasis: {
-        focus: 'series'
+        emphasis: {
+          focus: 'series'
+        },
+        itemStyle: {
+          color: type.color
+        },
+        name: type.label,
+        stack: '总量',
+        type: 'line'
+      })),
+      title: {
+        left: 'center',
+        text: `${selectedYear}年月度支出趋势`
       },
-      itemStyle: {
-        color: type.color
-      },
-      name: type.label,
-      stack: '总量',
-      type: 'line'
-    })),
-    title: {
-      left: 'center',
-      text: `${selectedYear}年月度支出趋势`
-    },
-    tooltip: {
+      tooltip: {
         formatter: (params: any) => {
-        let result = `${params[0].name}<br/>`;
-        let sum = 0;
+          let result = `${params[0].name}<br/>`;
+          let sum = 0;
 
-        // 先计算总和
+          // 先计算总和
           params.forEach((param: any) => {
-          sum += param.value;
-        });
+            sum += param.value;
+          });
 
-        // 然后添加每个类型的值和百分比
+          // 然后添加每个类型的值和百分比
           params.forEach((param: any) => {
             const percentage = sum > 0 ? ((param.value / sum) * 100).toFixed(1) : '0.0';
-          result += `${param.marker} ${param.seriesName}: ¥${param.value.toLocaleString()} (${percentage}%)<br/>`;
-        });
+            result += `${param.marker} ${param.seriesName}: ¥${param.value.toLocaleString()} (${percentage}%)<br/>`;
+          });
 
-        // 添加总额
-        result += `<br/><strong>总计: ¥${sum.toLocaleString()}</strong>`;
-        return result;
+          // 添加总额
+          result += `<br/><strong>总计: ¥${sum.toLocaleString()}</strong>`;
+          return result;
+        },
+        trigger: 'axis'
       },
-      trigger: 'axis'
-    },
-    xAxis: {
-      boundaryGap: false,
+      xAxis: {
+        boundaryGap: false,
         data: realChartData.map(item => item.month),
-      type: 'category'
-    },
-    yAxis: {
-      axisLabel: {
-          formatter: (value: number) => `¥${value.toLocaleString()}`
+        type: 'category'
       },
-      type: 'value'
-    }
+      yAxis: {
+        axisLabel: {
+          formatter: (value: number) => `¥${value.toLocaleString()}`
+        },
+        type: 'value'
+      }
     };
   });
 
@@ -502,18 +509,18 @@ const FinanceDashboard = () => {
           expenseType = expenseTypes.find(type => type.label === category);
         }
         return (
-        <div style={{ alignItems: 'center', display: 'flex' }}>
-          <div
-            style={{
+          <div style={{ alignItems: 'center', display: 'flex' }}>
+            <div
+              style={{
                 backgroundColor: expenseType?.color || '#ee6666',
-              borderRadius: '50%',
-              height: 10,
-              marginRight: 8,
-              width: 10
-            }}
-          />
+                borderRadius: '50%',
+                height: 10,
+                marginRight: 8,
+                width: 10
+              }}
+            />
             {expenseType?.label || category}
-        </div>
+          </div>
         );
       },
       title: '支出类型'
@@ -540,27 +547,27 @@ const FinanceDashboard = () => {
     },
     {
       key: 'action',
-      render: (text: string, record: FinancialRecord) => (
+      render: (_: string, record: FinancialRecord) => (
         <Space size="small">
           <Button
-            type="link"
-              size="small"
             icon={<EditOutlined />}
+            size="small"
+            type="link"
             onClick={() => handleEditRecord(record)}
           >
             编辑
           </Button>
           <Popconfirm
+            cancelText="取消"
+            okText="确定"
             title="确定要删除这条记录吗？"
             onConfirm={() => handleDeleteRecord(record.id)}
-            okText="确定"
-            cancelText="取消"
           >
             <Button
-              type="link"
-              size="small"
               danger
               icon={<DeleteOutlined />}
+              size="small"
+              type="link"
             >
               删除
             </Button>
@@ -622,27 +629,27 @@ const FinanceDashboard = () => {
     },
     {
       key: 'action',
-      render: (text: string, record: FinancialRecord) => (
+      render: (_: string, record: FinancialRecord) => (
         <Space size="small">
           <Button
-            type="link"
-            size="small"
             icon={<EditOutlined />}
+            size="small"
+            type="link"
             onClick={() => handleEditRecord(record)}
           >
             编辑
           </Button>
           <Popconfirm
+            cancelText="取消"
+            okText="确定"
             title="确定要删除这条记录吗？"
             onConfirm={() => handleDeleteRecord(record.id)}
-            okText="确定"
-            cancelText="取消"
           >
             <Button
-              type="link"
-              size="small"
               danger
               icon={<DeleteOutlined />}
+              size="small"
+              type="link"
             >
               删除
             </Button>
@@ -659,58 +666,58 @@ const FinanceDashboard = () => {
     () => {
       console.log('📊 年度财务图表配置更新，当前数据:', realChartData);
       return {
-      grid: {
-        bottom: '3%',
-        containLabel: true,
-        left: '3%',
-        right: '4%'
-      },
-      legend: {
-        data: ['收入', '支出', '利润']
-      },
-      series: [
-        {
+        grid: {
+          bottom: '3%',
+          containLabel: true,
+          left: '3%',
+          right: '4%'
+        },
+        legend: {
+          data: ['收入', '支出', '利润']
+        },
+        series: [
+          {
             data: realChartData.map(item => item.income),
-          emphasis: {
-            focus: 'series'
+            emphasis: {
+              focus: 'series'
+            },
+            name: '收入',
+            type: 'bar'
           },
-          name: '收入',
-          type: 'bar'
-        },
-        {
+          {
             data: realChartData.map(item => item.expense),
-          emphasis: {
-            focus: 'series'
+            emphasis: {
+              focus: 'series'
+            },
+            name: '支出',
+            type: 'bar'
           },
-          name: '支出',
-          type: 'bar'
-        },
-        {
+          {
             data: realChartData.map(item => item.profit),
-          emphasis: {
-            focus: 'series'
+            emphasis: {
+              focus: 'series'
+            },
+            name: '利润',
+            type: 'bar'
+          }
+        ],
+        tooltip: {
+          axisPointer: {
+            type: 'shadow'
           },
-          name: '利润',
-          type: 'bar'
-        }
-      ],
-      tooltip: {
-        axisPointer: {
-          type: 'shadow'
+          trigger: 'axis'
         },
-        trigger: 'axis'
-      },
-      xAxis: [
-        {
+        xAxis: [
+          {
             data: realChartData.map(item => item.month),
-          type: 'category'
-        }
-      ],
-      yAxis: [
-        {
-          type: 'value'
-        }
-      ]
+            type: 'category'
+          }
+        ],
+        yAxis: [
+          {
+            type: 'value'
+          }
+        ]
       };
     },
     {
@@ -836,7 +843,7 @@ const FinanceDashboard = () => {
     if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
       // 获取真实财务数据
       fetchRealFinancialData().then(() => {
-      initChart();
+        initChart();
       });
     }
     // 获取员工业绩数据
@@ -850,6 +857,10 @@ const FinanceDashboard = () => {
   useEffect(() => {
     if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
       fetchRealFinancialData();
+    }
+    // 员工业绩数据也需要在年份/月份变化时重新获取
+    if (activeTab === 'employee') {
+      fetchEmployeePerformance();
     }
   }, [selectedYear, selectedMonth, isSuperAdminUser, activeTab]);
 
@@ -1005,7 +1016,7 @@ const FinanceDashboard = () => {
               left: 'center',
               text: `${selectedYear}年月度支出趋势`
             },
-                        tooltip: {
+            tooltip: {
               confine: true,
               enterable: true,
               extraCssText: 'max-height: 300px; overflow-y: auto; max-width: 350px;',
@@ -1127,7 +1138,23 @@ const FinanceDashboard = () => {
         <div className="mt-4">
           <Row gutter={[16, 16]}>
             <Col span={24}>
-              <Card variant="borderless">
+              <Card
+                title={`${selectedYear}年${selectedMonth}月员工业绩排名`}
+                variant="borderless"
+                extra={
+                  <DatePicker
+                    allowClear={false}
+                    picker="month"
+                    value={dayjs(`${selectedYear}-${selectedMonth}`)}
+                    onChange={date => {
+                      if (date) {
+                        setSelectedYear(date.year());
+                        setSelectedMonth(date.month() + 1);
+                      }
+                    }}
+                  />
+                }
+              >
                 <Table
                   columns={employeeColumns}
                   dataSource={employeeData}
@@ -1210,12 +1237,12 @@ const FinanceDashboard = () => {
                 title={`${selectedYear}年${selectedMonth}月财务分析`}
                 variant="borderless"
                 extra={
-                    <DatePicker
-                      allowClear={false}
-                      picker="month"
-                      value={dayjs(`${selectedYear}-${selectedMonth}`)}
-                      onChange={handleMonthChange}
-                    />
+                  <DatePicker
+                    allowClear={false}
+                    picker="month"
+                    value={dayjs(`${selectedYear}-${selectedMonth}`)}
+                    onChange={handleMonthChange}
+                  />
                 }
               >
                 <Row gutter={16}>
@@ -1326,8 +1353,8 @@ const FinanceDashboard = () => {
                 variant="borderless"
                 extra={
                   <Button
-                    type="primary"
                     icon={<PlusOutlined />}
+                    type="primary"
                     onClick={handleCreateIncomeRecord}
                   >
                     新增收入记录
@@ -1337,19 +1364,19 @@ const FinanceDashboard = () => {
                 <Table
                   columns={incomeTypeColumns}
                   dataSource={incomeRecords}
-                  pagination={{
-                    current: incomePagination.current,
-                    pageSize: incomePagination.pageSize,
-                    total: incomePagination.total,
-                    showSizeChanger: true,
-                    showQuickJumper: true,
-                    showTotal: (total, range) => `共 ${total} 条，第 ${range[0]}-${range[1]} 条`,
-                    pageSizeOptions: ['5', '10', '20', '50'],
-                    onChange: handleIncomePageChange,
-                    onShowSizeChange: handleIncomePageChange
-                  }}
                   rowKey="id"
                   size="middle"
+                  pagination={{
+                    current: incomePagination.current,
+                    onChange: handleIncomePageChange,
+                    onShowSizeChange: handleIncomePageChange,
+                    pageSize: incomePagination.pageSize,
+                    pageSizeOptions: ['5', '10', '20', '50'],
+                    showQuickJumper: true,
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `共 ${total} 条，第 ${range[0]}-${range[1]} 条`,
+                    total: incomePagination.total
+                  }}
                 />
               </Card>
             </Col>
@@ -1360,8 +1387,8 @@ const FinanceDashboard = () => {
                 variant="borderless"
                 extra={
                   <Button
-                    type="primary"
                     icon={<PlusOutlined />}
+                    type="primary"
                     onClick={handleCreateExpenseRecord}
                   >
                     新增支出记录
@@ -1371,19 +1398,19 @@ const FinanceDashboard = () => {
                 <Table
                   columns={expenseTypeColumns}
                   dataSource={expenseRecords}
-                  pagination={{
-                    current: expensePagination.current,
-                    pageSize: expensePagination.pageSize,
-                    total: expensePagination.total,
-                    showSizeChanger: true,
-                    showQuickJumper: true,
-                    showTotal: (total, range) => `共 ${total} 条，第 ${range[0]}-${range[1]} 条`,
-                    pageSizeOptions: ['5', '10', '20', '50'],
-                    onChange: handleExpensePageChange,
-                    onShowSizeChange: handleExpensePageChange
-                  }}
                   rowKey="id"
                   size="middle"
+                  pagination={{
+                    current: expensePagination.current,
+                    onChange: handleExpensePageChange,
+                    onShowSizeChange: handleExpensePageChange,
+                    pageSize: expensePagination.pageSize,
+                    pageSizeOptions: ['5', '10', '20', '50'],
+                    showQuickJumper: true,
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `共 ${total} 条，第 ${range[0]}-${range[1]} 条`,
+                    total: expensePagination.total
+                  }}
                 />
               </Card>
             </Col>
@@ -1422,7 +1449,6 @@ const FinanceDashboard = () => {
                 </div>
               </Card>
             </Col>
-
           </Row>
         </div>
       ),
@@ -1447,10 +1473,10 @@ const FinanceDashboard = () => {
 
       {/* 财务记录弹窗 */}
       <FinancialRecordModal
-        visible={modalVisible}
         mode={modalMode}
-        recordType={modalRecordType}
         record={editRecord}
+        recordType={modalRecordType}
+        visible={modalVisible}
         onCancel={() => setModalVisible(false)}
         onSuccess={handleModalSuccess}
       />

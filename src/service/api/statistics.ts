@@ -2,22 +2,22 @@ import { apiClient } from './client';
 import type { ApiResponse } from './types';
 
 export interface EmployeePerformance {
+  department: string;
   id: number;
   name: string;
-  department: string;
-  trainingFeeAmount: number;
+  ratio: number;
+  target: number;
   taskAmount: number;
   totalPerformance: number;
-  target: number;
-  ratio: number;
+  trainingFeeAmount: number;
 }
 
 export interface PerformanceTrend {
-  period: string;
-  targetPerformance: number;
   actualPerformance: number;
-  trainingFeeIncome: number;
+  period: string;
   projectIncome: number;
+  targetPerformance: number;
+  trainingFeeIncome: number;
 }
 
 /** 统计服务 */
@@ -213,8 +213,10 @@ class StatisticsService {
 
   /** 获取员工业绩统计 */
   async getEmployeePerformance(params?: {
+    month?: number;
     timeRange?: 'month' | 'quarter' | 'year';
     userId?: number;
+    year?: number;
   }): Promise<EmployeePerformance[]> {
     const response = await apiClient.get<EmployeePerformance[]>(`${this.baseURL}/employee-performance`, {
       params

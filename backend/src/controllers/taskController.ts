@@ -628,6 +628,10 @@ export const getMyTasks = async (req: Request, res: Response) => {
 
 /**
  * 获取历史项目列表（已完成和归档的项目）
+ * 权限控制：只能显示与当前用户相关的项目
+ * - 项目负责人
+ * - 咨询部人员
+ * - 市场部经理
  */
 export const getArchivedTasks = async (req: Request, res: Response) => {
   try {
@@ -642,12 +646,19 @@ export const getArchivedTasks = async (req: Request, res: Response) => {
       completionTimeEnd
     } = req.query;
 
+    const currentUserId = (req as any).user?.id;
     const skip = (Number(current) - 1) * Number(size);
 
     // 构建查询条件 - 只查询已完成且已归档的项目
     const where: any = {
       isCompleted: true,
-      isArchived: true
+      isArchived: true,
+      // 权限控制：只显示与当前用户相关的项目
+      OR: [
+        { responsiblePersonId: currentUserId }, // 项目负责人
+        { consultantId: currentUserId },        // 咨询部人员
+        { marketManagerId: currentUserId }      // 市场部经理
+      ]
     };
 
     if (keyword) {

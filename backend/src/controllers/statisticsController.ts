@@ -10,36 +10,102 @@ class StatisticsController {
    */
   async getEmployeePerformance(req: Request, res: Response) {
     try {
-      const { timeRange, userId } = req.query;
+      const { timeRange, userId, year, month } = req.query;
       const currentUserId = (req as any).user?.id;
 
       // 构建时间范围条件
-      let timeCondition: any = {};
-      if (timeRange) {
+      let trainingFeeTimeCondition: any = {};
+      let projectTimeCondition: any = {};
+
+      if (timeRange && year && month) {
+        const targetYear = parseInt(year as string);
+        const targetMonth = parseInt(month as string);
+
+        // 构建月份时间范围
+        const startDate = new Date(targetYear, targetMonth - 1, 1);
+        const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
+
+        // 培训费收入按照班级学员的加入日期来算
+        trainingFeeTimeCondition = {
+          joinDate: {
+            gte: startDate,
+            lte: endDate
+          }
+        };
+
+        // 项目收入按照项目的完成时间来算
+        projectTimeCondition = {
+          completionTime: {
+            gte: startDate,
+            lte: endDate
+          }
+        };
+      } else if (timeRange) {
         const now = new Date();
         let startDate: Date;
 
         switch (timeRange) {
           case 'month':
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            trainingFeeTimeCondition = {
+              joinDate: {
+                gte: startDate,
+                lte: now
+              }
+            };
+            projectTimeCondition = {
+              completionTime: {
+                gte: startDate,
+                lte: now
+              }
+            };
             break;
           case 'quarter':
             const currentQuarter = Math.floor(now.getMonth() / 3);
             startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+            trainingFeeTimeCondition = {
+              joinDate: {
+                gte: startDate,
+                lte: now
+              }
+            };
+            projectTimeCondition = {
+              completionTime: {
+                gte: startDate,
+                lte: now
+              }
+            };
             break;
           case 'year':
             startDate = new Date(now.getFullYear(), 0, 1);
+            trainingFeeTimeCondition = {
+              joinDate: {
+                gte: startDate,
+                lte: now
+              }
+            };
+            projectTimeCondition = {
+              completionTime: {
+                gte: startDate,
+                lte: now
+              }
+            };
             break;
           default:
             startDate = new Date(now.getFullYear(), 0, 1); // 默认年度
+            trainingFeeTimeCondition = {
+              joinDate: {
+                gte: startDate,
+                lte: now
+              }
+            };
+            projectTimeCondition = {
+              completionTime: {
+                gte: startDate,
+                lte: now
+              }
+            };
         }
-
-        timeCondition = {
-          createdAt: {
-            gte: startDate,
-            lte: now
-          }
-        };
       }
 
       // 如果指定了用户ID，只获取该用户的数据
@@ -70,7 +136,7 @@ class StatisticsController {
           const studentTrainingFees = await prisma.classStudent.aggregate({
             where: {
               createdById: user.id,
-              ...timeCondition
+              ...trainingFeeTimeCondition
             },
             _sum: {
               trainingFee: true
@@ -85,10 +151,7 @@ class StatisticsController {
               paymentAmount: {
                 not: null
               },
-              // 使用completionTime而不是createdAt来筛选时间
-              ...(timeCondition.createdAt ? {
-                completionTime: timeCondition.createdAt
-              } : {})
+              ...projectTimeCondition
             },
             _sum: {
               paymentAmount: true
@@ -129,7 +192,14 @@ class StatisticsController {
             }
           });
 
-          const targetAmount = Number(employeeTarget?.targetAmount || 200000); // 默认目标20万
+          // 计算目标任务总数（各类型任务目标之和）
+          const totalTaskTarget = (employeeTarget?.consultTarget || 0) +
+                                  (employeeTarget?.followUpTarget || 0) +
+                                  (employeeTarget?.developTarget || 0) +
+                                  (employeeTarget?.registerTarget || 0);
+
+          // 以20万作为默认业绩目标，或者基于任务目标计算（假设平均每个任务5000元）
+          const targetAmount = totalTaskTarget > 0 ? totalTaskTarget * 5000 : 200000;
 
           return {
             id: user.id,

@@ -24,6 +24,16 @@ const router = express.Router();
  *         schema:
  *           type: integer
  *         description: 用户ID（可选，不传则获取所有用户）
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *         description: 年份（配合month使用）
+ *       - in: query
+ *         name: month
+ *         schema:
+ *           type: integer
+ *         description: 月份（配合year使用）
  *     responses:
  *       200:
  *         description: 获取成功
