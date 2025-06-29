@@ -1,24 +1,9 @@
 import { InboxOutlined, UploadOutlined } from '@ant-design/icons';
-import {
-  Button,
-  Card,
-  Col,
-  Modal,
-  Row,
-  Space,
-  Table,
-  Tabs,
-  Tag,
-  Upload,
-  message
-} from 'antd';
+import { Button, Card, Col, Modal, Row, Table, Tabs, Tag, Upload, message } from 'antd';
 import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 import { customerService } from '@/service/api';
-import type { CustomerApi } from '@/service/api/types';
-
-const { Dragger } = Upload;
 
 /** 客户跟进状态枚举 */
 enum FollowUpStatus {
@@ -81,6 +66,44 @@ const CustomerImport = () => {
   const [previewData, setPreviewData] = useState<CustomerImportItem[]>([]);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus | ''>('');
 
+  // 分页状态管理
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
+
+  /** 将字符串状态映射为枚举值 */
+  const mapStatusToEnum = (status: string): FollowUpStatus => {
+    const statusMap: Record<string, FollowUpStatus> = {
+      arrived: FollowUpStatus.ARRIVED,
+      // 英文状态映射
+      consult: FollowUpStatus.CONSULT,
+      early_25: FollowUpStatus.EARLY_25,
+      effective_visit: FollowUpStatus.EFFECTIVE_VISIT,
+      new_develop: FollowUpStatus.NEW_DEVELOP,
+      not_arrived: FollowUpStatus.NOT_ARRIVED,
+      registered: FollowUpStatus.REGISTERED,
+      rejected: FollowUpStatus.REJECTED,
+      vip: FollowUpStatus.VIP,
+      wechat_added: FollowUpStatus.WECHAT_ADDED,
+      // 中文状态映射
+      咨询: FollowUpStatus.CONSULT,
+      大客户: FollowUpStatus.VIP,
+      已加微信: FollowUpStatus.WECHAT_ADDED,
+      已实到: FollowUpStatus.ARRIVED,
+      已报名: FollowUpStatus.REGISTERED,
+      新开发: FollowUpStatus.NEW_DEVELOP,
+      早25: FollowUpStatus.EARLY_25,
+      早25客户: FollowUpStatus.EARLY_25,
+      有效回访: FollowUpStatus.EFFECTIVE_VISIT,
+      未实到: FollowUpStatus.NOT_ARRIVED,
+      未通过: FollowUpStatus.REJECTED
+    };
+
+    return statusMap[status] || FollowUpStatus.CONSULT;
+  };
+
   /** 文件上传属性配置 */
   const uploadProps: UploadProps = {
     accept: '.xlsx,.xls',
@@ -134,7 +157,7 @@ const CustomerImport = () => {
           }
 
           // 跳过标题行，处理数据
-          const dataRows = jsonData.slice(1);
+          const dataRows = jsonData.slice(1) as any[][];
           const previewItems: CustomerImportItem[] = [];
 
           dataRows.forEach((row: any[], index: number) => {
@@ -182,37 +205,6 @@ const CustomerImport = () => {
       message.error('预览失败');
       setUploading(false);
     }
-  };
-
-  /** 将字符串状态映射为枚举值 */
-  const mapStatusToEnum = (status: string): FollowUpStatus => {
-    const statusMap: Record<string, FollowUpStatus> = {
-      arrived: FollowUpStatus.ARRIVED,
-      // 英文状态映射
-      consult: FollowUpStatus.CONSULT,
-      early_25: FollowUpStatus.EARLY_25,
-      effective_visit: FollowUpStatus.EFFECTIVE_VISIT,
-      new_develop: FollowUpStatus.NEW_DEVELOP,
-      not_arrived: FollowUpStatus.NOT_ARRIVED,
-      registered: FollowUpStatus.REGISTERED,
-      rejected: FollowUpStatus.REJECTED,
-      vip: FollowUpStatus.VIP,
-      wechat_added: FollowUpStatus.WECHAT_ADDED,
-      // 中文状态映射
-      咨询: FollowUpStatus.CONSULT,
-      大客户: FollowUpStatus.VIP,
-      已加微信: FollowUpStatus.WECHAT_ADDED,
-      已实到: FollowUpStatus.ARRIVED,
-      已报名: FollowUpStatus.REGISTERED,
-      新开发: FollowUpStatus.NEW_DEVELOP,
-      早25: FollowUpStatus.EARLY_25,
-      早25客户: FollowUpStatus.EARLY_25,
-      有效回访: FollowUpStatus.EFFECTIVE_VISIT,
-      未实到: FollowUpStatus.NOT_ARRIVED,
-      未通过: FollowUpStatus.REJECTED
-    };
-
-    return statusMap[status] || FollowUpStatus.CONSULT;
   };
 
   /** 导入Excel文件 */
@@ -285,6 +277,42 @@ const CustomerImport = () => {
     if (!followUpStatus) return true;
     return item.followStatus === followUpStatus;
   });
+
+  // 处理分页变化
+  const handlePaginationChange = (page: number, pageSize?: number) => {
+    setPagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: pageSize || prev.pageSize
+    }));
+  };
+
+  // 当筛选状态变化时，重置分页并更新总数
+  const handleStatusChange = (key: string) => {
+    setFollowUpStatus(key as FollowUpStatus | '');
+    const filtered = previewData.filter(item => {
+      if (!key) return true;
+      return item.followStatus === key;
+    });
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filtered.length
+    }));
+  };
+
+  // 更新分页总数当预览数据变化时
+  React.useEffect(() => {
+    const filtered = previewData.filter(item => {
+      if (!followUpStatus) return true;
+      return item.followStatus === followUpStatus;
+    });
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filtered.length
+    }));
+  }, [previewData, followUpStatus]);
 
   /** 表格列定义 */
   const columns = [
@@ -387,8 +415,6 @@ const CustomerImport = () => {
     }
   ];
 
-
-
   return (
     <div className="h-full bg-white dark:bg-[#141414]">
       {/* 添加自定义样式 */}
@@ -429,7 +455,7 @@ const CustomerImport = () => {
           <Row gutter={[16, 16]}>
             <Col span={24}>
               <Card variant="borderless">
-                <div className="ant-row ant-row-center mt-4 css-dev-only-do-not-override-t23gha css-var-r0">
+                <div className="ant-row ant-row-center css-dev-only-do-not-override-t23gha css-var-r0 mt-4">
                   <Upload.Dragger {...uploadProps}>
                     <p className="ant-upload-drag-icon">
                       <InboxOutlined />
@@ -441,26 +467,24 @@ const CustomerImport = () => {
 
                 {fileList.length > 0 && (
                   <div className="mt-4">
-                    <div className="text-sm text-gray-500 mb-2">
-                      已选择文件：{fileList[0].name}
-                    </div>
+                    <div className="mb-2 text-sm text-gray-500">已选择文件：{fileList[0].name}</div>
                   </div>
                 )}
 
-                <div className="flex justify-center mt-6">
+                <div className="mt-6 flex justify-center">
                   <Button
-                    type="primary"
-                    style={{ marginRight: 16 }}
                     disabled={fileList.length === 0}
+                    style={{ marginRight: 16 }}
+                    type="primary"
                     onClick={handlePreview}
                   >
                     预览数据
                   </Button>
                   <Button
-                    type="primary"
-                    icon={<UploadOutlined />}
                     disabled={previewData.length === 0}
+                    icon={<UploadOutlined />}
                     loading={uploading}
+                    type="primary"
                     onClick={handleImport}
                   >
                     确认导入
@@ -472,27 +496,31 @@ const CustomerImport = () => {
             {previewData.length > 0 && (
               <Col span={24}>
                 <Card
+                  className="bg-white dark:bg-[#1f1f1f]"
                   title="数据预览"
                   variant="borderless"
-                  className="bg-white dark:bg-[#1f1f1f]"
                 >
                   <Tabs
                     activeKey={followUpStatus}
                     items={followUpStatusTabs}
-                    onChange={key => setFollowUpStatus(key as FollowUpStatus | '')}
+                    onChange={handleStatusChange}
                   />
                   <div className="customer-import-preview">
                     <Table
+                      className="customer-import-table"
                       columns={columns}
                       dataSource={filteredData}
                       rowKey="id"
                       scroll={{ x: 1300 }}
-                      className="customer-import-table"
                       pagination={{
-                        pageSize: 10,
+                        current: pagination.current,
+                        onChange: handlePaginationChange,
+                        onShowSizeChange: handlePaginationChange,
+                        pageSize: pagination.pageSize,
                         showQuickJumper: true,
                         showSizeChanger: true,
                         showTotal: (total, range) => `第 ${range[0]}-${range[1]} 项，共 ${total} 项`,
+                        total: pagination.total
                       }}
                     />
                   </div>
@@ -502,8 +530,6 @@ const CustomerImport = () => {
           </Row>
         </div>
       </Card>
-
-
     </div>
   );
 };
