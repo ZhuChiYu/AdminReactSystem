@@ -9,6 +9,22 @@ import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from
 const { Title } = Typography;
 const { Option } = Select;
 
+// 角色名称映射
+const roleNameMap: Record<string, string> = {
+  admin: '管理员',
+  consultant: '顾问',
+  employee: '员工',
+  hr_bp: '人力BP',
+  hr_specialist: '人力专员',
+  marketing_manager: '市场部经理',
+  sales_director: '销售总监',
+  sales_manager: '销售经理',
+  super_admin: '超级管理员',
+  员工: '员工',
+  管理员: '管理员',
+  顾问: '顾问'
+};
+
 const Component: React.FC = () => {
   const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -72,7 +88,7 @@ const Component: React.FC = () => {
   };
 
   // 删除员工
-  const deleteEmployee = (id: number) => {
+  const deleteEmployee = (_id: number) => {
     // 这里应该调用删除API
     message.success('员工删除成功');
     fetchEmployees(); // 重新加载数据
@@ -107,7 +123,9 @@ const Component: React.FC = () => {
 
   // 获取性别显示
   const getGenderText = (gender: string) => {
-    return gender === 'male' ? '男' : gender === 'female' ? '女' : '-';
+    if (gender === 'male') return '男';
+    if (gender === 'female') return '女';
+    return '-';
   };
 
   // 表格列配置
@@ -145,7 +163,10 @@ const Component: React.FC = () => {
       key: 'roleNames',
       title: '角色',
       ...getCenterColumnConfig(),
-      render: (roleNames: string[]) => roleNames?.join(', ') || '-',
+      render: (roleNames: string[]) => {
+        if (!roleNames || roleNames.length === 0) return '-';
+        return roleNames.map(roleName => roleNameMap[roleName] || roleName).join(', ');
+      },
       width: 150
     },
     {
