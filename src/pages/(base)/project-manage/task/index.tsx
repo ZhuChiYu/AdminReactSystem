@@ -33,6 +33,7 @@ import {
 import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 
 import { selectUserInfo } from '@/features/auth/authStore';
 import { employeeService, projectService } from '@/service/api';
@@ -101,7 +102,23 @@ const ACTION_NAMES: Record<string, string> = {
   confirm_proposal: '确认方案',
   confirm_teacher: '确认师资',
   reject_project: '审批拒绝',
-  upload_proposal: '上传方案'
+  upload_proposal: '上传方案',
+  // 新增打回相关的操作名称
+  '审批拒绝': '审批拒绝',
+  '打回重新确认师资': '打回重新确认师资',
+  '客户同意方案': '客户同意方案',
+  '客户拒绝方案': '客户拒绝方案',
+  '上传方案': '上传方案',
+  '确认授课老师': '确认授课老师',
+  '审批通过': '审批通过',
+  '客户已签合同': '客户已签合同',
+  '客户未签合同': '客户未签合同',
+  '项目已完成': '项目已完成',
+  '项目进行中': '项目进行中',
+  '已收到客户款项': '已收到客户款项',
+  '未收到客户款项': '未收到客户款项',
+  '创建项目': '创建项目',
+  '阶段推进': '阶段推进'
 };
 
 /** 根据阶段获取当前办理人 */
@@ -291,10 +308,22 @@ const getStageActions = (stage: string, permissions: any): Array<{ color: string
 
 /** 事项列表组件 */
 const ItemList = () => {
-  // 基础状态
-  const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<TaskApi.TaskListItem[]>([]);
-  const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskApi.TaskListItem | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [form] = Form.useForm();
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [currentTask, setCurrentTask] = useState<TaskApi.TaskListItem | null>(null);
+  const [attachments, setAttachments] = useState<TaskAttachmentApi.TaskAttachmentListItem[]>([]);
+  const [isStageActionModalVisible, setIsStageActionModalVisible] = useState(false);
+  const [stageActionForm] = Form.useForm();
+  const [uploadFileList, setUploadFileList] = useState<File[]>([]);
+  const navigate = useNavigate();
+
+  const currentUser = useSelector(selectUserInfo);
 
   // 分页状态
   const [pagination, setPagination] = useState({
@@ -302,19 +331,6 @@ const ItemList = () => {
     pageSize: 10,
     total: 0
   });
-
-  // 弹窗状态
-  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
-  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
-  const [isStageActionModalVisible, setIsStageActionModalVisible] = useState(false);
-
-  // 表单和当前操作的数据
-  const [createForm] = Form.useForm();
-  const [stageActionForm] = Form.useForm();
-  const [currentTask, setCurrentTask] = useState<TaskApi.TaskListItem | null>(null);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
-  const [attachments, setAttachments] = useState<TaskAttachmentApi.TaskAttachmentListItem[]>([]);
-  const [uploadFileList, setUploadFileList] = useState<File[]>([]);
 
   // 搜索和筛选状态
   const [searchParams, setSearchParams] = useState({
@@ -324,9 +340,6 @@ const ItemList = () => {
     responsiblePersonId: undefined as number | undefined,
     timeRange: null as any
   });
-
-  // 获取当前用户信息
-  const currentUser = useSelector(selectUserInfo);
 
   // 获取员工列表
   const fetchEmployees = async () => {
@@ -399,7 +412,12 @@ const ItemList = () => {
   // 处理附件上传
   const handleFileUpload = async (file: File, taskId: number, stage?: string) => {
     try {
-      console.log('开始上传附件:', file.name, 'taskId:', taskId);
+      console.log('🔄 开始上传附件:', {
+        fileName: file.name,
+        fileSize: file.size,
+        taskId,
+        stage
+      });
 
       await taskAttachmentService.uploadTaskAttachment({
         description: `${stage || '阶段'}附件`,
@@ -409,11 +427,34 @@ const ItemList = () => {
       });
 
       message.success('附件上传成功');
-      console.log('附件上传成功，开始刷新附件列表');
+      console.log('✅ 附件上传成功，开始刷新附件列表');
       await fetchTaskAttachments(taskId);
     } catch (error: any) {
-      console.error('上传附件失败:', error);
-      message.error(error.message || '上传附件失败');
+      console.error('❌ 上传附件失败:', error);
+
+      // 根据不同错误类型显示不同的错误信息
+      let errorMessage = '上传附件失败';
+
+      if (error.response?.status === 401) {
+        errorMessage = '登录已过期，请重新登录';
+      } else if (error.response?.status === 413) {
+        errorMessage = '文件太大，请选择较小的文件';
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.message || '请求参数错误';
+      } else if (error.response?.status === 500) {
+        errorMessage = '服务器内部错误，请稍后重试';
+      } else if (error.message?.includes('common.serverError')) {
+        errorMessage = '服务器出现错误，请检查网络连接或联系管理员';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      message.error(errorMessage);
+
+      // 如果是认证问题，跳转到登录页
+      if (error.response?.status === 401) {
+        navigate('/login-out');
+      }
     }
   };
 
@@ -522,10 +563,10 @@ const ItemList = () => {
 
   // 打开新增/编辑弹窗
   const openModal = (task?: TaskApi.TaskListItem) => {
-    createForm.resetFields();
+    form.resetFields();
     if (task) {
       setCurrentTask(task);
-      createForm.setFieldsValue({
+      form.setFieldsValue({
         consultantId: task.consultant?.id,
         endTime: task.endTime ? dayjs(task.endTime) : null,
         marketManagerId: task.marketManager?.id,
@@ -538,24 +579,24 @@ const ItemList = () => {
       });
     } else {
       setCurrentTask(null);
-      createForm.setFieldsValue({
+      form.setFieldsValue({
         priority: 2
       });
     }
-    setIsCreateModalVisible(true);
+    setIsModalVisible(true);
   };
 
   // 关闭弹窗
   const handleCancel = () => {
-    setIsCreateModalVisible(false);
+    setIsModalVisible(false);
     setCurrentTask(null);
-    createForm.resetFields();
+    form.resetFields();
   };
 
   // 提交表单
   const handleSubmit = async () => {
     try {
-      const values = await createForm.validateFields();
+      const values = await form.validateFields();
       const formData = {
         ...values,
         consultantId: values.consultantId ? Number(values.consultantId) : null,
@@ -574,9 +615,9 @@ const ItemList = () => {
         message.success('创建项目事项成功');
       }
 
-      setIsCreateModalVisible(false);
+      setIsModalVisible(false);
       setCurrentTask(null);
-      createForm.resetFields();
+      form.resetFields();
       await fetchTasks();
     } catch (error: any) {
       console.error('操作失败:', error);
@@ -1020,14 +1061,14 @@ const ItemList = () => {
 
         {/* 新建/编辑项目事项弹窗 */}
         <Modal
-          open={isCreateModalVisible}
+          open={isModalVisible}
           title={currentTask ? '编辑项目事项' : '新建项目事项'}
           width={800}
           onCancel={handleCancel}
           onOk={handleSubmit}
         >
           <Form
-            form={createForm}
+            form={form}
             labelCol={{ span: 6 }}
             wrapperCol={{ span: 16 }}
           >
@@ -1484,6 +1525,11 @@ const ItemList = () => {
                   break;
                 case 'approve_project':
                   await projectService.approveProject(currentTask.id, true, values.comment);
+                  break;
+                case 'reject_project':
+                  // 审批拒绝，打回到师资确定阶段
+                  await projectService.approveProject(currentTask.id, false, values.comment);
+                  message.success('审批已拒绝，项目已打回到师资确定阶段');
                   break;
                 case 'confirm_contract':
                   await projectService.confirmContract(currentTask.id, true, values.comment);
