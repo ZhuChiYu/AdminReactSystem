@@ -649,23 +649,58 @@ export const getArchivedTasks = async (req: Request, res: Response) => {
     const currentUserId = (req as any).user?.id;
     const skip = (Number(current) - 1) * Number(size);
 
+    // 检查当前用户是否是超级管理员
+    const currentUser = await prismaClient.user.findUnique({
+      where: { id: currentUserId },
+      include: {
+        userRoles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
+    const isSuperAdmin = currentUser?.userRoles.some(ur => ur.role.roleCode === 'super_admin');
+
     // 构建查询条件 - 只查询已完成且已归档的项目
     const where: any = {
       isCompleted: true,
-      isArchived: true,
-      // 权限控制：只显示与当前用户相关的项目
-      OR: [
-        { responsiblePersonId: currentUserId }, // 项目负责人
-        { consultantId: currentUserId },        // 咨询部人员
-        { marketManagerId: currentUserId }      // 市场部经理
-      ]
+      isArchived: true
     };
 
+    // 处理关键词搜索和权限控制
     if (keyword) {
-      where.OR = [
+      const keywordConditions = [
         { projectName: { contains: String(keyword), mode: 'insensitive' } },
         { projectType: { contains: String(keyword), mode: 'insensitive' } },
         { remark: { contains: String(keyword), mode: 'insensitive' } }
+      ];
+
+      if (!isSuperAdmin) {
+        // 普通用户：需要同时满足权限控制和关键词搜索
+        where.AND = [
+          {
+            OR: [
+              { responsiblePersonId: currentUserId }, // 项目负责人
+              { consultantId: currentUserId },        // 咨询部人员
+              { marketManagerId: currentUserId }      // 市场部经理
+            ]
+          },
+          {
+            OR: keywordConditions
+          }
+        ];
+      } else {
+        // 超级管理员：只需要关键词搜索
+        where.OR = keywordConditions;
+      }
+    } else if (!isSuperAdmin) {
+      // 没有关键词但不是超级管理员：只应用权限控制
+      where.OR = [
+        { responsiblePersonId: currentUserId }, // 项目负责人
+        { consultantId: currentUserId },        // 咨询部人员
+        { marketManagerId: currentUserId }      // 市场部经理
       ];
     }
 
