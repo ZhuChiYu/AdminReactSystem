@@ -53,7 +53,7 @@ const followUpStatusColors = [
 ];
 
 const PerformanceChart = () => {
-  const [activeTab, setActiveTab] = useState<string>('clientSource');
+  const [activeTab, setActiveTab] = useState<string>('month');
   const [customerData, setCustomerData] = useState<CustomerApi.CustomerListItem[]>([]);
   const [performanceTrendData, setPerformanceTrendData] = useState<{
     month: PerformanceTrend[];
@@ -221,7 +221,7 @@ const PerformanceChart = () => {
 
   // 业绩趋势图 - 月度（当前月每天的业绩）
   const { domRef: monthPerformanceRef, updateOptions: updateMonthChart } = useEcharts(() => {
-    const monthData = performanceTrendData.month;
+    // 初始化时返回基本配置，不显示"暂无数据"
     return {
       grid: {
         bottom: '3%',
@@ -234,7 +234,7 @@ const PerformanceChart = () => {
       },
       series: [
         {
-          data: monthData.map(item => item.trainingFeeIncome),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -243,7 +243,7 @@ const PerformanceChart = () => {
           type: 'bar'
         },
         {
-          data: monthData.map(item => item.projectIncome),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -252,7 +252,7 @@ const PerformanceChart = () => {
           type: 'bar'
         },
         {
-          data: monthData.map(item => item.actualPerformance),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -264,24 +264,11 @@ const PerformanceChart = () => {
         axisPointer: {
           type: 'cross'
         },
-        formatter: (params: any) => {
-          if (Array.isArray(params)) {
-            const period = params[0]?.name;
-            const dataItem = monthData.find(item => item.period === period);
-            if (dataItem) {
-              return `${period}<br/>
-                      培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
-                      项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
-                      总业绩: ¥${dataItem.actualPerformance.toLocaleString()}`;
-            }
-          }
-          return '';
-        },
         trigger: 'axis'
       },
       xAxis: [
         {
-          data: monthData.map(item => item.period),
+          data: [],
           type: 'category'
         }
       ],
@@ -298,7 +285,7 @@ const PerformanceChart = () => {
 
   // 业绩趋势图 - 季度（本年度各季度业绩）
   const { domRef: quarterPerformanceRef, updateOptions: updateQuarterChart } = useEcharts(() => {
-    const quarterData = performanceTrendData.quarter;
+    // 初始化时返回基本配置，不显示"暂无数据"
     return {
       grid: {
         bottom: '3%',
@@ -311,7 +298,7 @@ const PerformanceChart = () => {
       },
       series: [
         {
-          data: quarterData.map(item => item.trainingFeeIncome),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -320,7 +307,7 @@ const PerformanceChart = () => {
           type: 'bar'
         },
         {
-          data: quarterData.map(item => item.projectIncome),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -329,7 +316,7 @@ const PerformanceChart = () => {
           type: 'bar'
         },
         {
-          data: quarterData.map(item => item.actualPerformance),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -341,24 +328,11 @@ const PerformanceChart = () => {
         axisPointer: {
           type: 'cross'
         },
-        formatter: (params: any) => {
-          if (Array.isArray(params)) {
-            const period = params[0]?.name;
-            const dataItem = quarterData.find(item => item.period === period);
-            if (dataItem) {
-              return `${period}<br/>
-                      培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
-                      项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
-                      总业绩: ¥${dataItem.actualPerformance.toLocaleString()}`;
-            }
-          }
-          return '';
-        },
         trigger: 'axis'
       },
       xAxis: [
         {
-          data: quarterData.map(item => item.period),
+          data: [],
           type: 'category'
         }
       ],
@@ -376,6 +350,22 @@ const PerformanceChart = () => {
   // 业绩趋势图 - 年度（近三年的年度业绩）
   const { domRef: yearPerformanceRef, updateOptions: updateYearChart } = useEcharts(() => {
     const yearData = performanceTrendData.year;
+
+    // 如果没有数据，显示空状态
+    if (!yearData || yearData.length === 0) {
+      return {
+        title: {
+          left: 'center',
+          text: '暂无年度数据',
+          textStyle: {
+            fontSize: 16,
+            fontWeight: 'bold'
+          },
+          top: 20
+        }
+      };
+    }
+
     // 计算增长率
     const growthRates = yearData.map((item, index) => {
       if (index === 0) return 0;
@@ -550,17 +540,267 @@ const PerformanceChart = () => {
         break;
       case 'month':
         if (performanceTrendData.month.length > 0) {
-          updateMonthChart();
+          updateMonthChart(() => {
+            const monthData = performanceTrendData.month;
+            return {
+              grid: {
+                bottom: '3%',
+                containLabel: true,
+                left: '3%',
+                right: '4%'
+              },
+              legend: {
+                data: ['培训费收入', '项目收入', '总业绩']
+              },
+              series: [
+                {
+                  data: monthData.map(item => item.trainingFeeIncome),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '培训费收入',
+                  stack: 'total',
+                  type: 'bar'
+                },
+                {
+                  data: monthData.map(item => item.projectIncome),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '项目收入',
+                  stack: 'total',
+                  type: 'bar'
+                },
+                {
+                  data: monthData.map(item => item.actualPerformance),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '总业绩',
+                  type: 'line'
+                }
+              ],
+              tooltip: {
+                axisPointer: {
+                  type: 'cross'
+                },
+                formatter: (params: any) => {
+                  if (Array.isArray(params)) {
+                    const period = params[0]?.name;
+                    const dataItem = monthData.find(item => item.period === period);
+                    if (dataItem) {
+                      return `${period}<br/>
+                              培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
+                              项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
+                              总业绩: ¥${dataItem.actualPerformance.toLocaleString()}`;
+                    }
+                  }
+                  return '';
+                },
+                trigger: 'axis'
+              },
+              xAxis: [
+                {
+                  data: monthData.map(item => item.period),
+                  type: 'category'
+                }
+              ],
+              yAxis: [
+                {
+                  axisLabel: {
+                    formatter: '¥{value}'
+                  },
+                  type: 'value'
+                }
+              ]
+            };
+          });
         }
         break;
       case 'quarter':
         if (performanceTrendData.quarter.length > 0) {
-          updateQuarterChart();
+          updateQuarterChart(() => {
+            const quarterData = performanceTrendData.quarter;
+            return {
+              grid: {
+                bottom: '3%',
+                containLabel: true,
+                left: '3%',
+                right: '4%'
+              },
+              legend: {
+                data: ['培训费收入', '项目收入', '总业绩']
+              },
+              series: [
+                {
+                  data: quarterData.map(item => item.trainingFeeIncome),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '培训费收入',
+                  stack: 'total',
+                  type: 'bar'
+                },
+                {
+                  data: quarterData.map(item => item.projectIncome),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '项目收入',
+                  stack: 'total',
+                  type: 'bar'
+                },
+                {
+                  data: quarterData.map(item => item.actualPerformance),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '总业绩',
+                  type: 'line'
+                }
+              ],
+              tooltip: {
+                axisPointer: {
+                  type: 'cross'
+                },
+                formatter: (params: any) => {
+                  if (Array.isArray(params)) {
+                    const period = params[0]?.name;
+                    const dataItem = quarterData.find(item => item.period === period);
+                    if (dataItem) {
+                      return `${period}<br/>
+                              培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
+                              项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
+                              总业绩: ¥${dataItem.actualPerformance.toLocaleString()}`;
+                    }
+                  }
+                  return '';
+                },
+                trigger: 'axis'
+              },
+              xAxis: [
+                {
+                  data: quarterData.map(item => item.period),
+                  type: 'category'
+                }
+              ],
+              yAxis: [
+                {
+                  axisLabel: {
+                    formatter: '¥{value}'
+                  },
+                  type: 'value'
+                }
+              ]
+            };
+          });
         }
         break;
       case 'year':
         if (performanceTrendData.year.length > 0) {
-          updateYearChart();
+          updateYearChart(() => {
+            const yearData = performanceTrendData.year;
+            // 计算增长率
+            const growthRates = yearData.map((item, index) => {
+              if (index === 0) return 0;
+              const prevActual = yearData[index - 1].actualPerformance;
+              const currentActual = item.actualPerformance;
+              return prevActual > 0 ? ((currentActual - prevActual) / prevActual) * 100 : 0;
+            });
+
+            return {
+              grid: {
+                bottom: '3%',
+                containLabel: true,
+                left: '3%',
+                right: '4%'
+              },
+              legend: {
+                data: ['培训费收入', '项目收入', '总业绩', '增长率']
+              },
+              series: [
+                {
+                  data: yearData.map(item => item.trainingFeeIncome),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '培训费收入',
+                  stack: 'total',
+                  type: 'bar'
+                },
+                {
+                  data: yearData.map(item => item.projectIncome),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '项目收入',
+                  stack: 'total',
+                  type: 'bar'
+                },
+                {
+                  data: yearData.map(item => item.actualPerformance),
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '总业绩',
+                  type: 'line'
+                },
+                {
+                  data: growthRates,
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  name: '增长率',
+                  type: 'line',
+                  yAxisIndex: 1
+                }
+              ],
+              tooltip: {
+                axisPointer: {
+                  type: 'cross'
+                },
+                formatter: (params: any) => {
+                  if (Array.isArray(params)) {
+                    const period = params[0]?.name;
+                    const dataItem = yearData.find(item => item.period === period);
+                    const growthRate = growthRates[params[0]?.dataIndex] || 0;
+                    if (dataItem) {
+                      return `${period}<br/>
+                              培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
+                              项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
+                              总业绩: ¥${dataItem.actualPerformance.toLocaleString()}<br/>
+                              增长率: ${growthRate.toFixed(1)}%`;
+                    }
+                  }
+                  return '';
+                },
+                trigger: 'axis'
+              },
+              xAxis: [
+                {
+                  data: yearData.map(item => item.period),
+                  type: 'category'
+                }
+              ],
+              yAxis: [
+                {
+                  axisLabel: {
+                    formatter: '¥{value}'
+                  },
+                  name: '业绩',
+                  type: 'value'
+                },
+                {
+                  axisLabel: {
+                    formatter: '{value}%'
+                  },
+                  name: '增长率',
+                  position: 'right',
+                  type: 'value'
+                }
+              ]
+            };
+          });
         }
         break;
       default:

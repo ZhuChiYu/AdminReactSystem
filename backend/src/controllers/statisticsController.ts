@@ -114,9 +114,21 @@ class StatisticsController {
         userCondition = { id: parseInt(userId as string) };
       }
 
-      // 获取所有用户
+      // 获取所有用户及其职位角色信息，排除超级管理员
       const users = await prisma.user.findMany({
-        where: userCondition,
+        where: {
+          ...userCondition,
+          // 排除具有超级管理员角色的用户
+          NOT: {
+            userRoles: {
+              some: {
+                role: {
+                  roleCode: 'super_admin'
+                }
+              }
+            }
+          }
+        },
         select: {
           id: true,
           userName: true,
@@ -124,6 +136,19 @@ class StatisticsController {
           department: {
             select: {
               name: true
+            }
+          },
+          userRoles: {
+            select: {
+              role: {
+                select: {
+                  id: true,
+                  roleName: true,
+                  roleCode: true,
+                  roleType: true,
+                  department: true
+                }
+              }
             }
           }
         }
@@ -201,10 +226,27 @@ class StatisticsController {
           // 以20万作为默认业绩目标，或者基于任务目标计算（假设平均每个任务5000元）
           const targetAmount = totalTaskTarget > 0 ? totalTaskTarget * 5000 : 200000;
 
+          // 获取用户的职位角色部门
+          const getUserDepartment = () => {
+            // 优先使用职位角色的部门
+            const positionRoles = user.userRoles.filter(ur => ur.role.roleType === 'position');
+            if (positionRoles.length > 0) {
+              // 如果有多个职位角色，取第一个有部门信息的
+              for (const userRole of positionRoles) {
+                if (userRole.role.department) {
+                  return userRole.role.department;
+                }
+              }
+            }
+
+            // 如果没有职位角色或职位角色没有部门信息，使用用户的直接部门
+            return user.department?.name || '未分配';
+          };
+
           return {
             id: user.id,
             name: user.nickName || user.userName,
-            department: user.department?.name || '未分配',
+            department: getUserDepartment(),
             trainingFeeAmount: Number(trainingFeeTotal),
             taskAmount: Number(taskAmountTotal),
             totalPerformance: totalPerformance,
@@ -226,9 +268,7 @@ class StatisticsController {
 
   /**
    * 获取业绩趋势统计（月度/季度/年度）
-   * 月度：显示当前月每天的业绩
-   * 季度：显示本年的季度业绩
-   * 年度：显示近三年的年度业绩
+   * 显示所有员工的汇总业绩趋势，使用与员工业绩相同的计算逻辑
    */
   async getPerformanceTrend(req: Request, res: Response) {
     try {
@@ -285,48 +325,84 @@ class StatisticsController {
         }
       }
 
-      // 计算每个时间段的业绩数据
+      // 获取所有员工用户（排除超级管理员）
+      const users = await prisma.user.findMany({
+        where: {
+          status: 1,
+          userRoles: {
+            none: {
+              role: {
+                roleCode: 'super_admin'
+              }
+            }
+          }
+        },
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          },
+          department: true
+        }
+      });
+
+      // 计算每个时间段的汇总业绩数据
       const trendData = await Promise.all(
         periods.map(async (period) => {
-          // 获取该时间段内的培训费收入（按班级学员加入日期）
-          const trainingFeeIncome = await prisma.classStudent.aggregate({
-            where: {
-              joinDate: {
-                gte: period.startDate,
-                lte: period.endDate
-              }
-            },
-            _sum: {
-              trainingFee: true
-            }
-          });
+          let totalTrainingFee = 0;
+          let totalProjectIncome = 0;
 
-          // 获取该时间段内的项目收入（按项目完成时间）
-          const projectIncome = await prisma.task.aggregate({
-            where: {
-              completionTime: {
-                gte: period.startDate,
-                lte: period.endDate
+          // 遍历所有员工，计算每个员工在此时间段的业绩
+          for (const user of users) {
+            // 获取该时间段内该员工负责的培训费收入
+            const studentTrainingFees = await prisma.classStudent.aggregate({
+              where: {
+                joinDate: {
+                  gte: period.startDate,
+                  lte: period.endDate
+                },
+                createdById: user.id
               },
-              isCompleted: true,
-              paymentAmount: {
-                not: null
+              _sum: {
+                trainingFee: true
               }
-            },
-            _sum: {
-              paymentAmount: true
-            }
-          });
+            });
 
-          const trainingTotal = Number(trainingFeeIncome._sum.trainingFee || 0);
-          const projectTotal = Number(projectIncome._sum.paymentAmount || 0);
-          const totalActual = trainingTotal + projectTotal;
+            // 获取该时间段内该员工相关的项目收入
+            const completedTasksAmount = await prisma.task.aggregate({
+              where: {
+                completionTime: {
+                  gte: period.startDate,
+                  lte: period.endDate
+                },
+                isCompleted: true,
+                paymentAmount: {
+                  not: null
+                },
+                OR: [
+                  { responsiblePersonId: user.id },
+                  { executorId: user.id },
+                  { consultantId: user.id },
+                  { marketManagerId: user.id }
+                ]
+              },
+              _sum: {
+                paymentAmount: true
+              }
+            });
+
+            totalTrainingFee += Number(studentTrainingFees._sum.trainingFee || 0);
+            totalProjectIncome += Number(completedTasksAmount._sum.paymentAmount || 0);
+          }
+
+          const totalActual = totalTrainingFee + totalProjectIncome;
 
           return {
             period: period.label,
             actualPerformance: totalActual,
-            trainingFeeIncome: trainingTotal,
-            projectIncome: projectTotal
+            trainingFeeIncome: totalTrainingFee,
+            projectIncome: totalProjectIncome
           };
         })
       );
