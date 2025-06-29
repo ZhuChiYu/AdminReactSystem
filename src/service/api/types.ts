@@ -193,15 +193,15 @@ export namespace CustomerApi {
       name: string;
     };
     canEdit?: boolean;
+    canEditCustomer?: boolean;
     canViewEmail?: boolean;
+    canViewInfo?: boolean;
     canViewMobile?: boolean;
+    // 新增权限字段
+    canViewName?: boolean;
     // 权限相关字段（前端计算）
     canViewPhone?: boolean;
     canViewRealName?: boolean;
-    // 新增权限字段
-    canViewName?: boolean;
-    canViewInfo?: boolean;
-    canEditCustomer?: boolean;
     company: string;
     createdAt: string;
     createdBy?: {
@@ -219,6 +219,7 @@ export namespace CustomerApi {
     };
     followContent?: string;
     followStatus: string;
+    gender?: string;
     id: number;
     industry: string;
     level: number;
@@ -240,6 +241,7 @@ export namespace CustomerApi {
     email?: string;
     followContent?: string;
     followStatus: string;
+    gender?: string;
     industry?: string;
     level?: number;
     mobile?: string;
@@ -409,13 +411,19 @@ export namespace MeetingApi {
 export namespace TaskApi {
   // 项目阶段枚举
   export enum ProjectStage {
-    CUSTOMER_INQUIRY = 'customer_inquiry', // 客户询价
-    PROPOSAL_SUBMISSION = 'proposal_submission', // 方案申报
-    TEACHER_CONFIRMATION = 'teacher_confirmation', // 师资确定
-    PROJECT_APPROVAL = 'project_approval', // 项目审批
-    CONTRACT_SIGNING = 'contract_signing', // 签订合同
-    PROJECT_EXECUTION = 'project_execution', // 项目进行
-    PROJECT_SETTLEMENT = 'project_settlement' // 项目结算
+    // 项目审批
+    CONTRACT_SIGNING = 'contract_signing', // 客户询价
+    CUSTOMER_INQUIRY = 'customer_inquiry', // 方案申报
+    // 师资确定
+    PROJECT_APPROVAL = 'project_approval', // 师资确定
+    // 签订合同
+    PROJECT_EXECUTION = 'project_execution', // 项目审批
+    // 项目进行
+    PROJECT_SETTLEMENT = 'project_settlement', // 签订合同
+    // 客户询价
+    PROPOSAL_SUBMISSION = 'proposal_submission', // 项目进行
+    // 方案申报
+    TEACHER_CONFIRMATION = 'teacher_confirmation' // 项目结算
   }
 
   // 项目阶段名称
@@ -444,124 +452,124 @@ export namespace TaskApi {
   };
 
   export interface TaskQueryParams extends PageParams {
-    projectType?: string;
-    projectName?: string;
-    currentStage?: ProjectStage;
-    responsiblePersonId?: number;
-    executorId?: number;
     consultantId?: number;
+    currentStage?: ProjectStage;
+    endTimeEnd?: string;
+    endTimeStart?: string;
+    executorId?: number;
+    isArchived?: boolean;
     marketManagerId?: number;
     priority?: Priority;
-    startTimeStart?: string;
+    projectName?: string;
+    projectType?: string;
+    responsiblePersonId?: number;
     startTimeEnd?: string;
-    endTimeStart?: string;
-    endTimeEnd?: string;
-    isArchived?: boolean;
+    startTimeStart?: string;
   }
 
   export interface TaskListItem {
-    id: number;
-    projectType: string;
-    projectName: string;
+    approvalStatus?: string;
+    consultant?: {
+      id: number;
+      nickName: string;
+      userName: string;
+    };
+    contractSigned: boolean;
+    createTime: string;
     currentStage: ProjectStage;
-    stageHistory?: any[];
 
+    // 各阶段状态
+    customerInquiryStatus?: string;
+    endTime: string;
+    executor?: {
+      id: number;
+      nickName: string;
+      userName: string;
+    };
+    id: number;
+
+    isArchived: boolean;
+    marketManager?: {
+      id: number;
+      nickName: string;
+      userName: string;
+    };
+    paymentAmount?: number | string;
+
+    paymentReceived: boolean;
+    priority: Priority;
+    projectCompleted: boolean;
+    projectName: string;
+    projectType: string;
+    proposalAttachments?: any[];
+    proposalStatus?: string;
+    remark?: string;
     // 人员信息
     responsiblePerson: {
       id: number;
       nickName: string;
       userName: string;
     };
-    executor?: {
-      id: number;
-      nickName: string;
-      userName: string;
-    };
-    consultant?: {
-      id: number;
-      nickName: string;
-      userName: string;
-    };
-    marketManager?: {
-      id: number;
-      nickName: string;
-      userName: string;
-    };
+    stageHistory?: any[];
 
-    priority: Priority;
     startTime: string;
-    endTime: string;
-
-    // 各阶段状态
-    customerInquiryStatus?: string;
-    proposalStatus?: string;
-    proposalAttachments?: any[];
     teacherConfirmed: boolean;
     teacherInfo?: any;
-    approvalStatus?: string;
-    contractSigned: boolean;
-    projectCompleted: boolean;
-    paymentReceived: boolean;
-    paymentAmount?: number | string;
-
-    remark?: string;
-    createTime: string;
     updateTime: string;
-    isArchived: boolean;
   }
 
   export interface CreateTaskRequest {
-    projectType: string;
-    projectName: string;
-    responsiblePersonId: number;
-    executorId?: number;
     consultantId?: number;
+    endTime: string;
+    executorId?: number;
     marketManagerId?: number;
     priority?: Priority;
-    startTime: string;
-    endTime: string;
+    projectName: string;
+    projectType: string;
     remark?: string;
+    responsiblePersonId: number;
+    startTime: string;
   }
 
   export interface UpdateTaskRequest {
-    projectType?: string;
-    projectName?: string;
-    responsiblePersonId?: number;
-    executorId?: number;
     consultantId?: number;
+    endTime?: string;
+    executorId?: number;
     marketManagerId?: number;
     priority?: Priority;
-    startTime?: string;
-    endTime?: string;
+    projectName?: string;
+    projectType?: string;
     remark?: string;
+    responsiblePersonId?: number;
+    startTime?: string;
   }
 
   // 阶段操作相关类型
   export interface StageActionRequest {
-    taskId: number;
     action: string;
-    data?: any;
     attachments?: any[];
+    data?: any;
     remark?: string;
+    taskId: number;
   }
 
   // 方案上传请求
   export interface UploadProposalRequest {
-    taskId: number;
     attachments: any[];
     remark?: string;
+    taskId: number;
   }
 
   // 师资确定请求
   export interface ConfirmTeacherRequest {
+    remark?: string;
     taskId: number;
     teacherInfo: {
-      name: string;
-      title: string;
       experience: string;
+      name: string;
       specialties: string[];
+      title: string;
     };
-    remark?: string;
   }
 }
 
