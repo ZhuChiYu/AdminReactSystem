@@ -145,6 +145,7 @@ model RolePermission {
 model Customer {
   id                  Int                  @id @default(autoincrement())
   customerName        String               @map("customer_name") @db.VarChar(100)
+  gender              String?              @db.VarChar(10)
   company             String               @db.VarChar(200)
   position            String?              @db.VarChar(100)
   phone               String?              @db.VarChar(20)
