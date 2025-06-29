@@ -338,11 +338,78 @@ class CustomerController {
       throw new ValidationError('客户姓名和公司名称不能为空');
     }
 
+    if (!mobile && !phone) {
+      throw new ValidationError('手机号不能为空');
+    }
+
     if (!req.user) {
       throw new ValidationError('用户未认证');
     }
 
     try {
+      // 检查是否已存在相同的客户（根据单位名称和手机号）
+      // 只在当前用户权限范围内的客户中查找重复
+      const duplicateCheckWhere: any = {};
+
+      // 添加手机号检查条件（手机号或电话号码任一匹配即视为重复）
+      if (mobile || phone) {
+        const phoneConditions = [];
+        if (mobile) {
+          phoneConditions.push(
+            { mobile: mobile },
+            { phone: mobile }
+          );
+        }
+        if (phone) {
+          phoneConditions.push(
+            { mobile: phone },
+            { phone: phone }
+          );
+        }
+        duplicateCheckWhere.AND = [
+          { company: company },
+          { OR: phoneConditions }
+        ];
+      }
+
+      // 应用权限控制：只检查用户权限范围内的客户
+      if (req.user?.roles?.includes('super_admin')) {
+        // 超级管理员：可以看到所有客户数据，不添加限制
+      } else if (req.user?.roles?.includes('admin')) {
+        // 管理员：可以看到自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+        const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
+          where: { managerId: req.user.id },
+          select: { employeeId: true }
+        });
+
+        const allowedCreatorIds = [req.user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+        const permissionConditions = [
+          { createdById: { in: allowedCreatorIds } },
+          { assignedToId: req.user.id }
+        ];
+
+        if (duplicateCheckWhere.AND) {
+          duplicateCheckWhere.AND.push({ OR: permissionConditions });
+        } else {
+          duplicateCheckWhere.OR = permissionConditions;
+        }
+      } else {
+        // 普通员工：只能看到分配给自己的客户
+        if (duplicateCheckWhere.AND) {
+          duplicateCheckWhere.AND.push({ assignedToId: req.user.id });
+        } else {
+          duplicateCheckWhere.assignedToId = req.user.id;
+        }
+      }
+
+      const existingCustomer = await prisma.customer.findFirst({
+        where: duplicateCheckWhere
+      });
+
+      if (existingCustomer) {
+        const phoneNumber = mobile || phone;
+        throw new ValidationError(`单位 ${company} 的手机号 ${phoneNumber} 已存在`);
+      }
       const customer = await prisma.customer.create({
         data: {
           assignedToId: req.user.id, // 创建者默认成为负责人
@@ -738,16 +805,67 @@ class CustomerController {
             continue;
           }
 
-          // 检查是否已存在相同的客户（根据姓名和公司）
-          const existingCustomer = await prisma.customer.findFirst({
-            where: {
-              company: customerData.company,
-              customerName: customerData.customerName
+          // 检查是否已存在相同的客户（根据单位名称和手机号）
+          // 只在当前用户权限范围内的客户中查找重复
+          const duplicateCheckWhere: any = {
+            company: customerData.company
+          };
+
+          // 添加手机号检查条件（手机号或电话号码任一匹配即视为重复）
+          if (customerData.mobile || customerData.phone) {
+            const phoneConditions = [];
+            if (customerData.mobile) {
+              phoneConditions.push(
+                { mobile: customerData.mobile },
+                { phone: customerData.mobile }
+              );
             }
+            if (customerData.phone) {
+              phoneConditions.push(
+                { mobile: customerData.phone },
+                { phone: customerData.phone }
+              );
+            }
+            duplicateCheckWhere.AND = [
+              { company: customerData.company },
+              { OR: phoneConditions }
+            ];
+            // 重置company条件，因为已经在AND中包含了
+            delete duplicateCheckWhere.company;
+          } else {
+            // 如果没有手机号，跳过重复检查（或者可以设置为必须提供手机号）
+            errors.push(`第${i + 2}行：手机号不能为空`);
+            failureCount++;
+            continue;
+          }
+
+          // 应用权限控制：只检查用户权限范围内的客户
+          if (req.user?.roles?.includes('super_admin')) {
+            // 超级管理员：可以看到所有客户数据，不添加限制
+          } else if (req.user?.roles?.includes('admin')) {
+            // 管理员：可以看到自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+            const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
+              where: { managerId: req.user.id },
+              select: { employeeId: true }
+            });
+
+            const allowedCreatorIds = [req.user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+            duplicateCheckWhere.OR = [
+              { createdById: { in: allowedCreatorIds } },
+              { assignedToId: req.user.id }
+            ];
+          } else {
+            // 普通员工：只能看到分配给自己的客户
+            duplicateCheckWhere.assignedToId = req.user.id;
+          }
+
+          const existingCustomer = await prisma.customer.findFirst({
+            where: duplicateCheckWhere
           });
 
           if (existingCustomer) {
-            errors.push(`第${i + 2}行：客户 ${customerData.customerName}(${customerData.company}) 已存在`);
+            const phoneNumber = customerData.mobile || customerData.phone;
+            errors.push(`第${i + 2}行：单位 ${customerData.company} 的手机号 ${phoneNumber} 已存在`);
             failureCount++;
             continue;
           }

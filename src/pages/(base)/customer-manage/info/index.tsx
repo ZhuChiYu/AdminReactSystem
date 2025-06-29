@@ -711,8 +711,9 @@ const CustomerManagement = () => {
           <Form.Item
             label="手机"
             name="mobile"
+            rules={[{ message: '请输入手机号', required: true }]}
           >
-            <Input placeholder="请输入手机" />
+            <Input placeholder="请输入手机号" />
           </Form.Item>
           <Form.Item
             label="跟进状态"
