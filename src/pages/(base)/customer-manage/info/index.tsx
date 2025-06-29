@@ -1,17 +1,14 @@
-import { DownloadOutlined, UserAddOutlined } from '@ant-design/icons';
+import { DownloadOutlined, UserAddOutlined, UserSwitchOutlined } from '@ant-design/icons';
 import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
-import { customerService } from '@/service/api';
-import type { CustomerApi } from '@/service/api/types';
+import { customerService, employeeService } from '@/service/api';
+import type { CustomerApi, EmployeeApi } from '@/service/api/types';
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 导入员工服务
-import { UserSwitchOutlined } from '@ant-design/icons';
-import { employeeService } from '@/service/api';
-import type { EmployeeApi } from '@/service/api/types';
 
 // 定义本地的跟进状态枚举和映射
 export enum FollowUpStatus {
@@ -114,8 +111,8 @@ const CustomerManagement = () => {
         current: pagination.current,
         customerName: searchParams.customerName || undefined,
         followStatus: searchParams.followStatus || undefined,
-        phone: searchParams.phone || undefined,
-        mobile: searchParams.phone || undefined, // 使用同一个搜索框搜索手机和电话
+        mobile: searchParams.phone || undefined,
+        phone: searchParams.phone || undefined, // 使用同一个搜索框搜索手机和电话
         size: pagination.pageSize
       };
 
@@ -252,6 +249,7 @@ const CustomerManagement = () => {
         customerName: values.customerName,
         email: values.email || '',
         followStatus: values.followStatus,
+        gender: values.gender || '',
         industry: values.industry || '',
         mobile: values.mobile || '',
         phone: values.phone || '',
@@ -319,20 +317,20 @@ const CustomerManagement = () => {
 
       // 准备导出的数据
       const exportData = allCustomersData.records.map((customer, index) => ({
-        '序号': index + 1,
-        '客户姓名': customer.customerName || '',
-        '单位名称': customer.company || '',
-        '职位': customer.position || '',
-        '电话': customer.phone || '',
-        '手机': customer.mobile || '',
-        '邮箱': customer.email || '',
-        '行业': customer.industry || '',
-        '来源': customer.source || '',
-        '跟进状态': followUpStatusNames[customer.followStatus as FollowUpStatus] || customer.followStatus,
-        '负责人': customer.assignedTo?.nickName || '',
-        '备注': customer.remark || '',
-        '创建时间': customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '',
-        '更新时间': customer.updatedAt ? new Date(customer.updatedAt).toLocaleString() : ''
+        创建时间: customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '',
+        单位名称: customer.company || '',
+        备注: customer.remark || '',
+        客户姓名: customer.customerName || '',
+        序号: index + 1,
+        手机: customer.mobile || '',
+        更新时间: customer.updatedAt ? new Date(customer.updatedAt).toLocaleString() : '',
+        来源: customer.source || '',
+        电话: customer.phone || '',
+        职位: customer.position || '',
+        行业: customer.industry || '',
+        负责人: customer.assignedTo?.name || '',
+        跟进状态: followUpStatusNames[customer.followStatus as FollowUpStatus] || customer.followStatus,
+        邮箱: customer.email || ''
       }));
 
       // 创建工作簿
@@ -342,7 +340,7 @@ const CustomerManagement = () => {
 
       // 设置列宽
       const colWidths = [
-        { wch: 8 },  // 序号
+        { wch: 8 }, // 序号
         { wch: 15 }, // 客户姓名
         { wch: 25 }, // 单位名称
         { wch: 15 }, // 职位
@@ -355,7 +353,7 @@ const CustomerManagement = () => {
         { wch: 12 }, // 负责人
         { wch: 30 }, // 备注
         { wch: 20 }, // 创建时间
-        { wch: 20 }  // 更新时间
+        { wch: 20 } // 更新时间
       ];
       worksheet['!cols'] = colWidths;
 
@@ -381,8 +379,8 @@ const CustomerManagement = () => {
       setAssignLoading(true);
 
       await customerService.assignCustomers({
-        customerIds: selectedCustomersForAssign,
         assignedToId: values.employeeId,
+        customerIds: selectedCustomersForAssign,
         remark: values.remark || ''
       });
 
@@ -428,6 +426,19 @@ const CustomerManagement = () => {
       ...getCenterColumnConfig(),
       render: (text: string) => text || '-',
       width: 120
+    },
+    {
+      dataIndex: 'gender',
+      key: 'gender',
+      title: '性别',
+      ...getCenterColumnConfig(),
+      render: (gender: string) => {
+        if (!gender) return '-';
+        if (gender === 'male') return '男';
+        if (gender === 'female') return '女';
+        return gender;
+      },
+      width: 80
     },
     {
       dataIndex: 'company',
@@ -530,7 +541,7 @@ const CustomerManagement = () => {
   return (
     <div className="h-full bg-white p-4 dark:bg-[#141414]">
       <Card
-        title={isUserAdmin || isUserSuperAdmin ? "客户资料管理" : "我的客户"}
+        title={isUserAdmin || isUserSuperAdmin ? '客户资料管理' : '我的客户'}
         extra={
           <Space>
             <Button
@@ -542,9 +553,9 @@ const CustomerManagement = () => {
             </Button>
             {(isUserAdmin || isUserSuperAdmin) && (
               <Button
+                disabled={selectedCustomersForAssign.length === 0}
                 icon={<UserSwitchOutlined />}
                 onClick={openBatchAssignModal}
-                disabled={selectedCustomersForAssign.length === 0}
               >
                 批量分配
               </Button>
@@ -616,10 +627,10 @@ const CustomerManagement = () => {
           rowSelection={
             isUserAdmin || isUserSuperAdmin
               ? {
-                  selectedRowKeys: selectedCustomersForAssign,
                   onChange: (selectedRowKeys: React.Key[]) => {
                     setSelectedCustomersForAssign(selectedRowKeys as number[]);
-                  }
+                  },
+                  selectedRowKeys: selectedCustomersForAssign
                 }
               : undefined
           }
@@ -688,6 +699,15 @@ const CustomerManagement = () => {
             rules={[{ message: '请输入客户姓名', required: true }]}
           >
             <Input placeholder="请输入客户姓名" />
+          </Form.Item>
+          <Form.Item
+            label="性别"
+            name="gender"
+          >
+            <Select placeholder="请选择性别">
+              <Select.Option value="male">男</Select.Option>
+              <Select.Option value="female">女</Select.Option>
+            </Select>
           </Form.Item>
           <Form.Item
             label="单位"
@@ -763,9 +783,9 @@ const CustomerManagement = () => {
 
       {/* 分配客户弹窗 */}
       <Modal
+        confirmLoading={assignLoading}
         open={isAssignModalVisible}
         title="分配客户"
-        confirmLoading={assignLoading}
         onCancel={handleAssignCancel}
         onOk={handleAssignSubmit}
       >

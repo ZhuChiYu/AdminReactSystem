@@ -181,6 +181,7 @@ const CustomerFollow = () => {
         customerName: values.customerName,
         email: values.email || '',
         followStatus: values.followStatus || 'new_develop',
+        gender: values.gender || '',
         industry: 'other',
         level: 1,
         mobile: values.mobile || '',
@@ -215,6 +216,7 @@ const CustomerFollow = () => {
       customerName: record.customerName,
       followContent: record.remark || '',
       followStatus: record.followStatus,
+      gender: record.gender,
       mobile: record.mobile,
       phone: record.phone,
       position: record.position
@@ -238,6 +240,7 @@ const CustomerFollow = () => {
         company: values.company,
         customerName: values.customerName,
         followStatus: values.followStatus,
+        gender: values.gender,
         mobile: values.mobile,
         phone: values.phone,
         position: values.position,
@@ -283,17 +286,25 @@ const CustomerFollow = () => {
 
   // 表格行选择配置
   const rowSelection = {
-    selectedRowKeys,
     onChange: (selectedRowKeys: React.Key[], selectedRows: CustomerApi.CustomerListItem[]) => {
       setSelectedRowKeys(selectedRowKeys);
       setSelectedRows(selectedRows);
     },
-    onSelect: (record: CustomerApi.CustomerListItem, selected: boolean, selectedRows: CustomerApi.CustomerListItem[]) => {
+    onSelect: (
+      record: CustomerApi.CustomerListItem,
+      selected: boolean,
+      selectedRows: CustomerApi.CustomerListItem[]
+    ) => {
       console.log('选择行:', record, selected, selectedRows);
     },
-    onSelectAll: (selected: boolean, selectedRows: CustomerApi.CustomerListItem[], changeRows: CustomerApi.CustomerListItem[]) => {
+    onSelectAll: (
+      selected: boolean,
+      selectedRows: CustomerApi.CustomerListItem[],
+      changeRows: CustomerApi.CustomerListItem[]
+    ) => {
       console.log('全选状态:', selected, selectedRows, changeRows);
     },
+    selectedRowKeys
   };
 
   // 客户数据导出功能
@@ -309,16 +320,16 @@ const CustomerFollow = () => {
 
       // 准备导出数据
       const exportData = filteredRecords.map((record, index) => ({
-        序号: index + 1,
-        客户姓名: record.customerName,
         公司: record.company,
-        职位: record.position || '-',
-        电话: record.phone || '-',
+        创建时间: record.createdAt ? new Date(record.createdAt).toLocaleString('zh-CN') : '-',
+        客户姓名: record.customerName,
+        序号: index + 1,
         手机: record.mobile || '-',
-        跟进状态: getStatusLabel(record.followStatus),
-        跟进内容: record.remark || '暂无跟进内容',
+        电话: record.phone || '-',
+        职位: record.position || '-',
         负责人: record.assignedTo?.name || '未分配',
-        创建时间: record.createdAt ? new Date(record.createdAt).toLocaleString('zh-CN') : '-'
+        跟进内容: record.remark || '暂无跟进内容',
+        跟进状态: getStatusLabel(record.followStatus)
       }));
 
       // 转换为CSV格式
@@ -329,7 +340,7 @@ const CustomerFollow = () => {
       ].join('\n');
 
       // 创建下载链接
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
 
@@ -364,7 +375,6 @@ const CustomerFollow = () => {
     }
 
     Modal.confirm({
-      title: '批量删除确认',
       content: `确定要删除选中的 ${selectedRowKeys.length} 条客户记录吗？删除后无法恢复。`,
       icon: <DeleteOutlined />,
       okText: '确认删除',
@@ -375,9 +385,7 @@ const CustomerFollow = () => {
           console.log('🗑️ 批量删除客户:', selectedRowKeys);
 
           // 并发删除所有选中的客户
-          const deletePromises = selectedRowKeys.map(id =>
-            customerService.deleteCustomer(Number(id))
-          );
+          const deletePromises = selectedRowKeys.map(id => customerService.deleteCustomer(Number(id)));
 
           await Promise.all(deletePromises);
 
@@ -393,7 +401,8 @@ const CustomerFollow = () => {
         } finally {
           setDeleteLoading(false);
         }
-      }
+      },
+      title: '批量删除确认'
     });
   };
 
@@ -406,6 +415,19 @@ const CustomerFollow = () => {
       render: text => <span>{text}</span>,
       title: '客户姓名',
       width: 100
+    },
+    {
+      dataIndex: 'gender',
+      key: 'gender',
+      ...getCenterColumnConfig(),
+      render: (gender: string) => {
+        if (!gender) return '-';
+        if (gender === 'male') return '男';
+        if (gender === 'female') return '女';
+        return gender;
+      },
+      title: '性别',
+      width: 80
     },
     {
       dataIndex: 'company',
@@ -575,12 +597,10 @@ const CustomerFollow = () => {
       </Row>
 
       {/* 操作栏 */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           {isSuper && selectedRowKeys.length > 0 && (
-            <span style={{ color: '#666' }}>
-              已选择 {selectedRowKeys.length} 条记录
-            </span>
+            <span style={{ color: '#666' }}>已选择 {selectedRowKeys.length} 条记录</span>
           )}
         </div>
         <Space>
@@ -642,6 +662,16 @@ const CustomerFollow = () => {
             rules={[{ message: '请输入客户姓名', required: true }]}
           >
             <Input placeholder="请输入客户姓名" />
+          </Form.Item>
+
+          <Form.Item
+            label="性别"
+            name="gender"
+          >
+            <Select placeholder="请选择性别">
+              <Select.Option value="male">男</Select.Option>
+              <Select.Option value="female">女</Select.Option>
+            </Select>
           </Form.Item>
 
           <Form.Item
@@ -723,7 +753,7 @@ const CustomerFollow = () => {
           requiredMark={false}
         >
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 label="客户姓名"
                 name="customerName"
@@ -732,7 +762,18 @@ const CustomerFollow = () => {
                 <Input placeholder="请输入客户姓名" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
+              <Form.Item
+                label="性别"
+                name="gender"
+              >
+                <Select placeholder="请选择性别">
+                  <Select.Option value="male">男</Select.Option>
+                  <Select.Option value="female">女</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
               <Form.Item
                 label="公司名称"
                 name="company"
