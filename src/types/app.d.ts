@@ -662,7 +662,7 @@ declare namespace App {
           'route.(base)_customer-manage': string;
           'route.(base)_customer-manage_follow': string;
           'route.(base)_customer-manage_import': string;
-
+          'route.(base)_customer-manage_info': string;
           'route.(base)_finance-dashboard': string;
           'route.(base)_home': string;
           'route.(base)_project-manage': string;

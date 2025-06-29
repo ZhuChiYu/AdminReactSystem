@@ -260,6 +260,7 @@ async function main() {
   const superAdmin = await prisma.user.create({
     data: {
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_1.webp',
+      contractStartDate: new Date('2015-07-31T00:00:00.000Z'),
       departmentId: departments[0].id,
       email: 'admin@soybean.com',
       gender: 1,

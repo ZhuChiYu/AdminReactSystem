@@ -400,6 +400,7 @@ async function main() {
     // 1个超级管理员
     {
       avatar: 'https://cdn.jsdelivr.net/gh/zyronon/typing-word@v2.0.2/docs/images/avatar_1.webp',
+      contractStartDate: new Date('2015-07-31T00:00:00.000Z'),
       // 1-启用
       departmentId: departments[0].id,
       email: 'admin@soybean.com',
@@ -520,6 +521,7 @@ async function main() {
         data: {
           nickName: userData.nickName,
           avatar: userData.avatar,
+          contractStartDate: userData.contractStartDate,
           gender: userData.gender,
           status: userData.status,
           departmentId: userData.departmentId,
@@ -528,8 +530,9 @@ async function main() {
       });
     } else {
       // 如果用户不存在，创建新用户
+      const { displayPassword, ...userCreateData } = userData;
       user = await prisma.user.create({
-        data: userData
+        data: userCreateData
       });
     }
     createdUsers.push(user);
@@ -714,10 +717,10 @@ async function main() {
 
   // 为相关职位角色也分配客户权限（销售相关、市场相关、顾问等）
   const positionRolesWithCustomerAccess = [
-    roles[5], // marketing_manager 市场部经理
-    roles[6], // sales_manager 销售经理
-    roles[7], // hr_specialist 人力专员
-    roles[8]  // consultant 顾问
+    roles[5], // sales_manager 销售经理
+    roles[6], // marketing_manager 市场部经理
+    roles[8], // hr_specialist 人力专员
+    roles[9]  // consultant 顾问
   ];
 
   for (const role of positionRolesWithCustomerAccess) {

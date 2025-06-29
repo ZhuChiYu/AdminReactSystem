@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger';
 class CustomerController {
   /** 获取客户列表 */
   async getCustomers(req: Request, res: Response) {
-    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source } = req.query;
+    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source, phone, mobile } = req.query;
 
     const user = (req as any).user; // 获取当前登录用户
     const page = Number(current);
@@ -62,6 +62,24 @@ class CustomerController {
 
     if (source) {
       where.source = source as string;
+    }
+
+    // 添加手机和电话搜索条件
+    if (phone || mobile) {
+      const phoneConditions = [];
+      if (phone) {
+        phoneConditions.push(
+          { phone: { contains: phone as string, mode: 'insensitive' } },
+          { mobile: { contains: phone as string, mode: 'insensitive' } }
+        );
+      }
+      if (mobile && mobile !== phone) {
+        phoneConditions.push(
+          { phone: { contains: mobile as string, mode: 'insensitive' } },
+          { mobile: { contains: mobile as string, mode: 'insensitive' } }
+        );
+      }
+      where.OR = [...(where.OR || []), ...phoneConditions];
     }
 
     try {
