@@ -3,12 +3,15 @@ import { Button as AButton, Card as ACard } from 'antd';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { useEffect, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 
 import UserAvatar from '@/components/common/UserAvatar';
-import { selectUserInfo } from '@/features/auth/authStore';
+import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
 import { useAppSelector } from '@/hooks/business/useStore';
+import { authService } from '@/service/api';
 import { isAdminOrSuperAdmin } from '@/utils/auth';
+import { localStg } from '@/utils/storage';
 import 'dayjs/locale/zh-cn';
 
 dayjs.extend(duration);
@@ -16,6 +19,7 @@ dayjs.locale('zh-cn');
 
 const HeaderBanner = () => {
   const userInfo = useAppSelector(selectUserInfo);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
 
   // 用户注册时间，模拟数据
@@ -24,18 +28,65 @@ const HeaderBanner = () => {
   // 检查是否为管理员或超级管理员
   const showTeamManagement = isAdminOrSuperAdmin();
 
-  useEffect(() => {
-    // 从用户信息中获取合同开始时间
-    const contractStartDate = userInfo.contractStartDate;
+  // 刷新用户信息
+  const refreshUserInfo = async () => {
+    try {
+      console.log('🔄 刷新用户信息...');
+      const latestUserInfo = await authService.getUserInfo();
+      console.log('🔍 获取到的最新用户信息:', latestUserInfo);
+
+      // 转换并更新用户信息
+      const updatedUserInfo: Api.Auth.UserInfo = {
+        avatar: (latestUserInfo as any).avatar || userInfo.avatar,
+        buttons: (latestUserInfo as any).buttons || userInfo.buttons,
+        contractStartDate: (latestUserInfo as any).contractStartDate,
+        department: (latestUserInfo as any).department || userInfo.department,
+        email: (latestUserInfo as any).email || userInfo.email,
+        gender: (latestUserInfo as any).gender || userInfo.gender,
+        nickName: (latestUserInfo as any).nickName || userInfo.nickName,
+        phone: (latestUserInfo as any).phone || userInfo.phone,
+        position: (latestUserInfo as any).position || userInfo.position,
+        roles:
+          (latestUserInfo as any).roles?.map((role: any) => (typeof role === 'string' ? role : role.roleCode)) ||
+          userInfo.roles,
+        userId: (latestUserInfo as any).userId || userInfo.userId,
+        userName: (latestUserInfo as any).userName || userInfo.userName
+      };
+
+      console.log('🔍 转换后的用户信息:', updatedUserInfo);
+
+      // 更新Redux store和localStorage
+      dispatch(setUserInfo(updatedUserInfo));
+      localStg.set('userInfo', updatedUserInfo);
+    } catch (error) {
+      console.error('❌ 刷新用户信息失败:', error);
+    }
+  };
+
+  // 计算工作时长的函数
+  const calculateJoinTime = (contractStartDate?: string) => {
+    console.log('🔍 计算工作时长，合同开始时间:', contractStartDate);
 
     if (contractStartDate) {
       // 如果有合同开始时间，就使用它来计算工作时长
       const joinDate = dayjs(contractStartDate);
       const now = dayjs();
 
+      console.log('🔍 合同开始日期:', joinDate.format('YYYY-MM-DD'));
+      console.log('🔍 当前日期:', now.format('YYYY-MM-DD'));
+
+      // 检查是否是未来日期
+      if (joinDate.isAfter(now)) {
+        console.log('⚠️ 合同开始时间是未来日期，显示为即将入职');
+        setJoinTime('即将入职');
+        return;
+      }
+
       const years = now.diff(joinDate, 'year');
       const months = now.subtract(years, 'year').diff(joinDate, 'month');
       const days = now.subtract(years, 'year').subtract(months, 'month').diff(joinDate, 'day');
+
+      console.log('🔍 计算结果:', { days, months, years });
 
       let timeString = '';
       if (years > 0) {
@@ -46,8 +97,10 @@ const HeaderBanner = () => {
       }
       timeString += `${days}天`;
 
+      console.log('🔍 最终显示时间:', timeString);
       setJoinTime(timeString);
     } else {
+      console.log('⚠️ 没有合同开始时间，使用模拟数据');
       // 如果没有合同开始时间，使用模拟数据
       const randomDays = Math.floor(Math.random() * 365) + 1;
       const joinDate = dayjs().subtract(randomDays, 'day');
@@ -68,6 +121,31 @@ const HeaderBanner = () => {
 
       setJoinTime(timeString);
     }
+  };
+
+  useEffect(() => {
+    // 组件初始化时，先刷新用户信息，然后计算工作时长
+    const initializeData = async () => {
+      console.log('🔍 初始化首页数据...');
+      console.log('🔍 当前用户信息:', userInfo);
+
+      // 刷新用户信息
+      await refreshUserInfo();
+
+      // 延迟一下确保用户信息已更新
+      setTimeout(() => {
+        const updatedUserInfo = localStg.get('userInfo');
+        console.log('🔍 刷新后的用户信息:', updatedUserInfo);
+        calculateJoinTime(updatedUserInfo?.contractStartDate);
+      }, 100);
+    };
+
+    initializeData();
+  }, []); // 只在组件挂载时执行一次
+
+  // 监听用户信息的contractStartDate变化
+  useEffect(() => {
+    calculateJoinTime(userInfo.contractStartDate);
   }, [userInfo.contractStartDate]);
 
   // 转换性别格式

@@ -26,6 +26,11 @@ export function getUserInfo() {
     userInfo.avatar = '';
   }
 
+  // ensure contractStartDate field exists
+  if (!userInfo.contractStartDate) {
+    userInfo.contractStartDate = undefined;
+  }
+
   return userInfo;
 }
 
