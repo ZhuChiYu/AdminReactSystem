@@ -184,6 +184,17 @@ export const generatedRoutes: ElegantConstRoute[] = [
                   icon: 'ic:round-file-upload',
                   order: 2
                 }
+              },
+              {
+                matchedFiles: [null, '/src/pages/(base)/customer-manage/info/index.tsx', null, null],
+                name: '(base)_customer-manage_info',
+                path: '/customer-manage/info',
+                handle: {
+                  i18nKey: 'route.(base)_customer-manage_info',
+                  title: '客户资料',
+                  icon: 'ic:round-contacts',
+                  order: 3
+                }
               }
             ]
           },

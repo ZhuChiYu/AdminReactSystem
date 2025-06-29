@@ -35,6 +35,7 @@ export const pages: Record<string, () => Promise<any>> = {
 "(base)_customer-manage_assign": () => import("@/pages/(base)/customer-manage/assign/index.tsx"),
 "(base)_customer-manage_follow": () => import("@/pages/(base)/customer-manage/follow/index.tsx"),
 "(base)_customer-manage_import": () => import("@/pages/(base)/customer-manage/import/index.tsx"),
+"(base)_customer-manage_info": () => import("@/pages/(base)/customer-manage/info/index.tsx"),
 "(base)_employee-manage_address": () => import("@/pages/(base)/employee-manage/address/index.tsx"),
 "(base)_employee-manage_contact": () => import("@/pages/(base)/employee-manage/contact/index.tsx"),
 "(base)_employee-manage_identity": () => import("@/pages/(base)/employee-manage/identity/index.tsx"),

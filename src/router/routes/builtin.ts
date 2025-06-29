@@ -165,6 +165,17 @@ export const BaseChildrenRoutes = [
         id: 'customer_import',
         lazy: () => import('@/pages/(base)/customer-manage/import').then(convert),
         path: '/customer-manage/import'
+      },
+      {
+        handle: {
+          i18nKey: 'route.(base)_customer-manage_info',
+          icon: 'ic:round-contacts',
+          order: 3,
+          title: '客户资料'
+        },
+        id: 'customer_info',
+        lazy: () => import('@/pages/(base)/customer-manage/info').then(convert),
+        path: '/customer-manage/info'
       }
     ],
     handle: {

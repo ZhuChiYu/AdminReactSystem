@@ -18,7 +18,7 @@ const route = {
   '(base)_customer-manage_assign': '客户分配',
   '(base)_customer-manage_follow': '客户跟进',
   '(base)_customer-manage_import': '客户导入',
-
+  '(base)_customer-manage_info': '客户资料',
   '(base)_employee-manage': '员工管理',
   '(base)_employee-manage_address': '员工住址',
   '(base)_employee-manage_contact': '联系方式',
@@ -111,7 +111,7 @@ const route = {
   'route.(base)_customer-manage_assign': '客户分配',
   'route.(base)_customer-manage_follow': '客户跟进',
   'route.(base)_customer-manage_import': '客户导入',
-
+  'route.(base)_customer-manage_info': '客户资料',
   'route.(base)_employee-manage': '员工管理',
   'route.(base)_employee-manage_address': '员工住址',
   'route.(base)_employee-manage_contact': '联系方式',

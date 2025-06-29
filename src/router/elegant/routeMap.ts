@@ -43,6 +43,7 @@ export const routeMap: RouteMap = {
  "(base)_customer-manage_assign": "/customer-manage/assign",
  "(base)_customer-manage_follow": "/customer-manage/follow",
  "(base)_customer-manage_import": "/customer-manage/import",
+ "(base)_customer-manage_info": "/customer-manage/info",
  "(base)_employee-manage": "/employee-manage",
  "(base)_employee-manage_address": "/employee-manage/address",
  "(base)_employee-manage_contact": "/employee-manage/contact",
