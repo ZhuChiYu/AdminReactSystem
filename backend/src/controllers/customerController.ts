@@ -148,6 +148,7 @@ class CustomerController {
               }
             : null,
           customerName: shouldMaskSensitiveInfo ? '***' : customer.customerName,
+          gender: customer.gender,
           email: shouldMaskSensitiveInfo ? '***' : customer.email,
           followStatus: customer.followStatus,
           id: customer.id,
@@ -321,6 +322,7 @@ class CustomerController {
     const {
       company,
       customerName,
+      gender,
       email,
       followStatus = 'consult',
       industry,
@@ -417,6 +419,7 @@ class CustomerController {
           company,
           createdById: req.user.id,
           customerName,
+          gender,
           email,
           followStatus,
           industry,
@@ -456,6 +459,7 @@ class CustomerController {
                 }
               : null,
             customerName: customer.customerName,
+            gender: customer.gender,
             email: customer.email,
             followStatus: customer.followStatus,
             id: customer.id,
@@ -485,6 +489,7 @@ class CustomerController {
     const {
       company,
       customerName,
+      gender,
       email,
       followStatus,
       industry,
@@ -524,6 +529,7 @@ class CustomerController {
         data: {
           company,
           customerName,
+          gender,
           email,
           followStatus,
           industry,
@@ -577,6 +583,7 @@ class CustomerController {
                 }
               : null,
             customerName: customer.customerName,
+            gender: customer.gender,
             email: customer.email,
             followStatus: customer.followStatus,
             id: customer.id,
