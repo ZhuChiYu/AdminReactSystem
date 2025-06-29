@@ -18,10 +18,37 @@ async function main() {
 
   // 清理现有数据
   logger.info('🧹 清理现有数据...');
+
+  // 按照外键依赖关系的正确顺序删除数据
+  // 1. 首先删除关联表
   await prisma.userRole.deleteMany();
   await prisma.rolePermission.deleteMany();
+  await prisma.customerAssignment.deleteMany();
+
+  // 2. 删除依赖用户的表
+  await prisma.taskAttachment.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.followRecord.deleteMany();
+  await prisma.meetingParticipant.deleteMany();
+  await prisma.meetingRecord.deleteMany();
+  await prisma.meetingSummary.deleteMany();
+  await prisma.meeting.deleteMany();
+  await prisma.expenseApplication.deleteMany();
+  await prisma.financialRecord.deleteMany();
+  await prisma.operationLog.deleteMany();
+  await prisma.attachment.deleteMany();
+  await prisma.notificationAttachment.deleteMany();
+  await prisma.employeeManagerRelation.deleteMany();
+  await prisma.employeeTarget.deleteMany();
+  await prisma.classStudent.deleteMany();
+
+  // 3. 删除客户数据
   await prisma.customer.deleteMany();
+
+  // 4. 删除用户数据
   await prisma.user.deleteMany();
+
+  // 5. 删除基础数据
   await prisma.role.deleteMany();
   await prisma.permission.deleteMany();
   await prisma.department.deleteMany();
