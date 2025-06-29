@@ -349,31 +349,7 @@ const PerformanceChart = () => {
 
   // 业绩趋势图 - 年度（近三年的年度业绩）
   const { domRef: yearPerformanceRef, updateOptions: updateYearChart } = useEcharts(() => {
-    const yearData = performanceTrendData.year;
-
-    // 如果没有数据，显示空状态
-    if (!yearData || yearData.length === 0) {
-      return {
-        title: {
-          left: 'center',
-          text: '暂无年度数据',
-          textStyle: {
-            fontSize: 16,
-            fontWeight: 'bold'
-          },
-          top: 20
-        }
-      };
-    }
-
-    // 计算增长率
-    const growthRates = yearData.map((item, index) => {
-      if (index === 0) return 0;
-      const prevActual = yearData[index - 1].actualPerformance;
-      const currentActual = item.actualPerformance;
-      return prevActual > 0 ? ((currentActual - prevActual) / prevActual) * 100 : 0;
-    });
-
+    // 初始化时返回基本配置，不显示"暂无数据"
     return {
       grid: {
         bottom: '3%',
@@ -386,7 +362,7 @@ const PerformanceChart = () => {
       },
       series: [
         {
-          data: yearData.map(item => item.trainingFeeIncome),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -395,7 +371,7 @@ const PerformanceChart = () => {
           type: 'bar'
         },
         {
-          data: yearData.map(item => item.projectIncome),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -404,7 +380,7 @@ const PerformanceChart = () => {
           type: 'bar'
         },
         {
-          data: yearData.map(item => item.actualPerformance),
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -412,7 +388,7 @@ const PerformanceChart = () => {
           type: 'line'
         },
         {
-          data: growthRates,
+          data: [],
           emphasis: {
             focus: 'series'
           },
@@ -425,26 +401,11 @@ const PerformanceChart = () => {
         axisPointer: {
           type: 'cross'
         },
-        formatter: (params: any) => {
-          if (Array.isArray(params)) {
-            const period = params[0]?.name;
-            const dataItem = yearData.find(item => item.period === period);
-            const growthRate = growthRates[yearData.findIndex(item => item.period === period)];
-            if (dataItem) {
-              return `${period}<br/>
-                      培训费收入: ¥${dataItem.trainingFeeIncome.toLocaleString()}<br/>
-                      项目收入: ¥${dataItem.projectIncome.toLocaleString()}<br/>
-                      总业绩: ¥${dataItem.actualPerformance.toLocaleString()}<br/>
-                      增长率: ${growthRate.toFixed(1)}%`;
-            }
-          }
-          return '';
-        },
         trigger: 'axis'
       },
       xAxis: [
         {
-          data: yearData.map(item => item.period),
+          data: [],
           type: 'category'
         }
       ],
