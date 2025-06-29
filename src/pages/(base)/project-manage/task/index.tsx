@@ -38,7 +38,7 @@ import { useNavigate } from 'react-router-dom';
 import { selectUserInfo } from '@/features/auth/authStore';
 import { employeeService, projectService } from '@/service/api';
 import { taskAttachmentService } from '@/service/api/taskAttachment';
-import type { TaskAttachmentApi } from '@/service/api/taskAttachment';
+import type { TaskAttachmentListItem } from '@/service/api/taskAttachment';
 import type { EmployeeApi, TaskApi } from '@/service/api/types';
 import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
 
@@ -103,22 +103,22 @@ const ACTION_NAMES: Record<string, string> = {
   confirm_teacher: '确认师资',
   reject_project: '审批拒绝',
   upload_proposal: '上传方案',
+  上传方案: '上传方案',
+  创建项目: '创建项目',
   // 新增打回相关的操作名称
-  '审批拒绝': '审批拒绝',
-  '打回重新确认师资': '打回重新确认师资',
-  '客户同意方案': '客户同意方案',
-  '客户拒绝方案': '客户拒绝方案',
-  '上传方案': '上传方案',
-  '确认授课老师': '确认授课老师',
-  '审批通过': '审批通过',
-  '客户已签合同': '客户已签合同',
-  '客户未签合同': '客户未签合同',
-  '项目已完成': '项目已完成',
-  '项目进行中': '项目进行中',
-  '已收到客户款项': '已收到客户款项',
-  '未收到客户款项': '未收到客户款项',
-  '创建项目': '创建项目',
-  '阶段推进': '阶段推进'
+  审批拒绝: '审批拒绝',
+  审批通过: '审批通过',
+  客户同意方案: '客户同意方案',
+  客户已签合同: '客户已签合同',
+  客户拒绝方案: '客户拒绝方案',
+  客户未签合同: '客户未签合同',
+  已收到客户款项: '已收到客户款项',
+  打回重新确认师资: '打回重新确认师资',
+  未收到客户款项: '未收到客户款项',
+  确认授课老师: '确认授课老师',
+  阶段推进: '阶段推进',
+  项目已完成: '项目已完成',
+  项目进行中: '项目进行中'
 };
 
 /** 根据阶段获取当前办理人 */
@@ -317,7 +317,7 @@ const ItemList = () => {
   const [form] = Form.useForm();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [currentTask, setCurrentTask] = useState<TaskApi.TaskListItem | null>(null);
-  const [attachments, setAttachments] = useState<TaskAttachmentApi.TaskAttachmentListItem[]>([]);
+  const [attachments, setAttachments] = useState<TaskAttachmentListItem[]>([]);
   const [isStageActionModalVisible, setIsStageActionModalVisible] = useState(false);
   const [stageActionForm] = Form.useForm();
   const [uploadFileList, setUploadFileList] = useState<File[]>([]);
@@ -415,8 +415,8 @@ const ItemList = () => {
       console.log('🔄 开始上传附件:', {
         fileName: file.name,
         fileSize: file.size,
-        taskId,
-        stage
+        stage,
+        taskId
       });
 
       await taskAttachmentService.uploadTaskAttachment({
@@ -493,7 +493,7 @@ const ItemList = () => {
   };
 
   // 检查用户权限 - 只有当前办理人和管理员可以编辑/删除
-  const canEditAttachment = (attachment: TaskAttachmentApi.TaskAttachmentListItem) => {
+  const canEditAttachment = (attachment: TaskAttachmentListItem) => {
     if (!currentUser || !currentTask) return false;
 
     // 超级管理员可以操作所有附件
@@ -948,7 +948,7 @@ const ItemList = () => {
     <div className="h-full bg-white dark:bg-[#141414]">
       <Card
         className="h-full"
-        title={isSuperAdmin ? "项目事项列表（全部）" : "我的项目事项"}
+        title={isSuperAdmin ? '项目事项列表（全部）' : '我的项目事项'}
         variant="borderless"
         extra={
           <Space>

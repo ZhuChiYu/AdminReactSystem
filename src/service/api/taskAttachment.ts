@@ -1,45 +1,46 @@
 import { apiClient } from './client';
 import type { ApiResponse, PageResponse } from './types';
 
-/** 项目事项附件相关类型 */
-export namespace TaskAttachmentApi {
-  export interface TaskAttachmentQueryParams {
-    taskId?: number;
-    current?: number;
-    size?: number;
-  }
+/** 项目事项附件查询参数 */
+export interface TaskAttachmentQueryParams {
+  current?: number;
+  size?: number;
+  taskId?: number;
+}
 
-  export interface TaskAttachmentListItem {
+/** 项目事项附件列表项 */
+export interface TaskAttachmentListItem {
+  description?: string;
+  downloadUrl: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  id: number;
+  originalName?: string;
+  stage?: string;
+  taskId: number;
+  uploader?: {
     id: number;
-    taskId: number;
-    fileName: string;
-    originalName?: string;
-    fileType: string;
-    fileSize: number;
-    description?: string;
-    stage?: string;
-    uploader?: {
-      id: number;
-      name: string;
-    };
-    uploadTime: string;
-    downloadUrl: string;
-  }
+    name: string;
+  };
+  uploadTime: string;
+}
 
-  export interface UploadTaskAttachmentRequest {
-    taskId: number;
-    description?: string;
-    stage?: string;
-    file: File;
-    onProgress?: (progress: number) => void;
-  }
+/** 上传项目事项附件请求 */
+export interface UploadTaskAttachmentRequest {
+  description?: string;
+  file: File;
+  onProgress?: (progress: number) => void;
+  stage?: string;
+  taskId: number;
+}
 
-  export interface TaskAttachmentStats {
-    totalCount: number;
-    totalSize: number;
-    fileTypes: { type: string; count: number }[];
-    stages: { stage: string; count: number }[];
-  }
+/** 项目事项附件统计 */
+export interface TaskAttachmentStats {
+  fileTypes: { count: number; type: string }[];
+  stages: { count: number; stage: string }[];
+  totalCount: number;
+  totalSize: number;
 }
 
 /** 项目事项附件服务 */
@@ -47,18 +48,15 @@ class TaskAttachmentService {
   private readonly baseURL = '/task-attachments';
 
   /** 获取项目事项附件列表 */
-  async getTaskAttachmentList(params: TaskAttachmentApi.TaskAttachmentQueryParams) {
-    const response = await apiClient.get<PageResponse<TaskAttachmentApi.TaskAttachmentListItem>>(
-      `${this.baseURL}`,
-      {
-        params
-      }
-    );
+  async getTaskAttachmentList(params: TaskAttachmentQueryParams) {
+    const response = await apiClient.get<PageResponse<TaskAttachmentListItem>>(`${this.baseURL}`, {
+      params
+    });
     return response;
   }
 
   /** 上传项目事项附件 */
-  async uploadTaskAttachment(data: TaskAttachmentApi.UploadTaskAttachmentRequest) {
+  async uploadTaskAttachment(data: UploadTaskAttachmentRequest) {
     const formData = new FormData();
     formData.append('file', data.file);
     formData.append('taskId', data.taskId.toString());
@@ -69,24 +67,20 @@ class TaskAttachmentService {
       formData.append('stage', data.stage);
     }
 
-    const response = await apiClient.post<ApiResponse<TaskAttachmentApi.TaskAttachmentListItem>>(
-      `${this.baseURL}/upload`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: progressEvent => {
-          if (progressEvent.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            console.log(`Upload Progress: ${percentCompleted}%`);
-            if (data.onProgress) {
-              data.onProgress(percentCompleted);
-            }
+    const response = await apiClient.post<ApiResponse<TaskAttachmentListItem>>(`${this.baseURL}/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: progressEvent => {
+        if (progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Upload Progress: ${percentCompleted}%`);
+          if (data.onProgress) {
+            data.onProgress(percentCompleted);
           }
         }
       }
-    );
+    });
     return response;
   }
 
@@ -99,18 +93,17 @@ class TaskAttachmentService {
   /** 下载项目事项附件 */
   async downloadTaskAttachment(attachmentId: number) {
     const response = await apiClient.get(`${this.baseURL}/${attachmentId}/download`, {
-      responseType: 'blob'
+      responseType: 'blob',
+      timeout: 600000 // 设置下载超时时间为60秒
     });
     return response;
   }
 
   /** 获取项目事项的附件统计 */
-  async getTaskAttachmentStats(taskId: number): Promise<TaskAttachmentApi.TaskAttachmentStats> {
-    const response = await apiClient.get<ApiResponse<TaskAttachmentApi.TaskAttachmentStats>>(
-      `${this.baseURL}/task/${taskId}/stats`
-    );
+  async getTaskAttachmentStats(taskId: number): Promise<ApiResponse<TaskAttachmentStats>> {
+    const response = await apiClient.get<ApiResponse<TaskAttachmentStats>>(`${this.baseURL}/task/${taskId}/stats`);
     return response;
   }
 }
 
-export const taskAttachmentService = new TaskAttachmentService(); 
+export const taskAttachmentService = new TaskAttachmentService();

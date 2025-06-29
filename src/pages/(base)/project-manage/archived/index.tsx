@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 
 import { projectService } from '@/service/api';
 import { taskAttachmentService } from '@/service/api/taskAttachment';
-import type { TaskAttachmentApi } from '@/service/api/taskAttachment';
+import type { TaskAttachmentListItem } from '@/service/api/taskAttachment';
 import type { TaskApi } from '@/service/api/types';
 
 const ArchivedProjectPage: React.FC = () => {
@@ -13,7 +13,7 @@ const ArchivedProjectPage: React.FC = () => {
   const [archivedTasks, setArchivedTasks] = useState<TaskApi.TaskListItem[]>([]);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [currentTask, setCurrentTask] = useState<TaskApi.TaskListItem | null>(null);
-  const [currentTaskAttachments, setCurrentTaskAttachments] = useState<TaskAttachmentApi.TaskAttachmentListItem[]>([]);
+  const [currentTaskAttachments, setCurrentTaskAttachments] = useState<TaskAttachmentListItem[]>([]);
   const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -96,7 +96,7 @@ const ArchivedProjectPage: React.FC = () => {
       console.log('附件响应数据:', response);
 
       // 处理不同的响应格式
-      let attachmentList: TaskAttachmentApi.TaskAttachmentListItem[] = [];
+      let attachmentList: TaskAttachmentListItem[] = [];
       if (response?.data?.records) {
         attachmentList = response.data.records;
       } else if ((response as any)?.records) {
@@ -104,7 +104,7 @@ const ArchivedProjectPage: React.FC = () => {
       } else if (Array.isArray(response?.data)) {
         attachmentList = response.data;
       } else if (Array.isArray(response)) {
-        attachmentList = response as TaskAttachmentApi.TaskAttachmentListItem[];
+        attachmentList = response as TaskAttachmentListItem[];
       }
 
       console.log('解析的附件列表:', attachmentList);
@@ -231,7 +231,7 @@ const ArchivedProjectPage: React.FC = () => {
       key: 'paymentAmount',
       render: (amount: any) => {
         if (!amount) return '-';
-        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+        const numAmount = typeof amount === 'string' ? Number.parseFloat(amount) : amount;
         return `¥${numAmount.toFixed(2)}`;
       },
       title: '项目金额',
@@ -356,7 +356,7 @@ const ArchivedProjectPage: React.FC = () => {
                   {(() => {
                     const amount = (currentTask as any).paymentAmount;
                     if (!amount) return '-';
-                    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+                    const numAmount = typeof amount === 'string' ? Number.parseFloat(amount) : amount;
                     return `¥${numAmount.toFixed(2)}`;
                   })()}
                 </Descriptions.Item>
@@ -386,7 +386,7 @@ const ArchivedProjectPage: React.FC = () => {
                         bordered
                         dataSource={currentTaskAttachments}
                         size="small"
-                        renderItem={(attachment: TaskAttachmentApi.TaskAttachmentListItem) => (
+                        renderItem={(attachment: TaskAttachmentListItem) => (
                           <List.Item
                             actions={[
                               <Button
