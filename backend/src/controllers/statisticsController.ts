@@ -268,12 +268,16 @@ class StatisticsController {
 
   /**
    * 获取业绩趋势统计（月度/季度/年度）
-   * 显示所有员工的汇总业绩趋势，使用与员工业绩相同的计算逻辑
+   * 显示当前登录用户的个人业绩趋势
    */
   async getPerformanceTrend(req: Request, res: Response) {
     try {
       const { period = 'month', year, month } = req.query;
       const currentUserId = (req as any).user?.id;
+
+      if (!currentUserId) {
+        return res.status(401).json(createErrorResponse(401, '未获取到用户身份信息', null, req.path));
+      }
 
       let periods: any[] = [];
       const now = new Date();
@@ -325,89 +329,60 @@ class StatisticsController {
         }
       }
 
-      // 获取所有员工用户（排除超级管理员）
-      const users = await prisma.user.findMany({
-        where: {
-          status: 1,
-          userRoles: {
-            none: {
-              role: {
-                roleCode: 'super_admin'
-              }
-            }
-          }
-        },
-        include: {
-          userRoles: {
-            include: {
-              role: true
-            }
-          },
-          department: true
-        }
-      });
-
-      // 计算每个时间段的汇总业绩数据
+      // 计算每个时间段的当前用户个人业绩数据
       const trendData = await Promise.all(
         periods.map(async (period) => {
-          let totalTrainingFee = 0;
-          let totalProjectIncome = 0;
-
-          // 遍历所有员工，计算每个员工在此时间段的业绩
-          for (const user of users) {
-            // 获取该时间段内该员工负责的培训费收入
-            const studentTrainingFees = await prisma.classStudent.aggregate({
-              where: {
-                joinDate: {
-                  gte: period.startDate,
-                  lte: period.endDate
-                },
-                createdById: user.id
+          // 获取该时间段内当前用户负责的培训费收入
+          const studentTrainingFees = await prisma.classStudent.aggregate({
+            where: {
+              joinDate: {
+                gte: period.startDate,
+                lte: period.endDate
               },
-              _sum: {
-                trainingFee: true
-              }
-            });
+              createdById: currentUserId
+            },
+            _sum: {
+              trainingFee: true
+            }
+          });
 
-            // 获取该时间段内该员工相关的项目收入
-            const completedTasksAmount = await prisma.task.aggregate({
-              where: {
-                completionTime: {
-                  gte: period.startDate,
-                  lte: period.endDate
-                },
-                isCompleted: true,
-                paymentAmount: {
-                  not: null
-                },
-                OR: [
-                  { responsiblePersonId: user.id },
-                  { executorId: user.id },
-                  { consultantId: user.id },
-                  { marketManagerId: user.id }
-                ]
+          // 获取该时间段内当前用户相关的项目收入
+          const completedTasksAmount = await prisma.task.aggregate({
+            where: {
+              completionTime: {
+                gte: period.startDate,
+                lte: period.endDate
               },
-              _sum: {
-                paymentAmount: true
-              }
-            });
+              isCompleted: true,
+              paymentAmount: {
+                not: null
+              },
+              OR: [
+                { responsiblePersonId: currentUserId },
+                { executorId: currentUserId },
+                { consultantId: currentUserId },
+                { marketManagerId: currentUserId }
+              ]
+            },
+            _sum: {
+              paymentAmount: true
+            }
+          });
 
-            totalTrainingFee += Number(studentTrainingFees._sum.trainingFee || 0);
-            totalProjectIncome += Number(completedTasksAmount._sum.paymentAmount || 0);
-          }
-
-          const totalActual = totalTrainingFee + totalProjectIncome;
+          const trainingFeeIncome = Number(studentTrainingFees._sum.trainingFee || 0);
+          const projectIncome = Number(completedTasksAmount._sum.paymentAmount || 0);
+          const totalActual = trainingFeeIncome + projectIncome;
 
           return {
             period: period.label,
             actualPerformance: totalActual,
-            trainingFeeIncome: totalTrainingFee,
-            projectIncome: totalProjectIncome
+            trainingFeeIncome: trainingFeeIncome,
+            projectIncome: projectIncome
           };
         })
       );
 
-      res.json(createSuccessResponse(trendData, '获取业绩趋势统计成功', req.path));
+      res.json(createSuccessResponse(trendData, '获取个人业绩趋势统计成功', req.path));
     } catch (error) {
       logger.error('获取业绩趋势统计失败:', error);
       res.status(500).json(createErrorResponse(500, '获取业绩趋势统计失败', null, req.path));
