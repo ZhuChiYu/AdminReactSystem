@@ -31,6 +31,7 @@ import React, { useEffect, useState } from 'react';
 import { expenseService } from '@/service/api';
 import type { ExpenseApi } from '@/service/api/types';
 import { isSuperAdmin } from '@/utils/auth';
+import { getDisplayFileName } from '@/utils/encoding';
 import { getCenterColumnConfig, getTableConfig } from '@/utils/table';
 
 const { Text, Title } = Typography;
@@ -244,7 +245,7 @@ const Component: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = originalName;
+      link.download = getDisplayFileName(originalName, fileName); // 使用修复后的文件名
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -568,7 +569,7 @@ const Component: React.FC = () => {
                       }}
                     >
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 500 }}>{attachment.originalName}</div>
+                        <div style={{ fontWeight: 500 }}>{getDisplayFileName(attachment.originalName, attachment.fileName)}</div>
                         <div style={{ color: '#666', fontSize: '12px' }}>
                           {attachment.fileType} • {(attachment.fileSize / 1024).toFixed(1)} KB
                         </div>
@@ -783,7 +784,7 @@ const Component: React.FC = () => {
                       }}
                     >
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 500 }}>{attachment.originalName}</div>
+                        <div style={{ fontWeight: 500 }}>{getDisplayFileName(attachment.originalName, attachment.fileName)}</div>
                         <div style={{ color: '#666', fontSize: '12px' }}>
                           {attachment.fileType} • {(attachment.fileSize / 1024).toFixed(1)} KB
                           {attachment.uploadTime && ` • ${new Date(attachment.uploadTime).toLocaleString('zh-CN')}`}

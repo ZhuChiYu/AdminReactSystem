@@ -42,6 +42,18 @@ const upload = multer({
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ];
 
+    // 修复中文文件名编码问题
+    if (file.originalname) {
+      try {
+        // 尝试解码ISO-8859-1到UTF-8（修复浏览器上传时的编码问题）
+        const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        file.originalname = decoded;
+      } catch (error) {
+        // 如果解码失败，保持原文件名
+        console.warn('费用申请附件文件名编码修复失败:', error);
+      }
+    }
+
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {

@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { expenseService } from '@/service/api';
 import { isSuperAdmin } from '@/utils/auth';
+import { getDisplayFileName } from '@/utils/encoding';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Text, Title } = Typography;
@@ -190,7 +191,7 @@ const Component: React.FC = () => {
       const url = window.URL.createObjectURL(new Blob([response]));
       const link = document.createElement('a');
       link.href = url;
-      link.download = originalName || fileName;
+      link.download = getDisplayFileName(originalName, fileName); // 使用修复后的文件名
       document.body.appendChild(link);
       link.click();
 
@@ -508,7 +509,7 @@ const Component: React.FC = () => {
                       }}
                     >
                       <div>
-                        <Text strong>{attachment.originalName || attachment.fileName}</Text>
+                        <Text strong>{getDisplayFileName(attachment.originalName, attachment.fileName)}</Text>
                         <div>
                           <Text type="secondary">大小: {(attachment.fileSize / 1024 / 1024).toFixed(2)}MB</Text>
                           {attachment.description && <Text type="secondary"> | {attachment.description}</Text>}
