@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger';
 class CustomerController {
   /** 获取客户列表 */
   async getCustomers(req: Request, res: Response) {
-    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source, phone, mobile } = req.query;
+    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source, phone, mobile, assignedToName } = req.query;
 
     const user = (req as any).user; // 获取当前登录用户
     const page = Number(current);
@@ -80,6 +80,16 @@ class CustomerController {
         );
       }
       where.OR = [...(where.OR || []), ...phoneConditions];
+    }
+
+    // 添加负责人姓名搜索条件
+    if (assignedToName) {
+      where.assignedTo = {
+        nickName: {
+          contains: assignedToName as string,
+          mode: 'insensitive'
+        }
+      };
     }
 
     try {
@@ -767,7 +777,7 @@ class CustomerController {
 
         try {
           // Excel列顺序：A=姓名, B=性别, C=单位, D=职位, E=电话, F=手机, G=跟进, H=状态
-          const rawStatus = row[7]?.toString().trim() || 'consult';
+          const rawStatus = row[7]?.toString().trim() || '';
 
           // 状态映射：中文 -> 英文枚举
           const statusMap: Record<string, string> = {
@@ -784,6 +794,12 @@ class CustomerController {
             未通过: 'rejected'
           };
 
+          // 处理状态：如果状态为空，设置为 'empty'；如果有值但无效，使用 'consult' 作为兜底
+          let followStatus = 'empty'; // 默认为空状态
+          if (rawStatus) {
+            followStatus = statusMap[rawStatus] || 'consult';
+          }
+
           const customerData = {
             customerName: row[0]?.toString().trim() || '',        // A列：姓名
             gender: row[1]?.toString().trim() || '',              // B列：性别
@@ -792,7 +808,7 @@ class CustomerController {
             phone: row[4]?.toString().trim() || '',               // E列：电话
             mobile: row[5]?.toString().trim() || '',              // F列：手机
             remark: row[6]?.toString().trim() || '',              // G列：跟进
-            followStatus: statusMap[rawStatus] || rawStatus || 'consult', // H列：状态
+            followStatus,                                         // H列：状态
             assignedToId: req.user.id, // 导入者默认成为负责人
             assignedTime: new Date(), // 设置分配时间
             createdById: req.user.id,
@@ -903,10 +919,9 @@ class CustomerController {
       });
 
       const importResult = {
-        errors: errors.slice(0, 10),
+        errors: errors, // 返回所有错误信息，不做限制
         failureCount,
-        // 最多返回前10个错误
-        hasMoreErrors: errors.length > 10,
+        hasMoreErrors: false, // 不再限制错误数量
         successCount,
         totalCount: successCount + failureCount
       };
