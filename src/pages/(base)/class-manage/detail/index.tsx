@@ -1679,6 +1679,9 @@ const ClassDetail = () => {
                 dataIndex: 'followStatus',
                 key: 'followStatus',
                 render: (status: string) => {
+                  if (status === 'empty') {
+                    return <span style={{ color: '#8c8c8c' }}>-</span>;
+                  }
                   const statusMap: Record<string, { color: string; text: string }> = {
                     consult: { color: 'blue', text: '咨询' },
                     effective_visit: { color: 'orange', text: '有效回访' },

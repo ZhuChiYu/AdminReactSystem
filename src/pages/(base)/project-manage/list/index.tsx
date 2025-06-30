@@ -36,7 +36,8 @@ const followUpStatusNames = {
   [FollowUpStatus.REGISTERED]: '已报名',
   [FollowUpStatus.REJECTED]: '已拒绝',
   [FollowUpStatus.VIP]: 'VIP客户',
-  [FollowUpStatus.WECHAT_ADDED]: '已加微信'
+  [FollowUpStatus.WECHAT_ADDED]: '已加微信',
+  empty: '-'
 };
 
 /** 跟进状态颜色映射 */
@@ -703,6 +704,9 @@ const TaskManagement = () => {
       key: 'followStatus',
       ...getCenterColumnConfig(),
       render: (status: FollowUpStatus) => {
+        if (status === 'empty') {
+          return <span style={{ color: '#8c8c8c' }}>-</span>;
+        }
         const statusText = followUpStatusNames[status] || status;
         const color = followUpStatusColors[status] || 'default';
         return <Tag color={color}>{statusText}</Tag>;

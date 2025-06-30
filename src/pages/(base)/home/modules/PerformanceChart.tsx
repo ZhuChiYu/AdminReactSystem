@@ -35,7 +35,8 @@ const followUpStatusNames = {
   [FollowUpStatus.NOT_ARRIVED]: '未实到',
   [FollowUpStatus.REGISTERED]: '已报名',
   [FollowUpStatus.WECHAT_ADDED]: '已加微信',
-  [FollowUpStatus.EARLY_25]: '早25'
+  [FollowUpStatus.EARLY_25]: '早25',
+  empty: '未设置'
 };
 
 // 跟进状态颜色映射
