@@ -766,8 +766,8 @@ class CustomerController {
         }
 
         try {
-          // Excel列顺序：A=姓名, B=单位, C=职务, D=电话, E=手机, F=跟进, G=状态
-          const rawStatus = row[6]?.toString().trim() || 'consult';
+          // Excel列顺序：A=姓名, B=性别, C=单位, D=职位, E=电话, F=手机, G=跟进, H=状态
+          const rawStatus = row[7]?.toString().trim() || 'consult';
 
           // 状态映射：中文 -> 英文枚举
           const statusMap: Record<string, string> = {
@@ -785,23 +785,20 @@ class CustomerController {
           };
 
           const customerData = {
-            // A列：姓名
+            customerName: row[0]?.toString().trim() || '',        // A列：姓名
+            gender: row[1]?.toString().trim() || '',              // B列：性别
+            company: row[2]?.toString().trim() || '',             // C列：单位
+            position: row[3]?.toString().trim() || '',            // D列：职位
+            phone: row[4]?.toString().trim() || '',               // E列：电话
+            mobile: row[5]?.toString().trim() || '',              // F列：手机
+            remark: row[6]?.toString().trim() || '',              // G列：跟进
+            followStatus: statusMap[rawStatus] || rawStatus || 'consult', // H列：状态
             assignedToId: req.user.id, // 导入者默认成为负责人
             assignedTime: new Date(), // 设置分配时间
-            company: row[1]?.toString().trim() || '',
             createdById: req.user.id,
-            customerName: row[0]?.toString().trim() || '',
-            email: '', // F列：跟进内容
-            followStatus: statusMap[rawStatus] || rawStatus || 'consult', // G列：状态
+            email: '', // 邮箱暂时为空，可后续补充
             industry: 'other',
-            level: 1, // D列：电话
-            mobile: row[4]?.toString().trim() || '',
-            // C列：职务
-            phone: row[3]?.toString().trim() || '',
-            // B列：单位
-            position: row[2]?.toString().trim() || '',
-            // E列：手机
-            remark: row[5]?.toString().trim() || '',
+            level: 1,
             source: 'import'
           };
 

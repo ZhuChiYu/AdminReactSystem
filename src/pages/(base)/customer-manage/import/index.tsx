@@ -52,6 +52,7 @@ interface CustomerImportItem {
   createTime: string;
   followStatus: FollowUpStatus;
   followUp: string;
+  gender: string;
   id: number;
   mobile: string;
   name: string;
@@ -162,19 +163,20 @@ const CustomerImport = () => {
 
           dataRows.forEach((row: any[], index: number) => {
             if (row && !row.every(cell => !cell || cell.toString().trim() === '')) {
-              // Excel列顺序：A=姓名, B=单位, C=职务, D=电话, E=手机, F=跟进, G=状态
+              // Excel列顺序：A=姓名, B=性别, C=单位, D=职位, E=电话, F=手机, G=跟进, H=状态
               const item: CustomerImportItem = {
-                // A列：姓名
-                company: row[1]?.toString().trim() || '',
-                // G列：状态
-                createTime: new Date().toLocaleString(), // F列：跟进
-                followStatus: mapStatusToEnum(row[6]?.toString().trim() || 'consult'), // E列：手机
-                followUp: row[5]?.toString().trim() || '暂无跟进内容',
-                id: index + 1, // D列：电话
-                mobile: row[4]?.toString().trim() || '',
-                name: row[0]?.toString().trim() || '', // C列：职务
-                phone: row[3]?.toString().trim() || '', // B列：单位
-                position: row[2]?.toString().trim() || ''
+                // B列：性别
+                company: row[2]?.toString().trim() || '', // H列：状态
+                createTime: new Date().toLocaleString(), // G列：跟进
+                followStatus: mapStatusToEnum(row[7]?.toString().trim() || 'consult'), // F列：手机
+                followUp: row[6]?.toString().trim() || '暂无跟进内容', // A列：姓名
+                gender: row[1]?.toString().trim() || '',
+                id: index + 1, // E列：电话
+                mobile: row[5]?.toString().trim() || '',
+                name: row[0]?.toString().trim() || '', // D列：职位
+                phone: row[4]?.toString().trim() || '',
+                // C列：单位
+                position: row[3]?.toString().trim() || ''
               };
 
               if (item.name || item.company) {
@@ -323,49 +325,61 @@ const CustomerImport = () => {
       width: 60
     },
     {
-      dataIndex: 'company',
-      ellipsis: true,
-      key: 'company',
-      title: '单位',
-      width: 220
-    },
-    {
       dataIndex: 'name',
       key: 'name',
       title: '姓名',
       width: 100
     },
     {
+      dataIndex: 'gender',
+      key: 'gender',
+      render: (gender: string) => {
+        if (!gender) return '-';
+        if (gender === '男' || gender === 'male') return '男';
+        if (gender === '女' || gender === 'female') return '女';
+        return gender;
+      },
+      title: '性别',
+      width: 80
+    },
+    {
+      dataIndex: 'company',
+      ellipsis: true,
+      key: 'company',
+      title: '单位',
+      width: 200
+    },
+    {
       dataIndex: 'position',
       key: 'position',
       title: '职位',
-      width: 140
+      width: 120
     },
     {
       dataIndex: 'phone',
       key: 'phone',
       title: '电话',
-      width: 150
+      width: 130
     },
     {
       dataIndex: 'mobile',
       key: 'mobile',
       title: '手机',
-      width: 120
+      width: 130
     },
     {
       dataIndex: 'followUp',
       ellipsis: true,
       key: 'followUp',
       title: '跟进',
-      width: 250
+      width: 200
     },
     {
       dataIndex: 'followStatus',
       key: 'followStatus',
       render: (status: FollowUpStatus) => <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>,
       title: '状态',
-      width: 80
+      width: 100
     },
     {
       dataIndex: 'createTime',
