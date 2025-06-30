@@ -45,6 +45,9 @@ const getStatusColor = (status: string) => {
 
 /** 获取状态标签文本 */
 const getStatusLabel = (status: string) => {
+  if (status === 'empty') {
+    return '-';
+  }
   const option = followUpStatusOptions.find(opt => opt.value === status);
   return option?.label || status;
 };
@@ -103,7 +106,16 @@ const CustomerFollow = () => {
   // 检查是否为超级管理员
   const isSuper = isSuperAdmin();
 
-  // 获取跟进数据 - 支持分页和状态筛选
+  // 搜索条件
+  const [searchParams, setSearchParams] = useState({
+    assignedToName: '',
+    company: '',
+    customerName: '',
+    followStatus: '',
+    phone: ''
+  });
+
+  // 获取跟进数据 - 支持分页、状态筛选和搜索
   const fetchFollowData = async (pageNum?: number, pageSize?: number, status?: string) => {
     setLoading(true);
     try {
@@ -120,7 +132,12 @@ const CustomerFollow = () => {
 
       // 构建查询参数
       const queryParams: any = {
+        assignedToName: searchParams.assignedToName || undefined,
+        company: searchParams.company || undefined,
         current: currentPage,
+        customerName: searchParams.customerName || undefined,
+        mobile: searchParams.phone || undefined,
+        phone: searchParams.phone || undefined,
         scope: 'own',
         size: currentPageSize
       };
@@ -128,6 +145,8 @@ const CustomerFollow = () => {
       // 如果有状态筛选且不是'all'，添加筛选条件
       if (currentStatus && currentStatus !== 'all') {
         queryParams.followStatus = currentStatus;
+      } else if (searchParams.followStatus) {
+        queryParams.followStatus = searchParams.followStatus;
       }
 
       // 获取客户列表数据，支持分页和筛选
@@ -201,6 +220,25 @@ const CustomerFollow = () => {
 
     // 重新获取数据
     fetchFollowData(page, newPageSize);
+  };
+
+  // 处理搜索
+  const handleSearch = () => {
+    setPagination(prev => ({ ...prev, current: 1 })); // 重置到第一页
+    fetchFollowData(1, pagination.pageSize);
+  };
+
+  // 重置搜索条件
+  const resetSearch = () => {
+    setSearchParams({
+      assignedToName: '',
+      company: '',
+      customerName: '',
+      followStatus: '',
+      phone: ''
+    });
+    setPagination(prev => ({ ...prev, current: 1 }));
+    fetchFollowData(1, pagination.pageSize);
   };
 
   // 添加跟进记录
@@ -503,7 +541,12 @@ const CustomerFollow = () => {
       dataIndex: 'followStatus',
       key: 'followStatus',
       ...getCenterColumnConfig(),
-      render: (status: string) => <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>,
+      render: (status: string) => {
+        if (status === 'empty') {
+          return <span style={{ color: '#8c8c8c' }}>-</span>;
+        }
+        return <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>;
+      },
       title: '跟进状态',
       width: 100
     },
@@ -580,6 +623,11 @@ const CustomerFollow = () => {
     fetchFollowData();
   }, []);
 
+  // 当搜索参数变化时重新获取数据
+  useEffect(() => {
+    fetchFollowData();
+  }, [searchParams]);
+
   return (
     <div className="customer-follow">
       {/* 统计卡片 */}
@@ -635,6 +683,63 @@ const CustomerFollow = () => {
         ))}
       </Row>
 
+      {/* 搜索框 */}
+      <Card style={{ marginBottom: 16 }}>
+        <div className="mb-4 flex flex-wrap items-center gap-4">
+          <Input
+            allowClear
+            placeholder="客户姓名"
+            style={{ width: 150 }}
+            value={searchParams.customerName}
+            onChange={e => setSearchParams({ ...searchParams, customerName: e.target.value })}
+          />
+          <Input
+            allowClear
+            placeholder="电话或手机号"
+            style={{ width: 160 }}
+            value={searchParams.phone}
+            onChange={e => setSearchParams({ ...searchParams, phone: e.target.value })}
+          />
+          <Input
+            allowClear
+            placeholder="单位名称"
+            style={{ width: 160 }}
+            value={searchParams.company}
+            onChange={e => setSearchParams({ ...searchParams, company: e.target.value })}
+          />
+          <Input
+            allowClear
+            placeholder="负责人姓名"
+            style={{ width: 160 }}
+            value={searchParams.assignedToName}
+            onChange={e => setSearchParams({ ...searchParams, assignedToName: e.target.value })}
+          />
+          <Select
+            allowClear
+            placeholder="跟进状态"
+            style={{ width: 150 }}
+            value={searchParams.followStatus}
+            onChange={value => setSearchParams({ ...searchParams, followStatus: value })}
+          >
+            {followUpStatusOptions.slice(1).map(option => (
+              <Select.Option
+                key={option.value}
+                value={option.value}
+              >
+                {option.label}
+              </Select.Option>
+            ))}
+          </Select>
+          <Button
+            type="primary"
+            onClick={handleSearch}
+          >
+            搜索
+          </Button>
+          <Button onClick={resetSearch}>重置</Button>
+        </div>
+      </Card>
+
       {/* 操作栏 */}
       <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
@@ -684,13 +789,13 @@ const CustomerFollow = () => {
         pagination={{
           ...getFullTableConfig(10).pagination,
           current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
           onChange: handleTableChange,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-          showSizeChanger: true,
+          pageSize: pagination.pageSize,
+          pageSizeOptions: ['10', '20', '50', '100'],
           showQuickJumper: true,
-          pageSizeOptions: ['10', '20', '50', '100']
+          showSizeChanger: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+          total: pagination.total
         }}
       />
 

@@ -11,12 +11,13 @@ enum FollowUpStatus {
   CONSULT = 'consult',
   EARLY_25 = 'early_25',
   EFFECTIVE_VISIT = 'effective_visit',
+  EMPTY = 'empty',
   NEW_DEVELOP = 'new_develop',
   NOT_ARRIVED = 'not_arrived',
   REGISTERED = 'registered',
   REJECTED = 'rejected',
   VIP = 'vip',
-  WECHAT_ADDED = 'wechat_added'
+  WECHAT_ADDED = 'wechat_added' // 表示空状态
 }
 
 /** 客户跟进状态名称 */
@@ -30,7 +31,8 @@ const followUpStatusNames: Record<FollowUpStatus, string> = {
   [FollowUpStatus.REGISTERED]: '已报名',
   [FollowUpStatus.ARRIVED]: '已实到',
   [FollowUpStatus.NOT_ARRIVED]: '未实到',
-  [FollowUpStatus.NEW_DEVELOP]: '新开发'
+  [FollowUpStatus.NEW_DEVELOP]: '新开发',
+  [FollowUpStatus.EMPTY]: '-'
 };
 
 /** 客户跟进状态颜色 */
@@ -44,7 +46,8 @@ const followUpStatusColors: Record<FollowUpStatus, string> = {
   [FollowUpStatus.REGISTERED]: 'success',
   [FollowUpStatus.ARRIVED]: 'green',
   [FollowUpStatus.NOT_ARRIVED]: 'orange',
-  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
+  [FollowUpStatus.NEW_DEVELOP]: 'geekblue',
+  [FollowUpStatus.EMPTY]: 'default'
 };
 
 interface CustomerImportItem {
@@ -74,14 +77,14 @@ const CustomerImport = () => {
     total: 0
   });
 
-  /** 将字符串状态映射为枚举值 */
-  const mapStatusToEnum = (status: string): FollowUpStatus => {
+  /** 状态映射表 */
     const statusMap: Record<string, FollowUpStatus> = {
+    // 英文状态映射
       arrived: FollowUpStatus.ARRIVED,
-      // 英文状态映射
       consult: FollowUpStatus.CONSULT,
       early_25: FollowUpStatus.EARLY_25,
       effective_visit: FollowUpStatus.EFFECTIVE_VISIT,
+    empty: FollowUpStatus.EMPTY,
       new_develop: FollowUpStatus.NEW_DEVELOP,
       not_arrived: FollowUpStatus.NOT_ARRIVED,
       registered: FollowUpStatus.REGISTERED,
@@ -102,7 +105,57 @@ const CustomerImport = () => {
       未通过: FollowUpStatus.REJECTED
     };
 
-    return statusMap[status] || FollowUpStatus.CONSULT;
+  /** 解析Excel工作表 */
+  const parseExcelWorksheet = async (data: any) => {
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.read(data, { type: 'binary' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  };
+
+  /** 创建客户项目 */
+  const createCustomerItem = (row: any[], index: number): CustomerImportItem => {
+    const rawStatus = row[7]?.toString().trim() || '';
+    // 如果状态为空，显示为空状态；如果有值但无效，使用 CONSULT 作为兜底
+    const followStatus = rawStatus ? statusMap[rawStatus] || FollowUpStatus.CONSULT : FollowUpStatus.EMPTY;
+
+    return {
+      company: row[2]?.toString().trim() || '',
+      createTime: new Date().toLocaleString(),
+      followStatus,
+      followUp: row[6]?.toString().trim() || '暂无跟进内容',
+      gender: row[1]?.toString().trim() || '',
+      id: index + 1,
+      mobile: row[5]?.toString().trim() || '',
+      name: row[0]?.toString().trim() || '',
+      phone: row[4]?.toString().trim() || '',
+      position: row[3]?.toString().trim() || ''
+    };
+  };
+
+  /** 处理Excel数据 */
+  const processExcelData = async (data: any): Promise<CustomerImportItem[]> => {
+    const jsonData = await parseExcelWorksheet(data);
+
+    if (jsonData.length <= 1) {
+      throw new Error('Excel文件中没有数据行');
+    }
+
+    const dataRows = jsonData.slice(1) as any[][];
+    const previewItems: CustomerImportItem[] = [];
+
+    dataRows.forEach((row: any[], index: number) => {
+      const isNotEmptyRow = row && !row.every(cell => !cell || cell.toString().trim() === '');
+      if (isNotEmptyRow) {
+        const item = createCustomerItem(row, index);
+        if (item.name || item.company) {
+          previewItems.push(item);
+        }
+      }
+    });
+
+    return previewItems;
   };
 
   /** 文件上传属性配置 */
@@ -129,12 +182,9 @@ const CustomerImport = () => {
     try {
       const file = fileList[0].originFileObj as File;
 
-      // 动态导入xlsx库
-      const XLSX = await import('xlsx');
-
       // 使用FileReader读取文件
       const reader = new FileReader();
-      reader.onload = e => {
+      reader.onload = async e => {
         try {
           const data = e.target?.result;
           if (!data) {
@@ -143,49 +193,7 @@ const CustomerImport = () => {
             return;
           }
 
-          // 使用xlsx库解析Excel
-          const workbook = XLSX.read(data, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-
-          // 转换为JSON数据
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-          if (jsonData.length <= 1) {
-            message.warning('Excel文件中没有数据行');
-            setUploading(false);
-            return;
-          }
-
-          // 跳过标题行，处理数据
-          const dataRows = jsonData.slice(1) as any[][];
-          const previewItems: CustomerImportItem[] = [];
-
-          dataRows.forEach((row: any[], index: number) => {
-            if (row && !row.every(cell => !cell || cell.toString().trim() === '')) {
-              // Excel列顺序：A=姓名, B=性别, C=单位, D=职位, E=电话, F=手机, G=跟进, H=状态
-              const item: CustomerImportItem = {
-                // B列：性别
-                company: row[2]?.toString().trim() || '', // H列：状态
-                createTime: new Date().toLocaleString(), // G列：跟进
-                followStatus: mapStatusToEnum(row[7]?.toString().trim() || 'consult'), // F列：手机
-                followUp: row[6]?.toString().trim() || '暂无跟进内容', // A列：姓名
-                gender: row[1]?.toString().trim() || '',
-                id: index + 1, // E列：电话
-                mobile: row[5]?.toString().trim() || '',
-                name: row[0]?.toString().trim() || '', // D列：职位
-                phone: row[4]?.toString().trim() || '',
-                // C列：单位
-                position: row[3]?.toString().trim() || ''
-              };
-
-              if (item.name || item.company) {
-                // 至少有姓名或公司
-                previewItems.push(item);
-              }
-            }
-          });
-
+          const previewItems = await processExcelData(data);
           setPreviewData(previewItems);
           setUploading(false);
           message.success(`预览成功，共${previewItems.length}条记录`);
@@ -237,30 +245,55 @@ const CustomerImport = () => {
       // 如果有错误信息，显示详细错误
       if (result.errors && result.errors.length > 0) {
         Modal.info({
+          centered: true,
           content: (
             <div>
-              <p>成功：{result.successCount} 条</p>
-              <p>失败：{result.failureCount} 条</p>
+              <div style={{ marginBottom: '16px' }}>
+                <p style={{ color: '#52c41a', fontWeight: 'bold', margin: '4px 0' }}>
+                  ✅ 成功：{result.successCount} 条
+                </p>
+                <p style={{ color: '#ff4d4f', fontWeight: 'bold', margin: '4px 0' }}>
+                  ❌ 失败：{result.failureCount} 条
+                </p>
+              </div>
               {result.errors.length > 0 && (
                 <div>
-                  <p>错误详情：</p>
-                  <ul style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  <p style={{ color: '#1890ff', fontWeight: 'bold', margin: '8px 0' }}>📋 错误详情：</p>
+                  <div
+                    style={{
+                      backgroundColor: '#fafafa',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '6px',
+                      maxHeight: '400px',
+                      overflowY: 'auto',
+                      padding: '8px'
+                    }}
+                  >
+                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
                     {result.errors.map((error, index) => (
                       <li
                         key={index}
-                        style={{ color: 'red', fontSize: '12px' }}
+                          style={{
+                            color: '#ff4d4f',
+                            fontSize: '13px',
+                            lineHeight: '1.6',
+                            marginBottom: '4px'
+                          }}
                       >
                         {error}
                       </li>
                     ))}
                   </ul>
-                  {result.hasMoreErrors && <p style={{ color: 'orange' }}>还有更多错误未显示...</p>}
+                  </div>
+                  <p style={{ color: '#8c8c8c', fontSize: '12px', margin: '8px 0 0 0' }}>
+                    💡 提示：请根据错误信息修正Excel文件后重新导入
+                  </p>
                 </div>
               )}
             </div>
           ),
-          title: '导入详情',
-          width: 600
+          title: '📊 导入结果详情',
+          width: 700
         });
       }
 
@@ -377,7 +410,12 @@ const CustomerImport = () => {
     {
       dataIndex: 'followStatus',
       key: 'followStatus',
-      render: (status: FollowUpStatus) => <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>,
+      render: (status: FollowUpStatus) => {
+        if (status === FollowUpStatus.EMPTY) {
+          return <span style={{ color: '#8c8c8c' }}>-</span>;
+        }
+        return <Tag color={followUpStatusColors[status]}>{followUpStatusNames[status]}</Tag>;
+      },
       title: '状态',
       width: 100
     },

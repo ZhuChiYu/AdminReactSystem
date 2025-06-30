@@ -37,7 +37,8 @@ const followUpStatusNames: Record<string, string> = {
   [FollowUpStatus.NOT_ARRIVED]: '未实到',
   [FollowUpStatus.NEW_DEVELOP]: '新开发',
   already_paid: '已实到',
-  already_signed: '已报名'
+  already_signed: '已报名',
+  empty: '-'
 };
 
 /** 跟进状态颜色 */
@@ -96,6 +97,7 @@ const CustomerManagement = () => {
 
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
+    assignedToName: '',
     company: '',
     customerName: '',
     followStatus: '',
@@ -107,6 +109,7 @@ const CustomerManagement = () => {
     setLoading(true);
     try {
       const params: CustomerApi.CustomerQueryParams = {
+        assignedToName: searchParams.assignedToName || undefined,
         company: searchParams.company || undefined,
         current: pagination.current,
         customerName: searchParams.customerName || undefined,
@@ -168,6 +171,7 @@ const CustomerManagement = () => {
   // 重置搜索条件
   const resetSearch = () => {
     setSearchParams({
+      assignedToName: '',
       company: '',
       customerName: '',
       followStatus: '',
@@ -476,6 +480,9 @@ const CustomerManagement = () => {
       title: '跟进状态',
       ...getCenterColumnConfig(),
       render: (status: string) => {
+        if (status === 'empty') {
+          return <span style={{ color: '#8c8c8c' }}>-</span>;
+        }
         const statusName = followUpStatusNames[status] || status;
         const colorMap: Record<string, string> = {
           [FollowUpStatus.VIP]: 'red',
@@ -573,7 +580,7 @@ const CustomerManagement = () => {
           </Space>
         }
       >
-        <div className="mb-4 flex items-center gap-4">
+        <div className="mb-4 flex flex-wrap items-center gap-4">
           <Input
             allowClear
             placeholder="客户姓名"
@@ -584,16 +591,23 @@ const CustomerManagement = () => {
           <Input
             allowClear
             placeholder="电话/手机"
-            style={{ width: 150 }}
+            style={{ width: 160 }}
             value={searchParams.phone}
             onChange={e => setSearchParams({ ...searchParams, phone: e.target.value })}
           />
           <Input
             allowClear
             placeholder="单位名称"
-            style={{ width: 200 }}
+            style={{ width: 160 }}
             value={searchParams.company}
             onChange={e => setSearchParams({ ...searchParams, company: e.target.value })}
+          />
+          <Input
+            allowClear
+            placeholder="负责人姓名"
+            style={{ width: 160 }}
+            value={searchParams.assignedToName}
+            onChange={e => setSearchParams({ ...searchParams, assignedToName: e.target.value })}
           />
           <Select
             allowClear
