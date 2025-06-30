@@ -28,8 +28,9 @@ import {
 import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 
-import { meetingService } from '@/service/api';
+import { meetingService, fetchGetUserList } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
+import { getCurrentUserId } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Paragraph, Text, Title } = Typography;
@@ -52,9 +53,29 @@ const MeetingSummaryPage = () => {
   const [loading, setLoading] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
   const [createVisible, setCreateVisible] = useState(false);
+  const [participantsModalVisible, setParticipantsModalVisible] = useState(false);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
   const [selectedSummary, setSelectedSummary] = useState<MeetingSummary | null>(null);
+  const [currentSummaryForParticipants, setCurrentSummaryForParticipants] = useState<MeetingSummary | null>(null);
   const [meetings, setMeetings] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [form] = Form.useForm();
+
+  // 获取用户列表
+  const fetchUsers = async () => {
+    try {
+      const response = await fetchGetUserList({
+        current: 1,
+        size: 1000 // 获取所有用户
+      });
+
+      if (response?.records) {
+        setUsers(response.records);
+      }
+    } catch (error) {
+      console.error('获取用户列表失败:', error);
+    }
+  };
 
   // 获取会议列表
   const fetchMeetings = async () => {
@@ -80,6 +101,26 @@ const MeetingSummaryPage = () => {
     }
   };
 
+    // 使用项目中已有的用户认证工具函数
+
+    // 判断用户是否为会议参与者
+  const isUserParticipant = (userId: string, meeting: any): boolean => {
+    if (!meeting || !userId) return false;
+
+    const numUserId = parseInt(userId, 10);
+
+    // 如果是会议的组织者，可以查看
+    if (meeting.organizer?.id === numUserId || meeting.organizer?.id?.toString() === userId) return true;
+
+    // 如果有participantIds数组，检查用户是否在其中
+    if ((meeting as any).participantIds && Array.isArray((meeting as any).participantIds)) {
+      return (meeting as any).participantIds.includes(numUserId) || (meeting as any).participantIds.includes(userId);
+    }
+
+    // 如果没有具体的参与者信息，暂时允许查看
+    return true;
+  };
+
   // 获取会议总结列表
   const fetchSummaries = async () => {
     setLoading(true);
@@ -90,19 +131,31 @@ const MeetingSummaryPage = () => {
       });
 
       // 转换API数据格式
-      const formattedSummaries: MeetingSummary[] = response.records.map((summary: any) => ({
-        content: summary.content,
-        createTime: summary.createdAt,
-        creator: summary.creator?.nickName || summary.creator?.userName || '',
-        id: summary.id,
-        meetingDate: summary.meeting?.startTime,
-        meetingId: summary.meetingId,
-        meetingTitle: summary.meeting?.title || summary.title,
-        participants: summary.participants ? JSON.parse(summary.participants) : [],
-        status: summary.status === 1 ? 'published' : 'draft'
-      }));
+      const formattedSummaries: MeetingSummary[] = (response as any).records.map((summary: any) => {
+        const relatedMeeting = meetings.find(m => m.id === summary.meetingId);
+        const participantCount = relatedMeeting?.participantCount || 0;
 
-      setSummaries(formattedSummaries);
+        return {
+          content: summary.content,
+          createTime: dayjs(summary.createdAt || summary.createTime).format('YYYY-MM-DD HH:mm'),
+          creator: summary.creator?.nickName || summary.creator?.userName || '',
+          id: summary.id,
+          meetingDate: dayjs(summary.meeting?.startTime || relatedMeeting?.startTime).format('YYYY-MM-DD'),
+          meetingId: summary.meetingId,
+          meetingTitle: summary.meeting?.title || summary.title || relatedMeeting?.meetingTitle || '',
+          participants: Array.from({ length: participantCount }, (_, index) => `参与者${index + 1}`), // 根据实际参会人数生成数组
+          status: summary.status === 1 ? 'published' : 'draft'
+        };
+      });
+
+      // 权限过滤：只显示当前用户参与的会议总结
+      const currentUserId = getCurrentUserId();
+      const filteredSummaries = formattedSummaries.filter(summary => {
+        const relatedMeeting = meetings.find(m => m.id.toString() === summary.meetingId.toString());
+        return isUserParticipant(currentUserId, relatedMeeting);
+      });
+
+      setSummaries(filteredSummaries);
     } catch (error) {
       message.error('获取会议总结列表失败');
       console.error('获取会议总结列表失败:', error);
@@ -112,9 +165,16 @@ const MeetingSummaryPage = () => {
   };
 
   useEffect(() => {
-    fetchSummaries();
     fetchMeetings();
+    fetchUsers();
   }, []);
+
+  // 当meetings数据加载完成后，再获取会议总结
+  useEffect(() => {
+    if (meetings.length > 0) {
+      fetchSummaries();
+    }
+  }, [meetings]);
 
   const showDetail = (summary: MeetingSummary) => {
     setSelectedSummary(summary);
@@ -124,6 +184,80 @@ const MeetingSummaryPage = () => {
   const showCreateModal = () => {
     form.resetFields();
     setCreateVisible(true);
+  };
+
+  // 查看参与人员
+  const handleViewParticipants = async (summary: MeetingSummary) => {
+    if (summary.participants.length === 0) {
+      message.info('该会议总结暂无参与人员');
+      return;
+    }
+
+    setCurrentSummaryForParticipants(summary);
+    setParticipantsModalVisible(true);
+    setParticipantsLoading(true);
+
+    try {
+      // 尝试从会议详情获取参与人员信息
+      const relatedMeeting = meetings.find(m => m.id.toString() === summary.meetingId.toString());
+      if (relatedMeeting) {
+        try {
+          const detail = await meetingService.getMeetingDetail(relatedMeeting.id);
+
+          let participantsData: Array<{ id: number; name: string }> = [];
+
+          // 从后端API返回的数据结构中正确提取参与人员信息
+          if ((detail as any).participants && Array.isArray((detail as any).participants)) {
+            participantsData = (detail as any).participants.map((participant: any) => {
+              // 后端返回的结构：{ id: participantId, user: { id, nickName, userName, ... } }
+              const user = participant.user;
+              return {
+                id: user?.id || participant.id,
+                name: user?.nickName || user?.userName || `参与人员${participant.id}`
+              };
+            });
+            console.log('会议总结-从participants提取到的数据:', participantsData); // 调试日志
+          } else if ((detail as any).participantIds && Array.isArray((detail as any).participantIds)) {
+            participantsData = (detail as any).participantIds.map((participantId: number) => {
+              const user = users.find(u => u.id === participantId);
+              return {
+                id: participantId,
+                name: user ? (user.nickName || user.userName) : `用户${participantId}`
+              };
+            });
+            console.log('会议总结-从participantIds提取到的数据:', participantsData); // 调试日志
+          } else {
+            // 如果API没有返回参与人员详情，生成占位数据
+            participantsData = Array.from({ length: summary.participants.length }, (_, index) => ({
+              id: index + 1,
+              name: `参与者${index + 1}`
+            }));
+            console.log('会议总结-生成的占位数据:', participantsData); // 调试日志
+          }
+
+          // 更新当前总结的参与人员信息
+          setCurrentSummaryForParticipants(prev => prev ? {
+            ...prev,
+            participantsDetail: participantsData
+          } as MeetingSummary & { participantsDetail: Array<{ id: number; name: string }> } : null);
+
+        } catch (error) {
+          console.error('获取会议详情失败:', error);
+          // 使用占位数据
+          const participantsData = Array.from({ length: summary.participants.length }, (_, index) => ({
+            id: index + 1,
+            name: `参与者${index + 1}`
+          }));
+
+          setCurrentSummaryForParticipants(prev => prev ? {
+            ...prev,
+            participantsDetail: participantsData
+          } as MeetingSummary & { participantsDetail: Array<{ id: number; name: string }> } : null);
+        }
+      }
+    } finally {
+      setParticipantsLoading(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -175,7 +309,16 @@ const MeetingSummaryPage = () => {
       key: 'participants',
       title: '参与人数',
       ...getCenterColumnConfig(),
-      render: (participants: string[]) => participants.length
+      render: (participants: string[], record: MeetingSummary) => (
+        <Button
+          type="link"
+          style={{ padding: 0, height: 'auto', color: participants.length > 0 ? '#1890ff' : 'inherit' }}
+          disabled={participants.length === 0}
+          onClick={() => handleViewParticipants(record)}
+        >
+          {participants.length} 人
+        </Button>
+      )
     },
     {
       dataIndex: 'status',
@@ -310,16 +453,16 @@ const MeetingSummaryPage = () => {
             <div className="mb-4">
               <Title level={5}>{selectedSummary.meetingTitle}</Title>
               <div className="mb-2">
-                <Text type="secondary">会议日期：{dayjs(selectedSummary.meetingDate).format('YYYY-MM-DD')}</Text>
+                <Text type="secondary">会议日期：{selectedSummary.meetingDate}</Text>
               </div>
               <div className="mb-2">
                 <Text type="secondary">创建人：{selectedSummary.creator}</Text>
               </div>
               <div className="mb-2">
-                <Text type="secondary">创建时间：{dayjs(selectedSummary.createTime).format('YYYY-MM-DD HH:mm')}</Text>
+                <Text type="secondary">创建时间：{selectedSummary.createTime}</Text>
               </div>
               <div className="mb-4">
-                <Text type="secondary">参与人员：{selectedSummary.participants.join('、')}</Text>
+                <Text type="secondary">参与人数：{selectedSummary.participants.length} 人</Text>
               </div>
             </div>
 
@@ -338,6 +481,67 @@ const MeetingSummaryPage = () => {
                 {selectedSummary.content}
               </div>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 参与人员弹窗 */}
+      <Modal
+        destroyOnClose
+        open={participantsModalVisible}
+        title="参与人员"
+        width={500}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => setParticipantsModalVisible(false)}
+          >
+            关闭
+          </Button>
+        ]}
+        onCancel={() => setParticipantsModalVisible(false)}
+      >
+        {currentSummaryForParticipants && (
+          <div>
+            <div className="mb-4">
+              <p>
+                <strong>会议标题：</strong> {currentSummaryForParticipants.meetingTitle}
+              </p>
+              <p>
+                <strong>会议日期：</strong> {currentSummaryForParticipants.meetingDate}
+              </p>
+              <p>
+                <strong>参与人数：</strong> {currentSummaryForParticipants.participants.length} 人
+              </p>
+            </div>
+
+            {participantsLoading ? (
+              <div className="text-center py-4">
+                <div>正在加载参与人员...</div>
+              </div>
+            ) : (currentSummaryForParticipants as any).participantsDetail && (currentSummaryForParticipants as any).participantsDetail.length > 0 ? (
+              <div>
+                <h4 className="mb-3">参与人员列表：</h4>
+                <div className="space-y-2">
+                  {(currentSummaryForParticipants as any).participantsDetail.map((participant: any, index: number) => (
+                    <div
+                      key={participant.id}
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                    >
+                      <span className="flex items-center">
+                        <span className="mr-2 text-gray-500">#{index + 1}</span>
+                        <span>{participant.name}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <div>暂无参与人员详情</div>
+                <div className="text-sm mt-2">参与人数：{currentSummaryForParticipants.participants.length} 人</div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

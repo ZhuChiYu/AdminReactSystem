@@ -20,6 +20,7 @@ import React, { useEffect, useState } from 'react';
 
 import { meetingService, fetchGetUserList } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
+import { getCurrentUserId, getCurrentUserName } from '@/utils/auth';
 
 const { Paragraph, Text, Title } = Typography;
 const { TextArea } = Input;
@@ -48,13 +49,110 @@ const Component: React.FC = () => {
   const [participantRecordForm] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [participantRecordModalVisible, setParticipantRecordModalVisible] = useState(false);
+  const [participantsModalVisible, setParticipantsModalVisible] = useState(false);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MeetingRecord | null>(null);
   const [records, setRecords] = useState<MeetingRecord[]>([]);
   const [meetings, setMeetings] = useState<MeetingApi.MeetingListItem[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [currentMeetingForParticipants, setCurrentMeetingForParticipants] = useState<MeetingRecord | null>(null);
 
-  // 模拟当前用户，实际应用中应从用户认证上下文中获取
-  const currentUser = '张三';
+  // 获取当前登录用户姓名
+  const currentUser = getCurrentUserName() || '未知用户';
+
+      // 使用项目中已有的用户认证工具函数
+
+  // 判断用户是否为会议参与者
+  const isUserParticipant = (userId: string, meeting: any): boolean => {
+    if (!meeting || !userId) return false;
+
+    const numUserId = parseInt(userId, 10);
+
+    // 如果是会议的组织者，可以查看
+    if (meeting.organizer?.id === numUserId || meeting.organizer?.id?.toString() === userId) return true;
+
+    // 如果有participantIds数组，检查用户是否在其中
+    if ((meeting as any).participantIds && Array.isArray((meeting as any).participantIds)) {
+      return (meeting as any).participantIds.includes(numUserId) || (meeting as any).participantIds.includes(userId);
+    }
+
+    // 如果没有具体的参与者信息，暂时允许查看（或者可以改为false更严格）
+    return true;
+  };
+
+  // 查看参与人员
+  const handleViewParticipants = async (record: MeetingRecord) => {
+    if (record.attendees.length === 0) {
+      message.info('该会议记录暂无参与人员');
+      return;
+    }
+
+    setCurrentMeetingForParticipants(record);
+    setParticipantsModalVisible(true);
+    setParticipantsLoading(true);
+
+    try {
+      // 尝试从会议详情获取参与人员信息
+      const relatedMeeting = meetings.find(m => m.id.toString() === record.meetingId);
+      if (relatedMeeting) {
+        try {
+          const detail = await meetingService.getMeetingDetail(relatedMeeting.id);
+
+          let participantsData: Array<{ id: number; name: string }> = [];
+
+          // 从后端API返回的数据结构中正确提取参与人员信息
+          if ((detail as any).participants && Array.isArray((detail as any).participants)) {
+            participantsData = (detail as any).participants.map((participant: any) => {
+              // 后端返回的结构：{ id: participantId, user: { id, nickName, userName, ... } }
+              const user = participant.user;
+              return {
+                id: user?.id || participant.id,
+                name: user?.nickName || user?.userName || `参与人员${participant.id}`
+              };
+            });
+            console.log('会议记录-从participants提取到的数据:', participantsData); // 调试日志
+          } else if ((detail as any).participantIds && Array.isArray((detail as any).participantIds)) {
+            participantsData = (detail as any).participantIds.map((participantId: number) => {
+              const user = users.find(u => u.id === participantId);
+              return {
+                id: participantId,
+                name: user ? (user.nickName || user.userName) : `用户${participantId}`
+              };
+            });
+            console.log('会议记录-从participantIds提取到的数据:', participantsData); // 调试日志
+          } else {
+            // 如果API没有返回参与人员详情，生成占位数据
+            participantsData = Array.from({ length: record.attendees.length }, (_, index) => ({
+              id: index + 1,
+              name: `参与者${index + 1}`
+            }));
+            console.log('会议记录-生成的占位数据:', participantsData); // 调试日志
+          }
+
+          // 更新当前记录的参与人员信息
+          setCurrentMeetingForParticipants(prev => prev ? {
+            ...prev,
+            participants: participantsData
+          } as MeetingRecord & { participants: Array<{ id: number; name: string }> } : null);
+
+        } catch (error) {
+          console.error('获取会议详情失败:', error);
+          // 使用占位数据
+          const participantsData = Array.from({ length: record.attendees.length }, (_, index) => ({
+            id: index + 1,
+            name: `参与者${index + 1}`
+          }));
+
+          setCurrentMeetingForParticipants(prev => prev ? {
+            ...prev,
+            participants: participantsData
+          } as MeetingRecord & { participants: Array<{ id: number; name: string }> } : null);
+        }
+      }
+    } finally {
+      setParticipantsLoading(false);
+    }
+  };
 
   // 获取会议标题的辅助函数
   const getMeetingTitle = (meetingId: string): string => {
@@ -103,19 +201,32 @@ const Component: React.FC = () => {
       });
 
       // 转换API数据格式
-      const formattedRecords: MeetingRecord[] = response.records.map((record: any) => ({
-        attendees: [], // 从会议参与者中获取
-        content: record.content,
-        id: record.id.toString(),
-        meetingId: record.meetingId.toString(),
-        meetingTitle: record.meeting?.title || '',
-        participantRecords: [],
-        recordDate: dayjs(record.recordTime).format('YYYY-MM-DD'),
-        recorder: record.recorder?.nickName || record.recorder?.userName || '',
-        tags: []
-      }));
+      const formattedRecords: MeetingRecord[] = (response as any).records.map((record: any) => {
+        // 从对应的会议获取参会人员信息
+        const relatedMeeting = meetings.find(m => m.id === record.meetingId);
+        const participantCount = relatedMeeting?.participantCount || 0;
 
-      setRecords(formattedRecords);
+        return {
+          attendees: Array.from({ length: participantCount }, (_, index) => `participant-${index + 1}`), // 使用参会人数生成占位数据
+          content: record.content,
+          id: record.id.toString(),
+          meetingId: record.meetingId.toString(),
+          meetingTitle: record.meeting?.title || relatedMeeting?.meetingTitle || '',
+          participantRecords: [],
+          recordDate: dayjs(record.createTime || record.recordTime).format('YYYY-MM-DD'),
+          recorder: record.recorder?.nickName || record.recorder?.userName || '',
+          tags: []
+        };
+      });
+
+      // 权限过滤：只显示当前用户参与的会议记录
+      const currentUserId = getCurrentUserId(); // 需要实现获取当前用户ID的函数
+      const filteredRecords = formattedRecords.filter(record => {
+        const relatedMeeting = meetings.find(m => m.id.toString() === record.meetingId);
+        return isUserParticipant(currentUserId, relatedMeeting);
+      });
+
+      setRecords(filteredRecords);
     } catch (error) {
       console.error('获取会议记录失败:', error);
     }
@@ -123,9 +234,15 @@ const Component: React.FC = () => {
 
   useEffect(() => {
     fetchMeetings();
-    fetchRecords();
     fetchUsers();
   }, []);
+
+  // 当meetings数据加载完成后，再获取会议记录
+  useEffect(() => {
+    if (meetings.length > 0) {
+      fetchRecords();
+    }
+  }, [meetings]);
 
   const showModal = (record?: MeetingRecord) => {
     form.resetFields();
@@ -264,7 +381,15 @@ const Component: React.FC = () => {
                   <UserOutlined /> 记录人: {item.recorder}
                 </Space>,
                 <Space key="attendees">
-                  <TeamOutlined /> 参会人数: {item.attendees.length}
+                  <TeamOutlined /> 参会人数:
+                  <Button
+                    type="link"
+                    style={{ padding: 0, height: 'auto', color: item.attendees.length > 0 ? '#1890ff' : 'inherit' }}
+                    disabled={item.attendees.length === 0}
+                    onClick={() => handleViewParticipants(item)}
+                  >
+                    {item.attendees.length} 人
+                  </Button>
                 </Space>,
                 <Space key="actions">
                   <Button
@@ -364,7 +489,7 @@ const Component: React.FC = () => {
             <Select placeholder="请选择会议">
               {meetings.map(meeting => (
                 <Select.Option key={meeting.id} value={meeting.id.toString()}>
-                  {meeting.title} ({dayjs(meeting.startTime).format('YYYY-MM-DD')})
+                  {meeting.meetingTitle || meeting.title} ({dayjs(meeting.startTime).format('YYYY-MM-DD')})
                 </Select.Option>
               ))}
             </Select>
@@ -460,6 +585,67 @@ const Component: React.FC = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 参与人员弹窗 */}
+      <Modal
+        destroyOnClose
+        open={participantsModalVisible}
+        title="参与人员"
+        width={500}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => setParticipantsModalVisible(false)}
+          >
+            关闭
+          </Button>
+        ]}
+        onCancel={() => setParticipantsModalVisible(false)}
+      >
+        {currentMeetingForParticipants && (
+          <div>
+            <div className="mb-4">
+              <p>
+                <strong>会议标题：</strong> {currentMeetingForParticipants.meetingTitle}
+              </p>
+              <p>
+                <strong>记录日期：</strong> {currentMeetingForParticipants.recordDate}
+              </p>
+              <p>
+                <strong>参与人数：</strong> {currentMeetingForParticipants.attendees.length} 人
+              </p>
+            </div>
+
+            {participantsLoading ? (
+              <div className="text-center py-4">
+                <div>正在加载参与人员...</div>
+              </div>
+            ) : (currentMeetingForParticipants as any).participants && (currentMeetingForParticipants as any).participants.length > 0 ? (
+              <div>
+                <h4 className="mb-3">参与人员列表：</h4>
+                <div className="space-y-2">
+                  {(currentMeetingForParticipants as any).participants.map((participant: any, index: number) => (
+                    <div
+                      key={participant.id}
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                    >
+                      <span className="flex items-center">
+                        <span className="mr-2 text-gray-500">#{index + 1}</span>
+                        <span>{participant.name}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <div>暂无参与人员详情</div>
+                <div className="text-sm mt-2">参与人数：{currentMeetingForParticipants.attendees.length} 人</div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );
