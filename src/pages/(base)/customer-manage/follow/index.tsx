@@ -93,27 +93,45 @@ const CustomerFollow = () => {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
 
+  // 添加分页状态管理
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
+
   // 检查是否为超级管理员
   const isSuper = isSuperAdmin();
 
-  // 获取跟进数据
-  const fetchFollowData = async () => {
+  // 获取跟进数据 - 支持分页和状态筛选
+  const fetchFollowData = async (pageNum?: number, pageSize?: number, status?: string) => {
     setLoading(true);
     try {
       console.log('🔄 开始获取跟进数据...');
+
+      const currentPage = pageNum || pagination.current;
+      const currentPageSize = pageSize || pagination.pageSize;
+      const currentStatus = status !== undefined ? status : selectedFollowStatus;
 
       // 获取统计数据，客户跟进页面只显示自己的数据
       const statisticsData = await customerService.getCustomerStatistics({ scope: 'own' });
       console.log('📊 统计数据:', statisticsData);
       setStatistics(statisticsData);
 
-      // 获取客户列表数据，客户跟进页面只显示分配给自己的客户
-      const customerData = await customerService.getCustomerList({
-        current: 1,
-        // 获取更多数据用于演示
+      // 构建查询参数
+      const queryParams: any = {
+        current: currentPage,
         scope: 'own',
-        size: 100 // 只显示分配给自己的客户数据
-      });
+        size: currentPageSize
+      };
+
+      // 如果有状态筛选且不是'all'，添加筛选条件
+      if (currentStatus && currentStatus !== 'all') {
+        queryParams.followStatus = currentStatus;
+      }
+
+      // 获取客户列表数据，支持分页和筛选
+      const customerData = await customerService.getCustomerList(queryParams);
       console.log('📋 客户列表原始数据:', customerData);
 
       // 转换数据格式以匹配前端类型
@@ -132,10 +150,17 @@ const CustomerFollow = () => {
       }));
 
       console.log('✅ 格式化后的记录:', formattedRecords);
-      console.log(`📈 总共${formattedRecords.length}条记录`);
+      console.log(`📈 当前页${formattedRecords.length}条记录，总共${customerData.total}条记录`);
 
       setFollowRecords(formattedRecords);
       setFilteredRecords(formattedRecords);
+
+      // 更新分页信息
+      setPagination({
+        current: customerData.current,
+        pageSize: customerData.size,
+        total: customerData.total
+      });
 
       // 清空选择状态
       setSelectedRowKeys([]);
@@ -148,7 +173,7 @@ const CustomerFollow = () => {
     }
   };
 
-  // 筛选数据
+  // 筛选数据 - 修改为支持分页的筛选
   const filterData = (status: string) => {
     setSelectedFollowStatus(status);
 
@@ -156,12 +181,26 @@ const CustomerFollow = () => {
     setSelectedRowKeys([]);
     setSelectedRows([]);
 
-    if (status === 'all') {
-      setFilteredRecords(followRecords);
-    } else {
-      const filtered = followRecords.filter(record => record.followStatus === status);
-      setFilteredRecords(filtered);
-    }
+    // 重置到第一页并重新获取数据
+    setPagination(prev => ({ ...prev, current: 1 }));
+    fetchFollowData(1, pagination.pageSize, status);
+  };
+
+  // 处理分页变化
+  const handleTableChange = (page: number, pageSize?: number) => {
+    console.log('🔍 分页变化:', { current: pagination.current, oldPageSize: pagination.pageSize, page, pageSize });
+
+    const newPageSize = pageSize || pagination.pageSize;
+
+    // 更新分页状态
+    setPagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: newPageSize
+    }));
+
+    // 重新获取数据
+    fetchFollowData(page, newPageSize);
   };
 
   // 添加跟进记录
@@ -200,7 +239,7 @@ const CustomerFollow = () => {
       form.resetFields();
 
       console.log('🔄 重新获取数据...');
-      fetchFollowData(); // 重新获取数据
+      fetchFollowData(); // 重新获取当前分页的数据
     } catch (error) {
       console.error('❌ 添加跟进记录失败:', error);
       message.error('添加跟进记录失败');
@@ -255,7 +294,7 @@ const CustomerFollow = () => {
       editForm.resetFields();
 
       console.log('🔄 重新获取数据...');
-      fetchFollowData(); // 重新获取数据
+      fetchFollowData(); // 重新获取当前分页的数据
     } catch (error) {
       console.error('❌ 编辑失败:', error);
       message.error('编辑失败');
@@ -274,7 +313,7 @@ const CustomerFollow = () => {
           console.log('🗑️ 删除客户:', id);
           await customerService.deleteCustomer(id);
           message.success('删除成功');
-          fetchFollowData(); // 重新获取数据
+          fetchFollowData(); // 重新获取当前分页的数据
         } catch (error) {
           console.error('❌ 删除失败:', error);
           message.error('删除失败');
@@ -391,7 +430,7 @@ const CustomerFollow = () => {
 
           message.success(`成功删除 ${selectedRowKeys.length} 条客户记录`);
 
-          // 清空选择并重新获取数据
+          // 清空选择并重新获取当前分页的数据
           setSelectedRowKeys([]);
           setSelectedRows([]);
           fetchFollowData();
@@ -642,6 +681,17 @@ const CustomerFollow = () => {
         rowKey="id"
         rowSelection={isSuper ? rowSelection : undefined}
         {...getFullTableConfig(10)}
+        pagination={{
+          ...getFullTableConfig(10).pagination,
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: pagination.total,
+          onChange: handleTableChange,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ['10', '20', '50', '100']
+        }}
       />
 
       {/* 添加跟进记录模态框 */}
