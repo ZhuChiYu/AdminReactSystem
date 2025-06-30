@@ -170,6 +170,7 @@ export namespace CustomerApi {
   export interface CustomerQueryParams extends PageParams {
     assignedTimeEnd?: string;
     assignedTimeStart?: string;
+    assignedToName?: string; // 负责人姓名搜索
     company?: string;
     customerLevel?: number;
     customerName?: string;
