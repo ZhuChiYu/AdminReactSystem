@@ -169,9 +169,10 @@ class StatisticsController {
           });
 
           // 2. 计算用户负责的已完成事项金额总和
+          // 只有项目负责人的业绩才计算，其他相关人员（执行人、咨询部人员、市场部经理）不计算业绩
           const completedTasksAmount = await prisma.task.aggregate({
             where: {
-              responsiblePersonId: user.id,
+              responsiblePersonId: user.id,  // 只计算该员工作为负责人的项目
               isCompleted: true,
               paymentAmount: {
                 not: null
@@ -404,7 +405,8 @@ class StatisticsController {
               }
             });
 
-            // 获取该时间段内该员工相关的项目收入
+            // 获取该时间段内该员工作为负责人的项目收入
+            // 只有项目负责人的业绩才计算，其他相关人员不计算业绩
             const completedTasksAmount = await prisma.task.aggregate({
               where: {
                 completionTime: {
@@ -415,12 +417,7 @@ class StatisticsController {
                 paymentAmount: {
                   not: null
                 },
-                OR: [
-                  { responsiblePersonId: user.id },
-                  { executorId: user.id },
-                  { consultantId: user.id },
-                  { marketManagerId: user.id }
-                ]
+                responsiblePersonId: user.id  // 只计算该员工作为负责人的项目
               },
               _sum: {
                 paymentAmount: true
