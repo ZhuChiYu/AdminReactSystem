@@ -31,7 +31,7 @@ import React, { useEffect, useState } from 'react';
 import { expenseService } from '@/service/api';
 import type { ExpenseApi } from '@/service/api/types';
 import { isSuperAdmin } from '@/utils/auth';
-import { getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { getCenterColumnConfig, getTableConfig } from '@/utils/table';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -68,27 +68,38 @@ const Component: React.FC = () => {
   const [expenseData, setExpenseData] = useState<ExpenseItem[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    size: 10,
+    total: 0
+  });
+
   // 检查用户是否为超级管理员
   const isUserSuperAdmin = isSuperAdmin();
 
   // 获取费用申请列表
-  const fetchExpenses = async () => {
+  const fetchExpenses = async (params?: { current?: number; size?: number }) => {
     setLoading(true);
     try {
-      const response = await expenseService.getExpenseList({
-        current: 1,
-        size: 1000,
+      const requestParams = {
+        current: params?.current || pagination.current,
+        size: params?.size || pagination.size,
         status: 0 // 只获取待审批的申请
-      });
+      };
+
+      const response = await expenseService.getExpenseList(requestParams);
 
       if (!response) {
         setExpenseData([]);
+        setPagination(prev => ({ ...prev, total: 0 }));
         return;
       }
 
       // 检查 records 是否存在（由于expenseService已经解包了data部分）
       if (!(response as any).records || !Array.isArray((response as any).records)) {
         setExpenseData([]);
+        setPagination(prev => ({ ...prev, total: 0 }));
         return;
       }
 
@@ -108,9 +119,17 @@ const Component: React.FC = () => {
       }));
 
       setExpenseData(formattedExpenses);
+
+      // 更新分页状态
+      setPagination({
+        current: (response as any).current || 1,
+        size: (response as any).size || 10,
+        total: (response as any).total || 0
+      });
     } catch (error) {
       console.error('获取费用申请列表失败:', error);
       setExpenseData([]);
+      setPagination(prev => ({ ...prev, total: 0 }));
     } finally {
       setLoading(false);
     }
@@ -410,7 +429,7 @@ const Component: React.FC = () => {
           <Space>
             <Button
               icon={<SyncOutlined />}
-              onClick={fetchExpenses}
+              onClick={() => fetchExpenses()}
             >
               刷新
             </Button>
@@ -424,7 +443,21 @@ const Component: React.FC = () => {
           locale={{
             emptyText: expenseData.length === 0 && !loading ? '暂无待审批的申请' : undefined
           }}
-          {...getFullTableConfig(10)}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.size,
+            total: pagination.total,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+            onChange: (page, pageSize) => {
+              fetchExpenses({ current: page, size: pageSize });
+            },
+            onShowSizeChange: (current, size) => {
+              fetchExpenses({ current: 1, size });
+            }
+          }}
+          {...getTableConfig()}
         />
       </Card>
 

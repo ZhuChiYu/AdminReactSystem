@@ -16,7 +16,7 @@ import {
 import usePermissionStore, { PermissionType } from '@/store/permissionStore';
 import { getCurrentUserId, getCurrentUserInfo, isSuperAdmin } from '@/utils/auth';
 import { getEndDateDisabledDate, getStartDateDisabledDate, validateDateRange } from '@/utils/dateUtils';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
+import { getActionColumnConfig, getCenterColumnConfig, getTableConfig } from '@/utils/table';
 
 /** 班级状态枚举 */
 enum ClassStatus {
@@ -527,7 +527,21 @@ const ClassList = () => {
           dataSource={filteredList}
           loading={loading}
           rowKey="id"
-          {...getFullTableConfig(10)}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.size,
+            total: pagination.total,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+            onChange: (page, pageSize) => {
+              loadClassList({ current: page, size: pageSize });
+            },
+            onShowSizeChange: (current, size) => {
+              loadClassList({ current: 1, size });
+            }
+          }}
+          {...getTableConfig()}
         />
 
         <Modal
