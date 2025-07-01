@@ -18,7 +18,7 @@ import {
 import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 
-import { meetingService, fetchGetUserList } from '@/service/api';
+import { fetchGetUserList, meetingService } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
 import { getCurrentUserId, getCurrentUserName } from '@/utils/auth';
 
@@ -33,7 +33,8 @@ interface MeetingParticipantRecord {
 }
 
 interface MeetingRecord {
-  attendees: string[];
+  attendeeIds?: number[];
+  attendees: string[]; // 保存参会人员ID用于编辑
   content: string;
   id: string;
   meetingId: string;
@@ -60,13 +61,13 @@ const Component: React.FC = () => {
   // 获取当前登录用户姓名
   const currentUser = getCurrentUserName() || '未知用户';
 
-      // 使用项目中已有的用户认证工具函数
+  // 使用项目中已有的用户认证工具函数
 
   // 判断用户是否为会议参与者
   const isUserParticipant = (userId: string, meeting: any): boolean => {
     if (!meeting || !userId) return false;
 
-    const numUserId = parseInt(userId, 10);
+    const numUserId = Number.parseInt(userId, 10);
 
     // 如果是会议的组织者，可以查看
     if (meeting.organizer?.id === numUserId || meeting.organizer?.id?.toString() === userId) return true;
@@ -116,7 +117,7 @@ const Component: React.FC = () => {
               const user = users.find(u => u.id === participantId);
               return {
                 id: participantId,
-                name: user ? (user.nickName || user.userName) : `用户${participantId}`
+                name: user ? user.nickName || user.userName : `用户${participantId}`
               };
             });
             console.log('会议记录-从participantIds提取到的数据:', participantsData); // 调试日志
@@ -130,11 +131,14 @@ const Component: React.FC = () => {
           }
 
           // 更新当前记录的参与人员信息
-          setCurrentMeetingForParticipants(prev => prev ? {
-            ...prev,
-            participants: participantsData
-          } as MeetingRecord & { participants: Array<{ id: number; name: string }> } : null);
-
+          setCurrentMeetingForParticipants(prev =>
+            prev
+              ? ({
+                  ...prev,
+                  participants: participantsData
+                } as MeetingRecord & { participants: Array<{ id: number; name: string }> })
+              : null
+          );
         } catch (error) {
           console.error('获取会议详情失败:', error);
           // 使用占位数据
@@ -143,10 +147,14 @@ const Component: React.FC = () => {
             name: `参与者${index + 1}`
           }));
 
-          setCurrentMeetingForParticipants(prev => prev ? {
-            ...prev,
-            participants: participantsData
-          } as MeetingRecord & { participants: Array<{ id: number; name: string }> } : null);
+          setCurrentMeetingForParticipants(prev =>
+            prev
+              ? ({
+                  ...prev,
+                  participants: participantsData
+                } as MeetingRecord & { participants: Array<{ id: number; name: string }> })
+              : null
+          );
         }
       }
     } finally {
@@ -201,26 +209,65 @@ const Component: React.FC = () => {
       });
 
       // 转换API数据格式
-      const formattedRecords: MeetingRecord[] = (response as any).records.map((record: any) => {
-        // 从对应的会议获取参会人员信息
-        const relatedMeeting = meetings.find(m => m.id === record.meetingId);
-        const participantCount = relatedMeeting?.participantCount || 0;
+      const formattedRecords: MeetingRecord[] = await Promise.all(
+        (response as any).records.map(async (apiRecord: any) => {
+          // 从对应的会议获取参会人员信息
+          const relatedMeeting = meetings.find(m => m.id === apiRecord.meetingId);
+          let attendeeIds: number[] = [];
+          let attendeeNames: string[] = [];
 
-        return {
-          attendees: Array.from({ length: participantCount }, (_, index) => `participant-${index + 1}`), // 使用参会人数生成占位数据
-          content: record.content,
-          id: record.id.toString(),
-          meetingId: record.meetingId.toString(),
-          meetingTitle: record.meeting?.title || relatedMeeting?.meetingTitle || '',
-          participantRecords: [],
-          recordDate: dayjs(record.createTime || record.recordTime).format('YYYY-MM-DD'),
-          recorder: record.recorder?.nickName || record.recorder?.userName || '',
-          tags: []
-        };
-      });
+          // 如果记录中有参会人员信息，优先使用
+          if (apiRecord.attendees && Array.isArray(apiRecord.attendees)) {
+            attendeeIds = apiRecord.attendees;
+          } else if (relatedMeeting) {
+            // 否则从对应的会议中获取参会人员
+            try {
+              const meetingDetail = await meetingService.getMeetingDetail(relatedMeeting.id);
+              console.log('会议详情:', meetingDetail); // 调试日志
+
+              if ((meetingDetail as any).participantIds && Array.isArray((meetingDetail as any).participantIds)) {
+                attendeeIds = (meetingDetail as any).participantIds;
+              } else if ((meetingDetail as any).participants && Array.isArray((meetingDetail as any).participants)) {
+                // 尝试从participants数组获取
+                attendeeIds = (meetingDetail as any).participants.map((p: any) => p.id || p.userId);
+              }
+            } catch (_error) {
+              console.warn('获取会议详情失败，使用参会人数生成占位数据:', _error);
+            }
+          }
+
+          // 如果还是没有获取到参会人员，使用参会人数生成占位数据
+          if (attendeeIds.length === 0 && relatedMeeting?.participantCount) {
+            attendeeIds = Array.from({ length: relatedMeeting.participantCount }, (_, index) => index + 1);
+            attendeeNames = Array.from(
+              { length: relatedMeeting.participantCount },
+              (_, index) => `参会人员${index + 1}`
+            );
+          } else {
+            // 转换参会人员ID为名称
+            attendeeNames = attendeeIds.map(id => {
+              const user = users.find(u => u.id === id);
+              return user ? user.nickName || user.userName : `用户${id}`;
+            });
+          }
+
+          return {
+            attendeeIds,
+            attendees: attendeeNames,
+            content: apiRecord.content,
+            id: apiRecord.id.toString(),
+            meetingId: apiRecord.meetingId.toString(),
+            meetingTitle: apiRecord.meeting?.title || relatedMeeting?.meetingTitle || '',
+            participantRecords: [],
+            recordDate: dayjs(apiRecord.createTime || apiRecord.recordTime).format('YYYY-MM-DD'),
+            recorder: apiRecord.recorder?.nickName || apiRecord.recorder?.userName || '',
+            tags: []
+          };
+        })
+      );
 
       // 权限过滤：只显示当前用户参与的会议记录
-      const currentUserId = getCurrentUserId(); // 需要实现获取当前用户ID的函数
+      const currentUserId = getCurrentUserId();
       const filteredRecords = formattedRecords.filter(record => {
         const relatedMeeting = meetings.find(m => m.id.toString() === record.meetingId);
         return isUserParticipant(currentUserId, relatedMeeting);
@@ -249,7 +296,7 @@ const Component: React.FC = () => {
     if (record) {
       setEditingRecord(record);
       form.setFieldsValue({
-        attendees: record.attendees,
+        attendees: record.attendeeIds || [], // 使用ID而不是名称
         content: record.content,
         meetingId: record.meetingId,
         recordDate: dayjs(record.recordDate),
@@ -280,15 +327,15 @@ const Component: React.FC = () => {
             });
             message.success('会议记录已更新');
             fetchRecords(); // 重新获取列表
-          } catch (error) {
+          } catch (_error) {
             message.error('更新会议记录失败');
           }
         } else {
           // 创建新记录
           try {
             await meetingService.createMeetingRecord({
-              meetingId: Number(formattedValues.meetingId),
-              content: formattedValues.content
+              content: formattedValues.content,
+              meetingId: Number(formattedValues.meetingId)
             });
             message.success('会议记录已创建');
             fetchRecords(); // 重新获取列表
@@ -383,9 +430,9 @@ const Component: React.FC = () => {
                 <Space key="attendees">
                   <TeamOutlined /> 参会人数:
                   <Button
-                    type="link"
-                    style={{ padding: 0, height: 'auto', color: item.attendees.length > 0 ? '#1890ff' : 'inherit' }}
                     disabled={item.attendees.length === 0}
+                    style={{ color: item.attendees.length > 0 ? '#1890ff' : 'inherit', height: 'auto', padding: 0 }}
+                    type="link"
                     onClick={() => handleViewParticipants(item)}
                   >
                     {item.attendees.length} 人
@@ -488,7 +535,10 @@ const Component: React.FC = () => {
           >
             <Select placeholder="请选择会议">
               {meetings.map(meeting => (
-                <Select.Option key={meeting.id} value={meeting.id.toString()}>
+                <Select.Option
+                  key={meeting.id}
+                  value={meeting.id.toString()}
+                >
                   {meeting.meetingTitle || meeting.title} ({dayjs(meeting.startTime).format('YYYY-MM-DD')})
                 </Select.Option>
               ))}
@@ -509,12 +559,10 @@ const Component: React.FC = () => {
             rules={[{ message: '请选择参会人员', required: true }]}
           >
             <Select
+              showSearch
+              filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
               mode="multiple"
               placeholder="请选择参会人员"
-              showSearch
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
               options={users.map(user => ({
                 label: `${user.nickName || user.userName} (${user.userName})`,
                 value: user.id
@@ -618,17 +666,18 @@ const Component: React.FC = () => {
             </div>
 
             {participantsLoading ? (
-              <div className="text-center py-4">
+              <div className="py-4 text-center">
                 <div>正在加载参与人员...</div>
               </div>
-            ) : (currentMeetingForParticipants as any).participants && (currentMeetingForParticipants as any).participants.length > 0 ? (
+            ) : (currentMeetingForParticipants as any).participants &&
+              (currentMeetingForParticipants as any).participants.length > 0 ? (
               <div>
                 <h4 className="mb-3">参与人员列表：</h4>
                 <div className="space-y-2">
                   {(currentMeetingForParticipants as any).participants.map((participant: any, index: number) => (
                     <div
+                      className="flex items-center justify-between rounded bg-gray-50 p-2"
                       key={participant.id}
-                      className="flex items-center justify-between p-2 bg-gray-50 rounded"
                     >
                       <span className="flex items-center">
                         <span className="mr-2 text-gray-500">#{index + 1}</span>
@@ -639,9 +688,9 @@ const Component: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4 text-gray-500">
+              <div className="py-4 text-center text-gray-500">
                 <div>暂无参与人员详情</div>
-                <div className="text-sm mt-2">参与人数：{currentMeetingForParticipants.attendees.length} 人</div>
+                <div className="mt-2 text-sm">参与人数：{currentMeetingForParticipants.attendees.length} 人</div>
               </div>
             )}
           </div>
