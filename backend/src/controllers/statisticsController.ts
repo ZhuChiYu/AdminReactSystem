@@ -25,11 +25,13 @@ class StatisticsController {
         const startDate = new Date(targetYear, targetMonth - 1, 1);
         const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
 
-        // 培训费收入按照班级学员的加入日期来算
+        // 培训费收入按照班级的开始日期来算
         trainingFeeTimeCondition = {
-          joinDate: {
-            gte: startDate,
-            lte: endDate
+          class: {
+            startDate: {
+              gte: startDate,
+              lte: endDate
+            }
           }
         };
 
@@ -48,9 +50,11 @@ class StatisticsController {
           case 'month':
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
             trainingFeeTimeCondition = {
-              joinDate: {
-                gte: startDate,
-                lte: now
+              class: {
+                startDate: {
+                  gte: startDate,
+                  lte: now
+                }
               }
             };
             projectTimeCondition = {
@@ -64,9 +68,11 @@ class StatisticsController {
             const currentQuarter = Math.floor(now.getMonth() / 3);
             startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
             trainingFeeTimeCondition = {
-              joinDate: {
-                gte: startDate,
-                lte: now
+              class: {
+                startDate: {
+                  gte: startDate,
+                  lte: now
+                }
               }
             };
             projectTimeCondition = {
@@ -79,9 +85,11 @@ class StatisticsController {
           case 'year':
             startDate = new Date(now.getFullYear(), 0, 1);
             trainingFeeTimeCondition = {
-              joinDate: {
-                gte: startDate,
-                lte: now
+              class: {
+                startDate: {
+                  gte: startDate,
+                  lte: now
+                }
               }
             };
             projectTimeCondition = {
@@ -94,9 +102,11 @@ class StatisticsController {
           default:
             startDate = new Date(now.getFullYear(), 0, 1); // 默认年度
             trainingFeeTimeCondition = {
-              joinDate: {
-                gte: startDate,
-                lte: now
+              class: {
+                startDate: {
+                  gte: startDate,
+                  lte: now
+                }
               }
             };
             projectTimeCondition = {
@@ -394,9 +404,11 @@ class StatisticsController {
             // 获取该时间段内该员工负责的培训费收入
             const studentTrainingFees = await prisma.classStudent.aggregate({
               where: {
-                joinDate: {
-                  gte: period.startDate,
-                  lte: period.endDate
+                class: {
+                  startDate: {
+                    gte: period.startDate,
+                    lte: period.endDate
+                  }
                 },
                 createdById: user.id
               },
