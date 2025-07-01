@@ -10,6 +10,39 @@ import { createErrorResponse, createSuccessResponse } from '../utils/response';
 
 const router = express.Router();
 
+// 根据用户职务角色获取部门信息的辅助函数
+async function getUserDepartmentFromRole(userId: number): Promise<string> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        userRoles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
+    if (!user || !user.userRoles || user.userRoles.length === 0) {
+      return '未分配部门';
+    }
+
+    // 查找职务角色对应的部门
+    for (const userRole of user.userRoles) {
+      const role = userRole.role;
+      if (role.roleType === 'position' && role.department) {
+        return role.department;
+      }
+    }
+
+    return '未分配部门';
+  } catch (error) {
+    console.error('获取用户职务角色部门失败:', error);
+    return '未知部门';
+  }
+}
+
 // 配置附件上传
 const uploadsDir = path.join(__dirname, '../../uploads/expense-attachments');
 if (!fs.existsSync(uploadsDir)) {
@@ -128,28 +161,33 @@ router.get('/list', authMiddleware, async (req, res) => {
       prisma.expenseApplication.count({ where })
     ]);
 
-    const records = applications.map(app => ({
-      amount: Number(app.totalAmount),
-      applicant: {
-        id: app.applicant.id,
-        name: app.applicant.nickName || app.applicant.userName
-      },
-      applicationNo: app.applicationNo,
-      applicationTime: app.createdAt.toISOString(),
-      approvalTime: app.approvalTime?.toISOString(),
-      approver: app.approver
-        ? {
-            id: app.approver.id,
-            name: app.approver.nickName || app.approver.userName
-          }
-        : null,
-      attachments: (app.attachments as any[]) || [],
-      department: app.applicant.department?.name || '未知部门',
-      description: app.applicationReason,
-      expenseType: app.expenseType,
-      id: app.id,
-      remark: app.approvalComment,
-      status: app.applicationStatus
+    // 为每个申请获取申请人的职务角色部门
+    const records = await Promise.all(applications.map(async app => {
+      const department = await getUserDepartmentFromRole(app.applicant.id);
+
+      return {
+        amount: Number(app.totalAmount),
+        applicant: {
+          id: app.applicant.id,
+          name: app.applicant.nickName || app.applicant.userName
+        },
+        applicationNo: app.applicationNo,
+        applicationTime: app.createdAt.toISOString(),
+        approvalTime: app.approvalTime?.toISOString(),
+        approver: app.approver
+          ? {
+              id: app.approver.id,
+              name: app.approver.nickName || app.approver.userName
+            }
+          : null,
+        attachments: (app.attachments as any[]) || [],
+        department: department,
+        description: app.applicationReason,
+        expenseType: app.expenseType,
+        id: app.id,
+        remark: app.approvalComment,
+        status: app.applicationStatus
+      };
     }));
 
     const responseData = {
@@ -202,6 +240,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json(createErrorResponse(404, '费用申请不存在', null, req.path));
     }
 
+    // 获取申请人的职务角色部门
+    const department = await getUserDepartmentFromRole(application.applicant.id);
+
     const result = {
       amount: Number(application.totalAmount),
       applicant: {
@@ -218,7 +259,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
           }
         : null,
       attachments: (application.attachments as any[]) || [],
-      department: application.applicant.department?.name || '未知部门',
+      department: department,
       description: application.applicationReason,
       expenseType: application.expenseType,
       id: application.id,
