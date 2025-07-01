@@ -18,6 +18,7 @@ class CustomerController {
     const where: any = {};
 
         // 权限控制：根据权限角色决定数据范围
+    let permissionConditions: any = {};
     if (user?.roles?.includes('super_admin')) {
       // 超级管理员：可以看到所有客户数据
       // 不添加任何限制条件
@@ -29,14 +30,17 @@ class CustomerController {
       });
 
       const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
-      where.OR = [
+      permissionConditions.OR = [
         { createdById: { in: allowedCreatorIds } },
         { assignedToId: user.id }
       ];
     } else {
       // 普通员工：只能看到分配给自己的客户
-      where.assignedToId = user?.id;
+      permissionConditions.assignedToId = user?.id;
     }
+
+    // 合并权限条件到where中
+    Object.assign(where, permissionConditions);
 
     if (customerName) {
       where.customerName = {
@@ -79,7 +83,11 @@ class CustomerController {
           { mobile: { contains: mobile as string, mode: 'insensitive' } }
         );
       }
-      where.OR = [...(where.OR || []), ...phoneConditions];
+      // 将手机号搜索条件作为单独的AND条件
+      where.AND = [
+        ...(where.AND || []),
+        { OR: phoneConditions }
+      ];
     }
 
     // 添加负责人姓名搜索条件
