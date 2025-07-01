@@ -554,15 +554,25 @@ const Component: React.FC = () => {
           </Form.Item>
 
           <Form.Item
-            label="参会人员"
             name="attendees"
-            rules={[{ message: '请选择参会人员', required: true }]}
+            rules={editingRecord ? [] : [{ message: '请选择参会人员', required: true }]}
+            label={
+              <div>
+                参会人员
+                {editingRecord && (
+                  <span style={{ color: '#999', fontSize: '12px', fontWeight: 'normal', marginLeft: '8px' }}>
+                    (编辑模式下无法修改，请在会议管理中修改)
+                  </span>
+                )}
+              </div>
+            }
           >
             <Select
               showSearch
+              disabled={Boolean(editingRecord)}
               filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
               mode="multiple"
-              placeholder="请选择参会人员"
+              placeholder={editingRecord ? '参会人员信息来源于对应会议' : '请选择参会人员'}
               options={users.map(user => ({
                 label: `${user.nickName || user.userName} (${user.userName})`,
                 value: user.id
