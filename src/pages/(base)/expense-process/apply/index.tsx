@@ -29,7 +29,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { expenseService } from '@/service/api';
+import { fetchGetRoleList } from '@/service/api/system-manage';
 import { isSuperAdmin } from '@/utils/auth';
+import { localStg } from '@/utils/storage';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -57,15 +59,6 @@ const expenseTypes = [
   { label: '其他', value: 'other' }
 ];
 
-const departments = [
-  { label: '研发部', value: 'rd' },
-  { label: '市场部', value: 'marketing' },
-  { label: '销售部', value: 'sales' },
-  { label: '财务部', value: 'finance' },
-  { label: '人力资源部', value: 'hr' },
-  { label: '行政部', value: 'admin' }
-];
-
 const Component: React.FC = () => {
   const [form] = Form.useForm();
   const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
@@ -74,19 +67,109 @@ const Component: React.FC = () => {
   const [previewData, setPreviewData] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [userDepartment, setUserDepartment] = useState<string>('');
   const navigate = useNavigate();
   const isUserSuperAdmin = isSuperAdmin();
 
+  // 获取用户职务角色对应的部门信息
+  const getUserDepartmentFromRole = async (): Promise<string> => {
+    try {
+      // 从localStg获取用户信息
+      const userInfo = (localStg.get('userInfo') as any) || {};
+
+      console.log('🔍 [报销申请] localStg中的完整userInfo:', userInfo);
+      console.log('🔍 [报销申请] userInfo.roles 类型:', typeof userInfo.roles, userInfo.roles);
+
+      if (!userInfo.roles || userInfo.roles.length === 0) {
+        console.warn('⚠️ [报销申请] 用户没有分配角色，userInfo.roles:', userInfo.roles);
+        return '未分配部门';
+      }
+
+      console.log('📡 [报销申请] 开始获取职务角色列表...');
+
+      // 获取所有职务角色
+      const roleResponse = await fetchGetRoleList({
+        current: 1,
+        roleType: 'position',
+        size: 100
+      });
+
+      console.log('📡 [报销申请] 职务角色API响应:', roleResponse);
+
+      if (!roleResponse?.records) {
+        console.warn('⚠️ [报销申请] 获取职务角色列表失败，roleResponse:', roleResponse);
+        return '未知部门';
+      }
+
+      console.log('🔍 [报销申请] 用户角色数组:', userInfo.roles);
+      console.log('🔍 [报销申请] 用户角色类型:', typeof userInfo.roles[0]);
+      console.log(`🔍 [报销申请] 职务角色列表 (共 ${roleResponse.records.length} 个):`);
+
+      roleResponse.records.forEach((role: any) => {
+        console.log(`  - ${role.roleName} (${role.roleCode}) - 部门: ${role.department}`);
+      });
+
+      // 查找用户的职务角色对应的部门
+      for (const userRoleCode of userInfo.roles) {
+        console.log(`🔍 [报销申请] 正在查找角色: ${userRoleCode}`);
+
+        const matchedRole = roleResponse.records.find((role: any) => role.roleCode === userRoleCode);
+
+        if (matchedRole) {
+          console.log(`✅ [报销申请] 找到匹配的职务角色:`, matchedRole);
+
+          if (matchedRole.department) {
+            console.log(`🎯 [报销申请] 返回部门: ${matchedRole.department}`);
+            return matchedRole.department;
+          }
+          console.warn(`⚠️ [报销申请] 角色 ${matchedRole.roleName} 没有设置部门`);
+        } else {
+          console.log(`❌ [报销申请] 未找到角色: ${userRoleCode}`);
+        }
+      }
+
+      console.warn('⚠️ [报销申请] 未找到任何职务角色对应的部门');
+      return '未分配部门';
+    } catch (error) {
+      console.error('❌ [报销申请] 获取用户部门失败:', error);
+      return '未知部门';
+    }
+  };
+
   // 初始化表单默认值
   useEffect(() => {
-    // 从localStorage或用户信息中获取当前用户名
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    const currentUser = userInfo.nickName || userInfo.userName || '当前用户';
+    const initializeForm = async () => {
+      try {
+        // 从localStg获取用户信息
+        const userInfo = (localStg.get('userInfo') as any) || {};
+        const currentUser = userInfo.nickName || userInfo.userName || '当前用户';
 
-    form.setFieldsValue({
-      applicant: currentUser,
-      department: 'admin'
-    });
+        // 获取用户部门信息
+        const department = await getUserDepartmentFromRole();
+        setUserDepartment(department);
+
+        // 设置表单默认值
+        form.setFieldsValue({
+          applicant: currentUser,
+          department
+        });
+      } catch (error) {
+        console.error('初始化表单失败:', error);
+        message.error('获取用户信息失败');
+
+        // 设置默认值
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        const currentUser = userInfo.nickName || userInfo.userName || '当前用户';
+
+        form.setFieldsValue({
+          applicant: currentUser,
+          department: '未知部门'
+        });
+        setUserDepartment('未知部门');
+      }
+    };
+
+    initializeForm();
   }, [form]);
 
   // 添加报销项目
@@ -230,17 +313,18 @@ const Component: React.FC = () => {
       cancelText: '取消',
       content: '确定要重置表单吗？所有填写的内容将被清空。',
       okText: '确认',
-      onOk: () => {
+      onOk: async () => {
         form.resetFields();
         setExpenseItems([]);
         setFileList([]);
 
         // 重新设置默认值
-        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        const userInfo = (localStg.get('userInfo') as any) || {};
         const currentUser = userInfo.nickName || userInfo.userName || '当前用户';
+
         form.setFieldsValue({
           applicant: currentUser,
-          department: 'admin'
+          department: userDepartment
         });
 
         message.success('表单重置成功');
@@ -410,11 +494,14 @@ const Component: React.FC = () => {
             <Form.Item
               label="所属部门"
               name="department"
-              rules={[{ message: '请选择所属部门', required: true }]}
             >
-              <Select
-                options={departments}
-                placeholder="请选择所属部门"
+              <Input
+                disabled
+                placeholder="自动获取"
+                style={{
+                  backgroundColor: '#f0f0f0',
+                  cursor: 'not-allowed'
+                }}
               />
             </Form.Item>
           </div>
@@ -611,7 +698,7 @@ const Component: React.FC = () => {
             <div className="mb-4">
               <div className="flex justify-between">
                 <Title level={5}>{previewData.title}</Title>
-                <Tag color="blue">{departments.find(d => d.value === previewData.department)?.label}</Tag>
+                <Tag color="blue">{userDepartment}</Tag>
               </div>
               <div>
                 <Text type="secondary">申请人：{previewData.applicant}</Text>
