@@ -56,12 +56,12 @@ const createProjectNotification = async (
  */
 export const uploadProposal = async (req: Request, res: Response) => {
   try {
-    const { taskId, comment } = req.body;
+    const { taskId, remark } = req.body;
     const { id: userId } = req.user as any;
 
     console.log('📤 方案上传请求:', {
       taskId,
-      comment,
+      remark,
       user: req.user,
       userId
     });
@@ -120,7 +120,7 @@ export const uploadProposal = async (req: Request, res: Response) => {
       operator: userId,
       operatorName: operatorName || '未知用户',
       action: '上传方案',
-      comment
+      comment: remark
     });
 
     // 更新项目事项，记录方案上传信息
@@ -128,7 +128,7 @@ export const uploadProposal = async (req: Request, res: Response) => {
       where: { id: Number(taskId) },
       data: {
         proposalUploadTime: new Date(),
-        proposalComment: comment,
+        proposalComment: remark,
         stageHistory: JSON.stringify(stageHistory)
       },
       include: {
@@ -176,7 +176,7 @@ export const uploadProposal = async (req: Request, res: Response) => {
  */
 export const confirmProposal = async (req: Request, res: Response) => {
   try {
-    const { taskId, approved, comment } = req.body;
+    const { taskId, approved, remark } = req.body;
     const { id: userId } = req.user as any;
 
     const task = await prisma.task.findUnique({
@@ -217,12 +217,12 @@ export const confirmProposal = async (req: Request, res: Response) => {
       operator: userId,
       operatorName,
       action: approved ? '客户同意方案' : '客户拒绝方案',
-      comment
+      comment: remark
     });
 
     let updateData: any = {
       customerApprovalTime: new Date(),
-      customerApprovalComment: comment,
+      customerApprovalComment: remark,
       stageHistory: JSON.stringify(stageHistory)
     };
 
@@ -279,7 +279,7 @@ export const confirmProposal = async (req: Request, res: Response) => {
  */
 export const confirmTeacher = async (req: Request, res: Response) => {
   try {
-    const { taskId, teacherInfo, comment } = req.body;
+    const { taskId, teacherInfo, remark } = req.body;
     const { id: userId } = req.user as any;
 
     const task = await prisma.task.findUnique({
@@ -320,7 +320,7 @@ export const confirmTeacher = async (req: Request, res: Response) => {
       operator: userId,
       operatorName,
       action: '确认授课老师',
-      comment,
+      comment: remark,
       teacherInfo
     });
 
@@ -330,7 +330,7 @@ export const confirmTeacher = async (req: Request, res: Response) => {
         currentStage: 'project_approval',
         teacherInfo: JSON.stringify(teacherInfo),
         teacherConfirmTime: new Date(),
-        teacherConfirmComment: comment,
+        teacherConfirmComment: remark,
         stageHistory: JSON.stringify(stageHistory),
         // 自动更新办理人为市场部经理
         executorId: getCurrentExecutorId('project_approval', task)
@@ -374,7 +374,7 @@ export const confirmTeacher = async (req: Request, res: Response) => {
  */
 export const approveProject = async (req: Request, res: Response) => {
   try {
-    const { taskId, approved, comment } = req.body;
+    const { taskId, approved, remark } = req.body;
     const { id: userId } = req.user as any;
 
     const task = await prisma.task.findUnique({
@@ -415,12 +415,12 @@ export const approveProject = async (req: Request, res: Response) => {
       operator: userId,
       operatorName,
       action: approved ? '审批通过' : '审批拒绝',
-      comment
+      comment: remark
     });
 
     let updateData: any = {
       approvalTime: new Date(),
-      approvalComment: comment,
+      approvalComment: remark,
       stageHistory: JSON.stringify(stageHistory)
     };
 
@@ -473,7 +473,7 @@ export const approveProject = async (req: Request, res: Response) => {
         Number(taskId),
         task.consultant.id,
         '项目已打回，需要重新确认师资',
-        `项目"${task.projectName}"审批被拒绝，已打回到师资确定阶段，请重新确认师资信息。审批意见：${comment || '无'}`,
+        `项目"${task.projectName}"审批被拒绝，已打回到师资确定阶段，请重新确认师资信息。审批意见：${remark || '无'}`,
         'warning'
       );
     }
@@ -498,7 +498,7 @@ export const approveProject = async (req: Request, res: Response) => {
  */
 export const confirmContract = async (req: Request, res: Response) => {
   try {
-    const { taskId, signed, comment } = req.body;
+    const { taskId, signed, remark } = req.body;
     const { id: userId } = req.user as any;
 
     const task = await prisma.task.findUnique({
@@ -539,12 +539,12 @@ export const confirmContract = async (req: Request, res: Response) => {
       operator: userId,
       operatorName,
       action: signed ? '客户已签合同' : '客户未签合同',
-      comment
+      comment: remark
     });
 
     let updateData: any = {
       contractSignTime: new Date(),
-      contractSignComment: comment,
+      contractSignComment: remark,
       stageHistory: JSON.stringify(stageHistory)
     };
 
@@ -597,7 +597,7 @@ export const confirmContract = async (req: Request, res: Response) => {
  */
 export const confirmProjectCompletion = async (req: Request, res: Response) => {
   try {
-    const { taskId, completed, comment } = req.body;
+    const { taskId, completed, remark } = req.body;
     const { id: userId } = req.user as any;
 
     const task = await prisma.task.findUnique({
@@ -638,12 +638,12 @@ export const confirmProjectCompletion = async (req: Request, res: Response) => {
       operator: userId,
       operatorName,
       action: completed ? '项目已完成' : '项目进行中',
-      comment
+      comment: remark
     });
 
     let updateData: any = {
       projectCompletionTime: new Date(),
-      projectCompletionComment: comment,
+      projectCompletionComment: remark,
       stageHistory: JSON.stringify(stageHistory)
     };
 
@@ -696,7 +696,7 @@ export const confirmProjectCompletion = async (req: Request, res: Response) => {
  */
 export const confirmPayment = async (req: Request, res: Response) => {
   try {
-    const { taskId, received, amount, comment } = req.body;
+    const { taskId, received, amount, remark } = req.body;
     const { id: userId } = req.user as any;
 
     const task = await prisma.task.findUnique({
@@ -743,7 +743,7 @@ export const confirmPayment = async (req: Request, res: Response) => {
 
     let updateData: any = {
       paymentTime: new Date(),
-      paymentComment: comment,
+      paymentComment: remark,
       paymentAmount: amount,
       stageHistory: JSON.stringify(stageHistory)
     };

@@ -212,6 +212,17 @@ export const createTask = async (req: Request, res: Response) => {
       remark
     } = req.body;
 
+    const { id: userId } = req.user as any;
+
+    // 获取操作人姓名 - 优先使用nickName，其次userName
+    const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
+
+    console.log('📝 保存创建项目操作历史 - 用户信息:', {
+      user: req.user,
+      operatorName,
+      userId
+    });
+
     // 构建任务数据对象
     const taskData: any = {
       projectType,
@@ -231,8 +242,10 @@ export const createTask = async (req: Request, res: Response) => {
       stageHistory: JSON.stringify([{
         stage: ProjectStage.CUSTOMER_INQUIRY,
         timestamp: new Date().toISOString(),
-        operator: responsiblePersonId,
-        action: '创建项目'
+        operator: userId,
+        operatorName,
+        action: '创建项目',
+        comment: remark || null
       }])
     };
 
@@ -394,7 +407,8 @@ export const deleteTask = async (req: Request, res: Response) => {
  */
 export const advanceStage = async (req: Request, res: Response) => {
   try {
-    const { taskId, comment, operatorId } = req.body;
+    const { taskId, remark } = req.body;
+    const { id: userId } = req.user as any;
 
     const task = await prismaClient.task.findUnique({
       where: { id: Number(taskId) }
@@ -420,12 +434,23 @@ export const advanceStage = async (req: Request, res: Response) => {
 
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
+
+    // 获取操作人姓名 - 优先使用nickName，其次userName
+    const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
+
+    console.log('📝 保存操作历史 - 用户信息:', {
+      user: req.user,
+      operatorName,
+      userId
+    });
+
     stageHistory.push({
       stage: nextStage,
       timestamp: new Date().toISOString(),
-      operator: operatorId,
+      operator: userId,
+      operatorName,
       action: '推进阶段',
-      comment
+      comment: remark
     });
 
     const updatedTask = await prismaClient.task.update({

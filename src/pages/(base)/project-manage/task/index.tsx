@@ -265,7 +265,7 @@ const getStageActions = (stage: string, permissions: any): Array<{ color: string
       // 方案申报阶段：只有当前办理人（咨询部）或超级管理员可以操作
       if (isCurrentExecutor || isSuperAdmin) {
         actions.push({ color: 'blue', key: 'upload_proposal', title: '上传方案' });
-        actions.push({ color: 'green', key: 'confirm_proposal', title: '客户已同意方案' });
+        actions.push({ color: 'green', key: 'confirm_proposal', title: '已发方案' });
       }
       break;
     case 'teacher_confirmation':
