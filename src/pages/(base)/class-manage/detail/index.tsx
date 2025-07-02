@@ -139,7 +139,6 @@ const ClassDetail = () => {
 
   // 搜索相关状态
   const [searchText, setSearchText] = useState('');
-  const [filteredStudentList, setFilteredStudentList] = useState<any[]>([]);
 
   // 添加选择相关状态
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -161,6 +160,13 @@ const ClassDetail = () => {
   const [customerPagination, setCustomerPagination] = useState({
     current: 1,
     pageSize: 10,
+    total: 0
+  });
+
+  // 学员列表分页状态
+  const [studentPagination, setStudentPagination] = useState({
+    current: 1,
+    pageSize: 20,
     total: 0
   });
 
@@ -212,6 +218,60 @@ const ClassDetail = () => {
     fetchCustomerList(page, newPageSize);
   };
 
+  // 获取学员列表
+  const fetchStudentList = async (page = 1, pageSize = 20, search = '') => {
+    if (!classId) return;
+
+    try {
+      setLoading(true);
+      const params: any = {
+        classId: Number.parseInt(classId, 10),
+        current: page,
+        size: pageSize
+      };
+
+      // 如果有搜索关键词，添加到参数中
+      if (search.trim()) {
+        params.keyword = search.trim();
+      }
+
+      const studentsResponse = await classService.getClassStudentList(params);
+
+      const formattedStudents = studentsResponse.records.map((student: any) => ({
+        attendance: student.attendanceRate || 0,
+        avatar: student.avatar || null,
+        company: student.company || '',
+        createdBy: student.createdBy || null,
+        email: student.email || '',
+        gender: student.gender || '',
+        id: student.id,
+        joinDate: student.joinDate || '',
+        landline: student.landline || '',
+        name: student.name || '',
+        phone: student.phone || '',
+        position: student.position || '',
+        trainingFee: student.trainingFee || 0
+      }));
+
+      setStudentList(formattedStudents);
+      setStudentPagination({
+        current: page,
+        pageSize,
+        total: studentsResponse.total || 0
+      });
+    } catch {
+      message.error('获取学员列表失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 处理学员列表分页变化
+  const handleStudentPaginationChange = (page: number, pageSize?: number) => {
+    const newPageSize = pageSize || studentPagination.pageSize;
+    fetchStudentList(page, newPageSize, searchText);
+  };
+
   // 获取班级数据
   const fetchClassInfo = async () => {
     if (!classId) return;
@@ -234,33 +294,6 @@ const ClassDetail = () => {
         studentCount: classResponse.studentCount || 0,
         trainingFee: classResponse.trainingFee || '0.00'
       });
-
-      // 获取学生列表
-      const studentsResponse = await classService.getClassStudentList({
-        classId: Number.parseInt(classId, 10),
-        current: 1,
-        size: 1000
-      });
-
-      const formattedStudents = studentsResponse.records.map((student: any) => ({
-        attendance: student.attendanceRate || 0,
-        avatar: student.avatar || null,
-        company: student.company || '',
-        createdBy: student.createdBy || null, // 包含创建者信息
-        email: student.email || '',
-        gender: student.gender || '',
-        id: student.id,
-        joinDate: student.joinDate || student.enrollmentDate || '',
-        landline: student.landline || '',
-        name: student.name,
-        phone: student.phone || '',
-        position: student.position || '',
-        studentId: student.studentId || '',
-        trainingFee: student.trainingFee || 0
-      }));
-
-      setStudentList(formattedStudents);
-      setFilteredStudentList(formattedStudents);
 
       // 获取课程列表
       const coursesResponse = await courseService.getClassCourseList({
@@ -369,7 +402,7 @@ const ClassDetail = () => {
       setIsCustomerSelectModalVisible(false);
       setSelectedCustomers([]);
       setCustomerTrainingFees({});
-      await fetchClassInfo();
+      await fetchStudentList();
     } catch (error) {
       console.error('导入学员失败:', error);
       message.error('导入学员失败');
@@ -380,6 +413,7 @@ const ClassDetail = () => {
 
   useEffect(() => {
     fetchClassInfo();
+    fetchStudentList();
   }, [classId]);
 
   // 获取状态标签颜色
@@ -486,7 +520,7 @@ const ClassDetail = () => {
           await classService.deleteStudent(studentId);
           message.success('学员删除成功');
           // 重新获取学员列表
-          await fetchClassInfo();
+          await fetchStudentList(studentPagination.current, studentPagination.pageSize, searchText);
         } catch (error) {
           message.error('删除失败');
           console.error('删除学员失败:', error);
@@ -1421,37 +1455,9 @@ const ClassDetail = () => {
   // 处理搜索
   const handleSearch = (value: string) => {
     setSearchText(value);
+    setStudentPagination({ current: 1, pageSize: 20, total: 0 });
+    fetchStudentList(1, 20, value);
   };
-
-  // 按拼音排序学员列表
-  const sortStudentsByPinyin = (students: any[]) => {
-    return students.sort((a, b) => {
-      return a.name.localeCompare(b.name, 'zh-CN', { sensitivity: 'base' });
-    });
-  };
-
-  // 过滤和排序学员列表
-  const getFilteredAndSortedStudents = () => {
-    let filtered = studentList;
-
-    // 如果有搜索文本，进行过滤
-    if (searchText.trim()) {
-      const searchLower = searchText.toLowerCase();
-      filtered = studentList.filter(
-        student =>
-          student.name.toLowerCase().includes(searchLower) || student.company.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // 按拼音排序
-    return sortStudentsByPinyin(filtered);
-  };
-
-  // 更新过滤后的学员列表
-  useEffect(() => {
-    const filteredAndSorted = getFilteredAndSortedStudents();
-    setFilteredStudentList(filteredAndSorted);
-  }, [studentList, searchText]);
 
   // 处理表格选择变化
   const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
@@ -1480,7 +1486,7 @@ const ClassDetail = () => {
           message.success(`成功删除 ${selectedRowKeys.length} 名学员`);
           setSelectedRowKeys([]);
           // 重新获取学员列表
-          await fetchClassInfo();
+          await fetchStudentList(studentPagination.current, studentPagination.pageSize, searchText);
         } catch (error) {
           message.error('批量删除失败');
           console.error('批量删除失败:', error);
@@ -1588,15 +1594,19 @@ const ClassDetail = () => {
 
         <Table
           columns={getStudentColumns()}
-          dataSource={filteredStudentList}
+          dataSource={studentList}
           loading={loading}
           rowKey="id"
           scroll={{ x: isSuperAdmin() ? 1200 : 500 }}
           pagination={{
-            pageSize: 20,
+            current: studentPagination.current,
+            onChange: handleStudentPaginationChange,
+            onShowSizeChange: handleStudentPaginationChange,
+            pageSize: studentPagination.pageSize,
             showQuickJumper: true,
             showSizeChanger: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+            total: studentPagination.total
           }}
           rowSelection={{
             getCheckboxProps: (record: any) => {
