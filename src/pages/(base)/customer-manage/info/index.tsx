@@ -36,8 +36,6 @@ const followUpStatusNames: Record<string, string> = {
   [FollowUpStatus.ARRIVED]: '已实到',
   [FollowUpStatus.NOT_ARRIVED]: '未实到',
   [FollowUpStatus.NEW_DEVELOP]: '新开发',
-  already_paid: '已实到',
-  already_signed: '已报名',
   empty: '-'
 };
 
@@ -52,9 +50,7 @@ const followUpStatusColors = {
   [FollowUpStatus.REGISTERED]: 'success',
   [FollowUpStatus.ARRIVED]: 'green',
   [FollowUpStatus.NOT_ARRIVED]: 'orange',
-  [FollowUpStatus.NEW_DEVELOP]: 'geekblue',
-  already_paid: 'green',
-  already_signed: 'success'
+  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
 };
 
 /** 客户信息管理组件 */
