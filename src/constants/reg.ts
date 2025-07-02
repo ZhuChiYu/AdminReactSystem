@@ -7,9 +7,9 @@ export const REG_PHONE =
 /**
  * Password reg
  *
- * 6-18 characters, including letters, numbers, and underscores
+ * 6-18 characters, including letters, numbers, and special characters
  */
-export const REG_PWD = /^\w{6,18}$/;
+export const REG_PWD = /^[a-zA-Z0-9!@#$%^&*()_+=[\]{};':"\\|,.<>?`~-]{6,18}$/;
 
 /** Email reg */
 export const REG_EMAIL = /^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;

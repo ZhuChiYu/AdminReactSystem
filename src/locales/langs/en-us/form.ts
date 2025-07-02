@@ -16,7 +16,7 @@ const form: App.I18n.Schema['translation']['form'] = {
     required: 'Please enter phone number'
   },
   pwd: {
-    invalid: '6-18 characters, including letters, numbers, and underscores',
+    invalid: '6-18 characters, including letters, numbers, and special characters',
     required: 'Please enter password'
   },
   required: 'Cannot be empty',

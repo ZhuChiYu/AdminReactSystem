@@ -157,6 +157,12 @@ const ClassDetail = () => {
   });
   // 存储每个客户的培训费
   const [customerTrainingFees, setCustomerTrainingFees] = useState<Record<number, number>>({});
+  // 客户列表分页状态
+  const [customerPagination, setCustomerPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
 
   // 计算总培训费
   const calculateTotalTrainingFee = () => {
@@ -167,19 +173,24 @@ const ClassDetail = () => {
   };
 
   // 获取客户列表用于导入学员
-  const fetchCustomerList = async () => {
+  const fetchCustomerList = async (page = 1, pageSize = 10) => {
     try {
       setCustomerLoading(true);
       const params = {
         company: customerSearchParams.company || undefined,
-        current: 1,
+        current: page,
         customerName: customerSearchParams.customerName || undefined,
         followStatus: customerSearchParams.followStatus || undefined,
-        size: 1000
+        size: pageSize
       };
 
       const response = await customerService.getCustomerList(params);
-      setCustomerList(response.records);
+      setCustomerList(response.records || []);
+      setCustomerPagination({
+        current: page,
+        pageSize,
+        total: response.total || 0
+      });
     } catch {
       message.error('获取客户列表失败');
     } finally {
@@ -191,7 +202,14 @@ const ClassDetail = () => {
   const openCustomerSelectModal = () => {
     setIsCustomerSelectModalVisible(true);
     setSelectedCustomers([]);
-    fetchCustomerList();
+    setCustomerPagination({ current: 1, pageSize: 10, total: 0 });
+    fetchCustomerList(1, 10);
+  };
+
+  // 处理客户列表分页变化
+  const handleCustomerPaginationChange = (page: number, pageSize?: number) => {
+    const newPageSize = pageSize || customerPagination.pageSize;
+    fetchCustomerList(page, newPageSize);
   };
 
   // 获取班级数据
@@ -326,8 +344,7 @@ const ClassDetail = () => {
           classId: Number.parseInt(classId!, 10),
           company: customer.company,
           email: customer.email || '',
-          gender: '',
-          // 客户数据中可能没有性别字段
+          gender: customer.gender || '',
           joinDate: dayjs().format('YYYY-MM-DD'),
           landline: customer.landline || '',
           name: customer.customerName,
@@ -680,6 +697,12 @@ const ClassDetail = () => {
             align: 'center' as const,
             dataIndex: 'gender',
             key: 'gender',
+            render: (gender: string) => {
+              if (!gender) return '-';
+              if (gender === 'male') return '男';
+              if (gender === 'female') return '女';
+              return gender;
+            },
             title: '性别',
             width: 80
           },
@@ -1632,7 +1655,10 @@ const ClassDetail = () => {
             </Select>
             <Button
               type="primary"
-              onClick={fetchCustomerList}
+              onClick={() => {
+                setCustomerPagination({ current: 1, pageSize: 10, total: 0 });
+                fetchCustomerList(1, 10);
+              }}
             >
               搜索
             </Button>
@@ -1650,6 +1676,18 @@ const ClassDetail = () => {
                 key: 'customerName',
                 title: '客户姓名',
                 width: 120
+              },
+              {
+                dataIndex: 'gender',
+                key: 'gender',
+                render: (gender: string) => {
+                  if (!gender) return '-';
+                  if (gender === 'male') return '男';
+                  if (gender === 'female') return '女';
+                  return gender;
+                },
+                title: '性别',
+                width: 80
               },
               {
                 dataIndex: 'company',
@@ -1736,10 +1774,14 @@ const ClassDetail = () => {
               }
             ]}
             pagination={{
-              pageSize: 10,
+              current: customerPagination.current,
+              onChange: handleCustomerPaginationChange,
+              onShowSizeChange: handleCustomerPaginationChange,
+              pageSize: customerPagination.pageSize,
               showQuickJumper: true,
               showSizeChanger: true,
-              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
+              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+              total: customerPagination.total
             }}
             rowSelection={{
               getCheckboxProps: (record: any) => {

@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
+import { useFormRules } from '@/features/form';
 import { authService, avatarService, userService } from '@/service/api';
 import { UserRole, isAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
@@ -37,6 +38,9 @@ const UserCenter = () => {
 
   // 判断当前用户权限
   const isUserAdmin = isAdmin();
+
+  // 使用表单校验规则
+  const { formRules } = useFormRules();
 
   // 获取用户职务角色对应的部门信息
   const getUserDepartmentFromRole = async (userRoles: any[]): Promise<string> => {
@@ -536,10 +540,7 @@ const UserCenter = () => {
       <Form.Item
         label="新密码"
         name="newPassword"
-        rules={[
-          { message: '请输入新密码', required: true },
-          { message: '密码长度不能少于6位', min: 6 }
-        ]}
+        rules={formRules.pwd}
       >
         <Input.Password
           placeholder="请输入新密码"
