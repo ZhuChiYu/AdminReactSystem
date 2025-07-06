@@ -24,6 +24,7 @@ interface MeetingItem {
   status: number;
   summary?: string;
   title: string; // 会议记录内容
+  agenda?: string; // 会议议程
 }
 
 const Component: React.FC = () => {
@@ -88,7 +89,8 @@ const Component: React.FC = () => {
         startTime: meeting.startTime,
         status: meeting.status || 0,
         summary: '', // API中没有meetingSummary字段，使用空字符串
-        title: meeting.title
+        title: meeting.title,
+        agenda: meeting.description || '' // 添加会议议程
       }));
 
       setMeetings(formattedMeetings);
@@ -734,6 +736,13 @@ const Component: React.FC = () => {
               <strong className="text-gray-600">会议地点：</strong>
               <p className="mt-1">{currentMeeting.location}</p>
             </div>
+
+            {currentMeeting.agenda && (
+              <div>
+                <strong className="text-gray-600">会议议程：</strong>
+                <div className="mt-1 rounded bg-gray-50 p-3 whitespace-pre-wrap">{currentMeeting.agenda}</div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
