@@ -1,5 +1,5 @@
 import { SearchOutlined } from '@ant-design/icons';
-import { Button, Card, DatePicker, Form, Input, Modal, Progress, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, DatePicker, Form, Input, Modal, Pagination, Progress, Select, Space, Table, Tag, message } from 'antd';
 import type { RangePickerProps } from 'antd/es/date-picker';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
@@ -7,9 +7,10 @@ import { useEffect, useState } from 'react';
 import type { CustomerApi } from '@/service/api';
 import { customerService } from '@/service/api';
 import { taskStatsService } from '@/service/api/taskStats';
+import type { EmployeeTaskStats } from '@/service/api/taskStats';
 import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
-// 暂时注释掉未使用的导入
-// import { getCurrentUserId, getCurrentUserName, isAdmin } from '@/utils/auth';
+import { getCurrentUserId, getCurrentUserName, isAdmin, isSuperAdmin } from '@/utils/auth';
+import { localStg } from '@/utils/storage';
 
 /** 跟进状态枚举 */
 export enum FollowUpStatus {
@@ -161,6 +162,18 @@ const TaskManagement = () => {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<TaskRecord[]>([]);
 
+  // 团队任务统计数据
+  const [teamTaskStats, setTeamTaskStats] = useState<EmployeeTaskStats[]>([]);
+  const [teamStatsLoading, setTeamStatsLoading] = useState(false);
+  const [showTeamStats, setShowTeamStats] = useState(true);
+  const [teamSearchKeyword, setTeamSearchKeyword] = useState('');
+  const [teamPagination, setTeamPagination] = useState({
+    current: 1,
+    size: 6, // 每页显示6个员工
+    total: 0,
+    pages: 0
+  });
+
   // 分页状态
   const [pagination, setPagination] = useState({
     current: 1,
@@ -175,6 +188,12 @@ const TaskManagement = () => {
     timeRange: null as RangePickerProps['value'],
     type: ''
   });
+
+  // 用户权限检查
+  const userInfo = localStg.get('userInfo');
+  const currentUserId = getCurrentUserId();
+  const isManagerOrAdmin = isAdmin() || isSuperAdmin();
+  const canViewTeamStats = isManagerOrAdmin;
 
   // 根据客户数据生成任务统计
   const generateTasksFromCustomers = (
@@ -338,6 +357,63 @@ const TaskManagement = () => {
     }
   };
 
+    // 获取团队任务统计
+  const loadTeamTaskStats = async (
+    current?: number,
+    size?: number,
+    keyword?: string
+  ) => {
+    if (!canViewTeamStats) return;
+
+    setTeamStatsLoading(true);
+    try {
+      const currentDate = new Date();
+      const searchCurrent = current || teamPagination.current;
+      const searchSize = size || teamPagination.size;
+      const searchKeyword = keyword !== undefined ? keyword : teamSearchKeyword;
+
+      const response = await taskStatsService.getTeamTaskStats(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        searchCurrent,
+        searchSize,
+        searchKeyword
+      );
+
+      setTeamTaskStats(response.teamStats);
+      setTeamPagination({
+        current: response.pagination.current,
+        size: response.pagination.size,
+        total: response.pagination.total,
+        pages: response.pagination.pages
+      });
+      console.log('团队任务统计:', response);
+    } catch (error) {
+      console.error('获取团队任务统计失败:', error);
+      message.error('获取团队任务统计失败');
+    } finally {
+      setTeamStatsLoading(false);
+    }
+  };
+
+  // 处理团队搜索
+  const handleTeamSearch = () => {
+    setTeamPagination(prev => ({ ...prev, current: 1 })); // 搜索时重置到第一页
+    loadTeamTaskStats(1, teamPagination.size, teamSearchKeyword);
+  };
+
+  // 重置团队搜索
+  const resetTeamSearch = () => {
+    setTeamSearchKeyword('');
+    setTeamPagination(prev => ({ ...prev, current: 1 })); // 重置时重置到第一页
+    loadTeamTaskStats(1, teamPagination.size, '');
+  };
+
+  // 处理团队分页变化
+  const handleTeamPaginationChange = (page: number, pageSize: number) => {
+    loadTeamTaskStats(page, pageSize, teamSearchKeyword);
+  };
+
   // 初始化数据
   useEffect(() => {
     const initializeData = async () => {
@@ -345,6 +421,10 @@ const TaskManagement = () => {
       const currentTargets = await loadTaskTargets();
       // 再获取客户数据并生成任务
       await fetchCustomerData(currentTargets);
+      // 如果是管理员，加载团队任务统计
+      if (canViewTeamStats) {
+        await loadTeamTaskStats();
+      }
     };
 
     initializeData();
@@ -819,6 +899,146 @@ const TaskManagement = () => {
         }
       >
         <StatisticsCards />
+
+        {/* 团队任务统计 */}
+        {canViewTeamStats && (
+          <Card className="mt-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <span className="text-lg font-medium">团队任务统计</span>
+                <Tag color="blue" className="ml-2">
+                  {isSuperAdmin() ? '全部员工' : '管理员工'}
+                </Tag>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="搜索员工姓名"
+                  value={teamSearchKeyword}
+                  onChange={e => setTeamSearchKeyword(e.target.value)}
+                  onPressEnter={handleTeamSearch}
+                  style={{ width: 200 }}
+                  allowClear
+                />
+                <Button
+                  icon={<SearchOutlined />}
+                  onClick={handleTeamSearch}
+                >
+                  搜索
+                </Button>
+                <Button onClick={resetTeamSearch}>重置</Button>
+                <Button
+                  type="primary"
+                  size="small"
+                  loading={teamStatsLoading}
+                  onClick={() => loadTeamTaskStats()}
+                >
+                  刷新统计
+                </Button>
+                <Button
+                  type="text"
+                  size="small"
+                  onClick={() => setShowTeamStats(!showTeamStats)}
+                >
+                  {showTeamStats ? '隐藏' : '显示'}
+                </Button>
+              </div>
+            </div>
+
+            {showTeamStats && (
+              <div className="space-y-4">
+                {teamTaskStats.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    {teamStatsLoading ? '加载中...' : teamSearchKeyword ? '未找到匹配的员工' : '暂无团队数据'}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {teamTaskStats.map((stat, index) => (
+                      <Card key={stat.employee.id} className="border border-gray-200">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{stat.employee.nickName}</div>
+                              <div className="text-sm text-gray-500">{stat.employee.roleName}</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-center p-2 bg-blue-50 rounded">
+                              <div className="text-sm text-blue-600">咨询</div>
+                              <div className="text-lg font-medium">{stat.completions.consultCount}</div>
+                              <div className="text-xs text-gray-500">/{stat.targets.consultTarget}</div>
+                              <Progress
+                                percent={stat.progress.consultProgress}
+                                size="small"
+                                strokeColor="#1890ff"
+                                showInfo={false}
+                              />
+                            </div>
+
+                            <div className="text-center p-2 bg-green-50 rounded">
+                              <div className="text-sm text-green-600">报名</div>
+                              <div className="text-lg font-medium">{stat.completions.registerCount}</div>
+                              <div className="text-xs text-gray-500">/{stat.targets.registerTarget}</div>
+                              <Progress
+                                percent={stat.progress.registerProgress}
+                                size="small"
+                                strokeColor="#52c41a"
+                                showInfo={false}
+                              />
+                            </div>
+
+                            <div className="text-center p-2 bg-purple-50 rounded">
+                              <div className="text-sm text-purple-600">开发</div>
+                              <div className="text-lg font-medium">{stat.completions.developCount}</div>
+                              <div className="text-xs text-gray-500">/{stat.targets.developTarget}</div>
+                              <Progress
+                                percent={stat.progress.developProgress}
+                                size="small"
+                                strokeColor="#722ed1"
+                                showInfo={false}
+                              />
+                            </div>
+
+                            <div className="text-center p-2 bg-orange-50 rounded">
+                              <div className="text-sm text-orange-600">回访</div>
+                              <div className="text-lg font-medium">{stat.completions.followUpCount}</div>
+                              <div className="text-xs text-gray-500">/{stat.targets.followUpTarget}</div>
+                              <Progress
+                                percent={stat.progress.followUpProgress}
+                                size="small"
+                                strokeColor="#fa8c16"
+                                showInfo={false}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {/* 分页组件 */}
+                {teamPagination.total > 0 && (
+                  <div className="flex justify-center mt-6">
+                    <Pagination
+                      current={teamPagination.current}
+                      total={teamPagination.total}
+                      pageSize={teamPagination.size}
+                      onChange={handleTeamPaginationChange}
+                      onShowSizeChange={handleTeamPaginationChange}
+                      showSizeChanger
+                      showQuickJumper
+                      showTotal={(total, range) =>
+                        `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
+                      }
+                      pageSizeOptions={['6', '12', '18', '24']}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
 
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Input

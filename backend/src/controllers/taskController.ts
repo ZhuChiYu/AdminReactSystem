@@ -981,6 +981,279 @@ class TaskController {
   }
 
   /**
+   * 获取管理员的下属员工任务统计
+   */
+  async getTeamTaskStats(req: Request, res: Response) {
+    try {
+      const currentUser = (req as any).user;
+      const { year, month, current = 1, size = 10, keyword = '' } = req.query;
+
+      if (!currentUser) {
+        return res.status(401).json(createErrorResponse(401, '用户未登录', null, req.path));
+      }
+
+      // 解析年月参数
+      const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+      const targetMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
+
+      // 解析分页参数
+      const page = parseInt(current as string);
+      const pageSize = parseInt(size as string);
+      const searchKeyword = keyword as string;
+
+      let managedEmployees: any[] = [];
+
+      // 构建搜索条件
+      const searchCondition = searchKeyword ? {
+        OR: [
+          { nickName: { contains: searchKeyword, mode: 'insensitive' as const } },
+          { userName: { contains: searchKeyword, mode: 'insensitive' as const } }
+        ]
+      } : {};
+
+      // 根据用户角色获取管理的员工
+      if (currentUser.roles?.includes('super_admin')) {
+        // 超级管理员：获取所有员工总数
+        const totalCount = await prisma.user.count({
+          where: {
+            status: 1,
+            userRoles: {
+              some: {
+                role: {
+                  roleCode: {
+                    in: ['admin', 'consultant', 'hr_specialist', 'hr_bp', 'sales_manager', 'marketing_manager']
+                  }
+                }
+              }
+            },
+            ...searchCondition
+          }
+        });
+
+        // 获取分页数据
+        managedEmployees = await prisma.user.findMany({
+          where: {
+            status: 1,
+            userRoles: {
+              some: {
+                role: {
+                  roleCode: {
+                    in: ['admin', 'consultant', 'hr_specialist', 'hr_bp', 'sales_manager', 'marketing_manager']
+                  }
+                }
+              }
+            },
+            ...searchCondition
+          },
+          select: {
+            id: true,
+            nickName: true,
+            userName: true,
+            userRoles: {
+              select: {
+                role: {
+                  select: {
+                    roleCode: true,
+                    roleName: true
+                  }
+                }
+              }
+            }
+          },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          orderBy: { nickName: 'asc' }
+        });
+
+        // 保存总数用于分页计算
+        (managedEmployees as any).totalCount = totalCount;
+      } else if (currentUser.roles?.includes('admin')) {
+        // 管理员：先获取所有管理关系
+        const allManagedRelations = await prisma.employeeManagerRelation.findMany({
+          where: { managerId: currentUser.id },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                nickName: true,
+                userName: true,
+                userRoles: {
+                  select: {
+                    role: {
+                      select: {
+                        roleCode: true,
+                        roleName: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        let allManagedEmployees = allManagedRelations.map(rel => rel.employee);
+
+        // 应用搜索过滤
+        if (searchKeyword) {
+          allManagedEmployees = allManagedEmployees.filter(emp =>
+            emp.nickName.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+            emp.userName.toLowerCase().includes(searchKeyword.toLowerCase())
+          );
+        }
+
+        // 计算分页
+        const totalCount = allManagedEmployees.length;
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+
+        managedEmployees = allManagedEmployees
+          .sort((a, b) => a.nickName.localeCompare(b.nickName))
+          .slice(startIndex, endIndex);
+
+        // 保存总数用于分页计算
+        (managedEmployees as any).totalCount = totalCount;
+      } else {
+        return res.status(403).json(createErrorResponse(403, '权限不足', null, req.path));
+      }
+
+      // 时间范围
+      const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
+      const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+
+      // 获取每个员工的任务统计
+      const teamStats = await Promise.all(
+        managedEmployees.map(async (employee) => {
+          // 获取员工的任务目标
+          const employeeTarget = await prisma.employeeTarget.findFirst({
+            where: {
+              employeeId: employee.id,
+              targetYear,
+              targetMonth,
+              status: 1
+            }
+          });
+
+          // 获取员工的任务完成情况
+          const consultCount = await this.getTaskCount(employee.id, '咨询任务', startOfMonth, endOfMonth);
+          const followUpCount = await this.getTaskCount(employee.id, '回访任务', startOfMonth, endOfMonth);
+          const developCount = await this.getTaskCount(employee.id, '开发任务', startOfMonth, endOfMonth);
+          const registerCount = await this.getTaskCount(employee.id, '报名任务', startOfMonth, endOfMonth);
+
+          // 计算客户任务完成情况（基于客户状态变更）
+          const customerTaskStats = await this.getCustomerTaskStats(employee.id, startOfMonth, endOfMonth);
+
+                     return {
+             employee: {
+               id: employee.id,
+               nickName: employee.nickName,
+               userName: employee.userName,
+               roleName: employee.userRoles?.[0]?.role?.roleName || '未知角色'
+             },
+            targets: {
+              consultTarget: employeeTarget?.consultTarget || 50,
+              followUpTarget: employeeTarget?.followUpTarget || 50,
+              developTarget: employeeTarget?.developTarget || 50,
+              registerTarget: employeeTarget?.registerTarget || 50
+            },
+            completions: {
+              consultCount: consultCount + customerTaskStats.consultCount,
+              followUpCount: followUpCount + customerTaskStats.followUpCount,
+              developCount: developCount + customerTaskStats.developCount,
+              registerCount: registerCount + customerTaskStats.registerCount
+            },
+            progress: {
+              consultProgress: employeeTarget?.consultTarget ?
+                Math.round(((consultCount + customerTaskStats.consultCount) / employeeTarget.consultTarget) * 100) : 0,
+              followUpProgress: employeeTarget?.followUpTarget ?
+                Math.round(((followUpCount + customerTaskStats.followUpCount) / employeeTarget.followUpTarget) * 100) : 0,
+              developProgress: employeeTarget?.developTarget ?
+                Math.round(((developCount + customerTaskStats.developCount) / employeeTarget.developTarget) * 100) : 0,
+              registerProgress: employeeTarget?.registerTarget ?
+                Math.round(((registerCount + customerTaskStats.registerCount) / employeeTarget.registerTarget) * 100) : 0
+            }
+          };
+        })
+      );
+
+      // 获取总数
+      const totalCount = (managedEmployees as any).totalCount || managedEmployees.length;
+      const pages = Math.ceil(totalCount / pageSize);
+
+      res.json(createSuccessResponse({
+        teamStats,
+        period: `${targetYear}-${String(targetMonth).padStart(2, '0')}`,
+        pagination: {
+          current: page,
+          size: pageSize,
+          total: totalCount,
+          pages: pages
+        },
+        managedCount: managedEmployees.length
+      }, '获取团队任务统计成功', req.path));
+
+    } catch (error) {
+      logger.error('获取团队任务统计失败:', error);
+      res.status(500).json(createErrorResponse(500, '获取团队任务统计失败', null, req.path));
+    }
+  }
+
+  /**
+   * 获取基于客户状态的任务统计
+   */
+  private async getCustomerTaskStats(userId: number, startDate: Date, endDate: Date) {
+    try {
+      // 获取该员工在时间范围内负责的客户数据
+      const customers = await prisma.customer.findMany({
+        where: {
+          assignedToId: userId,
+          updatedAt: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        select: {
+          followStatus: true,
+          updatedAt: true
+        }
+      });
+
+      // 根据客户状态统计对应的任务完成情况
+      const consultCount = customers.filter(c =>
+        c.followStatus === 'consult' || c.followStatus === 'wechat_added'
+      ).length;
+
+      const followUpCount = customers.filter(c =>
+        c.followStatus === 'effective_visit' || c.followStatus === 'not_arrived' ||
+        c.followStatus === 'rejected' || c.followStatus === 'vip'
+      ).length;
+
+      const developCount = customers.filter(c =>
+        c.followStatus === 'new_develop' || c.followStatus === 'early_25'
+      ).length;
+
+      const registerCount = customers.filter(c =>
+        c.followStatus === 'registered' || c.followStatus === 'arrived'
+      ).length;
+
+      return {
+        consultCount,
+        followUpCount,
+        developCount,
+        registerCount
+      };
+    } catch (error) {
+      logger.error('获取客户任务统计失败:', error);
+      return {
+        consultCount: 0,
+        followUpCount: 0,
+        developCount: 0,
+        registerCount: 0
+      };
+    }
+  }
+
+  /**
    * 获取指定类型任务的完成数量
    */
   private async getTaskCount(userId: number, taskType: string, startDate: Date, endDate: Date): Promise<number> {

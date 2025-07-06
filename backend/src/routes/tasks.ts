@@ -12,6 +12,7 @@ import {
   getArchivedTasks,
   getProjectStatistics as getProjectStatisticsFromTask
 } from '../controllers/taskController';
+import TaskController from '../controllers/taskController';
 import {
   uploadProposal,
   confirmProposal,
@@ -81,6 +82,23 @@ router.get('/my',
 router.get('/statistics',
   authMiddleware,
   getProjectStatisticsFromTask
+);
+
+/**
+ * @route GET /api/tasks/team-stats
+ * @desc 获取团队任务统计（管理员和超级管理员）
+ * @access Private (Admin/SuperAdmin only)
+ */
+router.get('/team-stats',
+  authMiddleware,
+  [
+    query('year').optional().isInt({ min: 2020, max: 2030 }).withMessage('年份必须在2020-2030之间'),
+    query('month').optional().isInt({ min: 1, max: 12 }).withMessage('月份必须在1-12之间'),
+    query('current').optional().isInt({ min: 1 }).withMessage('页码必须是正整数'),
+    query('size').optional().isInt({ min: 1, max: 100 }).withMessage('页面大小必须在1-100之间'),
+    query('keyword').optional().isString().withMessage('搜索关键词必须是字符串')
+  ],
+  TaskController.getTeamTaskStats.bind(TaskController)
 );
 
 /**
