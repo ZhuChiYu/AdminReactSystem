@@ -8,7 +8,9 @@ export interface EmployeeTarget {
   employeeName: string;
   departmentName: string;
   targetYear: number;
-  targetMonth: number;
+  targetType: 'week' | 'month';
+  targetMonth?: number | null;
+  targetWeek?: number | null;
   consultTarget: number;
   followUpTarget: number;
   developTarget: number;
@@ -25,6 +27,8 @@ export interface EmployeeTargetQueryParams {
   employeeId?: number;
   year?: number;
   month?: number;
+  week?: number;
+  targetType?: 'week' | 'month';
   current?: number;
   size?: number;
 }
@@ -32,7 +36,9 @@ export interface EmployeeTargetQueryParams {
 export interface SetEmployeeTargetRequest {
   employeeId: number;
   targetYear: number;
-  targetMonth: number;
+  targetType: 'week' | 'month';
+  targetMonth?: number;
+  targetWeek?: number;
   consultTarget?: number;
   followUpTarget?: number;
   developTarget?: number;

@@ -8,6 +8,19 @@ export interface TaskTargets {
   registerTarget: number;
 }
 
+// 统计周期类型
+export type StatisticsPeriod = 'week' | 'month';
+
+// 时间周期信息
+export interface PeriodInfo {
+  type: StatisticsPeriod;
+  year: number;
+  month?: number | null;
+  week?: number | null;
+  startDate: string;
+  endDate: string;
+}
+
 // 员工任务统计信息
 export interface EmployeeTaskStats {
   employee: {
@@ -16,6 +29,7 @@ export interface EmployeeTaskStats {
     userName: string;
     roleName: string;
   };
+  period: PeriodInfo;
   targets: {
     consultTarget: number;
     followUpTarget: number;
@@ -39,7 +53,7 @@ export interface EmployeeTaskStats {
 // 团队任务统计响应
 export interface TeamTaskStatsResponse {
   teamStats: EmployeeTaskStats[];
-  period: string;
+  period: PeriodInfo;
   managedCount: number;
   pagination: {
     current: number;
@@ -64,6 +78,7 @@ export interface TaskProgress {
 }
 
 export interface UserTaskStats {
+  period: PeriodInfo;
   targets: TaskTargets;
   completions: TaskCompletions;
   progress: TaskProgress;
@@ -72,27 +87,40 @@ export interface UserTaskStats {
 class TaskStatsService {
   private baseURL = '/task-stats';
 
-  /** 获取用户任务统计和目标 */
-  async getUserTaskStats(year?: number, month?: number): Promise<UserTaskStats> {
-    const params: any = {};
+  /** 获取用户任务统计和目标（支持周/月统计） */
+  async getUserTaskStats(
+    year?: number,
+    month?: number,
+    week?: number,
+    period: StatisticsPeriod = 'month'
+  ): Promise<UserTaskStats> {
+    const params: any = {
+      period
+    };
     if (year) params.year = year;
-    if (month) params.month = month;
+    if (period === 'month' && month) params.month = month;
+    if (period === 'week' && week) params.week = week;
 
     const response = await apiClient.get<UserTaskStats>(`${this.baseURL}/user-stats`, { params });
     return response;
   }
 
-  /** 获取团队任务统计（管理员和超级管理员） */
+  /** 获取团队任务统计（管理员和超级管理员，支持周/月统计） */
   async getTeamTaskStats(
     year?: number,
     month?: number,
+    week?: number,
+    period: StatisticsPeriod = 'month',
     current?: number,
     size?: number,
     keyword?: string
   ): Promise<TeamTaskStatsResponse> {
-    const params: any = {};
+    const params: any = {
+      period
+    };
     if (year) params.year = year;
-    if (month) params.month = month;
+    if (period === 'month' && month) params.month = month;
+    if (period === 'week' && week) params.week = week;
     if (current) params.current = current;
     if (size) params.size = size;
     if (keyword) params.keyword = keyword;

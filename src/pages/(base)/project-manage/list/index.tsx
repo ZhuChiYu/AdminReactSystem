@@ -1,16 +1,36 @@
 import { SearchOutlined } from '@ant-design/icons';
-import { Button, Card, DatePicker, Form, Input, Modal, Pagination, Progress, Select, Space, Table, Tag, message } from 'antd';
+import {
+  Button,
+  Card,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Pagination,
+  Progress,
+  Select,
+  Space,
+  Table,
+  Tag,
+  message
+} from 'antd';
 import type { RangePickerProps } from 'antd/es/date-picker';
 import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
 import { useEffect, useState } from 'react';
 
 import type { CustomerApi } from '@/service/api';
 import { customerService } from '@/service/api';
 import { taskStatsService } from '@/service/api/taskStats';
 import type { EmployeeTaskStats } from '@/service/api/taskStats';
-import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
-import { getCurrentUserId, getCurrentUserName, isAdmin, isSuperAdmin } from '@/utils/auth';
+import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
+import { getActionColumnConfig, getCenterColumnConfig } from '@/utils/table';
+
+// 扩展dayjs插件
+dayjs.extend(weekOfYear);
+dayjs.extend(isoWeek);
 
 /** 跟进状态枚举 */
 export enum FollowUpStatus {
@@ -67,6 +87,32 @@ const customerSourceNames = {
   wechat: '微信'
 };
 
+// 工具函数：根据年份和周数获取日期范围
+const getWeekDateRange = (
+  year: number,
+  weekNumber: number
+): { end: dayjs.Dayjs; endDate: string; start: dayjs.Dayjs; startDate: string } => {
+  // 获取指定年份第一天
+  const firstDayOfYear = dayjs().year(year).startOf('year');
+
+  // 计算指定周的开始日期（周一）
+  const weekStart = firstDayOfYear.isoWeek(weekNumber).startOf('isoWeek');
+  const weekEnd = weekStart.endOf('isoWeek');
+
+  return {
+    end: weekEnd,
+    endDate: weekEnd.format('MM月DD日'),
+    start: weekStart,
+    startDate: weekStart.format('MM月DD日')
+  };
+};
+
+/** 统计周期枚举 */
+enum StatisticsPeriod {
+  MONTH = 'month',
+  WEEK = 'week'
+}
+
 /** 任务类型枚举 */
 enum TaskType {
   CONSULT = 'consult', // 咨询任务
@@ -91,11 +137,19 @@ const taskTypeColors = {
   [TaskType.FOLLOW_UP]: 'orange'
 };
 
-/** 统计周期枚举 */
-enum StatisticsPeriod {
-  MONTH = 'month',
-  WEEK = 'week'
-}
+// 工具函数：获取当前周期显示信息
+const getCurrentPeriodInfo = (period: StatisticsPeriod): string => {
+  const now = dayjs();
+  const year = now.year();
+
+  if (period === StatisticsPeriod.MONTH) {
+    const month = now.month() + 1;
+    return `${year}年${month}月`;
+  }
+  const week = now.isoWeek();
+  const { endDate, startDate } = getWeekDateRange(year, week);
+  return `${year}年第${week}周 (${startDate}-${endDate})`;
+};
 
 /** 统计周期名称 */
 const periodNames = {
@@ -169,9 +223,10 @@ const TaskManagement = () => {
   const [teamSearchKeyword, setTeamSearchKeyword] = useState('');
   const [teamPagination, setTeamPagination] = useState({
     current: 1,
-    size: 6, // 每页显示6个员工
-    total: 0,
-    pages: 0
+    pages: 0,
+    size: 6,
+    // 每页显示6个员工
+    total: 0
   });
 
   // 分页状态
@@ -194,6 +249,12 @@ const TaskManagement = () => {
   const currentUserId = getCurrentUserId();
   const isManagerOrAdmin = isAdmin() || isSuperAdmin();
   const canViewTeamStats = isManagerOrAdmin;
+
+  // 获取当前周数（ISO周数）
+  const getCurrentWeekNumber = (): number => {
+    const now = dayjs();
+    return now.isoWeek();
+  };
 
   // 根据客户数据生成任务统计
   const generateTasksFromCustomers = (
@@ -327,12 +388,30 @@ const TaskManagement = () => {
     }
   };
 
-  // 加载任务目标数据
+  // 加载任务目标数据（支持周/月统计）
   const loadTaskTargets = async () => {
     try {
       // 调用新的API获取用户的任务目标和统计
       const currentDate = new Date();
-      const stats = await taskStatsService.getUserTaskStats(currentDate.getFullYear(), currentDate.getMonth() + 1);
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const week = getCurrentWeekNumber();
+
+      console.log('🔍 请求参数:', {
+        month: selectedPeriod === 'month' ? month : undefined,
+        period: selectedPeriod,
+        week: selectedPeriod === 'week' ? week : undefined,
+        year
+      });
+
+      const stats = await taskStatsService.getUserTaskStats(
+        year,
+        selectedPeriod === 'month' ? month : undefined,
+        selectedPeriod === 'week' ? week : undefined,
+        selectedPeriod
+      );
+
+      console.log('🔍 API原始返回数据:', stats);
 
       const newTargets = {
         [TaskType.CONSULT]: stats.targets.consultTarget,
@@ -342,6 +421,12 @@ const TaskManagement = () => {
       };
 
       setTaskTargets(newTargets);
+      console.log('📊 任务目标加载成功:', {
+        originalTargets: stats.targets,
+        period: selectedPeriod,
+        periodInfo: stats.period,
+        targets: newTargets
+      });
       return newTargets;
     } catch (error) {
       console.error('❌ 加载目标数据失败:', error);
@@ -357,24 +442,26 @@ const TaskManagement = () => {
     }
   };
 
-    // 获取团队任务统计
-  const loadTeamTaskStats = async (
-    current?: number,
-    size?: number,
-    keyword?: string
-  ) => {
+  // 获取团队任务统计（支持周/月统计）
+  const loadTeamTaskStats = async (current?: number, size?: number, keyword?: string) => {
     if (!canViewTeamStats) return;
 
     setTeamStatsLoading(true);
     try {
       const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const week = getCurrentWeekNumber();
+
       const searchCurrent = current || teamPagination.current;
       const searchSize = size || teamPagination.size;
       const searchKeyword = keyword !== undefined ? keyword : teamSearchKeyword;
 
       const response = await taskStatsService.getTeamTaskStats(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
+        year,
+        selectedPeriod === 'month' ? month : undefined,
+        selectedPeriod === 'week' ? week : undefined,
+        selectedPeriod,
         searchCurrent,
         searchSize,
         searchKeyword
@@ -383,11 +470,11 @@ const TaskManagement = () => {
       setTeamTaskStats(response.teamStats);
       setTeamPagination({
         current: response.pagination.current,
+        pages: response.pagination.pages,
         size: response.pagination.size,
-        total: response.pagination.total,
-        pages: response.pagination.pages
+        total: response.pagination.total
       });
-      console.log('团队任务统计:', response);
+      console.log('📊 团队任务统计:', { period: selectedPeriod, periodInfo: response.period, stats: response });
     } catch (error) {
       console.error('获取团队任务统计失败:', error);
       message.error('获取团队任务统计失败');
@@ -429,6 +516,28 @@ const TaskManagement = () => {
 
     initializeData();
   }, []);
+
+  // 监听周期变化，重新加载数据
+  useEffect(() => {
+    const reloadDataOnPeriodChange = async () => {
+      console.log('🔄 周期切换，重新加载数据:', selectedPeriod);
+      // 重新加载目标数据
+      const currentTargets = await loadTaskTargets();
+      // 重新获取客户数据并生成任务
+      await fetchCustomerData(currentTargets);
+      // 如果是管理员，重新加载团队任务统计
+      if (canViewTeamStats) {
+        // 重置分页到第一页
+        setTeamPagination(prev => ({ ...prev, current: 1 }));
+        await loadTeamTaskStats(1, teamPagination.size, teamSearchKeyword);
+      }
+    };
+
+    // 跳过初始化时的调用，只在周期真正改变时重新加载
+    if (selectedPeriod) {
+      reloadDataOnPeriodChange();
+    }
+  }, [selectedPeriod]);
 
   // 当任务数据变化时更新列表和分页
   useEffect(() => {
@@ -473,8 +582,8 @@ const TaskManagement = () => {
       .filter(task => task.followUpStatus === TaskFollowUpStatus.COMPLETED)
       .reduce((sum, task) => sum + task.completedCount, 0);
 
-    // 直接从任务记录中获取目标值，确保使用最新的目标
-    const target = typeRecords.length > 0 ? typeRecords[0].targetCount : taskTargets[type];
+    // 直接使用当前周期的目标值，确保显示的是周目标或月目标
+    const target = taskTargets[type];
 
     return {
       completedCount,
@@ -795,10 +904,11 @@ const TaskManagement = () => {
       width: 100
     },
     {
-      dataIndex: 'createTime',
-      key: 'createTime',
+      dataIndex: 'updateTime',
+      key: 'updateTime',
       ...getCenterColumnConfig(),
-      title: '创建时间',
+      render: (time: string) => (time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      title: '修改时间',
       width: 180
     },
     {
@@ -879,11 +989,21 @@ const TaskManagement = () => {
         extra={
           <Space>
             <Select
-              style={{ width: 120 }}
+              style={{ width: 280 }}
               value={selectedPeriod}
               options={[
-                { label: '本周', value: StatisticsPeriod.WEEK },
-                { label: '本月', value: StatisticsPeriod.MONTH }
+                {
+                  label: `本周 (${(() => {
+                    const now = dayjs();
+                    const { endDate, startDate } = getWeekDateRange(now.year(), now.isoWeek());
+                    return `${startDate}-${endDate}`;
+                  })()})`,
+                  value: StatisticsPeriod.WEEK
+                },
+                {
+                  label: `本月 (${dayjs().format('YYYY年MM月')})`,
+                  value: StatisticsPeriod.MONTH
+                }
               ]}
               onChange={value => setSelectedPeriod(value)}
             />
@@ -893,7 +1013,9 @@ const TaskManagement = () => {
           <div className="flex items-center">
             <span className="mr-2 text-lg font-medium">任务管理</span>
             <div className="flex gap-2">
-              {selectedPeriod === StatisticsPeriod.WEEK ? <Tag color="blue">本周</Tag> : <Tag color="green">本月</Tag>}
+              <Tag color={selectedPeriod === StatisticsPeriod.WEEK ? 'blue' : 'green'}>
+                {getCurrentPeriodInfo(selectedPeriod)}
+              </Tag>
             </div>
           </div>
         }
@@ -903,21 +1025,24 @@ const TaskManagement = () => {
         {/* 团队任务统计 */}
         {canViewTeamStats && (
           <Card className="mt-4 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center">
                 <span className="text-lg font-medium">团队任务统计</span>
-                <Tag color="blue" className="ml-2">
+                <Tag
+                  className="ml-2"
+                  color="blue"
+                >
                   {isSuperAdmin() ? '全部员工' : '管理员工'}
                 </Tag>
               </div>
               <div className="flex items-center gap-2">
                 <Input
+                  allowClear
                   placeholder="搜索员工姓名"
+                  style={{ width: 200 }}
                   value={teamSearchKeyword}
                   onChange={e => setTeamSearchKeyword(e.target.value)}
                   onPressEnter={handleTeamSearch}
-                  style={{ width: 200 }}
-                  allowClear
                 />
                 <Button
                   icon={<SearchOutlined />}
@@ -927,16 +1052,16 @@ const TaskManagement = () => {
                 </Button>
                 <Button onClick={resetTeamSearch}>重置</Button>
                 <Button
-                  type="primary"
-                  size="small"
                   loading={teamStatsLoading}
+                  size="small"
+                  type="primary"
                   onClick={() => loadTeamTaskStats()}
                 >
                   刷新统计
                 </Button>
                 <Button
-                  type="text"
                   size="small"
+                  type="text"
                   onClick={() => setShowTeamStats(!showTeamStats)}
                 >
                   {showTeamStats ? '隐藏' : '显示'}
@@ -947,13 +1072,16 @@ const TaskManagement = () => {
             {showTeamStats && (
               <div className="space-y-4">
                 {teamTaskStats.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="py-8 text-center text-gray-500">
                     {teamStatsLoading ? '加载中...' : teamSearchKeyword ? '未找到匹配的员工' : '暂无团队数据'}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 md:grid-cols-2">
                     {teamTaskStats.map((stat, index) => (
-                      <Card key={stat.employee.id} className="border border-gray-200">
+                      <Card
+                        className="border border-gray-200"
+                        key={stat.employee.id}
+                      >
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <div>
@@ -963,51 +1091,51 @@ const TaskManagement = () => {
                           </div>
 
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="text-center p-2 bg-blue-50 rounded">
+                            <div className="rounded bg-blue-50 p-2 text-center">
                               <div className="text-sm text-blue-600">咨询</div>
                               <div className="text-lg font-medium">{stat.completions.consultCount}</div>
                               <div className="text-xs text-gray-500">/{stat.targets.consultTarget}</div>
                               <Progress
                                 percent={stat.progress.consultProgress}
+                                showInfo={false}
                                 size="small"
                                 strokeColor="#1890ff"
-                                showInfo={false}
                               />
                             </div>
 
-                            <div className="text-center p-2 bg-green-50 rounded">
+                            <div className="rounded bg-green-50 p-2 text-center">
                               <div className="text-sm text-green-600">报名</div>
                               <div className="text-lg font-medium">{stat.completions.registerCount}</div>
                               <div className="text-xs text-gray-500">/{stat.targets.registerTarget}</div>
                               <Progress
                                 percent={stat.progress.registerProgress}
+                                showInfo={false}
                                 size="small"
                                 strokeColor="#52c41a"
-                                showInfo={false}
                               />
                             </div>
 
-                            <div className="text-center p-2 bg-purple-50 rounded">
+                            <div className="rounded bg-purple-50 p-2 text-center">
                               <div className="text-sm text-purple-600">开发</div>
                               <div className="text-lg font-medium">{stat.completions.developCount}</div>
                               <div className="text-xs text-gray-500">/{stat.targets.developTarget}</div>
                               <Progress
                                 percent={stat.progress.developProgress}
+                                showInfo={false}
                                 size="small"
                                 strokeColor="#722ed1"
-                                showInfo={false}
                               />
                             </div>
 
-                            <div className="text-center p-2 bg-orange-50 rounded">
+                            <div className="rounded bg-orange-50 p-2 text-center">
                               <div className="text-sm text-orange-600">回访</div>
                               <div className="text-lg font-medium">{stat.completions.followUpCount}</div>
                               <div className="text-xs text-gray-500">/{stat.targets.followUpTarget}</div>
                               <Progress
                                 percent={stat.progress.followUpProgress}
+                                showInfo={false}
                                 size="small"
                                 strokeColor="#fa8c16"
-                                showInfo={false}
                               />
                             </div>
                           </div>
@@ -1019,19 +1147,17 @@ const TaskManagement = () => {
 
                 {/* 分页组件 */}
                 {teamPagination.total > 0 && (
-                  <div className="flex justify-center mt-6">
+                  <div className="mt-6 flex justify-center">
                     <Pagination
+                      showQuickJumper
+                      showSizeChanger
                       current={teamPagination.current}
-                      total={teamPagination.total}
                       pageSize={teamPagination.size}
+                      pageSizeOptions={['6', '12', '18', '24']}
+                      showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`}
+                      total={teamPagination.total}
                       onChange={handleTeamPaginationChange}
                       onShowSizeChange={handleTeamPaginationChange}
-                      showSizeChanger
-                      showQuickJumper
-                      showTotal={(total, range) =>
-                        `第 ${range[0]}-${range[1]} 条/共 ${total} 条`
-                      }
-                      pageSizeOptions={['6', '12', '18', '24']}
                     />
                   </div>
                 )}

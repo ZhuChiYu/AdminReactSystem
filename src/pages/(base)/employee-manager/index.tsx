@@ -1,5 +1,6 @@
 import { AimOutlined, DeleteOutlined, EditOutlined, UserOutlined } from '@ant-design/icons';
 import {
+  Button,
   Button as AButton,
   Card,
   DatePicker,
@@ -14,7 +15,13 @@ import {
   message
 } from 'antd';
 import dayjs from 'dayjs';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import { useEffect, useState } from 'react';
+
+// 扩展dayjs插件
+dayjs.extend(weekOfYear);
+dayjs.extend(isoWeek);
 
 import { type EmployeeApi, employeeService, employeeTargetService } from '@/service/api';
 import type { EmployeeTarget, SetEmployeeTargetRequest } from '@/service/api/employeeTarget';
@@ -33,6 +40,34 @@ interface EmployeeManagerRelation {
   managerName: string;
   remark?: string;
 }
+
+// 工具函数：根据年份和周数获取日期范围
+const getWeekDateRange = (year: number, weekNumber: number): { start: dayjs.Dayjs; end: dayjs.Dayjs; startDate: string; endDate: string } => {
+  // 获取指定年份第一天
+  const firstDayOfYear = dayjs().year(year).startOf('year');
+
+  // 计算指定周的开始日期（周一）
+  const weekStart = firstDayOfYear.isoWeek(weekNumber).startOf('isoWeek');
+  const weekEnd = weekStart.endOf('isoWeek');
+
+  return {
+    start: weekStart,
+    end: weekEnd,
+    startDate: weekStart.format('MM月DD日'),
+    endDate: weekEnd.format('MM月DD日')
+  };
+};
+
+// 工具函数：格式化周期显示
+const formatPeriodDisplay = (targetType: 'week' | 'month', year: number, month?: number, week?: number): string => {
+  if (targetType === 'month') {
+    return `${year}年${month}月`;
+  } else if (week) {
+    const { startDate, endDate } = getWeekDateRange(year, week);
+    return `${year}年第${week}周 (${startDate}-${endDate})`;
+  }
+  return `${year}年`;
+};
 
 const EmployeeManagerManagement = () => {
   const [form] = Form.useForm();
@@ -62,6 +97,8 @@ const EmployeeManagerManagement = () => {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeApi.EmployeeListItem | null>(null);
   const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear());
   const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
+  const [targetWeek, setTargetWeek] = useState<number>(dayjs().week());
+  const [targetType, setTargetType] = useState<'week' | 'month'>('month');
 
   // 加载基础数据
   const fetchBasicData = async () => {
@@ -109,15 +146,23 @@ const EmployeeManagerManagement = () => {
     }
   };
 
-  // 获取员工目标数据
+  // 获取员工目标数据（支持周/月统计）
   const fetchEmployeeTargets = async () => {
     try {
-      const targetData = await employeeTargetService.getEmployeeTargets({
+      const params: any = {
         current: 1,
-        month: targetMonth,
         size: 1000,
-        year: targetYear
-      });
+        year: targetYear,
+        targetType: targetType
+      };
+
+      if (targetType === 'month') {
+        params.month = targetMonth;
+      } else {
+        params.week = targetWeek;
+      }
+
+      const targetData = await employeeTargetService.getEmployeeTargets(params);
 
       // 将目标数据转换为以员工ID为键的对象
       const targetsMap: Record<number, EmployeeTarget> = {};
@@ -126,6 +171,7 @@ const EmployeeManagerManagement = () => {
       });
 
       setEmployeeTargets(targetsMap);
+      console.log('📊 员工目标数据加载成功:', { targetType, params, targetsMap });
     } catch (error) {
       console.error('获取员工目标数据失败:', error);
     }
@@ -172,7 +218,7 @@ const EmployeeManagerManagement = () => {
     if (canManageTargets && employees.length > 0 && relations.length >= 0) {
       fetchManagedEmployees();
     }
-  }, [targetYear, targetMonth, canManageTargets, employees, relations]);
+  }, [targetYear, targetMonth, targetWeek, targetType, canManageTargets, employees, relations]);
 
   // 获取可选的员工列表
   const getSelectableEmployees = () => {
@@ -277,7 +323,7 @@ const EmployeeManagerManagement = () => {
   };
 
   // 员工目标管理相关函数
-  // 设置员工任务目标
+  // 设置员工任务目标（支持周/月统计）
   const handleSetTarget = async () => {
     try {
       const values = await targetForm.validateFields();
@@ -291,12 +337,19 @@ const EmployeeManagerManagement = () => {
         followUpTarget: values.followUpTarget || 0,
         registerTarget: values.registerTarget || 0,
         remark: values.remark || '',
-        targetMonth: values.targetDate.month() + 1,
-        targetYear: values.targetDate.year()
+        targetType: values.targetType,
+        targetYear: values.targetYear
       };
 
+      // 根据目标类型设置相应的时间字段
+      if (values.targetType === 'month') {
+        targetData.targetMonth = values.targetMonth;
+      } else {
+        targetData.targetWeek = values.targetWeek;
+      }
+
       await employeeTargetService.setEmployeeTarget(targetData);
-      message.success('设置员工任务目标成功');
+      message.success(`设置员工${values.targetType === 'month' ? '月' : '周'}目标成功`);
 
       setIsTargetModalVisible(false);
       setEditingEmployee(null);
@@ -310,7 +363,7 @@ const EmployeeManagerManagement = () => {
     }
   };
 
-  // 编辑员工目标
+  // 编辑员工目标（支持周/月统计）
   const handleEditEmployeeTarget = (employee: EmployeeApi.EmployeeListItem) => {
     setEditingEmployee(employee);
 
@@ -324,7 +377,10 @@ const EmployeeManagerManagement = () => {
       followUpTarget: currentTarget?.followUpTarget || 0,
       registerTarget: currentTarget?.registerTarget || 0,
       remark: currentTarget?.remark || '',
-      targetDate: dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`)
+      targetType: currentTarget?.targetType || targetType,
+      targetYear: currentTarget?.targetYear || targetYear,
+      targetMonth: currentTarget?.targetMonth || targetMonth,
+      targetWeek: currentTarget?.targetWeek || targetWeek
     });
     setIsTargetModalVisible(true);
   };
@@ -422,9 +478,9 @@ const EmployeeManagerManagement = () => {
     {
       align: 'center' as const,
       key: 'targetPeriod',
-      render: () => `${targetYear}年${targetMonth}月`,
-      title: '目标月份',
-      width: 120
+      render: () => formatPeriodDisplay(targetType, targetYear, targetMonth, targetWeek),
+      title: '目标周期',
+      width: 180
     },
     {
       align: 'center' as const,
@@ -572,16 +628,64 @@ const EmployeeManagerManagement = () => {
                 title={
                   <Space>
                     <span>员工目标管理</span>
-                    <DatePicker.MonthPicker
-                      placeholder="选择月份"
-                      value={dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`)}
-                      onChange={date => {
-                        if (date) {
-                          setTargetYear(date.year());
-                          setTargetMonth(date.month() + 1);
-                        }
+                    <Select
+                      style={{ width: 100 }}
+                      value={targetType}
+                      onChange={(value: 'week' | 'month') => {
+                        setTargetType(value);
+                        console.log('🔄 切换目标类型:', value);
                       }}
+                      options={[
+                        { label: '周目标', value: 'week' },
+                        { label: '月目标', value: 'month' }
+                      ]}
                     />
+                    {targetType === 'month' ? (
+                      <DatePicker.MonthPicker
+                        placeholder="选择月份"
+                        value={dayjs(`${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`)}
+                        onChange={date => {
+                          if (date) {
+                            setTargetYear(date.year());
+                            setTargetMonth(date.month() + 1);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Space>
+                        <DatePicker
+                          placeholder="选择周"
+                          picker="week"
+                          value={(() => {
+                            try {
+                              // 根据年份和周数构造日期
+                              const { start } = getWeekDateRange(targetYear, targetWeek);
+                              return start;
+                            } catch {
+                              return dayjs().year(targetYear).isoWeek(targetWeek);
+                            }
+                          })()}
+                          onChange={date => {
+                            if (date) {
+                              setTargetYear(date.year());
+                              setTargetWeek(date.isoWeek());
+                            }
+                          }}
+                          format={`YYYY年第WW周 (MM月DD日)`}
+                          style={{ width: 200 }}
+                        />
+                        <span style={{ fontSize: '12px', color: '#666' }}>
+                          {(() => {
+                            try {
+                              const { startDate, endDate } = getWeekDateRange(targetYear, targetWeek);
+                              return `${startDate} 至 ${endDate}`;
+                            } catch {
+                              return '';
+                            }
+                          })()}
+                        </span>
+                      </Space>
+                    )}
                   </Space>
                 }
               >
@@ -676,6 +780,13 @@ const EmployeeManagerManagement = () => {
               <Input type="hidden" />
             </Form.Item>
 
+            <Form.Item
+              name="targetYear"
+              style={{ display: 'none' }}
+            >
+              <Input type="hidden" />
+            </Form.Item>
+
             <Form.Item label="员工信息">
               <Input
                 disabled
@@ -689,15 +800,126 @@ const EmployeeManagerManagement = () => {
             </Form.Item>
 
             <Form.Item
-              label="目标月份"
-              name="targetDate"
-              rules={[{ message: '请选择目标月份', required: true }]}
+              label="目标类型"
+              name="targetType"
+              rules={[{ message: '请选择目标类型', required: true }]}
             >
-              <DatePicker.MonthPicker
-                placeholder="选择目标月份"
+              <Select
+                placeholder="选择目标类型"
                 style={{ width: '100%' }}
+                options={[
+                  { label: '周目标', value: 'week' },
+                  { label: '月目标', value: 'month' }
+                ]}
               />
             </Form.Item>
+
+            <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr 1fr' }}>
+              <Form.Item
+                label="目标年份"
+                name="targetYear"
+                rules={[{ message: '请选择目标年份', required: true }]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  placeholder="年份"
+                  min={2020}
+                  max={2030}
+                />
+              </Form.Item>
+
+              <Form.Item
+                noStyle
+                shouldUpdate={(prevValues, currentValues) => prevValues.targetType !== currentValues.targetType}
+              >
+                {({ getFieldValue }) => {
+                  const currentTargetType = getFieldValue('targetType');
+                  return currentTargetType === 'month' ? (
+                    <Form.Item
+                      label="目标月份"
+                      name="targetMonth"
+                      rules={[{ message: '请选择目标月份', required: true }]}
+                    >
+                      <Select
+                        style={{ width: '100%' }}
+                        placeholder="选择月份"
+                        options={Array.from({ length: 12 }, (_, i) => ({
+                          label: `${i + 1}月`,
+                          value: i + 1
+                        }))}
+                      />
+                    </Form.Item>
+                  ) : (
+                    <Form.Item
+                      label="目标周数"
+                      name="targetWeek"
+                      rules={[{ message: '请选择目标周数', required: true }]}
+                    >
+                      <div>
+                        <DatePicker
+                          placeholder="选择周"
+                          picker="week"
+                          style={{ width: '100%' }}
+                          value={(() => {
+                            const formYear = targetForm.getFieldValue('targetYear') || new Date().getFullYear();
+                            const formWeek = targetForm.getFieldValue('targetWeek') || dayjs().isoWeek();
+                            try {
+                              const { start } = getWeekDateRange(formYear, formWeek);
+                              return start;
+                            } catch {
+                              return dayjs().year(formYear).isoWeek(formWeek);
+                            }
+                          })()}
+                          onChange={date => {
+                            if (date) {
+                              targetForm.setFieldsValue({
+                                targetYear: date.year(),
+                                targetWeek: date.isoWeek()
+                              });
+                            }
+                          }}
+                          format="YYYY年第WW周"
+                        />
+                        <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
+                          <Form.Item noStyle shouldUpdate={(prev, curr) => prev.targetYear !== curr.targetYear || prev.targetWeek !== curr.targetWeek}>
+                            {({ getFieldValue }) => {
+                              const formYear = getFieldValue('targetYear');
+                              const formWeek = getFieldValue('targetWeek');
+                              if (formYear && formWeek) {
+                                try {
+                                  const { startDate, endDate } = getWeekDateRange(formYear, formWeek);
+                                  return `${startDate} 至 ${endDate}`;
+                                } catch {
+                                  return '';
+                                }
+                              }
+                              return '';
+                            }}
+                          </Form.Item>
+                        </div>
+                      </div>
+                    </Form.Item>
+                  );
+                }}
+              </Form.Item>
+
+              <div style={{ display: 'flex', alignItems: 'end', paddingBottom: '24px' }}>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => {
+                    const now = dayjs();
+                    targetForm.setFieldsValue({
+                      targetYear: now.year(),
+                      targetMonth: now.month() + 1,
+                      targetWeek: now.isoWeek()
+                    });
+                  }}
+                >
+                  设为当前
+                </Button>
+              </div>
+            </div>
 
             <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
               <Form.Item

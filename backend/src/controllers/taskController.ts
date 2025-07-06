@@ -914,62 +914,102 @@ export const getProjectStatistics = async (req: Request, res: Response) => {
 
 class TaskController {
   /**
-   * 获取用户任务统计和目标
+   * 获取用户任务统计和目标（重写版本）
+   * 支持周/月统计和对应的目标
    */
   async getUserTaskStats(req: Request, res: Response) {
     try {
       const currentUserId = (req as any).user?.id;
-      const { year, month } = req.query;
+      const { year, month, week, period = 'month' } = req.query;
 
       if (!currentUserId) {
         return res.status(401).json(createErrorResponse(401, '用户未登录', null, req.path));
       }
 
-      // 解析年月参数
+      console.log('👤 当前用户ID:', currentUserId);
+
+      // 解析时间参数
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
-      const targetMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
+      let startDate: Date, endDate: Date;
+      let targetMonth: number | null = null;
+      let targetWeek: number | null = null;
+
+      if (period === 'week') {
+        // 周统计
+        const weekNumber = week ? parseInt(week as string) : this.getCurrentWeekNumber();
+        targetWeek = weekNumber;
+
+        const { start, end } = this.getWeekDateRange(targetYear, weekNumber);
+        startDate = start;
+        endDate = end;
+      } else {
+        // 月统计
+        const monthNumber = month ? parseInt(month as string) : new Date().getMonth() + 1;
+        targetMonth = monthNumber;
+
+        startDate = new Date(targetYear, monthNumber - 1, 1);
+        endDate = new Date(targetYear, monthNumber, 0, 23, 59, 59, 999);
+      }
 
       // 获取用户的任务目标
+      let targetWhereCondition: any = {
+        employeeId: currentUserId,
+        targetYear,
+        targetType: period as string,
+        status: 1
+      };
+
+      if (period === 'month') {
+        targetWhereCondition.targetMonth = targetMonth;
+      } else {
+        targetWhereCondition.targetWeek = targetWeek;
+      }
+
+      console.log('🔍 查询条件:', targetWhereCondition);
+
       const employeeTarget = await prisma.employeeTarget.findFirst({
-        where: {
-          employeeId: currentUserId,
-          targetYear,
-          targetMonth,
-          status: 1
-        }
+        where: targetWhereCondition
       });
 
-      // 获取用户任务完成情况统计（这里需要根据实际的任务统计逻辑）
-      // 假设任务表有 taskType 字段来区分任务类型
-      const currentDate = new Date();
-      const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
-      const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+      console.log('📋 查询结果:', employeeTarget);
 
-      // 获取各类型任务的完成数量
-      const consultCount = await this.getTaskCount(currentUserId, '咨询任务', startOfMonth, endOfMonth);
-      const followUpCount = await this.getTaskCount(currentUserId, '回访任务', startOfMonth, endOfMonth);
-      const developCount = await this.getTaskCount(currentUserId, '开发任务', startOfMonth, endOfMonth);
-      const registerCount = await this.getTaskCount(currentUserId, '报名任务', startOfMonth, endOfMonth);
+      // 获取项目任务完成情况
+      const projectTaskCount = await this.getTaskCount(currentUserId, '', startDate, endDate);
+
+      // 获取客户任务完成情况（基于客户状态变更）
+      const customerTaskStats = await this.getCustomerTaskStats(currentUserId, startDate, endDate);
 
       // 构建返回数据
       const result = {
+        period: {
+          type: period,
+          year: targetYear,
+          month: targetMonth,
+          week: targetWeek,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString()
+        },
         targets: {
-          consultTarget: employeeTarget?.consultTarget || 50,
-          followUpTarget: employeeTarget?.followUpTarget || 50,
-          developTarget: employeeTarget?.developTarget || 50,
-          registerTarget: employeeTarget?.registerTarget || 50
+          consultTarget: employeeTarget?.consultTarget || 0,
+          followUpTarget: employeeTarget?.followUpTarget || 0,
+          developTarget: employeeTarget?.developTarget || 0,
+          registerTarget: employeeTarget?.registerTarget || 0
         },
         completions: {
-          consultCount,
-          followUpCount,
-          developCount,
-          registerCount
+          consultCount: customerTaskStats.consultCount,
+          followUpCount: customerTaskStats.followUpCount,
+          developCount: customerTaskStats.developCount,
+          registerCount: customerTaskStats.registerCount
         },
         progress: {
-          consultProgress: employeeTarget?.consultTarget ? Math.round((consultCount / employeeTarget.consultTarget) * 100) : 0,
-          followUpProgress: employeeTarget?.followUpTarget ? Math.round((followUpCount / employeeTarget.followUpTarget) * 100) : 0,
-          developProgress: employeeTarget?.developTarget ? Math.round((developCount / employeeTarget.developTarget) * 100) : 0,
-          registerProgress: employeeTarget?.registerTarget ? Math.round((registerCount / employeeTarget.registerTarget) * 100) : 0
+          consultProgress: employeeTarget?.consultTarget ?
+            Math.round((customerTaskStats.consultCount / employeeTarget.consultTarget) * 100) : 0,
+          followUpProgress: employeeTarget?.followUpTarget ?
+            Math.round((customerTaskStats.followUpCount / employeeTarget.followUpTarget) * 100) : 0,
+          developProgress: employeeTarget?.developTarget ?
+            Math.round((customerTaskStats.developCount / employeeTarget.developTarget) * 100) : 0,
+          registerProgress: employeeTarget?.registerTarget ?
+            Math.round((customerTaskStats.registerCount / employeeTarget.registerTarget) * 100) : 0
         }
       };
 
@@ -981,20 +1021,39 @@ class TaskController {
   }
 
   /**
-   * 获取管理员的下属员工任务统计
+   * 获取管理员的下属员工任务统计（重写版本，支持周/月统计）
    */
   async getTeamTaskStats(req: Request, res: Response) {
     try {
       const currentUser = (req as any).user;
-      const { year, month, current = 1, size = 10, keyword = '' } = req.query;
+      const { year, month, week, period = 'month', current = 1, size = 10, keyword = '' } = req.query;
 
       if (!currentUser) {
         return res.status(401).json(createErrorResponse(401, '用户未登录', null, req.path));
       }
 
-      // 解析年月参数
+      // 解析时间参数
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
-      const targetMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
+      let startDate: Date, endDate: Date;
+      let targetMonth: number | null = null;
+      let targetWeek: number | null = null;
+
+      if (period === 'week') {
+        // 周统计
+        const weekNumber = week ? parseInt(week as string) : this.getCurrentWeekNumber();
+        targetWeek = weekNumber;
+
+        const { start, end } = this.getWeekDateRange(targetYear, weekNumber);
+        startDate = start;
+        endDate = end;
+      } else {
+        // 月统计
+        const monthNumber = month ? parseInt(month as string) : new Date().getMonth() + 1;
+        targetMonth = monthNumber;
+
+        startDate = new Date(targetYear, monthNumber - 1, 1);
+        endDate = new Date(targetYear, monthNumber, 0, 23, 59, 59, 999);
+      }
 
       // 解析分页参数
       const page = parseInt(current as string);
@@ -1117,60 +1176,66 @@ class TaskController {
         return res.status(403).json(createErrorResponse(403, '权限不足', null, req.path));
       }
 
-      // 时间范围
-      const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
-      const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
-
       // 获取每个员工的任务统计
       const teamStats = await Promise.all(
         managedEmployees.map(async (employee) => {
           // 获取员工的任务目标
+          let targetWhereCondition: any = {
+            employeeId: employee.id,
+            targetYear,
+            targetType: period as string,
+            status: 1
+          };
+
+          if (period === 'month') {
+            targetWhereCondition.targetMonth = targetMonth;
+          } else {
+            targetWhereCondition.targetWeek = targetWeek;
+          }
+
           const employeeTarget = await prisma.employeeTarget.findFirst({
-            where: {
-              employeeId: employee.id,
-              targetYear,
-              targetMonth,
-              status: 1
-            }
+            where: targetWhereCondition
           });
 
-          // 获取员工的任务完成情况
-          const consultCount = await this.getTaskCount(employee.id, '咨询任务', startOfMonth, endOfMonth);
-          const followUpCount = await this.getTaskCount(employee.id, '回访任务', startOfMonth, endOfMonth);
-          const developCount = await this.getTaskCount(employee.id, '开发任务', startOfMonth, endOfMonth);
-          const registerCount = await this.getTaskCount(employee.id, '报名任务', startOfMonth, endOfMonth);
+          // 获取员工的客户任务完成情况（基于客户状态变更）
+          const customerTaskStats = await this.getCustomerTaskStats(employee.id, startDate, endDate);
 
-          // 计算客户任务完成情况（基于客户状态变更）
-          const customerTaskStats = await this.getCustomerTaskStats(employee.id, startOfMonth, endOfMonth);
-
-                     return {
-             employee: {
-               id: employee.id,
-               nickName: employee.nickName,
-               userName: employee.userName,
-               roleName: employee.userRoles?.[0]?.role?.roleName || '未知角色'
-             },
+          return {
+            employee: {
+              id: employee.id,
+              nickName: employee.nickName,
+              userName: employee.userName,
+              roleName: employee.userRoles?.[0]?.role?.roleName || '未知角色'
+            },
+            period: {
+              type: period,
+              year: targetYear,
+              month: targetMonth,
+              week: targetWeek,
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString()
+            },
             targets: {
-              consultTarget: employeeTarget?.consultTarget || 50,
-              followUpTarget: employeeTarget?.followUpTarget || 50,
-              developTarget: employeeTarget?.developTarget || 50,
-              registerTarget: employeeTarget?.registerTarget || 50
+              consultTarget: employeeTarget?.consultTarget || 0,
+              followUpTarget: employeeTarget?.followUpTarget || 0,
+              developTarget: employeeTarget?.developTarget || 0,
+              registerTarget: employeeTarget?.registerTarget || 0
             },
             completions: {
-              consultCount: consultCount + customerTaskStats.consultCount,
-              followUpCount: followUpCount + customerTaskStats.followUpCount,
-              developCount: developCount + customerTaskStats.developCount,
-              registerCount: registerCount + customerTaskStats.registerCount
+              consultCount: customerTaskStats.consultCount,
+              followUpCount: customerTaskStats.followUpCount,
+              developCount: customerTaskStats.developCount,
+              registerCount: customerTaskStats.registerCount
             },
             progress: {
               consultProgress: employeeTarget?.consultTarget ?
-                Math.round(((consultCount + customerTaskStats.consultCount) / employeeTarget.consultTarget) * 100) : 0,
+                Math.round((customerTaskStats.consultCount / employeeTarget.consultTarget) * 100) : 0,
               followUpProgress: employeeTarget?.followUpTarget ?
-                Math.round(((followUpCount + customerTaskStats.followUpCount) / employeeTarget.followUpTarget) * 100) : 0,
+                Math.round((customerTaskStats.followUpCount / employeeTarget.followUpTarget) * 100) : 0,
               developProgress: employeeTarget?.developTarget ?
-                Math.round(((developCount + customerTaskStats.developCount) / employeeTarget.developTarget) * 100) : 0,
+                Math.round((customerTaskStats.developCount / employeeTarget.developTarget) * 100) : 0,
               registerProgress: employeeTarget?.registerTarget ?
-                Math.round(((registerCount + customerTaskStats.registerCount) / employeeTarget.registerTarget) * 100) : 0
+                Math.round((customerTaskStats.registerCount / employeeTarget.registerTarget) * 100) : 0
             }
           };
         })
@@ -1182,7 +1247,14 @@ class TaskController {
 
       res.json(createSuccessResponse({
         teamStats,
-        period: `${targetYear}-${String(targetMonth).padStart(2, '0')}`,
+        period: {
+          type: period,
+          year: targetYear,
+          month: targetMonth,
+          week: targetWeek,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString()
+        },
         pagination: {
           current: page,
           size: pageSize,
@@ -1199,12 +1271,13 @@ class TaskController {
   }
 
   /**
-   * 获取基于客户状态的任务统计
+   * 获取基于客户状态的任务统计（重写版本）
+   * 统计逻辑：基于客户跟进记录的修改时间，而不是创建时间
    */
   private async getCustomerTaskStats(userId: number, startDate: Date, endDate: Date) {
     try {
-      // 获取该员工在时间范围内负责的客户数据
-      const customers = await prisma.customer.findMany({
+      // 方案1：基于客户表的updatedAt字段（客户信息更新时间）
+      const customerUpdates = await prisma.customer.findMany({
         where: {
           assignedToId: userId,
           updatedAt: {
@@ -1218,30 +1291,75 @@ class TaskController {
         }
       });
 
-      // 根据客户状态统计对应的任务完成情况
-      const consultCount = customers.filter(c =>
-        c.followStatus === 'consult' || c.followStatus === 'wechat_added'
-      ).length;
+      // 方案2：基于跟进记录表的创建时间（更准确的跟进活动时间）
+      const followRecords = await prisma.followRecord.findMany({
+        where: {
+          customer: {
+            assignedToId: userId
+          },
+          createdAt: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        include: {
+          customer: {
+            select: {
+              followStatus: true
+            }
+          }
+        }
+      });
 
-      const followUpCount = customers.filter(c =>
-        c.followStatus === 'effective_visit' || c.followStatus === 'not_arrived' ||
-        c.followStatus === 'rejected' || c.followStatus === 'vip'
-      ).length;
+      // 合并两种统计方式，优先使用跟进记录，补充客户更新
+      const allActivities = new Map<string, string>();
 
-      const developCount = customers.filter(c =>
-        c.followStatus === 'new_develop' || c.followStatus === 'early_25'
-      ).length;
+      // 添加跟进记录活动
+      followRecords.forEach(record => {
+        const key = `${record.customerId}-${record.createdAt.toISOString()}`;
+        allActivities.set(key, record.customer.followStatus);
+      });
 
-      const registerCount = customers.filter(c =>
-        c.followStatus === 'registered' || c.followStatus === 'arrived'
-      ).length;
+      // 添加客户更新活动（如果没有对应的跟进记录）
+      customerUpdates.forEach(customer => {
+        const key = `${customer.followStatus}-${customer.updatedAt.toISOString()}`;
+        if (!allActivities.has(key)) {
+          allActivities.set(key, customer.followStatus);
+        }
+      });
 
-      return {
-        consultCount,
-        followUpCount,
-        developCount,
-        registerCount
+      // 根据状态统计任务完成情况
+      const statusCounts = {
+        consultCount: 0,
+        followUpCount: 0,
+        developCount: 0,
+        registerCount: 0
       };
+
+      Array.from(allActivities.values()).forEach(status => {
+        switch (status) {
+          case 'consult':
+          case 'wechat_added':
+            statusCounts.consultCount++;
+            break;
+          case 'effective_visit':
+          case 'not_arrived':
+          case 'rejected':
+          case 'vip':
+            statusCounts.followUpCount++;
+            break;
+          case 'new_develop':
+          case 'early_25':
+            statusCounts.developCount++;
+            break;
+          case 'registered':
+          case 'arrived':
+            statusCounts.registerCount++;
+            break;
+        }
+      });
+
+      return statusCounts;
     } catch (error) {
       logger.error('获取客户任务统计失败:', error);
       return {
@@ -1280,6 +1398,44 @@ class TaskController {
       logger.error(`获取${taskType}数量失败:`, error);
       return 0;
     }
+  }
+
+  /**
+   * 获取当前周数（ISO周数）
+   */
+  private getCurrentWeekNumber(): number {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const pastDaysOfYear = (now.getTime() - startOfYear.getTime()) / 86400000;
+    return Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+  }
+
+  /**
+   * 获取指定年份和周数的日期范围
+   */
+  private getWeekDateRange(year: number, weekNumber: number): { start: Date; end: Date } {
+    // 获取该年第一天
+    const firstDayOfYear = new Date(year, 0, 1);
+
+    // 计算第一周的开始日期（周一）
+    const firstMonday = new Date(firstDayOfYear);
+    const dayOfWeek = firstDayOfYear.getDay();
+    const daysToAdd = dayOfWeek === 0 ? 1 : 8 - dayOfWeek; // 如果是周日，加1天；否则加到下周一
+    firstMonday.setDate(firstDayOfYear.getDate() + daysToAdd);
+
+    // 计算目标周的开始日期
+    const targetWeekStart = new Date(firstMonday);
+    targetWeekStart.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+
+    // 计算目标周的结束日期（周日 23:59:59）
+    const targetWeekEnd = new Date(targetWeekStart);
+    targetWeekEnd.setDate(targetWeekStart.getDate() + 6);
+    targetWeekEnd.setHours(23, 59, 59, 999);
+
+    return {
+      start: targetWeekStart,
+      end: targetWeekEnd
+    };
   }
 }
 

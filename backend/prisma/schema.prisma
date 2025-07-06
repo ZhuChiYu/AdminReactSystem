@@ -613,7 +613,9 @@ model EmployeeTarget {
   id              Int      @id @default(autoincrement())
   employeeId      Int      @map("employee_id")
   targetYear      Int      @map("target_year")
-  targetMonth     Int      @map("target_month")
+  targetType      String   @map("target_type") @db.VarChar(10) // 'week' or 'month'
+  targetMonth     Int?     @map("target_month")    // 1-12, null for weekly targets
+  targetWeek      Int?     @map("target_week")     // 1-53, null for monthly targets
 
   // 四种任务类型的目标数量
   consultTarget   Int?     @default(0) @map("consult_target")
@@ -629,7 +631,7 @@ model EmployeeTarget {
   employee        User     @relation("EmployeeTargets", fields: [employeeId], references: [id], onDelete: Cascade)
   manager         User     @relation("ManagerTargets", fields: [managerId], references: [id])
 
-  @@unique([employeeId, targetYear, targetMonth])
+  @@unique([employeeId, targetYear, targetType, targetMonth, targetWeek])
   @@map("employee_targets")
 }
 

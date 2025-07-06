@@ -5,11 +5,11 @@ import { logger } from '@/utils/logger';
 
 class EmployeeTargetController {
   /**
-   * 获取员工目标列表
+   * 获取员工目标列表（重写版本，支持周目标）
    */
   async getEmployeeTargets(req: Request, res: Response) {
     try {
-      const { employeeId, year, month, current = 1, size = 10 } = req.query;
+      const { employeeId, year, month, week, targetType = 'month', current = 1, size = 10 } = req.query;
       const currentUserId = (req as any).user?.id;
       const userRoles = (req as any).user?.roles || [];
 
@@ -36,8 +36,16 @@ class EmployeeTargetController {
       if (year) {
         whereCondition.targetYear = parseInt(year as string);
       }
-      if (month) {
+
+      // 目标类型筛选
+      whereCondition.targetType = targetType as string;
+
+      if (targetType === 'month' && month) {
         whereCondition.targetMonth = parseInt(month as string);
+      }
+
+      if (targetType === 'week' && week) {
+        whereCondition.targetWeek = parseInt(week as string);
       }
 
       const offset = (parseInt(current as string) - 1) * parseInt(size as string);
@@ -68,7 +76,9 @@ class EmployeeTargetController {
           },
           orderBy: [
             { targetYear: 'desc' },
+            { targetType: 'desc' },
             { targetMonth: 'desc' },
+            { targetWeek: 'desc' },
             { createdAt: 'desc' }
           ],
           skip: offset,
@@ -85,7 +95,9 @@ class EmployeeTargetController {
         employeeName: target.employee.nickName || target.employee.userName,
         departmentName: target.employee.department?.name || '未分配',
         targetYear: target.targetYear,
+        targetType: target.targetType,
         targetMonth: target.targetMonth,
+        targetWeek: target.targetWeek,
         consultTarget: target.consultTarget || 0,
         followUpTarget: target.followUpTarget || 0,
         developTarget: target.developTarget || 0,
@@ -111,17 +123,46 @@ class EmployeeTargetController {
   }
 
   /**
-   * 创建或更新员工目标
+   * 创建或更新员工目标（重写版本，支持周目标）
    */
   async setEmployeeTarget(req: Request, res: Response) {
     try {
-      const { employeeId, targetYear, targetMonth, consultTarget, followUpTarget, developTarget, registerTarget, remark } = req.body;
+      const {
+        employeeId,
+        targetYear,
+        targetType = 'month',
+        targetMonth,
+        targetWeek,
+        consultTarget,
+        followUpTarget,
+        developTarget,
+        registerTarget,
+        remark
+      } = req.body;
       const currentUserId = (req as any).user?.id;
       const userRoles = (req as any).user?.roles || [];
 
       // 验证必需字段
-      if (!employeeId || !targetYear || !targetMonth) {
-        return res.status(400).json(createErrorResponse(400, '员工ID、年份和月份不能为空', null, req.path));
+      if (!employeeId || !targetYear || !targetType) {
+        return res.status(400).json(createErrorResponse(400, '员工ID、年份和目标类型不能为空', null, req.path));
+      }
+
+      // 根据目标类型验证相应字段
+      if (targetType === 'month' && !targetMonth) {
+        return res.status(400).json(createErrorResponse(400, '月目标必须指定月份', null, req.path));
+      }
+
+      if (targetType === 'week' && !targetWeek) {
+        return res.status(400).json(createErrorResponse(400, '周目标必须指定周数', null, req.path));
+      }
+
+      // 验证数据范围
+      if (targetType === 'month' && (targetMonth < 1 || targetMonth > 12)) {
+        return res.status(400).json(createErrorResponse(400, '月份必须在1-12之间', null, req.path));
+      }
+
+      if (targetType === 'week' && (targetWeek < 1 || targetWeek > 53)) {
+        return res.status(400).json(createErrorResponse(400, '周数必须在1-53之间', null, req.path));
       }
 
       // 权限检查
@@ -153,16 +194,43 @@ class EmployeeTargetController {
         return res.status(404).json(createErrorResponse(404, '员工不存在', null, req.path));
       }
 
-      // 检查是否已存在该员工该月的目标
-      const existingTarget = await prisma.employeeTarget.findUnique({
-        where: {
-          employeeId_targetYear_targetMonth: {
-            employeeId: parseInt(employeeId),
-            targetYear: parseInt(targetYear),
-            targetMonth: parseInt(targetMonth)
-          }
-        }
+      // 构建查询条件
+      const uniqueCondition: any = {
+        employeeId: parseInt(employeeId),
+        targetYear: parseInt(targetYear),
+        targetType
+      };
+
+      if (targetType === 'month') {
+        uniqueCondition.targetMonth = parseInt(targetMonth);
+        uniqueCondition.targetWeek = null;
+      } else {
+        uniqueCondition.targetWeek = parseInt(targetWeek);
+        uniqueCondition.targetMonth = null;
+      }
+
+      // 检查是否已存在该员工该时期的目标
+      const existingTarget = await prisma.employeeTarget.findFirst({
+        where: uniqueCondition
       });
+
+      // 准备数据
+      const targetData: any = {
+        consultTarget: consultTarget ? parseInt(consultTarget) : 0,
+        followUpTarget: followUpTarget ? parseInt(followUpTarget) : 0,
+        developTarget: developTarget ? parseInt(developTarget) : 0,
+        registerTarget: registerTarget ? parseInt(registerTarget) : 0,
+        managerId: currentUserId,
+        remark
+      };
+
+      if (targetType === 'month') {
+        targetData.targetMonth = parseInt(targetMonth);
+        targetData.targetWeek = null;
+      } else {
+        targetData.targetWeek = parseInt(targetWeek);
+        targetData.targetMonth = null;
+      }
 
       let result;
       if (existingTarget) {
@@ -170,12 +238,7 @@ class EmployeeTargetController {
         result = await prisma.employeeTarget.update({
           where: { id: existingTarget.id },
           data: {
-            consultTarget: consultTarget ? parseInt(consultTarget) : 0,
-            followUpTarget: followUpTarget ? parseInt(followUpTarget) : 0,
-            developTarget: developTarget ? parseInt(developTarget) : 0,
-            registerTarget: registerTarget ? parseInt(registerTarget) : 0,
-            managerId: currentUserId,
-            remark,
+            ...targetData,
             updatedAt: new Date()
           }
         });
@@ -185,13 +248,8 @@ class EmployeeTargetController {
           data: {
             employeeId: parseInt(employeeId),
             targetYear: parseInt(targetYear),
-            targetMonth: parseInt(targetMonth),
-            consultTarget: consultTarget ? parseInt(consultTarget) : 0,
-            followUpTarget: followUpTarget ? parseInt(followUpTarget) : 0,
-            developTarget: developTarget ? parseInt(developTarget) : 0,
-            registerTarget: registerTarget ? parseInt(registerTarget) : 0,
-            managerId: currentUserId,
-            remark
+            targetType,
+            ...targetData
           }
         });
       }
