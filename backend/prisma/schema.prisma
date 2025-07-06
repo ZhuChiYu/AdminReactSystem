@@ -36,6 +36,7 @@ model User {
   assignedCustomerRelations       CustomerAssignment[]      @relation("CustomerAssignedBy")
   customerAssignments             CustomerAssignment[]      @relation("CustomerAssignedTo")
   assignedCustomers               Customer[]                @relation("AssignedToUser")
+  assignedByCustomers             Customer[]                @relation("AssignedByUser")
   createdCustomers                Customer[]                @relation("CreatedByUser")
   assignedRelations               EmployeeManagerRelation[] @relation("AssignedByRelation")
   employeeRelations               EmployeeManagerRelation[] @relation("EmployeeRelation")
@@ -158,6 +159,7 @@ model Customer {
   followStatus        String               @map("follow_status") @db.VarChar(50)
   nextFollowTime      DateTime?            @map("next_follow_time")
   assignedToId        Int?                 @map("assigned_to_id")
+  assignedById        Int?                 @map("assigned_by_id")
   assignedTime        DateTime?            @map("assigned_time")
   createdById         Int?                 @map("created_by_id")
   remark              String?
@@ -165,6 +167,7 @@ model Customer {
   updatedAt           DateTime             @updatedAt @map("updated_at")
   customerAssignments CustomerAssignment[]
   assignedTo          User?                @relation("AssignedToUser", fields: [assignedToId], references: [id])
+  assignedBy          User?                @relation("AssignedByUser", fields: [assignedById], references: [id])
   createdBy           User?                @relation("CreatedByUser", fields: [createdById], references: [id])
   followRecords       FollowRecord[]
 

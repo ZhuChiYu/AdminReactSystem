@@ -569,8 +569,8 @@ const CustomerFollow = () => {
       width: 100
     },
     {
-      dataIndex: 'createdAt',
-      key: 'createTime',
+      dataIndex: 'updatedAt',
+      key: 'updateTime',
       ...getCenterColumnConfig(),
       render: (text: string) => {
         if (!text) return '-';
@@ -587,7 +587,7 @@ const CustomerFollow = () => {
           })
           .replace(/\//g, '-');
       },
-      title: '创建时间',
+      title: '修改时间',
       width: 150
     },
     {

@@ -104,10 +104,17 @@ class CustomerController {
       // 获取总数
       const total = await prisma.customer.count({ where });
 
-      // 获取客户列表
+      // 获取客户列表 - 被分配的客户排在前面，按修改时间排序
       const customers = await prisma.customer.findMany({
         include: {
           assignedTo: {
+            select: {
+              id: true,
+              nickName: true,
+              userName: true
+            }
+          },
+          assignedBy: {
             select: {
               id: true,
               nickName: true,
@@ -122,9 +129,19 @@ class CustomerController {
             }
           }
         },
-        orderBy: {
-          createdAt: 'desc'
-        },
+        orderBy: [
+          // 被分配的客户排在前面
+          {
+            assignedToId: {
+              sort: 'desc',
+              nulls: 'last'
+            }
+          },
+          // 按修改时间排序，最近修改的在前面
+          {
+            updatedAt: 'desc'
+          }
+        ],
         skip,
         take: pageSize,
         where
@@ -153,6 +170,12 @@ class CustomerController {
             ? {
                 id: customer.assignedTo.id,
                 name: customer.assignedTo.nickName
+              }
+            : null,
+          assignedBy: customer.assignedBy
+            ? {
+                id: customer.assignedBy.id,
+                name: customer.assignedBy.nickName
               }
             : null,
           canDelete,
@@ -243,6 +266,13 @@ class CustomerController {
               userName: true
             }
           },
+          assignedBy: {
+            select: {
+              id: true,
+              nickName: true,
+              userName: true
+            }
+          },
           createdBy: {
             select: {
               id: true,
@@ -284,6 +314,12 @@ class CustomerController {
           ? {
               id: customer.assignedTo.id,
               name: customer.assignedTo.nickName
+            }
+          : null,
+        assignedBy: customer.assignedBy
+          ? {
+              id: customer.assignedBy.id,
+              name: customer.assignedBy.nickName
             }
           : null,
         company: customer.company,
@@ -433,6 +469,7 @@ class CustomerController {
       const customer = await prisma.customer.create({
         data: {
           assignedToId: req.user.id, // 创建者默认成为负责人
+          assignedById: req.user.id, // 创建者也是分配者
           assignedTime: new Date(), // 设置分配时间
           company,
           createdById: req.user.id,
@@ -818,6 +855,7 @@ class CustomerController {
             remark: row[6]?.toString().trim() || '',              // G列：跟进
             followStatus,                                         // H列：状态
             assignedToId: req.user.id, // 导入者默认成为负责人
+            assignedById: req.user.id, // 导入者也是分配者
             assignedTime: new Date(), // 设置分配时间
             createdById: req.user.id,
             email: '', // 邮箱暂时为空，可后续补充
@@ -1033,6 +1071,7 @@ class CustomerController {
   async assignCustomers(req: Request, res: Response) {
     const { assignedToId, customerIds, remark } = req.body;
     const assignedById = (req as any).user!.id;
+    const user = (req as any).user!;
 
     try {
       // 验证输入
@@ -1053,7 +1092,29 @@ class CustomerController {
         return res.status(400).json(createErrorResponse(400, '员工不存在', null, req.path));
       }
 
-      // 验证客户是否存在
+      // 权限控制：检查是否有权限分配给指定员工
+      const isSuperAdmin = user.roles?.includes('super_admin');
+      if (!isSuperAdmin) {
+        const isAdmin = user.roles?.includes('admin');
+        if (!isAdmin) {
+          return res.status(403).json(createErrorResponse(403, '没有权限分配客户', null, req.path));
+        }
+
+        // 管理员只能分配给自己管理的员工
+        const managedEmployee = await prisma.employeeManagerRelation.findFirst({
+          where: {
+            employeeId: assignedToId,
+            managerId: user.id,
+            status: 1
+          }
+        });
+
+        if (!managedEmployee && assignedToId !== user.id) {
+          return res.status(403).json(createErrorResponse(403, '您只能分配客户给自己管理的员工', null, req.path));
+        }
+      }
+
+      // 验证客户是否存在且当前用户有权限操作这些客户
       const customers = await prisma.customer.findMany({
         where: {
           id: {
@@ -1066,26 +1127,66 @@ class CustomerController {
         return res.status(400).json(createErrorResponse(400, '部分客户不存在', null, req.path));
       }
 
-      // 检查是否已经存在分配关系
+      // 权限控制：检查用户是否有权限操作这些客户
+      if (!isSuperAdmin) {
+        const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
+          where: { managerId: user.id },
+          select: { employeeId: true }
+        });
+
+        const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+
+        for (const customer of customers) {
+          // 管理员只能分配：自己创建的客户、下属创建的客户、分配给自己的客户
+          const canOperate = allowedCreatorIds.includes(customer.createdById!) ||
+                           customer.assignedToId === user.id ||
+                           customer.assignedById === user.id;
+
+          if (!canOperate) {
+            return res.status(403).json(createErrorResponse(403, `没有权限操作客户 ${customer.customerName}`, null, req.path));
+          }
+        }
+      }
+
+      // 检查是否已经存在分配关系（如果是重新分配，先删除旧的分配关系）
       const existingAssignments = await prisma.customerAssignment.findMany({
         where: {
-          assignedToId,
           customerId: {
             in: customerIds.map(Number)
           }
         }
       });
 
-      if (existingAssignments.length > 0) {
-        const existingCustomerIds = existingAssignments.map(a => a.customerId);
-        const existingCustomers = customers.filter(customer => existingCustomerIds.includes(customer.id));
-        const names = existingCustomers.map(customer => customer.customerName).join(', ');
+      // 如果存在分配关系，检查是否需要更新
+      const customersToReassign = existingAssignments.filter(assignment => assignment.assignedToId !== assignedToId);
+
+      if (customersToReassign.length > 0) {
+        // 删除旧的分配关系（重新分配）
+        await prisma.customerAssignment.deleteMany({
+          where: {
+            id: {
+              in: customersToReassign.map(a => a.id)
+            }
+          }
+        });
+      }
+
+      // 检查是否有客户已经分配给目标员工
+      const alreadyAssigned = existingAssignments.filter(assignment => assignment.assignedToId === assignedToId);
+      if (alreadyAssigned.length > 0) {
+        const assignedCustomerIds = alreadyAssigned.map(a => a.customerId);
+        const assignedCustomers = customers.filter(customer => assignedCustomerIds.includes(customer.id));
+        const names = assignedCustomers.map(customer => customer.customerName).join(', ');
         return res.status(400).json(createErrorResponse(400, `客户 ${names} 已经分配给该员工`, null, req.path));
       }
 
-      // 创建分配关系
+      // 创建分配关系（只为需要新分配的客户）
+      const customersNeedNewAssignment = customerIds.filter(customerId =>
+        !alreadyAssigned.some(a => a.customerId === Number(customerId))
+      );
+
       const assignments = await Promise.all(
-        customerIds.map(customerId =>
+        customersNeedNewAssignment.map(customerId =>
           prisma.customerAssignment.create({
             data: {
               assignedById,
@@ -1097,13 +1198,16 @@ class CustomerController {
         )
       );
 
-      // 同时更新customer表的assignedToId和assignedTime
+      // 同时更新customer表的assignedToId、assignedById和assignedTime，触发updatedAt更新
       await Promise.all(
         customerIds.map(customerId =>
           prisma.customer.update({
             data: {
               assignedTime: new Date(),
-              assignedToId
+              assignedToId,
+              assignedById,
+              // 通过更新updatedAt确保排序时被分配的客户排在前面
+              updatedAt: new Date()
             },
             where: { id: Number(customerId) }
           })
@@ -1143,11 +1247,12 @@ class CustomerController {
         }
       });
 
-      // 同时清除customer表的assignedToId和assignedTime
+      // 同时清除customer表的assignedToId、assignedById和assignedTime
       await prisma.customer.update({
         data: {
           assignedTime: null,
-          assignedToId: null
+          assignedToId: null,
+          assignedById: null
         },
         where: { id: assignment.customerId }
       });
@@ -1216,7 +1321,9 @@ class CustomerController {
       await prisma.customer.update({
         data: {
           assignedTime: new Date(),
-          assignedToId: Number(employeeId)
+          assignedToId: Number(employeeId),
+          assignedById: user.id,
+          updatedAt: new Date()
         },
         where: { id: Number(customerId) }
       });

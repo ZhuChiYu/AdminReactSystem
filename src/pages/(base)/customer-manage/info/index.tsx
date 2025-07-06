@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 
 import { customerService, employeeService } from '@/service/api';
 import type { CustomerApi, EmployeeApi } from '@/service/api/types';
-import usePermissionStore, { PermissionType } from '@/store/permissionStore';
-import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
+
+import { isAdmin, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 // 导入员工服务
@@ -39,19 +39,7 @@ const followUpStatusNames: Record<string, string> = {
   empty: '-'
 };
 
-/** 跟进状态颜色 */
-const followUpStatusColors = {
-  [FollowUpStatus.WECHAT_ADDED]: 'blue',
-  [FollowUpStatus.REJECTED]: 'error',
-  [FollowUpStatus.EARLY_25]: 'purple',
-  [FollowUpStatus.VIP]: 'gold',
-  [FollowUpStatus.EFFECTIVE_VISIT]: 'success',
-  [FollowUpStatus.CONSULT]: 'cyan',
-  [FollowUpStatus.REGISTERED]: 'success',
-  [FollowUpStatus.ARRIVED]: 'green',
-  [FollowUpStatus.NOT_ARRIVED]: 'orange',
-  [FollowUpStatus.NEW_DEVELOP]: 'geekblue'
-};
+
 
 /** 客户信息管理组件 */
 const CustomerManagement = () => {
@@ -81,11 +69,7 @@ const CustomerManagement = () => {
     total: 0
   });
 
-  // 从权限管理器中获取权限相关方法
-  const { hasPermission } = usePermissionStore();
 
-  // 获取当前用户信息
-  const currentUserId = getCurrentUserId();
 
   // 判断当前用户是否为超级管理员或管理员
   const isUserSuperAdmin = isSuperAdmin();
@@ -501,6 +485,28 @@ const CustomerManagement = () => {
       width: 120
     },
     {
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      title: '修改时间',
+      ...getCenterColumnConfig(),
+      render: (text: string) => {
+        if (!text) return '-';
+        const date = new Date(text);
+        return date
+          .toLocaleString('zh-CN', {
+            day: '2-digit',
+            hour: '2-digit',
+            hour12: false,
+            minute: '2-digit',
+            month: '2-digit',
+            second: '2-digit',
+            year: 'numeric'
+          })
+          .replace(/\//g, '-');
+      },
+      width: 150
+    },
+    {
       key: 'action',
       title: '操作',
       ...getActionColumnConfig(isUserAdmin || isUserSuperAdmin ? 150 : 120),
@@ -532,11 +538,11 @@ const CustomerManagement = () => {
   // 如果是超级管理员或管理员，显示"分配者"列
   if (isUserAdmin || isUserSuperAdmin) {
     columns.splice(6, 0, {
-      dataIndex: 'createdBy',
-      key: 'createdBy',
+      dataIndex: 'assignedBy',
+      key: 'assignedBy',
       title: '分配者',
       ...getCenterColumnConfig(),
-      render: (createdBy: any) => createdBy?.name || '-',
+      render: (assignedBy: any) => assignedBy?.name || '-',
       width: 120
     });
   }
