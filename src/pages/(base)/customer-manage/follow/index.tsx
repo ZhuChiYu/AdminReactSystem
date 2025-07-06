@@ -1,4 +1,4 @@
-import { DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
@@ -83,14 +83,14 @@ if (typeof document !== 'undefined') {
 const CustomerFollow = () => {
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState<Record<string, number>>({});
-  const [followRecords, setFollowRecords] = useState<CustomerApi.CustomerListItem[]>([]);
+  const [_followRecords, setFollowRecords] = useState<CustomerApi.CustomerListItem[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<CustomerApi.CustomerListItem[]>([]);
   const [selectedFollowStatus, setSelectedFollowStatus] = useState<string>('all');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerApi.CustomerListItem | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [selectedRows, setSelectedRows] = useState<CustomerApi.CustomerListItem[]>([]);
+  const [_selectedRows, setSelectedRows] = useState<CustomerApi.CustomerListItem[]>([]);
   const [exportLoading, setExportLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [form] = Form.useForm();
@@ -105,6 +105,37 @@ const CustomerFollow = () => {
 
   // 检查是否为超级管理员
   const isSuper = isSuperAdmin();
+
+  // 复制到剪切板的功能
+  const copyToClipboard = async (text: string, type: string) => {
+    if (!text || text === '-') {
+      message.warning(`${type}为空，无法复制`);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success(`${type}已复制到剪切板`);
+    } catch {
+      // 降级处理：使用传统的复制方法
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        message.success(`${type}已复制到剪切板`);
+      } catch (fallbackError) {
+        console.error('复制失败:', fallbackError);
+        message.error('复制失败，请手动复制');
+      }
+    }
+  };
 
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
@@ -525,17 +556,41 @@ const CustomerFollow = () => {
       dataIndex: 'phone',
       key: 'phone',
       ...getCenterColumnConfig(),
-      render: text => <span>{text || '-'}</span>,
+      render: (text: string) => (
+        <Space size="small">
+          <span>{text || '-'}</span>
+          {text && text !== '-' && (
+            <Button
+              icon={<CopyOutlined />}
+              size="small"
+              type="text"
+              onClick={() => copyToClipboard(text, '电话')}
+            />
+          )}
+        </Space>
+      ),
       title: '电话',
-      width: 120
+      width: 160
     },
     {
       dataIndex: 'mobile',
       key: 'mobile',
       ...getCenterColumnConfig(),
-      render: text => <span>{text || '-'}</span>,
+      render: (text: string) => (
+        <Space size="small">
+          <span>{text || '-'}</span>
+          {text && text !== '-' && (
+            <Button
+              icon={<CopyOutlined />}
+              size="small"
+              type="text"
+              onClick={() => copyToClipboard(text, '手机')}
+            />
+          )}
+        </Space>
+      ),
       title: '手机',
-      width: 120
+      width: 160
     },
     {
       dataIndex: 'followStatus',

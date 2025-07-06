@@ -1,4 +1,4 @@
-import { DownloadOutlined, UserAddOutlined, UserSwitchOutlined } from '@ant-design/icons';
+import { CopyOutlined, DownloadOutlined, UserAddOutlined, UserSwitchOutlined } from '@ant-design/icons';
 import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -140,6 +140,37 @@ const CustomerManagement = () => {
   const canEditCustomer = (customer: CustomerApi.CustomerListItem) => {
     // 使用后端返回的权限字段
     return customer.canEdit || false;
+  };
+
+  // 复制到剪切板的功能
+  const copyToClipboard = async (text: string, type: string) => {
+    if (!text || text === '-') {
+      message.warning(`${type}为空，无法复制`);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success(`${type}已复制到剪切板`);
+    } catch (error) {
+      // 降级处理：使用传统的复制方法
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        message.success(`${type}已复制到剪切板`);
+      } catch (fallbackError) {
+        console.error('复制失败:', fallbackError);
+        message.error('复制失败，请手动复制');
+      }
+    }
   };
 
   // 处理搜索
@@ -443,16 +474,40 @@ const CustomerManagement = () => {
       key: 'phone',
       title: '电话',
       ...getCenterColumnConfig(),
-      render: (text: string) => text || '-',
-      width: 120
+      render: (text: string) => (
+        <Space size="small">
+          <span>{text || '-'}</span>
+          {text && text !== '-' && (
+            <Button
+              icon={<CopyOutlined />}
+              size="small"
+              type="text"
+              onClick={() => copyToClipboard(text, '电话')}
+            />
+          )}
+        </Space>
+      ),
+      width: 160
     },
     {
       dataIndex: 'mobile',
       key: 'mobile',
       title: '手机',
       ...getCenterColumnConfig(),
-      render: (text: string) => text || '-',
-      width: 120
+      render: (text: string) => (
+        <Space size="small">
+          <span>{text || '-'}</span>
+          {text && text !== '-' && (
+            <Button
+              icon={<CopyOutlined />}
+              size="small"
+              type="text"
+              onClick={() => copyToClipboard(text, '手机')}
+            />
+          )}
+        </Space>
+      ),
+      width: 160
     },
     {
       dataIndex: 'followStatus',
