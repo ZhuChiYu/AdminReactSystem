@@ -1,7 +1,7 @@
 import { AimOutlined, DeleteOutlined, EditOutlined, UserOutlined } from '@ant-design/icons';
 import {
-  Button,
   Button as AButton,
+  Button,
   Card,
   DatePicker,
   Form,
@@ -15,19 +15,19 @@ import {
   message
 } from 'antd';
 import dayjs from 'dayjs';
-import weekOfYear from 'dayjs/plugin/weekOfYear';
 import isoWeek from 'dayjs/plugin/isoWeek';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
 import { useEffect, useState } from 'react';
-
-// 扩展dayjs插件
-dayjs.extend(weekOfYear);
-dayjs.extend(isoWeek);
 
 import { type EmployeeApi, employeeService, employeeTargetService } from '@/service/api';
 import type { EmployeeTarget, SetEmployeeTargetRequest } from '@/service/api/employeeTarget';
 import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
 import { getFullTableConfig } from '@/utils/table';
+
+// 扩展dayjs插件
+dayjs.extend(weekOfYear);
+dayjs.extend(isoWeek);
 
 interface EmployeeManagerRelation {
   assignedById: number;
@@ -42,7 +42,10 @@ interface EmployeeManagerRelation {
 }
 
 // 工具函数：根据年份和周数获取日期范围
-const getWeekDateRange = (year: number, weekNumber: number): { start: dayjs.Dayjs; end: dayjs.Dayjs; startDate: string; endDate: string } => {
+const getWeekDateRange = (
+  year: number,
+  weekNumber: number
+): { end: dayjs.Dayjs; endDate: string; start: dayjs.Dayjs; startDate: string } => {
   // 获取指定年份第一天
   const firstDayOfYear = dayjs().year(year).startOf('year');
 
@@ -51,19 +54,25 @@ const getWeekDateRange = (year: number, weekNumber: number): { start: dayjs.Dayj
   const weekEnd = weekStart.endOf('isoWeek');
 
   return {
-    start: weekStart,
     end: weekEnd,
-    startDate: weekStart.format('MM月DD日'),
-    endDate: weekEnd.format('MM月DD日')
+    endDate: weekEnd.format('MM月DD日'),
+    start: weekStart,
+    startDate: weekStart.format('MM月DD日')
   };
 };
 
 // 工具函数：格式化周期显示
-const formatPeriodDisplay = (targetType: 'week' | 'month', year: number, month?: number, week?: number): string => {
+const formatPeriodDisplay = (params: {
+  month?: number;
+  targetType: 'month' | 'week';
+  week?: number;
+  year: number;
+}): string => {
+  const { month, targetType, week, year } = params;
   if (targetType === 'month') {
     return `${year}年${month}月`;
   } else if (week) {
-    const { startDate, endDate } = getWeekDateRange(year, week);
+    const { endDate, startDate } = getWeekDateRange(year, week);
     return `${year}年第${week}周 (${startDate}-${endDate})`;
   }
   return `${year}年`;
@@ -98,7 +107,7 @@ const EmployeeManagerManagement = () => {
   const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear());
   const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
   const [targetWeek, setTargetWeek] = useState<number>(dayjs().week());
-  const [targetType, setTargetType] = useState<'week' | 'month'>('month');
+  const [targetType, setTargetType] = useState<'month' | 'week'>('month');
 
   // 加载基础数据
   const fetchBasicData = async () => {
@@ -152,8 +161,8 @@ const EmployeeManagerManagement = () => {
       const params: any = {
         current: 1,
         size: 1000,
-        year: targetYear,
-        targetType: targetType
+        targetType,
+        year: targetYear
       };
 
       if (targetType === 'month') {
@@ -171,10 +180,90 @@ const EmployeeManagerManagement = () => {
       });
 
       setEmployeeTargets(targetsMap);
-      console.log('📊 员工目标数据加载成功:', { targetType, params, targetsMap });
+      console.log('📊 员工目标数据加载成功:', { params, targetsMap, targetType });
     } catch (error) {
       console.error('获取员工目标数据失败:', error);
     }
+  };
+
+  // 获取超级管理员管理的员工列表
+  const getSuperAdminManagedEmployees = () => {
+    const allEmployees = [...employees];
+
+    // 将员工分为管理员和普通员工
+    const adminEmployees = allEmployees.filter(emp =>
+      emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
+    );
+    const regularEmployees = allEmployees.filter(
+      emp => !emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
+    );
+
+    // 管理员置顶，然后是普通员工
+    return [...adminEmployees, ...regularEmployees];
+  };
+
+  // 获取当前用户ID
+  const getCurrentUserIdForAdmin = () => {
+    const userInfo = localStg.get('userInfo');
+    let currentUserId: string | number | undefined = getCurrentUserId() || userInfo?.userId;
+
+    // 如果还是没找到，尝试从员工列表中查找
+    if (!currentUserId) {
+      const currentUserInEmployees = employees.find(
+        emp => emp.userName === userInfo?.userName || emp.userName === 'manager1'
+      );
+      currentUserId = currentUserInEmployees?.id;
+    }
+
+    // 如果通过ID匹配不到，尝试通过用户名匹配关系数据中的managerName
+    if (!currentUserId && userInfo?.userName) {
+      const relationWithCurrentUser = relations.find(
+        rel => rel.managerName === userInfo.userName || rel.managerName.includes(userInfo.userName)
+      );
+      if (relationWithCurrentUser) {
+        currentUserId = relationWithCurrentUser.managerId;
+      }
+    }
+
+    // 临时方案：如果是manager1用户，直接使用ID=2
+    if (!currentUserId && (userInfo?.userName === 'manager1' || userInfo?.email?.includes('manager1'))) {
+      currentUserId = 2;
+    }
+
+    return currentUserId;
+  };
+
+  // 获取管理员管理的员工列表
+  const getAdminManagedEmployees = () => {
+    const currentUserId = getCurrentUserIdForAdmin();
+    const currentUserIdNum = Number(currentUserId);
+
+    const managedEmployeeIds = relations
+      .filter(relation => relation.managerId === currentUserIdNum)
+      .map(relation => relation.employeeId);
+
+    return employees.filter(emp => managedEmployeeIds.includes(emp.id));
+  };
+
+  // 获取管理的员工列表（用于目标设置）
+  const getManagedEmployees = () => {
+    console.log('🔍 getManagedEmployees执行:', {
+      getCurrentUserId: getCurrentUserId(),
+      isAdminUser,
+      isSuperAdminUser,
+      relationsLength: relations.length
+    });
+
+    if (isSuperAdminUser) {
+      const result = getSuperAdminManagedEmployees();
+      console.log('🔍 超级管理员可管理的员工:', result);
+      return result;
+    } else if (isAdminUser) {
+      const result = getAdminManagedEmployees();
+      console.log('🔍 管理员可管理的员工:', result);
+      return result;
+    }
+    return [];
   };
 
   // 加载管理的员工数据
@@ -377,85 +466,12 @@ const EmployeeManagerManagement = () => {
       followUpTarget: currentTarget?.followUpTarget || 0,
       registerTarget: currentTarget?.registerTarget || 0,
       remark: currentTarget?.remark || '',
-      targetType: currentTarget?.targetType || targetType,
-      targetYear: currentTarget?.targetYear || targetYear,
       targetMonth: currentTarget?.targetMonth || targetMonth,
-      targetWeek: currentTarget?.targetWeek || targetWeek
+      targetType: currentTarget?.targetType || targetType,
+      targetWeek: currentTarget?.targetWeek || targetWeek,
+      targetYear: currentTarget?.targetYear || targetYear
     });
     setIsTargetModalVisible(true);
-  };
-
-  // 获取管理的员工列表（用于目标设置）
-  const getManagedEmployees = () => {
-    console.log('🔍 getManagedEmployees执行:', {
-      getCurrentUserId: getCurrentUserId(),
-      isAdminUser,
-      isSuperAdminUser,
-      relationsLength: relations.length
-    });
-
-    if (isSuperAdminUser) {
-      // 超级管理员可以管理所有员工
-      const result = employees.filter(
-        emp => !emp.roles?.some(role => role.code === 'admin' || role.code === 'super_admin')
-      );
-      console.log('🔍 超级管理员可管理的员工:', result);
-      return result;
-    } else if (isAdminUser) {
-      // 管理员只能管理分配给自己的员工
-      const userInfo = localStg.get('userInfo');
-      let currentUserId = getCurrentUserId() || userInfo?.userId || userInfo?.id;
-
-      // 如果还是没找到，尝试从员工列表中查找
-      if (!currentUserId) {
-        const currentUserInEmployees = employees.find(
-          emp => emp.userName === userInfo?.userName || emp.userName === 'manager1'
-        );
-        currentUserId = currentUserInEmployees?.id;
-      }
-
-      // 如果通过ID匹配不到，尝试通过用户名匹配关系数据中的managerName
-      if (!currentUserId && userInfo?.userName) {
-        const relationWithCurrentUser = relations.find(
-          rel => rel.managerName === userInfo.userName || rel.managerName.includes(userInfo.userName)
-        );
-        if (relationWithCurrentUser) {
-          currentUserId = relationWithCurrentUser.managerId;
-        }
-      }
-
-      // 临时方案：如果是manager1用户，直接使用ID=2（从关系数据看到的）
-      if (!currentUserId && (userInfo?.userName === 'manager1' || userInfo?.email?.includes('manager1'))) {
-        currentUserId = 2;
-      }
-
-      const currentUserIdNum = Number(currentUserId);
-
-      console.log('🔍 当前管理员信息:', {
-        currentUserIdNum,
-        finalCurrentUserId: currentUserId,
-        getCurrentUserId: getCurrentUserId(),
-        userInfo,
-        userInfoId: userInfo?.id,
-        userInfoUserId: userInfo?.userId,
-        userInfoUserName: userInfo?.userName
-      });
-      console.log('🔍 所有关系数据:', relations);
-
-      const managedEmployeeIds = relations
-        .filter(relation => {
-          console.log('🔍 检查关系:', { currentUserIdNum, relationManagerId: relation.managerId });
-          return relation.managerId === currentUserIdNum;
-        })
-        .map(relation => relation.employeeId);
-
-      console.log('🔍 管理的员工ID列表:', managedEmployeeIds);
-
-      const result = employees.filter(emp => managedEmployeeIds.includes(emp.id));
-      console.log('🔍 管理员可管理的员工:', result);
-      return result;
-    }
-    return [];
   };
 
   // 管理员工列表表格列定义
@@ -478,7 +494,7 @@ const EmployeeManagerManagement = () => {
     {
       align: 'center' as const,
       key: 'targetPeriod',
-      render: () => formatPeriodDisplay(targetType, targetYear, targetMonth, targetWeek),
+      render: () => formatPeriodDisplay({ month: targetMonth, targetType, week: targetWeek, year: targetYear }),
       title: '目标周期',
       width: 180
     },
@@ -631,14 +647,14 @@ const EmployeeManagerManagement = () => {
                     <Select
                       style={{ width: 100 }}
                       value={targetType}
-                      onChange={(value: 'week' | 'month') => {
-                        setTargetType(value);
-                        console.log('🔄 切换目标类型:', value);
-                      }}
                       options={[
                         { label: '周目标', value: 'week' },
                         { label: '月目标', value: 'month' }
                       ]}
+                      onChange={(value: 'month' | 'week') => {
+                        setTargetType(value);
+                        console.log('🔄 切换目标类型:', value);
+                      }}
                     />
                     {targetType === 'month' ? (
                       <DatePicker.MonthPicker
@@ -654,8 +670,10 @@ const EmployeeManagerManagement = () => {
                     ) : (
                       <Space>
                         <DatePicker
-                          placeholder="选择周"
+                          format="YYYY年第WW周 (MM月DD日)"
                           picker="week"
+                          placeholder="选择周"
+                          style={{ width: 200 }}
                           value={(() => {
                             try {
                               // 根据年份和周数构造日期
@@ -671,13 +689,11 @@ const EmployeeManagerManagement = () => {
                               setTargetWeek(date.isoWeek());
                             }
                           }}
-                          format={`YYYY年第WW周 (MM月DD日)`}
-                          style={{ width: 200 }}
                         />
-                        <span style={{ fontSize: '12px', color: '#666' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>
                           {(() => {
                             try {
-                              const { startDate, endDate } = getWeekDateRange(targetYear, targetWeek);
+                              const { endDate, startDate } = getWeekDateRange(targetYear, targetWeek);
                               return `${startDate} 至 ${endDate}`;
                             } catch {
                               return '';
@@ -821,10 +837,10 @@ const EmployeeManagerManagement = () => {
                 rules={[{ message: '请选择目标年份', required: true }]}
               >
                 <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder="年份"
-                  min={2020}
                   max={2030}
+                  min={2020}
+                  placeholder="年份"
+                  style={{ width: '100%' }}
                 />
               </Form.Item>
 
@@ -841,8 +857,8 @@ const EmployeeManagerManagement = () => {
                       rules={[{ message: '请选择目标月份', required: true }]}
                     >
                       <Select
-                        style={{ width: '100%' }}
                         placeholder="选择月份"
+                        style={{ width: '100%' }}
                         options={Array.from({ length: 12 }, (_, i) => ({
                           label: `${i + 1}月`,
                           value: i + 1
@@ -857,8 +873,9 @@ const EmployeeManagerManagement = () => {
                     >
                       <div>
                         <DatePicker
-                          placeholder="选择周"
+                          format="YYYY年第WW周"
                           picker="week"
+                          placeholder="选择周"
                           style={{ width: '100%' }}
                           value={(() => {
                             const formYear = targetForm.getFieldValue('targetYear') || new Date().getFullYear();
@@ -873,21 +890,25 @@ const EmployeeManagerManagement = () => {
                           onChange={date => {
                             if (date) {
                               targetForm.setFieldsValue({
-                                targetYear: date.year(),
-                                targetWeek: date.isoWeek()
+                                targetWeek: date.isoWeek(),
+                                targetYear: date.year()
                               });
                             }
                           }}
-                          format="YYYY年第WW周"
                         />
-                        <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
-                          <Form.Item noStyle shouldUpdate={(prev, curr) => prev.targetYear !== curr.targetYear || prev.targetWeek !== curr.targetWeek}>
-                            {({ getFieldValue }) => {
-                              const formYear = getFieldValue('targetYear');
-                              const formWeek = getFieldValue('targetWeek');
+                        <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+                          <Form.Item
+                            noStyle
+                            shouldUpdate={(prev, curr) =>
+                              prev.targetYear !== curr.targetYear || prev.targetWeek !== curr.targetWeek
+                            }
+                          >
+                            {({ getFieldValue: getFormFieldValue }) => {
+                              const formYear = getFormFieldValue('targetYear');
+                              const formWeek = getFormFieldValue('targetWeek');
                               if (formYear && formWeek) {
                                 try {
-                                  const { startDate, endDate } = getWeekDateRange(formYear, formWeek);
+                                  const { endDate, startDate } = getWeekDateRange(formYear, formWeek);
                                   return `${startDate} 至 ${endDate}`;
                                 } catch {
                                   return '';
@@ -903,16 +924,16 @@ const EmployeeManagerManagement = () => {
                 }}
               </Form.Item>
 
-              <div style={{ display: 'flex', alignItems: 'end', paddingBottom: '24px' }}>
+              <div style={{ alignItems: 'end', display: 'flex', paddingBottom: '24px' }}>
                 <Button
-                  type="link"
                   size="small"
+                  type="link"
                   onClick={() => {
                     const now = dayjs();
                     targetForm.setFieldsValue({
-                      targetYear: now.year(),
                       targetMonth: now.month() + 1,
-                      targetWeek: now.isoWeek()
+                      targetWeek: now.isoWeek(),
+                      targetYear: now.year()
                     });
                   }}
                 >
