@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 
 import { fetchGetUserList, meetingService } from '@/service/api';
 import type { MeetingApi } from '@/service/api/types';
+import { isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getTableConfig } from '@/utils/table';
 
 const { Title } = Typography;
@@ -11,20 +12,23 @@ const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
 interface MeetingItem {
-  approvalStatus: number; // 审批状态
+  // 会议记录内容
+  agenda?: string;
+  approvalStatus: number;
+  // 审批状态
   endTime: string;
   id: number;
   location: string;
   organizer: string;
   participantCount: number; // 参与人数
-  participants?: Array<{ id: number; name: string }>; // 参与人员详情（从详情接口获取）
+  participants?: Array<{ id: number; name: string }>;
+  // 参与人员详情（从详情接口获取）
   // 会议总结内容
   record?: string;
   startTime: string;
   status: number;
   summary?: string;
-  title: string; // 会议记录内容
-  agenda?: string; // 会议议程
+  title: string; // 会议议程
 }
 
 const Component: React.FC = () => {
@@ -79,18 +83,21 @@ const Component: React.FC = () => {
 
       // 转换API数据格式
       const formattedMeetings: MeetingItem[] = response.records.map((meeting: any) => ({
-        approvalStatus: meeting.approvalStatus || 1, // 使用实际的审批状态
+        agenda: meeting.description || '',
+        approvalStatus: meeting.approvalStatus || 1,
+        // 使用实际的审批状态
         endTime: meeting.endTime,
         id: meeting.id,
         location: meeting.location || meeting.room?.name || '未指定',
         organizer: meeting.organizer?.nickName || meeting.organizer?.userName || '',
         participantCount: meeting.participantCount || 0, // 使用API返回的参与人数
-        record: '', // API中没有meetingRecord字段，使用空字符串
+        record: '',
+        // API中没有meetingRecord字段，使用空字符串
         startTime: meeting.startTime,
         status: meeting.status || 0,
-        summary: '', // API中没有meetingSummary字段，使用空字符串
-        title: meeting.title,
-        agenda: meeting.description || '' // 添加会议议程
+        summary: '',
+        // API中没有meetingSummary字段，使用空字符串
+        title: meeting.title // 添加会议议程
       }));
 
       setMeetings(formattedMeetings);
@@ -152,7 +159,7 @@ const Component: React.FC = () => {
             const user = users.find(u => u.id === participantId);
             return {
               id: participantId,
-              name: user ? (user.nickName || user.userName) : `用户${participantId}`
+              name: user ? user.nickName || user.userName : `用户${participantId}`
             };
           });
 
@@ -160,9 +167,7 @@ const Component: React.FC = () => {
           setTimeout(() => {
             setMeetings(prevMeetings =>
               prevMeetings.map(meeting =>
-                meeting.id === newMeeting.id
-                  ? { ...meeting, participants: participantsData }
-                  : meeting
+                meeting.id === newMeeting.id ? { ...meeting, participants: participantsData } : meeting
               )
             );
           }, 100);
@@ -277,7 +282,7 @@ const Component: React.FC = () => {
     });
   };
 
-      // 查看参与人员
+  // 查看参与人员
   const handleViewParticipants = async (record: MeetingItem) => {
     if (record.participantCount === 0) {
       message.info('该会议暂无参与人员');
@@ -313,7 +318,7 @@ const Component: React.FC = () => {
             const user = users.find(u => u.id === participantId);
             return {
               id: participantId,
-              name: user ? (user.nickName || user.userName) : `用户${participantId}`
+              name: user ? user.nickName || user.userName : `用户${participantId}`
             };
           });
           console.log('从participantIds提取到的数据:', participantsData); // 调试日志
@@ -327,14 +332,12 @@ const Component: React.FC = () => {
         }
 
         // 更新当前会议的参与人员信息
-        setCurrentMeeting(prev => prev ? { ...prev, participants: participantsData } : null);
+        setCurrentMeeting(prev => (prev ? { ...prev, participants: participantsData } : null));
 
         // 同时更新会议列表中的数据
         setMeetings(prevMeetings =>
           prevMeetings.map(meeting =>
-            meeting.id === record.id
-              ? { ...meeting, participants: participantsData }
-              : meeting
+            meeting.id === record.id ? { ...meeting, participants: participantsData } : meeting
           )
         );
       } catch (error) {
@@ -345,7 +348,7 @@ const Component: React.FC = () => {
           name: `参与者${index + 1}（加载失败）`
         }));
 
-        setCurrentMeeting(prev => prev ? { ...prev, participants: participantsData } : null);
+        setCurrentMeeting(prev => (prev ? { ...prev, participants: participantsData } : null));
         message.warning('无法获取参与人员详情，显示默认信息');
       } finally {
         setParticipantsLoading(false);
@@ -438,9 +441,9 @@ const Component: React.FC = () => {
       ...getCenterColumnConfig(),
       render: (count: number, record: MeetingItem) => (
         <Button
-          type="link"
-          style={{ padding: 0, height: 'auto', color: count > 0 ? '#1890ff' : 'inherit' }}
           disabled={count === 0}
+          style={{ color: count > 0 ? '#1890ff' : 'inherit', height: 'auto', padding: 0 }}
+          type="link"
           onClick={() => handleViewParticipants(record)}
         >
           {count} 人
@@ -473,8 +476,8 @@ const Component: React.FC = () => {
             </Button>
           )}
 
-          {/* 只有未开始的会议才能删除 */}
-          {record.status === 0 && (
+          {/* 超级管理员可以删除任何状态的会议，其他用户只能删除未开始的会议 */}
+          {(isSuperAdmin() || record.status === 0) && (
             <Button
               danger
               size="small"
@@ -528,17 +531,17 @@ const Component: React.FC = () => {
           rowKey="id"
           pagination={{
             current: pagination.current,
-            pageSize: pagination.size,
-            total: pagination.total,
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
             onChange: (page, pageSize) => {
               fetchMeetings({ current: page, size: pageSize });
             },
-            onShowSizeChange: (current, size) => {
+            onShowSizeChange: (_current, size) => {
               fetchMeetings({ current: 1, size });
-            }
+            },
+            pageSize: pagination.size,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+            total: pagination.total
           }}
           {...getTableConfig()}
         />
@@ -740,7 +743,7 @@ const Component: React.FC = () => {
             {currentMeeting.agenda && (
               <div>
                 <strong className="text-gray-600">会议议程：</strong>
-                <div className="mt-1 rounded bg-gray-50 p-3 whitespace-pre-wrap">{currentMeeting.agenda}</div>
+                <div className="mt-1 whitespace-pre-wrap rounded bg-gray-50 p-3">{currentMeeting.agenda}</div>
               </div>
             )}
 
@@ -822,44 +825,40 @@ const Component: React.FC = () => {
               </p>
             </div>
 
-            {participantsLoading ? (
-              <div className="text-center py-4">
+            {participantsLoading && (
+              <div className="py-4 text-center">
                 <div>正在加载参与人员...</div>
               </div>
-            ) : currentMeeting.participants && currentMeeting.participants.length > 0 ? (
+            )}
+
+            {!participantsLoading && currentMeeting.participants && currentMeeting.participants.length > 0 && (
               <div>
                 <h4 className="mb-3">参与人员列表：</h4>
                 <div className="space-y-2">
                   {currentMeeting.participants.map((participant, index) => (
                     <div
+                      className="flex items-center justify-between border rounded-lg bg-gray-50 p-3"
                       key={participant.id || index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
                     >
                       <div className="flex items-center">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-blue-600 font-medium text-sm">
-                            {index + 1}
-                          </span>
+                        <div className="mr-3 h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
+                          <span className="text-sm text-blue-600 font-medium">{index + 1}</span>
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">
-                            {participant.name || `参与者${index + 1}`}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            ID: {participant.id}
-                          </div>
+                          <div className="text-gray-900 font-medium">{participant.name || `参与者${index + 1}`}</div>
+                          <div className="text-sm text-gray-500">ID: {participant.id}</div>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-            ) : (
-              <div className="text-center text-gray-500 py-8">
-                <div className="text-lg mb-2">暂无参与人员信息</div>
-                <div className="text-sm">
-                  参与人数：{currentMeeting?.participantCount || 0} 人
-                </div>
+            )}
+
+            {!participantsLoading && (!currentMeeting.participants || currentMeeting.participants.length === 0) && (
+              <div className="py-8 text-center text-gray-500">
+                <div className="mb-2 text-lg">暂无参与人员信息</div>
+                <div className="text-sm">参与人数：{currentMeeting?.participantCount || 0} 人</div>
               </div>
             )}
           </div>
