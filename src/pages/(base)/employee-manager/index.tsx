@@ -109,6 +109,13 @@ const EmployeeManagerManagement = () => {
   const [targetWeek, setTargetWeek] = useState<number>(dayjs().week());
   const [targetType, setTargetType] = useState<'month' | 'week'>('month');
 
+  // 员工目标管理分页状态
+  const [targetPagination, setTargetPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
+
   // 加载基础数据
   const fetchBasicData = async () => {
     try {
@@ -245,8 +252,8 @@ const EmployeeManagerManagement = () => {
     return employees.filter(emp => managedEmployeeIds.includes(emp.id));
   };
 
-  // 获取管理的员工列表（用于目标设置）
-  const getManagedEmployees = () => {
+  // 获取管理的员工列表（用于目标设置）- 支持分页
+  const getManagedEmployeesWithPagination = () => {
     console.log('🔍 getManagedEmployees执行:', {
       getCurrentUserId: getCurrentUserId(),
       isAdminUser,
@@ -254,16 +261,26 @@ const EmployeeManagerManagement = () => {
       relationsLength: relations.length
     });
 
+    let allEmployees: EmployeeApi.EmployeeListItem[] = [];
+
     if (isSuperAdminUser) {
-      const result = getSuperAdminManagedEmployees();
-      console.log('🔍 超级管理员可管理的员工:', result);
-      return result;
+      allEmployees = getSuperAdminManagedEmployees();
+      console.log('🔍 超级管理员可管理的员工:', allEmployees);
     } else if (isAdminUser) {
-      const result = getAdminManagedEmployees();
-      console.log('🔍 管理员可管理的员工:', result);
-      return result;
+      allEmployees = getAdminManagedEmployees();
+      console.log('🔍 管理员可管理的员工:', allEmployees);
     }
-    return [];
+
+    // 计算分页数据
+    const total = allEmployees.length;
+    const startIndex = (targetPagination.current - 1) * targetPagination.pageSize;
+    const endIndex = startIndex + targetPagination.pageSize;
+    const paginatedEmployees = allEmployees.slice(startIndex, endIndex);
+
+    return {
+      employees: paginatedEmployees,
+      total
+    };
   };
 
   // 加载管理的员工数据
@@ -272,7 +289,7 @@ const EmployeeManagerManagement = () => {
 
     try {
       setTargetLoading(true);
-      const managedEmployeeList = getManagedEmployees();
+      const { employees: paginatedEmployees, total } = getManagedEmployeesWithPagination();
       const userInfo = localStg.get('userInfo');
       console.log('🔍 管理的员工列表:', {
         canManageTargets,
@@ -282,11 +299,18 @@ const EmployeeManagerManagement = () => {
         employeesCount: employees.length,
         isAdminUser,
         isSuperAdminUser,
-        managedEmployeeList,
+        paginatedEmployees,
         relations,
-        relationsCount: relations.length
+        relationsCount: relations.length,
+        total
       });
-      setManagedEmployees(managedEmployeeList);
+      setManagedEmployees(paginatedEmployees);
+
+      // 更新分页状态
+      setTargetPagination(prev => ({
+        ...prev,
+        total
+      }));
 
       // 获取员工目标数据
       await fetchEmployeeTargets();
@@ -307,7 +331,17 @@ const EmployeeManagerManagement = () => {
     if (canManageTargets && employees.length > 0 && relations.length >= 0) {
       fetchManagedEmployees();
     }
-  }, [targetYear, targetMonth, targetWeek, targetType, canManageTargets, employees, relations]);
+  }, [
+    targetYear,
+    targetMonth,
+    targetWeek,
+    targetType,
+    canManageTargets,
+    employees,
+    relations,
+    targetPagination.current,
+    targetPagination.pageSize
+  ]);
 
   // 获取可选的员工列表
   const getSelectableEmployees = () => {
@@ -711,7 +745,28 @@ const EmployeeManagerManagement = () => {
                   loading={targetLoading}
                   rowKey="id"
                   scroll={{ x: 'max-content', y: 500 }}
-                  {...getFullTableConfig(10)}
+                  pagination={{
+                    current: targetPagination.current,
+                    onChange: (page, pageSize) => {
+                      setTargetPagination(prev => ({
+                        ...prev,
+                        current: page,
+                        pageSize: pageSize || prev.pageSize
+                      }));
+                    },
+                    onShowSizeChange: (_current, size) => {
+                      setTargetPagination(prev => ({
+                        ...prev,
+                        current: 1, // 改变页面大小时重置到第一页
+                        pageSize: size
+                      }));
+                    },
+                    pageSize: targetPagination.pageSize,
+                    showQuickJumper: true,
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+                    total: targetPagination.total
+                  }}
                 />
               </Card>
             ),
