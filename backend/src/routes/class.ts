@@ -166,6 +166,10 @@ router.get('/', asyncErrorHandler(classController.getClasses));
 router.get('/students', async (req, res) => {
   try {
     const { classId, current = 1, size = 10 } = req.query;
+    const user = req.user;
+
+    // 检查用户是否为超级管理员
+    const isSuperAdmin = user?.roles?.includes('super_admin');
 
     if (!classId) {
       return res.status(400).json({
@@ -205,27 +209,40 @@ router.get('/students', async (req, res) => {
     const result = {
       current: page,
       pages: Math.ceil(total / pageSize),
-      records: students.map(student => ({
-        attendanceRate: student.attendanceRate,
-        avatar: student.avatar,
-        company: student.company,
-        createdAt: student.createdAt.toISOString(),
-        createdBy: student.createdBy ? {
-          id: student.createdBy.id,
-          nickName: student.createdBy.nickName,
-          userName: student.createdBy.userName
-        } : null,
-        email: student.email,
-        gender: student.gender,
-        id: student.id,
-        joinDate: student.joinDate.toISOString().split('T')[0],
-        landline: student.landline,
-        name: student.name,
-        phone: student.phone,
-        position: student.position,
-        status: student.status,
-        trainingFee: student.trainingFee ? student.trainingFee.toString() : null
-      })),
+      records: students.map(student => {
+        // 基础信息（所有用户都能看到）
+        const basicInfo = {
+          attendanceRate: student.attendanceRate,
+          avatar: student.avatar,
+          createdAt: student.createdAt.toISOString(),
+          createdBy: student.createdBy ? {
+            id: student.createdBy.id,
+            nickName: student.createdBy.nickName,
+            userName: student.createdBy.userName
+          } : null,
+          gender: student.gender,
+          id: student.id,
+          joinDate: student.joinDate.toISOString().split('T')[0],
+          name: student.name,
+          status: student.status,
+          trainingFee: student.trainingFee ? student.trainingFee.toString() : null
+        };
+
+        // 如果是超级管理员，返回完整信息
+        if (isSuperAdmin) {
+          return {
+            ...basicInfo,
+            company: student.company,
+            email: student.email,
+            landline: student.landline,
+            phone: student.phone,
+            position: student.position
+          };
+        }
+
+        // 普通用户只返回基础信息
+        return basicInfo;
+      }),
       size: pageSize,
       total
     };
@@ -1412,17 +1429,9 @@ router.put('/students/:id', async (req, res) => {
  *         description: 参数错误
  */
 router.delete('/students/batch', async (req, res) => {
-  console.log('🚨🚨🚨 BATCH DELETE ROUTE HIT 🚨🚨🚨');
   try {
-    console.log('🔥🔥🔥 批量删除学员请求开始 🔥🔥🔥');
-    console.log('请求体:', JSON.stringify(req.body, null, 2));
 
     const { studentIds } = req.body;
-
-    console.log('提取的studentIds:', studentIds);
-    console.log('studentIds类型:', typeof studentIds);
-    console.log('是否为数组:', Array.isArray(studentIds));
-    console.log('长度:', studentIds?.length);
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       return res.status(400).json({
@@ -1436,26 +1445,12 @@ router.delete('/students/batch', async (req, res) => {
 
     // 验证并转换所有ID为有效数字
     const validIds: number[] = [];
-    console.log('开始验证学员ID...');
     for (const id of studentIds) {
       const numId = typeof id === 'string' ? Number.parseInt(id, 10) : Number(id);
-      console.log('处理ID:', {
-        原始ID: id,
-        原始类型: typeof id,
-        转换后ID: numId,
-        是否为整数: Number.isInteger(numId),
-        是否大于0: numId > 0
-      });
       if (Number.isInteger(numId) && numId > 0) {
         validIds.push(numId);
       }
     }
-
-    console.log('验证结果:', {
-      原始长度: studentIds.length,
-      有效长度: validIds.length,
-      有效IDs: validIds
-    });
 
     if (validIds.length !== studentIds.length) {
       return res.status(400).json({

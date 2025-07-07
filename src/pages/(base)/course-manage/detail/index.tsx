@@ -27,7 +27,6 @@ const CourseDetail = () => {
       setCourse(response);
     } catch (error) {
       message.error('获取课程详情失败');
-      console.error('获取课程详情失败:', error);
     } finally {
       setLoading(false);
     }
@@ -41,7 +40,7 @@ const CourseDetail = () => {
       const response = await attachmentService.getCourseAttachmentStats(Number.parseInt(courseId, 10));
       setAttachmentCount(response?.totalCount || 0);
     } catch (error) {
-      console.error('获取附件数量失败:', error);
+      // 获取附件数量失败
     }
   }, [courseId]);
 

@@ -45,8 +45,7 @@ const CustomerAssignManagement = () => {
   // 直接从localStorage获取用户信息和ID
   const userInfo = localStg.get('userInfo');
   const currentUserId = userInfo?.userId || '';
-  console.log('🔍 用户信息:', userInfo);
-  console.log('🔍 用户ID:', currentUserId);
+  // 用户信息获取完成
 
   // 状态管理
   const [assignments, setAssignments] = useState<CustomerAssignment[]>([]);
@@ -86,10 +85,10 @@ const CustomerAssignManagement = () => {
 
         // 获取客户分配记录
         const assignmentResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
-        console.log('🔍 初始加载分配数据:', assignmentResponse);
+        // 初始加载分配数据完成
         setAssignments(assignmentResponse.records);
       } catch (error) {
-        console.error('获取数据失败:', error);
+        // 获取数据失败
         message.error('获取数据失败');
       } finally {
         setLoading(false);
@@ -162,7 +161,7 @@ const CustomerAssignManagement = () => {
       setEditingAssignment(null);
       form.resetFields();
     } catch (error) {
-      console.error('操作失败:', error);
+      // 操作失败
       message.error('操作失败');
     } finally {
       setLoading(false);
@@ -180,7 +179,7 @@ const CustomerAssignManagement = () => {
       const assignmentsResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
       setAssignments(assignmentsResponse.records || []);
     } catch (error) {
-      console.error('删除失败:', error);
+      // 删除失败
       message.error('删除失败');
     } finally {
       setLoading(false);

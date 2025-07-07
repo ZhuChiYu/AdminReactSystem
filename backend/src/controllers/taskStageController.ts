@@ -59,12 +59,6 @@ export const uploadProposal = async (req: Request, res: Response) => {
     const { taskId, remark } = req.body;
     const { id: userId } = req.user as any;
 
-    console.log('📤 方案上传请求:', {
-      taskId,
-      remark,
-      user: req.user,
-      userId
-    });
 
     const task = await prisma.task.findUnique({
       where: { id: Number(taskId) },
@@ -103,11 +97,6 @@ export const uploadProposal = async (req: Request, res: Response) => {
     // 获取操作人姓名 - 优先使用nickName，其次userName
     const operatorName = req.user?.nickName || req.user?.userName;
 
-    console.log('📝 保存操作历史 - 用户信息:', {
-      user: req.user,
-      operatorName,
-      userId
-    });
 
     if (!operatorName) {
       console.error('❌ 警告: 无法获取操作人姓名', { user: req.user });
@@ -149,12 +138,6 @@ export const uploadProposal = async (req: Request, res: Response) => {
         'info'
       );
     }
-
-    console.log('✅ 方案上传成功:', {
-      taskId,
-      operatorName,
-      historyCount: stageHistory.length
-    });
 
     res.json({
       code: 0,
@@ -208,8 +191,6 @@ export const confirmProposal = async (req: Request, res: Response) => {
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-    console.log('📝 保存操作历史 - 用户信息:', req.user);
-    console.log('📝 操作人姓名:', operatorName);
 
     stageHistory.push({
       stage: 'proposal_submission',
@@ -311,8 +292,6 @@ export const confirmTeacher = async (req: Request, res: Response) => {
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-    console.log('📝 保存操作历史 - 用户信息:', req.user);
-    console.log('📝 操作人姓名:', operatorName);
 
     stageHistory.push({
       stage: 'teacher_confirmation',
@@ -406,8 +385,6 @@ export const approveProject = async (req: Request, res: Response) => {
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-    console.log('📝 保存操作历史 - 用户信息:', req.user);
-    console.log('📝 操作人姓名:', operatorName);
 
     stageHistory.push({
       stage: 'project_approval',
@@ -530,8 +507,6 @@ export const confirmContract = async (req: Request, res: Response) => {
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-    console.log('📝 保存操作历史 - 用户信息:', req.user);
-    console.log('📝 操作人姓名:', operatorName);
 
     stageHistory.push({
       stage: 'contract_signing',
@@ -629,9 +604,6 @@ export const confirmProjectCompletion = async (req: Request, res: Response) => {
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-    console.log('📝 保存操作历史 - 用户信息:', req.user);
-    console.log('📝 操作人姓名:', operatorName);
-
     stageHistory.push({
       stage: 'project_execution',
       timestamp: new Date().toISOString(),
@@ -728,8 +700,6 @@ export const confirmPayment = async (req: Request, res: Response) => {
     // 更新阶段历史
     const stageHistory = task.stageHistory ? JSON.parse(task.stageHistory as string) : [];
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-    console.log('📝 保存操作历史 - 用户信息:', req.user);
-    console.log('📝 操作人姓名:', operatorName);
 
     stageHistory.push({
       stage: 'project_settlement',
@@ -809,8 +779,6 @@ export const confirmPayment = async (req: Request, res: Response) => {
           status: 200
         }
       });
-
-      console.log(`✅ 项目 "${task.projectName}" 已完成并归档`);
     }
 
     res.json({

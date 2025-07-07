@@ -21,13 +21,10 @@ const ResetPwd = () => {
 
   async function handleSubmit() {
     const params = await form.validateFields();
-    console.log(params);
 
     // request to reset password
     window.$message?.success(t('page.login.common.validateSuccess'));
   }
-
-  console.log('reset-pwd');
 
   return (
     <>

@@ -74,7 +74,7 @@ class TaskAttachmentService {
       onUploadProgress: progressEvent => {
         if (progressEvent.total) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          console.log(`Upload Progress: ${percentCompleted}%`);
+          // 上传进度
           if (data.onProgress) {
             data.onProgress(percentCompleted);
           }

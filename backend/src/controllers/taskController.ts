@@ -217,12 +217,6 @@ export const createTask = async (req: Request, res: Response) => {
     // 获取操作人姓名 - 优先使用nickName，其次userName
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
 
-    console.log('📝 保存创建项目操作历史 - 用户信息:', {
-      user: req.user,
-      operatorName,
-      userId
-    });
-
     // 构建任务数据对象
     const taskData: any = {
       projectType,
@@ -437,12 +431,6 @@ export const advanceStage = async (req: Request, res: Response) => {
 
     // 获取操作人姓名 - 优先使用nickName，其次userName
     const operatorName = req.user?.nickName || req.user?.userName || '未知用户';
-
-    console.log('📝 保存操作历史 - 用户信息:', {
-      user: req.user,
-      operatorName,
-      userId
-    });
 
     stageHistory.push({
       stage: nextStage,
@@ -926,8 +914,6 @@ class TaskController {
         return res.status(401).json(createErrorResponse(401, '用户未登录', null, req.path));
       }
 
-      console.log('👤 当前用户ID:', currentUserId);
-
       // 解析时间参数
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
       let startDate: Date, endDate: Date;
@@ -965,13 +951,9 @@ class TaskController {
         targetWhereCondition.targetWeek = targetWeek;
       }
 
-      console.log('🔍 查询条件:', targetWhereCondition);
-
       const employeeTarget = await prisma.employeeTarget.findFirst({
         where: targetWhereCondition
       });
-
-      console.log('📋 查询结果:', employeeTarget);
 
       // 获取项目任务完成情况
       const projectTaskCount = await this.getTaskCount(currentUserId, '', startDate, endDate);

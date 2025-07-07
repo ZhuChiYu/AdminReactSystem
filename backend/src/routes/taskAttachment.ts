@@ -82,18 +82,6 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
   try {
     const { taskId, description, stage } = req.body;
 
-    console.log('📤 项目事项附件上传请求:', {
-      taskId,
-      description,
-      stage,
-      user: req.user,
-      file: req.file ? {
-        originalname: req.file.originalname,
-        size: req.file.size,
-        mimetype: req.file.mimetype
-      } : null
-    });
-
     if (!req.file) {
       console.error('❌ 附件上传失败: 未选择文件');
       return res.status(400).json(createErrorResponse(400, '请选择要上传的文件', null, req.path));
@@ -122,11 +110,6 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
 
     // 获取当前用户ID
     const uploaderId = req.user.id;
-    console.log('📋 上传用户信息:', {
-      uploaderId,
-      userName: req.user.userName,
-      nickName: req.user.nickName
-    });
 
     // 创建附件记录
     const attachment = await prisma.taskAttachment.create({
@@ -170,13 +153,6 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
         : null,
       uploadTime: attachment.uploadTime.toISOString()
     };
-
-    console.log('✅ 项目事项附件上传成功:', {
-      fileName: req.file.originalname,
-      taskId,
-      attachmentId: attachment.id,
-      uploader: result.uploader
-    });
 
     logger.info(`项目事项附件上传成功: ${req.file.originalname}, 项目事项ID: ${taskId}`);
 

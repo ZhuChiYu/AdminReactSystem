@@ -92,7 +92,6 @@ const roleMap = {
 };
 
 async function processData() {
-  console.log('开始处理Excel数据...\n');
 
   // 读取客户数据
   let customers = [];
@@ -126,9 +125,7 @@ async function processData() {
       };
     });
 
-    console.log(`✅ 成功处理 ${customers.length} 个客户数据`);
   } catch (error) {
-    console.error('❌ 处理客户数据失败:', error.message);
   }
 
   // 读取员工数据
@@ -181,7 +178,6 @@ async function processData() {
       });
     }
 
-    console.log(`✅ 成功处理 ${employees.length} 个员工数据`);
   } catch (error) {
     console.error('❌ 处理员工数据失败:', error.message);
   }
@@ -206,15 +202,7 @@ async function processData() {
   });
 
   fs.writeFileSync(path.join(__dirname, '../data/员工登录信息.md'), credentialsDoc, 'utf8');
-
-  console.log('\n📋 员工登录信息:');
   console.table(userCredentials);
-
-  console.log('\n✅ 数据处理完成！');
-  console.log(`📁 客户数据: ${customers.length} 条`);
-  console.log(`👥 员工数据: ${employees.length} 条`);
-  console.log(`💾 数据已保存到: backend/data/excel-import-data.json`);
-  console.log(`📄 登录信息已保存到: backend/data/员工登录信息.md`);
 }
 
 // 确保data目录存在

@@ -49,7 +49,6 @@ try {
     }
   ];
 } catch (error) {
-  console.log('使用默认数据');
 }
 
 // 合并数据 - 检查是否已存在相同名称的班级
@@ -57,23 +56,14 @@ frontendData.forEach(newClass => {
   const existingIndex = existingData.findIndex(c => c.name === newClass.name);
   if (existingIndex >= 0) {
     existingData[existingIndex] = newClass;
-    console.log(`更新了班级: ${newClass.name}`);
   } else {
     existingData.push(newClass);
-    console.log(`添加了新班级: ${newClass.name}`);
   }
 });
 
 // 保存合并后的数据
 fs.writeFileSync('./updated_class_list.json', JSON.stringify(existingData, null, 2));
 
-console.log('\n最终的班级列表数据：');
-console.log(JSON.stringify(existingData, null, 2));
-
-console.log('\n数据已保存到 updated_class_list.json');
-console.log('请将此数据复制到班级管理页面的localStorage中');
-
 // 生成可以直接在浏览器控制台执行的代码
 const browserCode = `localStorage.setItem('classList', '${JSON.stringify(existingData).replace(/'/g, "\\'")}');`;
 fs.writeFileSync('./browser_update_code.txt', browserCode);
-console.log('浏览器更新代码已保存到 browser_update_code.txt');

@@ -74,7 +74,7 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
     async function fetchPositionRoles() {
       try {
         const response = await fetchGetRoleList({ current: 1, roleType: 'position', size: 100 });
-        console.log('获取职位角色响应:', response);
+        // 获取职位角色响应
 
         if (response && response.records) {
           const options = response.records.map((role: Api.SystemManage.Role) => ({
@@ -83,11 +83,11 @@ const UserOperateDrawer: FC<Page.OperateDrawerProps> = ({ form, handleSubmit, on
           }));
           setPositionRoleOptions(options);
         } else {
-          console.warn('职位角色响应格式异常:', response);
+          // 职位角色响应格式异常
           setPositionRoleOptions([]);
         }
       } catch (error) {
-        console.error('获取职位角色失败:', error);
+        // 获取职位角色失败
         // 设置默认的职位角色选项
         setPositionRoleOptions([
           { label: '总经理', value: 'general_manager' },

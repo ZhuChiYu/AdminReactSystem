@@ -359,19 +359,14 @@ const UserDetailPage = () => {
 
 export async function loader({ params }: LoaderFunctionArgs) {
   try {
-    console.log('🔍 Loader - Fetching user detail for ID:', params.id);
     const data = await fetchGetUserDetail(Number(params.id));
-    console.log('🔍 Loader - API Response:', data);
 
     if (!data) {
-      console.log('⚠️ Loader - No data received');
       return null;
     }
 
-    console.log('✅ Loader - Returning user data:', data);
     return data;
   } catch (error) {
-    console.error('❌ Loader - Error fetching user detail:', error);
     return null;
   }
 }

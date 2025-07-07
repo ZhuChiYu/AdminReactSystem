@@ -329,6 +329,4 @@ export const setupSwagger = (app: Express): void => {
     res.setHeader('Content-Type', 'application/json');
     res.send(specs);
   });
-
-  console.log(`📚 API文档地址: http://localhost:${config.port}${config.apiDocPath}`);
 };

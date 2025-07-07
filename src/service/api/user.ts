@@ -12,10 +12,9 @@ class UserService {
     try {
       const response = await apiClient.put(`/users/${data.userId}/profile`, data);
       return response;
-    } catch (error) {
-      console.error('更新用户资料失败:', error);
-      throw error;
-    }
+      } catch (error) {
+    throw error;
+  }
   }
 
   /** 修改密码 */
@@ -26,10 +25,9 @@ class UserService {
         oldPassword: data.oldPassword
       });
       return response;
-    } catch (error) {
-      console.error('修改密码失败:', error);
-      throw error;
-    }
+      } catch (error) {
+    throw error;
+  }
   }
 }
 

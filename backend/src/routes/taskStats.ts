@@ -18,9 +18,6 @@ router.get('/user-stats', async (req: Request, res: Response) => {
       return res.status(401).json(createErrorResponse(401, '用户未登录', null, req.path));
     }
 
-    console.log('👤 当前用户ID:', currentUserId);
-    console.log('📊 查询参数:', { year, month, week, period });
-
     // 解析时间参数
     const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
     let startDate: Date, endDate: Date;
@@ -58,13 +55,10 @@ router.get('/user-stats', async (req: Request, res: Response) => {
       targetWhereCondition.targetWeek = targetWeek;
     }
 
-    console.log('🔍 查询条件:', targetWhereCondition);
-
     const employeeTarget = await prisma.employeeTarget.findFirst({
       where: targetWhereCondition
     });
 
-    console.log('📋 查询结果:', employeeTarget);
 
     // 获取客户任务完成情况（基于客户状态变更）
     const customerTaskStats = await getCustomerTaskStats(currentUserId, startDate, endDate);
@@ -102,11 +96,8 @@ router.get('/user-stats', async (req: Request, res: Response) => {
           Math.round((customerTaskStats.registerCount / employeeTarget.registerTarget) * 100) : 0
       }
     };
-
-    console.log('✅ 返回结果:', result);
     res.json(createSuccessResponse(result, '获取任务统计成功', req.path));
   } catch (error) {
-    logger.error('获取任务统计失败:', error);
     res.status(500).json(createErrorResponse(500, '获取任务统计失败', null, req.path));
   }
 });
@@ -155,7 +146,6 @@ function getWeekDateRange(year: number, weekNumber: number): { start: Date; end:
  */
 async function getCustomerTaskStats(userId: number, startDate: Date, endDate: Date) {
   try {
-    console.log('🔍 统计参数:', { userId, startDate, endDate });
 
     // 方法1：基于客户的修改时间统计（主要逻辑）
     const customers = await prisma.customer.findMany({
@@ -173,8 +163,6 @@ async function getCustomerTaskStats(userId: number, startDate: Date, endDate: Da
       }
     });
 
-    console.log('📊 找到的客户记录:', customers.length);
-
     // 按客户状态统计数量
     let consultCount = 0;    // 咨询
     let followUpCount = 0;   // 回访
@@ -182,7 +170,6 @@ async function getCustomerTaskStats(userId: number, startDate: Date, endDate: Da
     let registerCount = 0;   // 报名
 
     for (const customer of customers) {
-      console.log(`客户ID ${customer.id}, 状态: ${customer.status}, 修改时间: ${customer.updatedAt}`);
 
       switch (customer.status) {
         case 'consult':
@@ -199,8 +186,6 @@ async function getCustomerTaskStats(userId: number, startDate: Date, endDate: Da
           break;
       }
     }
-
-    console.log('📈 统计结果:', { consultCount, followUpCount, developCount, registerCount });
 
     return {
       consultCount,

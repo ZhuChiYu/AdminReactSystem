@@ -11,13 +11,7 @@ async function checkAvatar() {
         userName: true
       }
     });
-
-    console.log('All users and their avatars:');
-    users.forEach(user => {
-      console.log(`ID: ${user.id}, Username: ${user.userName}, Avatar: ${user.avatar}`);
-    });
   } catch (error) {
-    console.error('Error:', error);
   } finally {
     await prisma.$disconnect();
   }

@@ -55,7 +55,6 @@ const NotificationsPage: React.FC = () => {
       filterNotifications(formattedNotifications, activeTab);
     } catch (error) {
       message.error('获取通知列表失败');
-      console.error('获取通知列表失败:', error);
     } finally {
       setLoading(false);
     }
@@ -89,7 +88,6 @@ const NotificationsPage: React.FC = () => {
       message.success('已标记为已读');
     } catch (error) {
       message.error('标记失败');
-      console.error('标记通知失败:', error);
     }
   };
 
@@ -104,7 +102,6 @@ const NotificationsPage: React.FC = () => {
       message.success('所有通知已标记为已读');
     } catch (error) {
       message.error('标记失败');
-      console.error('标记所有通知失败:', error);
     }
   };
 

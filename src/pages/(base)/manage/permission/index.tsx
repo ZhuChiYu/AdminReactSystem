@@ -99,7 +99,6 @@ const PermissionManagement = () => {
           total: response.total
         }));
       } catch (error) {
-        console.error('获取员工列表失败:', error);
         message.error('获取员工列表失败');
       } finally {
         setLoading(false);
@@ -118,7 +117,6 @@ const PermissionManagement = () => {
         const response = await customerService.getCustomerList({ current: 1, size: 1000 });
         setCustomers(response.records || []);
       } catch (error) {
-        console.error('获取客户列表失败:', error);
         message.error('获取客户列表失败');
       } finally {
         setCustomerLoading(false);
@@ -138,7 +136,6 @@ const PermissionManagement = () => {
         const response = await classService.getClassList({ current: 1, size: 1000 });
         setClasses(response.records || []);
       } catch (error) {
-        console.error('获取班级列表失败:', error);
         message.error('获取班级列表失败');
       } finally {
         setClassLoading(false);
@@ -300,7 +297,6 @@ const PermissionManagement = () => {
 
   // 处理选择员工
   const handleUserSelect = (user: { id: string; name: string; role: string }) => {
-    console.log('👤 选择员工调试信息:', user);
     setSelectedUser(user);
   };
 
@@ -409,7 +405,7 @@ const PermissionManagement = () => {
         refreshUserPermissions();
       }, 100);
     } catch (error) {
-      console.error('Form validation failed:', error);
+      // 表单验证失败
     }
   };
 
@@ -432,16 +428,7 @@ const PermissionManagement = () => {
       // 授予客户权限
       grantCustomerPermission(selectedUser.id, values.customerId, values.permissions, currentUserId);
 
-      console.log('🔧 权限设置调试信息:', {
-        selectedUserId: selectedUser.id,
-        selectedUserIdType: typeof selectedUser.id,
-        customerId: values.customerId,
-        customerIdType: typeof values.customerId,
-        permissions: values.permissions,
-        grantedBy: currentUserId,
-        grantedByType: typeof currentUserId,
-        isEditingMode: isEditingPermission
-      });
+      // 权限设置完成
 
       // 关键修复：调用后端API真正分配客户给员工
       try {
@@ -450,30 +437,13 @@ const PermissionManagement = () => {
           customerIds: [values.customerId],
           remark: `权限管理分配 - ${new Date().toLocaleString()}`
         });
-        console.log('✅ 客户分配成功:', {
-          employeeId: selectedUser.id,
-          customerId: values.customerId
-        });
+        // 客户分配成功
       } catch (error) {
-        console.error('❌ 客户分配失败:', error);
         // 如果分配失败，显示警告但不阻止权限设置
         message.warning('权限设置成功，但客户分配可能失败，请检查该客户是否已分配给其他员工');
       }
 
-      // 验证权限是否正确保存
-      setTimeout(() => {
-        const savedPermissions = getUserPermissions(selectedUser.id);
-        const allPermissions = usePermissionStore.getState().permissions;
-        console.log('📝 保存后的权限验证:', {
-          userId: selectedUser.id,
-          userIdType: typeof selectedUser.id,
-          allPermissions: allPermissions,
-          savedPermissions: savedPermissions,
-          customerPermissions: savedPermissions.filter(p => p.customerId === values.customerId),
-          // 额外检查：查找所有包含该用户ID的权限
-          permissionsContainingUserId: allPermissions.filter(p => p.userId === selectedUser.id)
-        });
-      }, 50);
+      // 权限保存完成
 
       message.success(isEditingPermission ? '客户权限修改成功' : '客户权限设置成功');
       setIsCustomerModalVisible(false);
@@ -518,7 +488,7 @@ const PermissionManagement = () => {
         refreshUserPermissions();
       }, 100);
     } catch (error) {
-      console.error('Form validation failed:', error);
+      // 表单验证失败
     }
   };
 
@@ -579,14 +549,9 @@ const PermissionManagement = () => {
 
         if (targetAssignment) {
           await customerService.removeCustomerAssignment(targetAssignment.id);
-          console.log('✅ 客户分配已取消:', {
-            assignmentId: targetAssignment.id,
-            employeeId: selectedUser.id,
-            customerId: record.customerId
-          });
+          // 客户分配已取消
         }
       } catch (error) {
-        console.error('❌ 取消客户分配失败:', error);
         message.warning('权限已撤销，但取消客户分配可能失败');
       }
     } else if (record.classId) {
@@ -650,7 +615,6 @@ const PermissionManagement = () => {
               name: record.nickName,
               role: record.roles?.[0]?.code || ''
             };
-            console.log('👥 员工记录信息:', { record, userToSelect });
             handleUserSelect(userToSelect);
           }}
         >

@@ -32,7 +32,6 @@ class AttachmentService {
         onUploadProgress: progressEvent => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            console.log(`Upload Progress: ${percentCompleted}%`);
             if (data.onProgress) {
               data.onProgress(percentCompleted);
             }

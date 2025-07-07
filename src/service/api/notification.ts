@@ -16,7 +16,6 @@ class NotificationService {
       // apiClient 已经处理了响应格式，直接返回 data 部分
       return response;
     } catch (error) {
-      console.error('获取通知列表失败:', error);
       // 如果API调用失败，返回空数据
       return {
         current: params.current || 1,
@@ -82,7 +81,6 @@ class NotificationService {
       });
       return response;
     } catch (error) {
-      console.error('获取通知附件列表失败:', error);
       return {
         current: params.current || 1,
         pages: 0,
@@ -113,7 +111,7 @@ class NotificationService {
         onUploadProgress: progressEvent => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            console.log(`Upload Progress: ${percentCompleted}%`);
+            // 上传进度
             if (data.onProgress) {
               data.onProgress(percentCompleted);
             }

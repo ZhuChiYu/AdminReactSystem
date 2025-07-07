@@ -49,7 +49,6 @@ const CourseCategory = () => {
       setCategories(formattedCategories);
     } catch (error) {
       message.error('获取分类列表失败');
-      console.error('获取分类列表失败:', error);
     } finally {
       setLoading(false);
     }
@@ -114,7 +113,6 @@ const CourseCategory = () => {
       } else {
         message.error('分类创建失败');
       }
-      console.error('保存分类失败:', error);
     } finally {
       setConfirmLoading(false);
     }
@@ -128,7 +126,6 @@ const CourseCategory = () => {
       fetchCategories(); // 重新获取列表
     } catch (error) {
       message.error('删除失败');
-      console.error('删除分类失败:', error);
     }
   };
 

@@ -92,24 +92,17 @@ app.use(
         allowedOrigins.push('https://your-domain.com');
       }
 
-      console.log(`🌐 CORS检查: 请求来源 = ${origin}`);
-      console.log(`📋 CORS允许的域名:`, allowedOrigins);
-
       // 检查是否在允许列表中
       if (allowedOrigins.includes(origin)) {
-        console.log(`✅ CORS: 允许访问 ${origin}`);
         return callback(null, true);
       }
 
       // 开发环境宽松策略：允许localhost和指定IP
       if (process.env.NODE_ENV !== 'production') {
         if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('111.230.110.95')) {
-          console.log(`✅ CORS: 开发环境允许 ${origin}`);
           return callback(null, true);
         }
       }
-
-      console.log(`❌ CORS: 拒绝访问 ${origin}`);
       callback(new Error(`CORS策略不允许来自 ${origin} 的访问`));
     },
     credentials: true,
@@ -133,7 +126,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 全局OPTIONS预检请求处理
 app.options('*', (req, res) => {
-  console.log(`🔍 OPTIONS请求: ${req.method} ${req.url}, Origin: ${req.headers.origin}`);
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');

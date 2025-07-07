@@ -49,7 +49,7 @@ const Role = () => {
         ...params,
         roleType: 'position'
       });
-      console.log('角色列表适配器收到数据:', response);
+      // 角色列表适配器收到数据
 
       // 如果response已经是解包后的格式，需要重新包装为{data: response}格式
       if (response && typeof response === 'object' && 'records' in response) {
@@ -61,7 +61,7 @@ const Role = () => {
       // 如果response已经是{data: {...}}格式，直接返回
       return response;
     } catch (error) {
-      console.error('角色列表适配器错误:', error);
+      // 角色列表适配器错误
       return {
         data: {
           current: params?.current || 1,
@@ -196,7 +196,7 @@ const Role = () => {
         window.$message?.success(t('common.createSuccess'));
         run(); // 刷新表格数据
       } catch (error) {
-        console.error('创建角色失败:', error);
+        // 创建角色失败
         window.$message?.error(t('common.createFailed'));
       }
     } else {
@@ -213,7 +213,7 @@ const Role = () => {
         window.$message?.success(t('common.updateSuccess'));
         run(); // 刷新表格数据
       } catch (error) {
-        console.error('更新角色失败:', error);
+        // 更新角色失败
         window.$message?.error(t('common.updateFailed'));
       }
     }
@@ -235,7 +235,7 @@ const Role = () => {
       run(); // 刷新表格数据
       onBatchDeleted();
     } catch (error) {
-      console.error('批量删除角色失败:', error);
+      // 批量删除角色失败
       window.$message?.error(t('common.batchDeleteFailed'));
     }
   }
@@ -254,7 +254,7 @@ const Role = () => {
       run(); // 刷新表格数据
       onDeleted();
     } catch (error) {
-      console.error('删除角色失败:', error);
+      // 删除角色失败
       window.$message?.error(t('common.deleteFailed'));
     }
   }
@@ -268,7 +268,7 @@ const Role = () => {
         canCreateClass: findItem.canCreateClass || false, // 确保canCreateClass字段被正确映射
         roleDesc: findItem.remark, // 将数据库的remark字段映射到表单的roleDesc字段
       };
-      console.log('编辑角色数据:', formData); // 添加调试日志
+      // 编辑角色数据
       handleEdit(formData);
     }
   }

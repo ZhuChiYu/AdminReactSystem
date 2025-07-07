@@ -16,14 +16,6 @@ class ApiClient {
     this.baseURL =
       import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_SERVICE_BASE_URL || 'http://localhost:3001/api';
 
-    console.log(`🌐 API Base URL: ${this.baseURL}`);
-    console.log('🔧 Environment Variables:', {
-      MODE: import.meta.env.MODE,
-      NODE_ENV: import.meta.env.NODE_ENV,
-      VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
-      VITE_SERVICE_BASE_URL: import.meta.env.VITE_SERVICE_BASE_URL
-    });
-
     // 创建axios实例
     this.instance = axios.create({
       baseURL: this.baseURL,
@@ -47,27 +39,11 @@ class ApiClient {
   private setupRequestInterceptors() {
     this.instance.interceptors.request.use(
       config => {
-        // 打印请求信息
-        console.log('🚀 发送请求:', {
-          baseURL: config.baseURL,
-          data: config.data,
-          fullURL: `${config.baseURL}${config.url}`,
-          headers: {
-            Authorization: config.headers?.Authorization ? '已设置' : '未设置',
-            'Content-Type': config.headers?.['Content-Type']
-          },
-          method: config.method?.toUpperCase(),
-          params: config.params,
-          url: config.url
-        });
-
         // 添加认证token
         const token = localStg.get('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('✅ Token已添加到请求头');
         } else {
-          console.log('⚠️ 未找到认证Token');
         }
 
         // 添加时间戳防止缓存
@@ -81,7 +57,6 @@ class ApiClient {
         return config;
       },
       error => {
-        console.error('❌ 请求拦截器错误:', error);
         return Promise.reject(error);
       }
     );
@@ -91,16 +66,8 @@ class ApiClient {
   private setupResponseInterceptors() {
     this.instance.interceptors.response.use(
       (response: AxiosResponse<ApiResponse>) => {
-        console.log('📨 收到响应:', {
-          data: response.data,
-          status: response.status,
-          statusText: response.statusText,
-          url: response.config.url
-        });
-
         // 如果是blob类型响应，直接返回数据
         if (response.config.responseType === 'blob') {
-          console.log('📦 Blob响应，直接返回');
           return response.data;
         }
 
@@ -108,28 +75,15 @@ class ApiClient {
 
         // 成功响应
         if (code === ErrorCode.SUCCESS) {
-          console.log('✅ 业务成功响应，返回data:', data);
           return data;
         }
 
         // 业务错误
-        console.error('❌ 业务错误响应:', { code, message });
         const error = new Error(message || '请求失败');
         (error as any).code = code;
         return Promise.reject(error);
       },
       error => {
-        console.error('❌ HTTP响应错误:', {
-          config: {
-            baseURL: error.config?.baseURL,
-            method: error.config?.method,
-            url: error.config?.url
-          },
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
-        });
-
         // 网络错误或HTTP状态码错误
         if (error.response) {
           const { data, status } = error.response;
@@ -137,7 +91,6 @@ class ApiClient {
           switch (status) {
             case 401:
               // Token过期或无效，清除本地存储并跳转登录
-              console.log('🔐 Token过期，清除存储并跳转登录');
               localStg.remove('token');
               localStg.remove('refreshToken');
               window.location.href = '/login';
@@ -147,7 +100,6 @@ class ApiClient {
               return Promise.reject(new Error($t('common.forbidden')));
 
             case 404:
-              console.log('🔍 请求的资源不存在 (404)');
               return Promise.reject(new Error($t('common.notFound')));
 
             case 500:
@@ -158,11 +110,9 @@ class ApiClient {
           }
         } else if (error.request) {
           // 网络错误
-          console.error('🌐 网络连接错误');
           return Promise.reject(new Error($t('common.networkError')));
         } else {
           // 其他错误
-          console.error('❓ 其他错误:', error.message);
           return Promise.reject(new Error(error.message || $t('common.unknownError')));
         }
       }

@@ -32,8 +32,6 @@ const NotificationDropdown: React.FC = () => {
         size: 10
       });
 
-      console.log('✅ 通知API响应:', response);
-
       // 检查响应数据格式
       if (response && response.records && Array.isArray(response.records)) {
         // 转换API数据格式
@@ -45,17 +43,13 @@ const NotificationDropdown: React.FC = () => {
           title: notification.title,
           type: notification.type as 'error' | 'info' | 'meeting' | 'success' | 'warning'
         }));
-
-        console.log('✅ 格式化后的通知:', formattedNotifications);
         setNotifications(formattedNotifications);
         setUnreadCount(formattedNotifications.filter(n => !n.read).length);
       } else {
-        console.warn('❌ 通知API返回数据格式异常:', response);
         setNotifications([]);
         setUnreadCount(0);
       }
     } catch (error) {
-      console.error('❌ 获取通知失败:', error);
       setNotifications([]);
       setUnreadCount(0);
     } finally {
@@ -111,7 +105,6 @@ const NotificationDropdown: React.FC = () => {
       navigate('/meeting-manage/approve');
     } else {
       // 显示通知详情
-      console.log('查看通知:', notification);
     }
   };
 

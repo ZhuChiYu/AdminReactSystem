@@ -380,7 +380,6 @@ class UserController {
                 });
               } catch (roleError) {
                 // 角色分配失败不影响用户创建
-                console.log('角色分配失败，但用户创建成功');
               }
             }
 
@@ -501,8 +500,6 @@ class UserController {
           }
         }
       });
-
-      console.log(`找到 ${usersWithoutRoles.length} 个没有角色的用户`);
 
       // 获取默认角色
       const defaultRole = await prisma.role.findFirst({

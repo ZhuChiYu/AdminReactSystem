@@ -14,9 +14,7 @@ const boxenOptions: BoxenOptions = {
 
 export function setupProjectInfo(): Plugin {
   return {
-    buildStart() {
-      console.log(boxen(welcomeMessage, boxenOptions));
-    },
+    buildStart() {},
 
     name: 'vite:buildInfo'
   };

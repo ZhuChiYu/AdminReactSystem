@@ -9,7 +9,6 @@ export class CourseService {
       const response = await apiClient.get('/courses', { params });
       return response;
     } catch (error) {
-      console.error('获取课程列表失败:', error);
       return {
         current: params?.current || 1,
         pages: 0,
@@ -25,10 +24,9 @@ export class CourseService {
     try {
       const response = await apiClient.get(`/courses/${id}`);
       return response;
-    } catch (error) {
-      console.error('获取课程详情失败:', error);
-      throw error;
-    }
+      } catch (error) {
+    throw error;
+  }
   }
 
   /** 创建课程 */
@@ -36,10 +34,9 @@ export class CourseService {
     try {
       const response = await apiClient.post('/courses', data);
       return response;
-    } catch (error) {
-      console.error('创建课程失败:', error);
-      throw error;
-    }
+      } catch (error) {
+    throw error;
+  }
   }
 
   /** 更新课程 */
@@ -47,10 +44,9 @@ export class CourseService {
     try {
       const response = await apiClient.put(`/courses/${id}`, data);
       return response;
-    } catch (error) {
-      console.error('更新课程失败:', error);
-      throw error;
-    }
+      } catch (error) {
+    throw error;
+  }
   }
 
   /** 删除课程 */
@@ -58,10 +54,9 @@ export class CourseService {
     try {
       const response = await apiClient.delete(`/courses/${courseId}`);
       return response;
-    } catch (error) {
-      console.error('删除课程失败:', error);
-      throw error;
-    }
+      } catch (error) {
+    throw error;
+  }
   }
 
   /** 批量删除课程 */
@@ -72,7 +67,6 @@ export class CourseService {
       });
       return response;
     } catch (error) {
-      console.error('批量删除课程失败:', error);
       throw error;
     }
   }
@@ -83,7 +77,6 @@ export class CourseService {
       const response = await apiClient.get('/courses/categories/list');
       return response;
     } catch (error) {
-      console.error('获取课程分类失败:', error);
       return [];
     }
   }
@@ -94,7 +87,6 @@ export class CourseService {
       const response = await apiClient.get('/courses/statistics/overview');
       return response;
     } catch (error) {
-      console.error('获取课程统计失败:', error);
       return {
         archived: 0,
         draft: 0,
@@ -111,7 +103,6 @@ export class CourseService {
     try {
       await apiClient.post('/courses/batch-operate', { courseIds, operation });
     } catch (error) {
-      console.error('批量操作课程失败:', error);
       throw error;
     }
   }
@@ -122,7 +113,6 @@ export class CourseService {
       const response = await apiClient.get(`/courses/${courseId}/reviews`);
       return response;
     } catch (error) {
-      console.error('获取课程评价失败:', error);
       return [];
     }
   }
@@ -133,7 +123,6 @@ export class CourseService {
       const response = await apiClient.post(`/courses/${data.courseId}/reviews`, data);
       return response;
     } catch (error) {
-      console.error('添加课程评价失败:', error);
       throw error;
     }
   }
@@ -146,7 +135,6 @@ export class CourseService {
       });
       return response;
     } catch (error) {
-      console.error('获取班级课程列表失败:', error);
       return {
         current: params?.current || 1,
         pages: 0,
@@ -167,7 +155,6 @@ export class CourseService {
       const response = await apiClient.post('/courses/categories', data);
       return response;
     } catch (error) {
-      console.error('创建课程分类失败:', error);
       throw error;
     }
   }
@@ -181,7 +168,6 @@ export class CourseService {
       const response = await apiClient.put(`/courses/categories/${id}`, data);
       return response;
     } catch (error) {
-      console.error('更新课程分类失败:', error);
       throw error;
     }
   }
@@ -191,7 +177,6 @@ export class CourseService {
     try {
       await apiClient.delete(`/courses/categories/${id}`);
     } catch (error) {
-      console.error('删除课程分类失败:', error);
       throw error;
     }
   }

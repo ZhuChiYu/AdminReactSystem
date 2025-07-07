@@ -111,6 +111,10 @@ class ClassController {
   async getClassById(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const user = req.user;
+
+      // 检查用户是否为超级管理员
+      const isSuperAdmin = user?.roles?.includes('super_admin');
 
       const classItem = await prisma.class.findUnique({
         include: {
@@ -152,21 +156,34 @@ class ClassController {
         startDate: classItem.startDate.toISOString().split('T')[0],
         status: classItem.status,
         studentCount,
-        students: classItem.students.map((student: any) => ({
-          attendanceRate: student.attendanceRate,
-          avatar: student.avatar,
-          company: student.company,
-          createdAt: student.createdAt.toISOString().replace('T', ' ').substring(0, 19),
-          email: student.email,
-          gender: student.gender,
-          id: student.id,
-          joinDate: student.joinDate.toISOString().split('T')[0],
-          name: student.name,
-          phone: student.phone,
-          position: student.position,
-          status: student.status,
-          trainingFee: student.trainingFee ? student.trainingFee.toString() : null
-        })),
+        students: classItem.students.map((student: any) => {
+          // 基础信息（所有用户都能看到）
+          const basicInfo = {
+            attendanceRate: student.attendanceRate,
+            avatar: student.avatar,
+            createdAt: student.createdAt.toISOString().replace('T', ' ').substring(0, 19),
+            gender: student.gender,
+            id: student.id,
+            joinDate: student.joinDate.toISOString().split('T')[0],
+            name: student.name,
+            status: student.status,
+            trainingFee: student.trainingFee ? student.trainingFee.toString() : null
+          };
+
+          // 如果是超级管理员，返回完整信息
+          if (isSuperAdmin) {
+            return {
+              ...basicInfo,
+              company: student.company,
+              email: student.email,
+              phone: student.phone,
+              position: student.position
+            };
+          }
+
+          // 普通用户只返回基础信息
+          return basicInfo;
+        }),
         trainingFee: totalTrainingFee.toFixed(2),
         updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
       };

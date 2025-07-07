@@ -24,12 +24,8 @@ async function testGetUserInfo() {
   });
 
   if (!user) {
-    console.log('User not found');
     return;
   }
-
-  console.log('Raw user avatar:', user.avatar);
-  console.log('Raw user object keys:', Object.keys(user));
 
   // 提取角色和权限
   const roles = user.userRoles.map(ur => ur.role.roleCode);
@@ -49,9 +45,6 @@ async function testGetUserInfo() {
     userId: user.id.toString(),
     userName: user.userName
   };
-
-  console.log('Final userInfo avatar:', userInfo.avatar);
-  console.log('Full userInfo:', JSON.stringify(userInfo, null, 2));
 
   await prisma.$disconnect();
 }

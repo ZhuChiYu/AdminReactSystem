@@ -554,8 +554,6 @@ const ClassDetail = () => {
       // 调用后端API更新学员信息
       const updatedStudent = await classService.updateStudent(editFormStudent.id, updateData);
 
-      console.log('学员信息更新成功，返回数据:', updatedStudent);
-
       // 更新本地学员列表
       setStudentList(prevList =>
         prevList.map(student => (student.id === editFormStudent.id ? { ...student, ...updatedStudent } : student))
@@ -617,16 +615,7 @@ const ClassDetail = () => {
     try {
       setAvatarUploading(true);
 
-      console.log('开始上传头像:', {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        studentId: editFormStudent.id
-      });
-
       const result = await classService.uploadStudentAvatar(editFormStudent.id, file);
-
-      console.log('头像上传成功，完整返回数据:', result);
 
       // 提取头像URL
       let avatarUrl = result.data?.avatar || result.avatar;
@@ -635,8 +624,6 @@ const ClassDetail = () => {
       if (avatarUrl && !avatarUrl.startsWith('http')) {
         avatarUrl = `http://localhost:3001${avatarUrl}`;
       }
-
-      console.log('处理后的头像URL:', avatarUrl);
 
       // 更新编辑表单中的头像字段
       setEditFormStudent((prev: any) => ({
@@ -648,12 +635,6 @@ const ClassDetail = () => {
       setStudentList(prevList =>
         prevList.map(student => (student.id === editFormStudent.id ? { ...student, avatar: avatarUrl } : student))
       );
-
-      console.log('头像更新完成，新的editFormStudent:', {
-        avatar: avatarUrl,
-        id: editFormStudent.id,
-        name: editFormStudent.name
-      });
 
       message.success('头像上传成功');
       return false; // 阻止Upload组件的默认上传行为

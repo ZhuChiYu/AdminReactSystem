@@ -40,7 +40,6 @@ export function fixEncodedFileName(filename: string): string {
           const decoded = attempt();
           // 检查解码结果是否包含常见的中文字符
           if (/[\u4e00-\u9fff]/.test(decoded)) {
-            console.log(`文件名编码修复成功: "${filename}" -> "${decoded}"`);
             return decoded;
           }
         } catch (error) {
