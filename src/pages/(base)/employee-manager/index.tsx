@@ -23,7 +23,6 @@ import { type EmployeeApi, employeeService, employeeTargetService } from '@/serv
 import type { EmployeeTarget, SetEmployeeTargetRequest } from '@/service/api/employeeTarget';
 import { getCurrentUserId, isAdmin, isSuperAdmin } from '@/utils/auth';
 import { localStg } from '@/utils/storage';
-import { getFullTableConfig } from '@/utils/table';
 
 // 扩展dayjs插件
 dayjs.extend(weekOfYear);
@@ -116,6 +115,33 @@ const EmployeeManagerManagement = () => {
     total: 0
   });
 
+  // 员工分配管理分页状态
+  const [relationPagination, setRelationPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
+
+  // 获取员工分配关系数据（支持分页）
+  const fetchRelationsData = async () => {
+    if (!canManageTargets) return;
+
+    try {
+      const relationsResponse = await employeeService.getEmployeeManagerRelations({
+        current: relationPagination.current,
+        size: relationPagination.pageSize
+      });
+      setRelations(relationsResponse.records || []);
+      setRelationPagination(prev => ({
+        ...prev,
+        total: relationsResponse.total || 0
+      }));
+    } catch (error) {
+      console.error('获取员工分配关系失败:', error);
+      message.error('获取员工分配关系失败');
+    }
+  };
+
   // 加载基础数据
   const fetchBasicData = async () => {
     try {
@@ -151,8 +177,7 @@ const EmployeeManagerManagement = () => {
 
       // 获取员工-管理员关系记录（所有管理员都需要）
       if (canManageTargets) {
-        const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
-        setRelations(relationsResponse.records || []);
+        await fetchRelationsData();
       }
     } catch (error) {
       console.error('获取数据失败:', error);
@@ -343,6 +368,13 @@ const EmployeeManagerManagement = () => {
     targetPagination.pageSize
   ]);
 
+  // 监听员工分配关系分页变化
+  useEffect(() => {
+    if (canManageTargets && employees.length > 0) {
+      fetchRelationsData();
+    }
+  }, [relationPagination.current, relationPagination.pageSize]);
+
   // 获取可选的员工列表
   const getSelectableEmployees = () => {
     // 过滤出所有员工（不包括管理员）
@@ -395,8 +427,7 @@ const EmployeeManagerManagement = () => {
       }
 
       // 重新获取关系数据
-      const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
-      setRelations(relationsResponse.records);
+      await fetchRelationsData();
 
       // 清空选择
       setSelectedEmployees([]);
@@ -421,8 +452,7 @@ const EmployeeManagerManagement = () => {
       message.success('删除成功');
 
       // 重新获取关系数据
-      const relationsResponse = await employeeService.getEmployeeManagerRelations({ current: 1, size: 1000 });
-      setRelations(relationsResponse.records);
+      await fetchRelationsData();
     } catch (error) {
       console.error('删除失败:', error);
       message.error('删除失败');
@@ -806,7 +836,28 @@ const EmployeeManagerManagement = () => {
                   loading={loading}
                   rowKey="id"
                   scroll={{ x: 'max-content', y: 500 }}
-                  {...getFullTableConfig(10)}
+                  pagination={{
+                    current: relationPagination.current,
+                    onChange: (page, pageSize) => {
+                      setRelationPagination(prev => ({
+                        ...prev,
+                        current: page,
+                        pageSize: pageSize || prev.pageSize
+                      }));
+                    },
+                    onShowSizeChange: (_current, size) => {
+                      setRelationPagination(prev => ({
+                        ...prev,
+                        current: 1, // 改变页面大小时重置到第一页
+                        pageSize: size
+                      }));
+                    },
+                    pageSize: relationPagination.pageSize,
+                    showQuickJumper: true,
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+                    total: relationPagination.total
+                  }}
                 />
               </Card>
             ),
