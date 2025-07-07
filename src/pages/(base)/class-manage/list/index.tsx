@@ -69,10 +69,8 @@ const ClassList = () => {
   const fetchUserPermissions = async () => {
     // 临时解决方案：直接检查用户角色
     const userInfo = getCurrentUserInfo();
-    console.log('获取的用户信息:', userInfo);
 
     if (!userInfo) {
-      console.log('用户信息为空');
       setCanCreateClass(false);
       return;
     }
@@ -80,30 +78,8 @@ const ClassList = () => {
     // 检查用户是否有人力BP角色
     const hasHrBpRole = userInfo.roles.some(role => role === 'hr_bp' || role === '人力bp' || role === '人力BP');
 
-    console.log('用户角色:', userInfo.roles);
-    console.log('是否有人力BP角色:', hasHrBpRole);
-
     // 临时设置：如果是人力BP角色，则有新增班级权限
     setCanCreateClass(hasHrBpRole);
-
-    // 注释掉原来的API调用，避免用户ID问题
-    /*
-    if (!currentUserId) {
-      console.log('当前用户ID为空');
-      return;
-    }
-
-    try {
-      console.log('正在获取用户权限，用户ID:', currentUserId);
-      const response = await getUserRolePermissions(Number(currentUserId));
-      console.log('用户权限API响应:', response);
-      console.log('canCreateClass权限:', response.data.canCreateClass);
-      setCanCreateClass(response.data.canCreateClass || false);
-    } catch (error) {
-      console.error('获取用户权限失败:', error);
-      setCanCreateClass(false);
-    }
-    */
   };
 
   // 获取班级分类数据
@@ -236,7 +212,6 @@ const ClassList = () => {
   // 查看班级详情
   const handleViewDetail = (classId: number) => {
     navigate(`/class-manage/detail/${classId}`);
-    console.log('跳转到详情页，URL:', `/class-manage/detail/${classId}`);
   };
 
   // 编辑班级
@@ -504,12 +479,6 @@ const ClassList = () => {
           <Button onClick={resetFilters}>重置</Button>
           {/* 调试信息 */}
           {(() => {
-            console.log('按钮显示逻辑检查:', {
-              canCreateClass,
-              currentUserId,
-              isUserSuperAdmin,
-              shouldShow: isUserSuperAdmin || canCreateClass
-            });
             return null;
           })()}
           {(isUserSuperAdmin || canCreateClass) && (
@@ -529,17 +498,17 @@ const ClassList = () => {
           rowKey="id"
           pagination={{
             current: pagination.current,
-            pageSize: pagination.size,
-            total: pagination.total,
-            showQuickJumper: true,
-            showSizeChanger: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
             onChange: (page, pageSize) => {
               loadClassList({ current: page, size: pageSize });
             },
             onShowSizeChange: (current, size) => {
               loadClassList({ current: 1, size });
-            }
+            },
+            pageSize: pagination.size,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+            total: pagination.total
           }}
           {...getTableConfig()}
         />

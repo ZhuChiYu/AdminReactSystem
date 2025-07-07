@@ -83,11 +83,8 @@ const PerformanceChart = () => {
         size: 1000
       });
 
-      console.log('🔍 客户数据详情:', response.records);
-
       // 打印所有不同的 followStatus 值
       const statusValues = [...new Set(response.records.map(customer => customer.followStatus))];
-      console.log('🔍 所有跟进状态值:', statusValues);
 
       setCustomerData(response.records);
     } catch (error) {
@@ -133,8 +130,6 @@ const PerformanceChart = () => {
       {} as Record<string, number>
     );
 
-    console.log('🔍 统计结果:', stats);
-
     const result = Object.entries(stats).map(([status, count], index) => {
       // 获取状态的中文名称，如果未定义则使用原状态值
       const displayName = followUpStatusNames[status as keyof typeof followUpStatusNames] || status;
@@ -148,16 +143,11 @@ const PerformanceChart = () => {
       };
     });
 
-    console.log('🔍 图表数据:', result);
-    console.log('🔍 客户数据总数:', customerData.length);
-
     return result;
   };
 
   // 客户统计图
   const { domRef: clientSourceRef, updateOptions: updateClientSourceChart } = useEcharts(() => {
-    console.log('🔍 useEcharts 初始化回调执行，customerData.length:', customerData.length);
-
     if (customerData.length === 0) {
       return {
         title: {
@@ -437,13 +427,9 @@ const PerformanceChart = () => {
   }, []);
 
   useEffect(() => {
-    console.log('🔍 useEffect 触发，activeTab:', activeTab, 'customerData.length:', customerData.length);
-
     switch (activeTab) {
       case 'clientSource':
         if (customerData.length > 0) {
-          console.log('🔍 准备更新客户统计图表');
-
           // 使用 updateOptions 重新生成图表配置
           updateClientSourceChart(() => {
             const statisticsData = getCustomerStatistics();
@@ -493,11 +479,9 @@ const PerformanceChart = () => {
               }
             };
 
-            console.log('🔍 图表更新配置:', chartOptions);
             return chartOptions;
           });
         } else {
-          console.log('🔍 客户数据为空，跳过图表更新');
         }
         break;
       case 'month':

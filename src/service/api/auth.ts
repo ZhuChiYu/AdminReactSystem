@@ -28,6 +28,33 @@ export class AuthService {
   async getRoutes(): Promise<UserApi.MenuRoute[]> {
     return apiClient.get('/auth/routes');
   }
+
+  /** 获取验证码 */
+  async getCaptcha() {
+    return apiClient.get<{ captchaId: string; captchaImage: string }>('/auth/captcha');
+  }
+
+  /** 获取登录记录（仅超级管理员） */
+  async getLoginRecords(params: { current?: number; size?: number }) {
+    return apiClient.get<{
+      current: number;
+      pages: number;
+      records: Array<{
+        id: number;
+        userId: number;
+        userName: string;
+        nickName: string;
+        avatar: string | null;
+        loginIp: string;
+        userAgent: string | null;
+        loginTime: string;
+        loginResult: string;
+        location: string | null;
+      }>;
+      size: number;
+      total: number;
+    }>('/auth/login-records', { params });
+  }
 }
 
 // 导出认证服务实例

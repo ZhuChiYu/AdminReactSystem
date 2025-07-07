@@ -1,5 +1,5 @@
 import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, ProjectOutlined } from '@ant-design/icons';
-import { Card, List, Tag, Button } from 'antd';
+import { Button, Card, List, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,10 +10,10 @@ import type { MeetingApi, TaskApi } from '@/service/api/types';
 import { localStg } from '@/utils/storage';
 
 interface MeetingItem {
+  approvalStatus: number;
   id: number;
   location?: string;
   status: number;
-  approvalStatus: number;
   time: string;
   title: string;
   type: string;
@@ -23,12 +23,12 @@ interface ProjectTaskItem {
   currentStage: string;
   currentStageTitle: string;
   dueDate?: string;
+  executor?: { id: number; nickName?: string; userName?: string };
   id: number;
   priority: number;
   projectName: string;
   projectType: string;
   responsiblePerson?: { id: number; nickName?: string; userName?: string };
-  executor?: { id: number; nickName?: string; userName?: string };
 }
 
 // 项目阶段映射
@@ -59,30 +59,25 @@ const TodayMeetingsAndTasks = () => {
       const weekStart = today.startOf('week').format('YYYY-MM-DD');
       const weekEnd = today.endOf('week').format('YYYY-MM-DD');
 
-      console.log('🔍 开始获取会议列表，时间范围:', `${weekStart} - ${weekEnd}`);
-
       const params = {
         current: 1,
         size: 10, // 增加显示数量
         startTimeBegin: `${weekStart} 00:00:00`,
         startTimeEnd: `${weekEnd} 23:59:59`
       };
-      console.log('📋 会议查询参数:', params);
 
       const response = await meetingService.getMeetingList(params);
-      console.log('📊 会议API响应:', response);
 
       const recentMeetings: MeetingItem[] = response.records.map((meeting: any) => ({
+        approvalStatus: meeting.approvalStatus || 0,
         id: meeting.id,
         location: meeting.location || meeting.room?.name || '未指定',
         status: meeting.status || 0,
-        approvalStatus: meeting.approvalStatus || 0,
         time: meeting.startTime,
         title: meeting.title,
         type: meeting.meetingType || 'meeting'
       }));
 
-      console.log('✅ 处理后的会议数据:', recentMeetings);
       setMeetings(recentMeetings);
     } catch (error) {
       console.error('❌ 获取会议列表失败:', error);
@@ -101,21 +96,20 @@ const TodayMeetingsAndTasks = () => {
       });
 
       // 处理返回的数据
-      const myTasks: ProjectTaskItem[] = response.records
-        .map((task: TaskApi.TaskListItem) => {
-          const stageInfo = PROJECT_STAGES.find(s => s.key === task.currentStage);
-          return {
-            currentStage: task.currentStage,
-            currentStageTitle: stageInfo?.title || task.currentStage,
-            dueDate: task.endTime,
-            id: task.id,
-            priority: task.priority || 2,
-            projectName: task.projectName,
-            projectType: task.projectType,
-            responsiblePerson: task.responsiblePerson,
-            executor: task.executor
-          };
-        });
+      const myTasks: ProjectTaskItem[] = response.records.map((task: TaskApi.TaskListItem) => {
+        const stageInfo = PROJECT_STAGES.find(s => s.key === task.currentStage);
+        return {
+          currentStage: task.currentStage,
+          currentStageTitle: stageInfo?.title || task.currentStage,
+          dueDate: task.endTime,
+          executor: task.executor,
+          id: task.id,
+          priority: task.priority || 2,
+          projectName: task.projectName,
+          projectType: task.projectType,
+          responsiblePerson: task.responsiblePerson
+        };
+      });
 
       setProjectTasks(myTasks);
     } catch (error) {
@@ -216,12 +210,6 @@ const TodayMeetingsAndTasks = () => {
       <Card
         loading={loading}
         size="small"
-        title={
-          <div className="flex items-center gap-2">
-            <CalendarOutlined />
-            <span>会议列表</span>
-          </div>
-        }
         extra={
           meetings.length > 0 && (
             <Button
@@ -232,6 +220,12 @@ const TodayMeetingsAndTasks = () => {
               查看全部
             </Button>
           )
+        }
+        title={
+          <div className="flex items-center gap-2">
+            <CalendarOutlined />
+            <span>会议列表</span>
+          </div>
         }
       >
         {meetings.length > 0 ? (
@@ -244,8 +238,8 @@ const TodayMeetingsAndTasks = () => {
                 onClick={handleMeetingClick}
               >
                 <div className="w-full">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-base text-gray-800">{meeting.title}</div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-base text-gray-800 font-medium">{meeting.title}</div>
                     <div className="ml-2">{getMeetingStatusTag(meeting.approvalStatus)}</div>
                   </div>
 
@@ -261,9 +255,7 @@ const TodayMeetingsAndTasks = () => {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div className="text-xs text-gray-500">
-                        会议状态: {getMeetingProgressTag(meeting.status)}
-                      </div>
+                      <div className="text-xs text-gray-500">会议状态: {getMeetingProgressTag(meeting.status)}</div>
                     </div>
                   </div>
                 </div>
@@ -290,12 +282,6 @@ const TodayMeetingsAndTasks = () => {
       <Card
         loading={loading}
         size="small"
-        title={
-          <div className="flex items-center gap-2">
-            <ProjectOutlined />
-            <span>我的项目事项</span>
-          </div>
-        }
         extra={
           projectTasks.length > 0 && (
             <Button
@@ -306,6 +292,12 @@ const TodayMeetingsAndTasks = () => {
               查看全部
             </Button>
           )
+        }
+        title={
+          <div className="flex items-center gap-2">
+            <ProjectOutlined />
+            <span>我的项目事项</span>
+          </div>
         }
       >
         {projectTasks.length > 0 ? (
@@ -320,9 +312,7 @@ const TodayMeetingsAndTasks = () => {
                 <div className="w-full flex items-center justify-between">
                   <div className="flex-1">
                     <div className="font-medium">{task.projectName}</div>
-                    <div className="text-sm text-gray-500">
-                      类型: {task.projectType}
-                    </div>
+                    <div className="text-sm text-gray-500">类型: {task.projectType}</div>
                     <div className="text-xs text-gray-400">
                       {task.responsiblePerson?.id === currentUserId ? '我负责' : '我办理'}
                       {task.dueDate && (

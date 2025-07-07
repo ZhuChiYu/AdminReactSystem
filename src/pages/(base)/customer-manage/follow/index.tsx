@@ -150,15 +150,12 @@ const CustomerFollow = () => {
   const fetchFollowData = async (pageNum?: number, pageSize?: number, status?: string) => {
     setLoading(true);
     try {
-      console.log('🔄 开始获取跟进数据...');
-
       const currentPage = pageNum || pagination.current;
       const currentPageSize = pageSize || pagination.pageSize;
       const currentStatus = status !== undefined ? status : selectedFollowStatus;
 
       // 获取统计数据，客户跟进页面只显示自己的数据
       const statisticsData = await customerService.getCustomerStatistics({ scope: 'own' });
-      console.log('📊 统计数据:', statisticsData);
       setStatistics(statisticsData);
 
       // 构建查询参数
@@ -182,7 +179,6 @@ const CustomerFollow = () => {
 
       // 获取客户列表数据，支持分页和筛选
       const customerData = await customerService.getCustomerList(queryParams);
-      console.log('📋 客户列表原始数据:', customerData);
 
       // 转换数据格式以匹配前端类型
       const formattedRecords = customerData.records.map(customer => ({
@@ -198,9 +194,6 @@ const CustomerFollow = () => {
         followContent: customer.remark || '暂无跟进内容',
         updateTime: customer.updatedAt
       }));
-
-      console.log('✅ 格式化后的记录:', formattedRecords);
-      console.log(`📈 当前页${formattedRecords.length}条记录，总共${customerData.total}条记录`);
 
       setFollowRecords(formattedRecords);
       setFilteredRecords(formattedRecords);
@@ -238,8 +231,6 @@ const CustomerFollow = () => {
 
   // 处理分页变化
   const handleTableChange = (page: number, pageSize?: number) => {
-    console.log('🔍 分页变化:', { current: pagination.current, oldPageSize: pagination.pageSize, page, pageSize });
-
     const newPageSize = pageSize || pagination.pageSize;
 
     // 更新分页状态
@@ -281,7 +272,6 @@ const CustomerFollow = () => {
   const handleFormSubmit = async () => {
     try {
       const values = await form.validateFields();
-      console.log('📝 提交跟进记录:', values);
 
       // 创建客户数据
       const customerData = {
@@ -298,16 +288,12 @@ const CustomerFollow = () => {
         remark: values.followContent || '',
         source: 'manual'
       };
-
-      console.log('🚀 准备创建客户:', customerData);
       const result = await customerService.createCustomer(customerData);
-      console.log('✅ 客户创建成功:', result);
 
       message.success('添加跟进记录成功');
       setIsModalVisible(false);
       form.resetFields();
 
-      console.log('🔄 重新获取数据...');
       fetchFollowData(); // 重新获取当前分页的数据
     } catch (error) {
       console.error('❌ 添加跟进记录失败:', error);
@@ -317,7 +303,6 @@ const CustomerFollow = () => {
 
   // 编辑记录
   const handleEdit = (record: CustomerApi.CustomerListItem) => {
-    console.log('编辑记录:', record);
     setEditingCustomer(record);
     editForm.setFieldsValue({
       company: record.company,
@@ -342,8 +327,6 @@ const CustomerFollow = () => {
         return;
       }
 
-      console.log('🔄 提交编辑数据:', values);
-
       const updateData = {
         company: values.company,
         customerName: values.customerName,
@@ -361,8 +344,6 @@ const CustomerFollow = () => {
       setIsEditModalVisible(false);
       setEditingCustomer(null);
       editForm.resetFields();
-
-      console.log('🔄 重新获取数据...');
       fetchFollowData(); // 重新获取当前分页的数据
     } catch (error) {
       console.error('❌ 编辑失败:', error);
@@ -379,7 +360,6 @@ const CustomerFollow = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          console.log('🗑️ 删除客户:', id);
           await customerService.deleteCustomer(id);
           message.success('删除成功');
           fetchFollowData(); // 重新获取当前分页的数据
@@ -402,16 +382,12 @@ const CustomerFollow = () => {
       record: CustomerApi.CustomerListItem,
       selected: boolean,
       selectedRows: CustomerApi.CustomerListItem[]
-    ) => {
-      console.log('选择行:', record, selected, selectedRows);
-    },
+    ) => {},
     onSelectAll: (
       selected: boolean,
       selectedRows: CustomerApi.CustomerListItem[],
       changeRows: CustomerApi.CustomerListItem[]
-    ) => {
-      console.log('全选状态:', selected, selectedRows, changeRows);
-    },
+    ) => {},
     selectedRowKeys
   };
 
@@ -424,8 +400,6 @@ const CustomerFollow = () => {
 
     setExportLoading(true);
     try {
-      console.log('📤 开始导出客户数据...');
-
       // 准备导出数据
       const exportData = filteredRecords.map((record, index) => ({
         公司: record.company,
@@ -461,7 +435,6 @@ const CustomerFollow = () => {
       document.body.removeChild(link);
 
       message.success(`成功导出 ${exportData.length} 条客户数据`);
-      console.log('✅ 导出完成:', fileName);
     } catch (error) {
       console.error('❌ 导出失败:', error);
       message.error('导出失败');
@@ -490,8 +463,6 @@ const CustomerFollow = () => {
       onOk: async () => {
         setDeleteLoading(true);
         try {
-          console.log('🗑️ 批量删除客户:', selectedRowKeys);
-
           // 并发删除所有选中的客户
           const deletePromises = selectedRowKeys.map(id => customerService.deleteCustomer(Number(id)));
 

@@ -60,6 +60,7 @@ model User {
   createdClassStudents            ClassStudent[]            @relation("ClassStudentCreatedBy")
   employeeTargets                 EmployeeTarget[]          @relation("EmployeeTargets")
   managedTargets                  EmployeeTarget[]          @relation("ManagerTargets")
+  loginRecords                    LoginRecord[]             @relation("UserLoginRecords")
   department                      Department?               @relation(fields: [departmentId], references: [id])
 
   @@map("users")
@@ -668,4 +669,20 @@ model TaskAttachment {
   uploader      User     @relation("TaskAttachmentUploader", fields: [uploaderId], references: [id])
 
   @@map("task_attachments")
+}
+
+model LoginRecord {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  userName    String   @map("user_name") @db.VarChar(50)
+  loginIp     String   @map("login_ip") @db.VarChar(50)
+  userAgent   String?  @map("user_agent")
+  loginTime   DateTime @default(now()) @map("login_time")
+  loginResult String   @default("success") @map("login_result") @db.VarChar(20)
+  location    String?  @db.VarChar(100)
+  user        User     @relation("UserLoginRecords", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([loginTime])
+  @@map("login_records")
 }

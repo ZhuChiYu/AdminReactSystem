@@ -104,7 +104,32 @@ class CustomerController {
       // 获取总数
       const total = await prisma.customer.count({ where });
 
-      // 获取客户列表 - 被分配的客户排在前面，按修改时间排序
+      // 构建排序条件 - 根据用户角色决定排序方式
+      let orderBy: any[];
+      
+      if (user?.roles?.includes('super_admin')) {
+        // 超级管理员：直接按修改时间倒序排列，最近修改的在前面
+        orderBy = [
+          {
+            updatedAt: 'desc'
+          }
+        ];
+      } else {
+        // 其他用户：被分配的客户排在前面，再按修改时间排序
+        orderBy = [
+          {
+            assignedToId: {
+              sort: 'desc',
+              nulls: 'last'
+            }
+          },
+          {
+            updatedAt: 'desc'
+          }
+        ];
+      }
+
+      // 获取客户列表
       const customers = await prisma.customer.findMany({
         include: {
           assignedTo: {
@@ -129,19 +154,7 @@ class CustomerController {
             }
           }
         },
-        orderBy: [
-          // 被分配的客户排在前面
-          {
-            assignedToId: {
-              sort: 'desc',
-              nulls: 'last'
-            }
-          },
-          // 按修改时间排序，最近修改的在前面
-          {
-            updatedAt: 'desc'
-          }
-        ],
+        orderBy,
         skip,
         take: pageSize,
         where

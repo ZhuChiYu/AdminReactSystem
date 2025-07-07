@@ -1,7 +1,9 @@
-import { EditOutlined, LockOutlined, MailOutlined, PhoneOutlined, SaveOutlined, UserOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Divider, Form, Input, Modal, Row, Tabs, Tag, Upload, message } from 'antd';
+import { EditOutlined, LockOutlined, MailOutlined, PhoneOutlined, SaveOutlined, UserOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Divider, Form, Input, Modal, Row, Tabs, Tag, Upload, message, Table, Space } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import dayjs from 'dayjs';
 
 import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
@@ -35,9 +37,17 @@ const UserCenter = () => {
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [avatarKey, setAvatarKey] = useState(Date.now()); // 添加头像刷新key
+  const [loginRecords, setLoginRecords] = useState<any[]>([]);
+  const [loginRecordsLoading, setLoginRecordsLoading] = useState(false);
+  const [loginRecordsPagination, setLoginRecordsPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
 
   // 判断当前用户权限
   const isUserAdmin = isAdmin();
+  const isSuperAdmin = userInfo.roles?.includes('super_admin');
 
   // 使用表单校验规则
   const { formRules } = useFormRules();
@@ -94,7 +104,7 @@ const UserCenter = () => {
         // 扩展属性
         avatar: latestUserInfo.avatar || '',
         buttons: latestUserInfo.buttons || [],
-        contractStartDate: latestUserInfo.contractStartDate,
+        contractStartDate: (latestUserInfo as any).contractStartDate,
         department: userDepartment,
         email: latestUserInfo.email || '',
         gender: latestUserInfo.gender || undefined,
@@ -104,11 +114,11 @@ const UserCenter = () => {
         roles: latestUserInfo.roles?.map((role: any) => role.roleCode || role) || [],
         userId: (() => {
           // 尝试多种方式获取用户ID
-          if (latestUserInfo.userId) {
-            return latestUserInfo.userId.toString();
+          if ((latestUserInfo as any).userId) {
+            return (latestUserInfo as any).userId.toString();
           }
-          if (latestUserInfo.id) {
-            return latestUserInfo.id.toString();
+          if ((latestUserInfo as any).id) {
+            return (latestUserInfo as any).id.toString();
           }
 
           // 从当前用户数据获取
@@ -179,9 +189,36 @@ const UserCenter = () => {
     }
   };
 
+  // 获取登录记录
+  const loadLoginRecords = async (page = 1, pageSize = 10) => {
+    if (!isSuperAdmin) return;
+    
+    try {
+      setLoginRecordsLoading(true);
+      const response = await authService.getLoginRecords({
+        current: page,
+        size: pageSize
+      });
+      
+      setLoginRecords(response.records);
+      setLoginRecordsPagination({
+        current: response.current,
+        pageSize: response.size,
+        total: response.total
+      });
+    } catch (error: any) {
+      message.error('获取登录记录失败');
+    } finally {
+      setLoginRecordsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUserInfo();
-  }, []);
+    if (isSuperAdmin) {
+      loadLoginRecords();
+    }
+  }, [isSuperAdmin]);
 
   // 保存个人信息
   const handleSaveProfile = async (values: any) => {
@@ -209,8 +246,8 @@ const UserCenter = () => {
         console.warn('无法从本地获取用户ID，尝试从后端重新获取用户信息');
         try {
           const freshUserInfo = await authService.getUserInfo();
-          if (freshUserInfo.userId || freshUserInfo.id) {
-            userId = Number.parseInt(String(freshUserInfo.userId || freshUserInfo.id), 10);
+          if ((freshUserInfo as any).userId || (freshUserInfo as any).id) {
+            userId = Number.parseInt(String((freshUserInfo as any).userId || (freshUserInfo as any).id), 10);
             console.log('🔍 从后端重新获取的用户ID:', userId);
           }
         } catch (error) {
@@ -271,8 +308,8 @@ const UserCenter = () => {
         console.warn('无法从本地获取用户ID，尝试从后端重新获取用户信息');
         try {
           const freshUserInfo = await authService.getUserInfo();
-          if (freshUserInfo.userId || freshUserInfo.id) {
-            userId = Number.parseInt(String(freshUserInfo.userId || freshUserInfo.id), 10);
+          if ((freshUserInfo as any).userId || (freshUserInfo as any).id) {
+            userId = Number.parseInt(String((freshUserInfo as any).userId || (freshUserInfo as any).id), 10);
             console.log('🔍 从后端重新获取的用户ID:', userId);
           }
         } catch (error) {
@@ -403,8 +440,8 @@ const UserCenter = () => {
         console.warn('无法从本地获取用户ID，尝试从后端重新获取用户信息');
         try {
           const freshUserInfo = await authService.getUserInfo();
-          if (freshUserInfo.userId || freshUserInfo.id) {
-            userId = Number.parseInt(String(freshUserInfo.userId || freshUserInfo.id), 10);
+          if ((freshUserInfo as any).userId || (freshUserInfo as any).id) {
+            userId = Number.parseInt(String((freshUserInfo as any).userId || (freshUserInfo as any).id), 10);
             console.log('🔍 从后端重新获取的用户ID:', userId);
           }
         } catch (error) {
@@ -446,6 +483,68 @@ const UserCenter = () => {
     if (gender === 1) return 'male';
     if (gender === 2) return 'female';
     return undefined;
+  };
+
+  // 登录记录表格列定义
+  const loginRecordsColumns: ColumnsType<any> = [
+    {
+      title: '用户',
+      dataIndex: 'nickName',
+      key: 'nickName',
+      render: (text: string, record: any) => (
+        <Space>
+          <UserAvatar
+            avatar={record.avatar}
+            size={32}
+          />
+          <div>
+            <div>{record.nickName}</div>
+            <div style={{ fontSize: '12px', color: '#999' }}>@{record.userName}</div>
+          </div>
+        </Space>
+      )
+    },
+    {
+      title: '登录IP',
+      dataIndex: 'loginIp',
+      key: 'loginIp'
+    },
+    {
+      title: '登录时间',
+      dataIndex: 'loginTime',
+      key: 'loginTime',
+      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss')
+    },
+    {
+      title: '设备信息',
+      dataIndex: 'userAgent',
+      key: 'userAgent',
+      render: (userAgent: string) => {
+        if (!userAgent) return '-';
+        // 简化显示用户代理信息
+        const simplified = userAgent.split(' ')[0] || userAgent;
+        return (
+          <div title={userAgent} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {simplified}
+          </div>
+        );
+      }
+    },
+    {
+      title: '状态',
+      dataIndex: 'loginResult',
+      key: 'loginResult',
+      render: (result: string) => (
+        <Tag color={result === 'success' ? 'success' : 'error'}>
+          {result === 'success' ? '成功' : '失败'}
+        </Tag>
+      )
+    }
+  ];
+
+  // 处理登录记录分页变化
+  const handleLoginRecordsTableChange = (pagination: any) => {
+    loadLoginRecords(pagination.current, pagination.pageSize);
   };
 
   // 基本信息表单
@@ -581,6 +680,32 @@ const UserCenter = () => {
     </Form>
   );
 
+  // 登录记录组件
+  const LoginRecordsForm = () => (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <h4>系统登录记录</h4>
+        <p style={{ color: '#666' }}>显示所有用户的登录历史记录</p>
+      </div>
+      <Table
+        columns={loginRecordsColumns}
+        dataSource={loginRecords}
+        loading={loginRecordsLoading}
+        pagination={{
+          current: loginRecordsPagination.current,
+          pageSize: loginRecordsPagination.pageSize,
+          total: loginRecordsPagination.total,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total) => `共 ${total} 条记录`
+        }}
+        rowKey="id"
+        scroll={{ x: 800 }}
+        onChange={handleLoginRecordsTableChange}
+      />
+    </div>
+  );
+
   // 渲染角色标签
   const renderRoleTag = (role: string) => {
     if (role === UserRole.SUPER_ADMIN) {
@@ -693,7 +818,17 @@ const UserCenter = () => {
                   children: <PasswordForm />,
                   key: '2',
                   label: '修改密码'
-                }
+                },
+                ...(isSuperAdmin ? [{
+                  children: <LoginRecordsForm />,
+                  key: '3',
+                  label: (
+                    <span>
+                      <HistoryOutlined />
+                      登录记录
+                    </span>
+                  )
+                }] : [])
               ]}
               onChange={setActiveTab}
             />

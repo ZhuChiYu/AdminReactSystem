@@ -145,6 +145,36 @@ router.get('/me', authMiddleware, asyncErrorHandler(authController.getCurrentUse
 
 /**
  * @swagger
+ * /api/auth/login-records:
+ *   get:
+ *     summary: 获取登录记录（仅超级管理员）
+ *     tags: [认证管理]
+ *     parameters:
+ *       - in: query
+ *         name: current
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: 当前页码
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: 每页大小
+ *     responses:
+ *       200:
+ *         description: 获取成功
+ *       403:
+ *         description: 权限不足，仅超级管理员可访问
+ */
+router.get('/login-records', authMiddleware, asyncErrorHandler(authController.getLoginRecords));
+
+/**
+ * @swagger
  * /api/auth/captcha:
  *   get:
  *     summary: 获取验证码

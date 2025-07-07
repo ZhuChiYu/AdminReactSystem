@@ -31,9 +31,7 @@ const HeaderBanner = () => {
   // 刷新用户信息
   const refreshUserInfo = async () => {
     try {
-      console.log('🔄 刷新用户信息...');
       const latestUserInfo = await authService.getUserInfo();
-      console.log('🔍 获取到的最新用户信息:', latestUserInfo);
 
       // 转换并更新用户信息
       const updatedUserInfo: Api.Auth.UserInfo = {
@@ -53,8 +51,6 @@ const HeaderBanner = () => {
         userName: (latestUserInfo as any).userName || userInfo.userName
       };
 
-      console.log('🔍 转换后的用户信息:', updatedUserInfo);
-
       // 更新Redux store和localStorage
       dispatch(setUserInfo(updatedUserInfo));
       localStg.set('userInfo', updatedUserInfo);
@@ -65,19 +61,13 @@ const HeaderBanner = () => {
 
   // 计算工作时长的函数
   const calculateJoinTime = (contractStartDate?: string) => {
-    console.log('🔍 计算工作时长，合同开始时间:', contractStartDate);
-
     if (contractStartDate) {
       // 如果有合同开始时间，就使用它来计算工作时长
       const joinDate = dayjs(contractStartDate);
       const now = dayjs();
 
-      console.log('🔍 合同开始日期:', joinDate.format('YYYY-MM-DD'));
-      console.log('🔍 当前日期:', now.format('YYYY-MM-DD'));
-
       // 检查是否是未来日期
       if (joinDate.isAfter(now)) {
-        console.log('⚠️ 合同开始时间是未来日期，显示为即将入职');
         setJoinTime('即将入职');
         return;
       }
@@ -85,8 +75,6 @@ const HeaderBanner = () => {
       const years = now.diff(joinDate, 'year');
       const months = now.subtract(years, 'year').diff(joinDate, 'month');
       const days = now.subtract(years, 'year').subtract(months, 'month').diff(joinDate, 'day');
-
-      console.log('🔍 计算结果:', { days, months, years });
 
       let timeString = '';
       if (years > 0) {
@@ -97,10 +85,8 @@ const HeaderBanner = () => {
       }
       timeString += `${days}天`;
 
-      console.log('🔍 最终显示时间:', timeString);
       setJoinTime(timeString);
     } else {
-      console.log('⚠️ 没有合同开始时间，使用模拟数据');
       // 如果没有合同开始时间，使用模拟数据
       const randomDays = Math.floor(Math.random() * 365) + 1;
       const joinDate = dayjs().subtract(randomDays, 'day');
@@ -126,16 +112,12 @@ const HeaderBanner = () => {
   useEffect(() => {
     // 组件初始化时，先刷新用户信息，然后计算工作时长
     const initializeData = async () => {
-      console.log('🔍 初始化首页数据...');
-      console.log('🔍 当前用户信息:', userInfo);
-
       // 刷新用户信息
       await refreshUserInfo();
 
       // 延迟一下确保用户信息已更新
       setTimeout(() => {
         const updatedUserInfo = localStg.get('userInfo');
-        console.log('🔍 刷新后的用户信息:', updatedUserInfo);
         calculateJoinTime(updatedUserInfo?.contractStartDate);
       }, 100);
     };

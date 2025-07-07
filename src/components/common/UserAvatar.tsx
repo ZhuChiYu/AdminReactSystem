@@ -52,20 +52,9 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ avatar, className, gender, size
     const newAvatarSrc = processAvatarUrl(avatar);
     setAvatarSrc(newAvatarSrc);
     setImageError(false);
-
-    console.log('UserAvatar组件更新:', {
-      avatar,
-      baseURL,
-      cleanBaseURL: baseURL.replace('/api', ''),
-      defaultAvatar: getDefaultAvatar(),
-      gender,
-      processedSrc: newAvatarSrc,
-      size
-    });
   }, [avatar, gender, size, baseURL]);
 
   const handleImageError = () => {
-    console.log('头像加载失败，使用默认头像:', avatarSrc);
     setImageError(true);
     setAvatarSrc(getDefaultAvatar());
     return false; // 阻止默认错误处理

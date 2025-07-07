@@ -29,11 +29,6 @@ const UserAvatar = memo(() => {
   useEffect(() => {
     const storedUserInfo = localStg.get('userInfo');
     if (storedUserInfo && (storedUserInfo.avatar !== userInfo.avatar || !userInfo.avatar)) {
-      console.log('🔍 顶部导航栏刷新用户信息:', {
-        avatarChanged: storedUserInfo.avatar !== userInfo.avatar,
-        current: userInfo,
-        stored: storedUserInfo
-      });
       dispatch(setUserInfo(storedUserInfo));
     }
   }, [userInfo.avatar, dispatch]);
@@ -116,13 +111,6 @@ const UserAvatar = memo(() => {
 
     return avatar;
   };
-
-  console.log('🔍 顶部导航栏 UserAvatar 渲染:', {
-    avatar: userInfo.avatar,
-    baseURL,
-    processedAvatar: getAvatarUrl(userInfo.avatar),
-    userInfo
-  });
 
   return token ? (
     <ADropdown

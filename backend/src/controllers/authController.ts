@@ -127,6 +127,17 @@ class AuthController {
       where: { id: user.id }
     });
 
+    // 记录登录历史
+    await prisma.loginRecord.create({
+      data: {
+        userId: user.id,
+        userName: user.userName,
+        loginIp: req.ip || 'unknown',
+        userAgent: req.get('User-Agent'),
+        loginResult: 'success'
+      }
+    });
+
     // 记录登录日志
     loggerUtils.logBusiness(user.id, '用户登录', 'auth', {
       ip: req.ip,
@@ -306,6 +317,68 @@ class AuthController {
     const captchaData = await authService.generateCaptcha();
 
     res.json(createSuccessResponse(captchaData, '获取成功', req.path));
+  }
+
+  /** 获取登录记录（仅超级管理员） */
+  async getLoginRecords(req: Request, res: Response) {
+    try {
+      // 检查用户权限
+      const user = req.user;
+      if (!user?.roles?.includes('super_admin')) {
+        return res.status(403).json(createErrorResponse(403, '权限不足，仅超级管理员可访问', null, req.path));
+      }
+
+      const { current = 1, size = 10 } = req.query;
+      const skip = (Number(current) - 1) * Number(size);
+      const take = Number(size);
+
+      // 获取登录记录
+      const [loginRecords, total] = await Promise.all([
+        prisma.loginRecord.findMany({
+          include: {
+            user: {
+              select: {
+                id: true,
+                userName: true,
+                nickName: true,
+                avatar: true
+              }
+            }
+          },
+          orderBy: {
+            loginTime: 'desc'
+          },
+          skip,
+          take
+        }),
+        prisma.loginRecord.count()
+      ]);
+
+      const records = loginRecords.map(record => ({
+        id: record.id,
+        userId: record.userId,
+        userName: record.userName,
+        nickName: record.user.nickName,
+        avatar: record.user.avatar,
+        loginIp: record.loginIp,
+        userAgent: record.userAgent,
+        loginTime: record.loginTime,
+        loginResult: record.loginResult,
+        location: record.location
+      }));
+
+      const result = {
+        current: Number(current),
+        pages: Math.ceil(total / take),
+        records,
+        size: take,
+        total
+      };
+
+      res.json(createSuccessResponse(result, '获取登录记录成功', req.path));
+    } catch (error: any) {
+      res.status(500).json(createErrorResponse(500, '获取登录记录失败', null, req.path));
+    }
   }
 
   // 清除用户缓存（调试用）
