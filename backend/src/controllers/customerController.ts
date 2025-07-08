@@ -107,15 +107,15 @@ class CustomerController {
       // 构建排序条件 - 根据用户角色决定排序方式
       let orderBy: any[];
 
-      if (user?.roles?.includes('super_admin')) {
-        // 超级管理员：直接按修改时间倒序排列，最近修改的在前面
+      if (user?.roles?.includes('super_admin') || user?.roles?.includes('admin')) {
+        // 超级管理员和管理员：直接按修改时间倒序排列，最近修改的在前面
         orderBy = [
           {
             updatedAt: 'desc'
           }
         ];
       } else {
-        // 其他用户：被分配的客户排在前面，再按修改时间排序
+        // 普通员工：被分配的客户排在前面，再按修改时间排序
         orderBy = [
           {
             assignedToId: {
@@ -1324,12 +1324,33 @@ class CustomerController {
         throw new NotFoundError('客户不存在');
       }
 
-      // 权限控制：超级管理员可以查看所有历史，其他用户只能查看自己相关的客户历史
+      // 权限控制：根据角色决定可访问的客户范围
       const isSuperAdmin = req.user.roles?.includes('super_admin');
-      const isCreator = customer.createdById === req.user.id;
-      const isAssignedUser = customer.assignedToId === req.user.id;
+      let hasPermission = false;
 
-      if (!isSuperAdmin && !isCreator && !isAssignedUser) {
+      if (isSuperAdmin) {
+        // 超级管理员：可以查看所有客户历史
+        hasPermission = true;
+      } else if (req.user.roles?.includes('admin')) {
+        // 管理员：可以查看自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+        const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
+          where: { managerId: req.user.id },
+          select: { employeeId: true }
+        });
+
+        const allowedCreatorIds = [req.user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+        const isCreator = allowedCreatorIds.includes(customer.createdById!);
+        const isAssignedUser = customer.assignedToId === req.user.id;
+
+        hasPermission = isCreator || isAssignedUser;
+      } else {
+        // 普通员工：只能查看自己创建的客户和分配给自己的客户
+        const isCreator = customer.createdById === req.user.id;
+        const isAssignedUser = customer.assignedToId === req.user.id;
+        hasPermission = isCreator || isAssignedUser;
+      }
+
+      if (!hasPermission) {
         throw new NotFoundError('您没有权限查看此客户的历史记录');
       }
 

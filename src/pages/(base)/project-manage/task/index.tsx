@@ -388,8 +388,6 @@ const ItemList = () => {
         taskId
       });
 
-      console.log('附件列表响应:', response);
-
       // 兼容不同的响应结构
       let attachmentList = [];
       if (response.data?.records) {
@@ -403,7 +401,6 @@ const ItemList = () => {
       }
 
       setAttachments(attachmentList);
-      console.log('设置的附件列表:', attachmentList);
     } catch (error) {
       console.error('获取附件列表失败:', error);
     }
@@ -412,13 +409,6 @@ const ItemList = () => {
   // 处理附件上传
   const handleFileUpload = async (file: File, taskId: number, stage?: string) => {
     try {
-      console.log('🔄 开始上传附件:', {
-        fileName: file.name,
-        fileSize: file.size,
-        stage,
-        taskId
-      });
-
       await taskAttachmentService.uploadTaskAttachment({
         description: `${stage || '阶段'}附件`,
         file,
@@ -427,7 +417,6 @@ const ItemList = () => {
       });
 
       message.success('附件上传成功');
-      console.log('✅ 附件上传成功，开始刷新附件列表');
       await fetchTaskAttachments(taskId);
     } catch (error: any) {
       console.error('❌ 上传附件失败:', error);

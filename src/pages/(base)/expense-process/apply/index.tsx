@@ -77,15 +77,10 @@ const Component: React.FC = () => {
       // 从localStg获取用户信息
       const userInfo = (localStg.get('userInfo') as any) || {};
 
-      console.log('🔍 [报销申请] localStg中的完整userInfo:', userInfo);
-      console.log('🔍 [报销申请] userInfo.roles 类型:', typeof userInfo.roles, userInfo.roles);
-
       if (!userInfo.roles || userInfo.roles.length === 0) {
         console.warn('⚠️ [报销申请] 用户没有分配角色，userInfo.roles:', userInfo.roles);
         return '未分配部门';
       }
-
-      console.log('📡 [报销申请] 开始获取职务角色列表...');
 
       // 获取所有职务角色
       const roleResponse = await fetchGetRoleList({
@@ -94,37 +89,21 @@ const Component: React.FC = () => {
         size: 100
       });
 
-      console.log('📡 [报销申请] 职务角色API响应:', roleResponse);
-
       if (!roleResponse?.records) {
         console.warn('⚠️ [报销申请] 获取职务角色列表失败，roleResponse:', roleResponse);
         return '未知部门';
       }
 
-      console.log('🔍 [报销申请] 用户角色数组:', userInfo.roles);
-      console.log('🔍 [报销申请] 用户角色类型:', typeof userInfo.roles[0]);
-      console.log(`🔍 [报销申请] 职务角色列表 (共 ${roleResponse.records.length} 个):`);
-
-      roleResponse.records.forEach((role: any) => {
-        console.log(`  - ${role.roleName} (${role.roleCode}) - 部门: ${role.department}`);
-      });
-
       // 查找用户的职务角色对应的部门
       for (const userRoleCode of userInfo.roles) {
-        console.log(`🔍 [报销申请] 正在查找角色: ${userRoleCode}`);
-
         const matchedRole = roleResponse.records.find((role: any) => role.roleCode === userRoleCode);
 
         if (matchedRole) {
-          console.log(`✅ [报销申请] 找到匹配的职务角色:`, matchedRole);
-
           if (matchedRole.department) {
-            console.log(`🎯 [报销申请] 返回部门: ${matchedRole.department}`);
             return matchedRole.department;
           }
           console.warn(`⚠️ [报销申请] 角色 ${matchedRole.roleName} 没有设置部门`);
         } else {
-          console.log(`❌ [报销申请] 未找到角色: ${userRoleCode}`);
         }
       }
 

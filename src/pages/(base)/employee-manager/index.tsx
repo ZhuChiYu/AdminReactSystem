@@ -163,11 +163,6 @@ const EmployeeManagerManagement = () => {
       const currentUserInEmployees = allEmployees.find(
         emp => emp.userName === userInfo?.userName || emp.userName === 'manager1'
       );
-      console.log('🔍 在员工列表中找到当前用户:', {
-        currentUserInEmployees,
-        searchForManager1: allEmployees.find(emp => emp.userName === 'manager1'),
-        userInfoUserName: userInfo?.userName
-      });
 
       // 过滤出管理员角色的员工
       const managerList = allEmployees.filter(emp =>
@@ -212,7 +207,6 @@ const EmployeeManagerManagement = () => {
       });
 
       setEmployeeTargets(targetsMap);
-      console.log('📊 员工目标数据加载成功:', { params, targetsMap, targetType });
     } catch (error) {
       console.error('获取员工目标数据失败:', error);
     }
@@ -279,21 +273,13 @@ const EmployeeManagerManagement = () => {
 
   // 获取管理的员工列表（用于目标设置）- 支持分页
   const getManagedEmployeesWithPagination = () => {
-    console.log('🔍 getManagedEmployees执行:', {
-      getCurrentUserId: getCurrentUserId(),
-      isAdminUser,
-      isSuperAdminUser,
-      relationsLength: relations.length
-    });
 
     let allEmployees: EmployeeApi.EmployeeListItem[] = [];
 
     if (isSuperAdminUser) {
       allEmployees = getSuperAdminManagedEmployees();
-      console.log('🔍 超级管理员可管理的员工:', allEmployees);
     } else if (isAdminUser) {
       allEmployees = getAdminManagedEmployees();
-      console.log('🔍 管理员可管理的员工:', allEmployees);
     }
 
     // 计算分页数据
@@ -316,19 +302,6 @@ const EmployeeManagerManagement = () => {
       setTargetLoading(true);
       const { employees: paginatedEmployees, total } = getManagedEmployeesWithPagination();
       const userInfo = localStg.get('userInfo');
-      console.log('🔍 管理的员工列表:', {
-        canManageTargets,
-        currentUserId: getCurrentUserId(),
-        currentUserInfo: userInfo,
-        currentUserInfoKeys: userInfo ? Object.keys(userInfo) : [],
-        employeesCount: employees.length,
-        isAdminUser,
-        isSuperAdminUser,
-        paginatedEmployees,
-        relations,
-        relationsCount: relations.length,
-        total
-      });
       setManagedEmployees(paginatedEmployees);
 
       // 更新分页状态
@@ -717,7 +690,6 @@ const EmployeeManagerManagement = () => {
                       ]}
                       onChange={(value: 'month' | 'week') => {
                         setTargetType(value);
-                        console.log('🔄 切换目标类型:', value);
                       }}
                     />
                     {targetType === 'month' ? (

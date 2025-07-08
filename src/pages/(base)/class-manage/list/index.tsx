@@ -232,7 +232,6 @@ const ClassList = () => {
       // 设置编辑模式并保存当前编辑的班级ID
       setEditingClassId(classId);
       setIsModalOpen(true);
-      console.log('编辑班级:', classId);
     } catch (error) {
       console.error('获取班级详情失败:', error);
       message.error('获取班级详情失败');

@@ -86,14 +86,11 @@ const ArchivedProjectPage: React.FC = () => {
   const fetchTaskAttachments = async (taskId: number) => {
     setAttachmentLoading(true);
     try {
-      console.log('正在获取任务附件，taskId:', taskId);
       const response = await taskAttachmentService.getTaskAttachmentList({
         current: 1,
         size: 100,
         taskId
       });
-
-      console.log('附件响应数据:', response);
 
       // 处理不同的响应格式
       let attachmentList: TaskAttachmentListItem[] = [];
@@ -107,7 +104,6 @@ const ArchivedProjectPage: React.FC = () => {
         attachmentList = response as TaskAttachmentListItem[];
       }
 
-      console.log('解析的附件列表:', attachmentList);
       setCurrentTaskAttachments(attachmentList);
     } catch (error) {
       console.error('获取附件失败:', error);

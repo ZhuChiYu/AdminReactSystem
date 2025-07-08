@@ -1,9 +1,17 @@
-import { EditOutlined, LockOutlined, MailOutlined, PhoneOutlined, SaveOutlined, UserOutlined, HistoryOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Divider, Form, Input, Modal, Row, Tabs, Tag, Upload, message, Table, Space } from 'antd';
+import {
+  EditOutlined,
+  HistoryOutlined,
+  LockOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  SaveOutlined,
+  UserOutlined
+} from '@ant-design/icons';
+import { Button, Card, Col, Divider, Form, Input, Modal, Row, Space, Table, Tabs, Tag, Upload, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import dayjs from 'dayjs';
 
 import UserAvatar from '@/components/common/UserAvatar';
 import { selectUserInfo, setUserInfo } from '@/features/auth/authStore';
@@ -192,14 +200,14 @@ const UserCenter = () => {
   // 获取登录记录
   const loadLoginRecords = async (page = 1, pageSize = 10) => {
     if (!isSuperAdmin) return;
-    
+
     try {
       setLoginRecordsLoading(true);
       const response = await authService.getLoginRecords({
         current: page,
         size: pageSize
       });
-      
+
       setLoginRecords(response.records);
       setLoginRecordsPagination({
         current: response.current,
@@ -248,7 +256,6 @@ const UserCenter = () => {
           const freshUserInfo = await authService.getUserInfo();
           if ((freshUserInfo as any).userId || (freshUserInfo as any).id) {
             userId = Number.parseInt(String((freshUserInfo as any).userId || (freshUserInfo as any).id), 10);
-            console.log('🔍 从后端重新获取的用户ID:', userId);
           }
         } catch (error) {
           console.error('从后端获取用户信息失败:', error);
@@ -259,8 +266,6 @@ const UserCenter = () => {
       if (!userId || Number.isNaN(userId)) {
         throw new Error('无法获取用户ID，请重新登录');
       }
-
-      console.log('🔍 保存个人信息使用的用户ID:', userId);
 
       await userService.updateUserProfile({
         userId,
@@ -310,7 +315,6 @@ const UserCenter = () => {
           const freshUserInfo = await authService.getUserInfo();
           if ((freshUserInfo as any).userId || (freshUserInfo as any).id) {
             userId = Number.parseInt(String((freshUserInfo as any).userId || (freshUserInfo as any).id), 10);
-            console.log('🔍 从后端重新获取的用户ID:', userId);
           }
         } catch (error) {
           console.error('从后端获取用户信息失败:', error);
@@ -321,8 +325,6 @@ const UserCenter = () => {
       if (!userId || Number.isNaN(userId)) {
         throw new Error('无法获取用户ID，请重新登录');
       }
-
-      console.log('🔍 修改密码使用的用户ID:', userId);
 
       await userService.changePassword({
         newPassword: values.newPassword,
@@ -370,12 +372,6 @@ const UserCenter = () => {
 
       // 强制刷新头像组件
       setAvatarKey(timestamp);
-
-      console.log('🔍 头像更新完成:', {
-        newUrl: newAvatarUrl,
-        reduxState: updatedUserInfo,
-        withTimestamp: avatarUrlWithTimestamp
-      });
 
       message.success('头像更新成功');
     } catch (error) {
@@ -442,7 +438,6 @@ const UserCenter = () => {
           const freshUserInfo = await authService.getUserInfo();
           if ((freshUserInfo as any).userId || (freshUserInfo as any).id) {
             userId = Number.parseInt(String((freshUserInfo as any).userId || (freshUserInfo as any).id), 10);
-            console.log('🔍 从后端重新获取的用户ID:', userId);
           }
         } catch (error) {
           console.error('从后端获取用户信息失败:', error);
@@ -453,8 +448,6 @@ const UserCenter = () => {
       if (!userId || Number.isNaN(userId)) {
         throw new Error('无法获取用户ID，请重新登录');
       }
-
-      console.log('🔍 头像上传使用的用户ID:', userId);
 
       const response = await avatarService.uploadAvatar(file, userId);
       if (response && response.url) {
@@ -488,7 +481,6 @@ const UserCenter = () => {
   // 登录记录表格列定义
   const loginRecordsColumns: ColumnsType<any> = [
     {
-      title: '用户',
       dataIndex: 'nickName',
       key: 'nickName',
       render: (text: string, record: any) => (
@@ -499,24 +491,24 @@ const UserCenter = () => {
           />
           <div>
             <div>{record.nickName}</div>
-            <div style={{ fontSize: '12px', color: '#999' }}>@{record.userName}</div>
+            <div style={{ color: '#999', fontSize: '12px' }}>@{record.userName}</div>
           </div>
         </Space>
-      )
+      ),
+      title: '用户'
     },
     {
-      title: '登录IP',
       dataIndex: 'loginIp',
-      key: 'loginIp'
+      key: 'loginIp',
+      title: '登录IP'
     },
     {
-      title: '登录时间',
       dataIndex: 'loginTime',
       key: 'loginTime',
-      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss')
+      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss'),
+      title: '登录时间'
     },
     {
-      title: '设备信息',
       dataIndex: 'userAgent',
       key: 'userAgent',
       render: (userAgent: string) => {
@@ -524,21 +516,23 @@ const UserCenter = () => {
         // 简化显示用户代理信息
         const simplified = userAgent.split(' ')[0] || userAgent;
         return (
-          <div title={userAgent} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div
+            style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            title={userAgent}
+          >
             {simplified}
           </div>
         );
-      }
+      },
+      title: '设备信息'
     },
     {
-      title: '状态',
       dataIndex: 'loginResult',
       key: 'loginResult',
       render: (result: string) => (
-        <Tag color={result === 'success' ? 'success' : 'error'}>
-          {result === 'success' ? '成功' : '失败'}
-        </Tag>
-      )
+        <Tag color={result === 'success' ? 'success' : 'error'}>{result === 'success' ? '成功' : '失败'}</Tag>
+      ),
+      title: '状态'
     }
   ];
 
@@ -691,16 +685,16 @@ const UserCenter = () => {
         columns={loginRecordsColumns}
         dataSource={loginRecords}
         loading={loginRecordsLoading}
+        rowKey="id"
+        scroll={{ x: 800 }}
         pagination={{
           current: loginRecordsPagination.current,
           pageSize: loginRecordsPagination.pageSize,
-          total: loginRecordsPagination.total,
-          showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (total) => `共 ${total} 条记录`
+          showSizeChanger: true,
+          showTotal: total => `共 ${total} 条记录`,
+          total: loginRecordsPagination.total
         }}
-        rowKey="id"
-        scroll={{ x: 800 }}
         onChange={handleLoginRecordsTableChange}
       />
     </div>
@@ -819,16 +813,20 @@ const UserCenter = () => {
                   key: '2',
                   label: '修改密码'
                 },
-                ...(isSuperAdmin ? [{
-                  children: <LoginRecordsForm />,
-                  key: '3',
-                  label: (
-                    <span>
-                      <HistoryOutlined />
-                      登录记录
-                    </span>
-                  )
-                }] : [])
+                ...(isSuperAdmin
+                  ? [
+                      {
+                        children: <LoginRecordsForm />,
+                        key: '3',
+                        label: (
+                          <span>
+                            <HistoryOutlined />
+                            登录记录
+                          </span>
+                        )
+                      }
+                    ]
+                  : [])
               ]}
               onChange={setActiveTab}
             />

@@ -545,12 +545,6 @@ const ClassDetail = () => {
         joinDate: values.joinDate ? values.joinDate.format('YYYY-MM-DD') : null
       };
 
-      console.log('保存学员信息，数据:', {
-        currentAvatar: editFormStudent?.avatar,
-        studentId: editFormStudent.id,
-        updateData
-      });
-
       // 调用后端API更新学员信息
       const updatedStudent = await classService.updateStudent(editFormStudent.id, updateData);
 
@@ -1058,10 +1052,8 @@ const ClassDetail = () => {
             description: '课程附件',
             file: file.originFileObj || file
           };
-          console.log('上传文件数据:', uploadData);
 
           const result = await attachmentService.uploadAttachment(uploadData);
-          console.log(`文件 ${file.name} 上传结果:`, result);
           return result;
         } catch (error) {
           console.error(`上传文件 ${file.name} 失败:`, error);
@@ -1159,7 +1151,6 @@ const ClassDetail = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      console.log(`成功下载通知附件: ${attachment.name}`, attachment);
       message.success(`下载成功: ${attachment.name}`);
     } catch (error) {
       console.error('下载通知附件失败:', error);
@@ -1201,7 +1192,6 @@ const ClassDetail = () => {
       } else {
         // 新建模式 - 调用API创建通知
         const result = await notificationService.createNotification(announceData);
-        console.log('创建通知成功:', result);
 
         // 重新获取通知列表
         const announcementsResponse = await notificationService.getNotificationList({
@@ -1345,8 +1335,6 @@ const ClassDetail = () => {
             file: file.originFileObj || file,
             notificationId: currentAnnounce.id
           });
-
-          console.log(`通知附件上传成功: ${file.name}`, result);
           return result;
         } catch (error) {
           console.error(`上传文件 ${file.name} 失败:`, error);
@@ -1458,11 +1446,6 @@ const ClassDetail = () => {
         try {
           setDeleteLoading(true);
           const studentIdsToDelete = selectedRowKeys.map(key => Number(key));
-          console.log('准备批量删除学员:', {
-            selectedRowKeys,
-            studentIdsToDelete,
-            types: studentIdsToDelete.map(id => typeof id)
-          });
           await classService.deleteStudentsBatch(studentIdsToDelete);
           message.success(`成功删除 ${selectedRowKeys.length} 名学员`);
           setSelectedRowKeys([]);

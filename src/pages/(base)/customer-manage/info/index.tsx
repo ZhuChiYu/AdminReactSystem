@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 
 import { customerService, employeeService } from '@/service/api';
 import type { CustomerApi, EmployeeApi } from '@/service/api/types';
-
 import { isAdmin, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
@@ -39,8 +38,6 @@ const followUpStatusNames: Record<string, string> = {
   empty: '-'
 };
 
-
-
 /** 客户信息管理组件 */
 const CustomerManagement = () => {
   const { message } = App.useApp();
@@ -68,8 +65,6 @@ const CustomerManagement = () => {
     pageSize: 10,
     total: 0
   });
-
-
 
   // 判断当前用户是否为超级管理员或管理员
   const isUserSuperAdmin = isSuperAdmin();
@@ -152,7 +147,7 @@ const CustomerManagement = () => {
     try {
       await navigator.clipboard.writeText(text);
       message.success(`${type}已复制到剪切板`);
-    } catch (error) {
+    } catch {
       // 降级处理：使用传统的复制方法
       try {
         const textArea = document.createElement('textarea');
@@ -421,8 +416,6 @@ const CustomerManagement = () => {
 
   // 表格分页处理
   const handleTableChange = (page: number, pageSize?: number) => {
-    console.log('🔍 分页变化:', { current: pagination.current, oldPageSize: pagination.pageSize, page, pageSize });
-
     const newPageSize = pageSize || pagination.pageSize;
 
     setPagination(prev => ({
@@ -477,7 +470,7 @@ const CustomerManagement = () => {
       render: (text: string) => (
         <Space size="small">
           <span>{text || '-'}</span>
-          {text && text !== '-' && (
+          {text && text !== '-' && text !== '***' && (
             <Button
               icon={<CopyOutlined />}
               size="small"
@@ -497,7 +490,7 @@ const CustomerManagement = () => {
       render: (text: string) => (
         <Space size="small">
           <span>{text || '-'}</span>
-          {text && text !== '-' && (
+          {text && text !== '-' && text !== '***' && (
             <Button
               icon={<CopyOutlined />}
               size="small"

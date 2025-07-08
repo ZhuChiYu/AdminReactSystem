@@ -59,8 +59,6 @@ const Component: React.FC = () => {
         size: 1000
       });
 
-      console.log('API响应:', submittedResponse);
-
       let submittedItems: HistoryItem[] = [];
 
       // 检查API响应格式

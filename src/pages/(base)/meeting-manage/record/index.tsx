@@ -111,7 +111,6 @@ const Component: React.FC = () => {
                 name: user?.nickName || user?.userName || `参与人员${participant.id}`
               };
             });
-            console.log('会议记录-从participants提取到的数据:', participantsData); // 调试日志
           } else if ((detail as any).participantIds && Array.isArray((detail as any).participantIds)) {
             participantsData = (detail as any).participantIds.map((participantId: number) => {
               const user = users.find(u => u.id === participantId);
@@ -120,14 +119,12 @@ const Component: React.FC = () => {
                 name: user ? user.nickName || user.userName : `用户${participantId}`
               };
             });
-            console.log('会议记录-从participantIds提取到的数据:', participantsData); // 调试日志
           } else {
             // 如果API没有返回参与人员详情，生成占位数据
             participantsData = Array.from({ length: record.attendees.length }, (_, index) => ({
               id: index + 1,
               name: `参与者${index + 1}`
             }));
-            console.log('会议记录-生成的占位数据:', participantsData); // 调试日志
           }
 
           // 更新当前记录的参与人员信息
@@ -193,8 +190,6 @@ const Component: React.FC = () => {
       });
       const records = response.records || [];
       setMeetings(records);
-      console.log('获取到的会议列表:', records); // 调试日志
-      console.log('会议数量:', records.length); // 调试日志
     } catch (error) {
       console.error('获取会议列表失败:', error);
     }
@@ -223,7 +218,6 @@ const Component: React.FC = () => {
             // 否则从对应的会议中获取参会人员
             try {
               const meetingDetail = await meetingService.getMeetingDetail(relatedMeeting.id);
-              console.log('会议详情:', meetingDetail); // 调试日志
 
               if ((meetingDetail as any).participantIds && Array.isArray((meetingDetail as any).participantIds)) {
                 attendeeIds = (meetingDetail as any).participantIds;
@@ -357,7 +351,6 @@ const Component: React.FC = () => {
   };
 
   const handleExportRecord = (record: MeetingRecord) => {
-    console.log('导出会议记录', record);
     message.success('会议记录导出功能尚未实现');
   };
 

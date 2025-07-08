@@ -611,7 +611,7 @@ const CustomerFollow = () => {
       render: (text: string) => (
         <Space size="small">
           <span>{text || '-'}</span>
-          {text && text !== '-' && (
+          {text && text !== '-' && text !== '***' && (
             <Button
               icon={<CopyOutlined />}
               size="small"
@@ -631,7 +631,7 @@ const CustomerFollow = () => {
       render: (text: string) => (
         <Space size="small">
           <span>{text || '-'}</span>
-          {text && text !== '-' && (
+          {text && text !== '-' && text !== '***' && (
             <Button
               icon={<CopyOutlined />}
               size="small"

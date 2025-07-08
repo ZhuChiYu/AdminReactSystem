@@ -57,19 +57,14 @@ const CourseList = () => {
   const fetchUserPermissions = async () => {
     // 临时解决方案：直接检查用户角色
     const userInfo = getCurrentUserInfo();
-    console.log('获取的用户信息:', userInfo);
 
     if (!userInfo) {
-      console.log('用户信息为空');
       setCanCreateCourse(false);
       return;
     }
 
     // 检查用户是否有人力BP角色
     const hasHrBpRole = userInfo.roles.some(role => role === 'hr_bp' || role === '人力bp' || role === '人力BP');
-
-    console.log('用户角色:', userInfo.roles);
-    console.log('是否有人力BP角色:', hasHrBpRole);
 
     // 临时设置：如果是人力BP角色，则有新增课程权限
     setCanCreateCourse(hasHrBpRole);

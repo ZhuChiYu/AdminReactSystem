@@ -34,8 +34,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { attachmentService, courseService } from '@/service/api';
 import type { AttachmentApi, CourseApi } from '@/service/api/types';
-import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 import { isSuperAdmin } from '@/utils/auth';
+import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
 const { Dragger } = Upload;
 const { Text, Title } = Typography;
@@ -91,20 +91,11 @@ function Component() {
   const fetchData = async () => {
     if (!courseId) return;
 
-    console.log('=== 开始获取数据 ===');
-    console.log('courseId:', courseId, 'type:', typeof courseId);
-
     setLoading(true);
     try {
       // 获取课程信息（如果失败则使用fallback）
       try {
-        console.log('步骤1：获取课程详情...');
         const courseResponse = await courseService.getCourseDetail(Number.parseInt(courseId, 10));
-        console.log('课程详情获取成功:', courseResponse);
-        const courseData: Course = {
-          id: courseResponse.id,
-          name: courseResponse.courseName
-        };
         setCourse(courseData);
       } catch (courseError) {
         console.error('获取课程详情失败:', courseError);
@@ -118,44 +109,14 @@ function Component() {
       }
 
       // 获取附件列表
-      console.log('步骤2：开始获取附件列表...');
-      const requestParams = {
-        courseId: Number.parseInt(courseId, 10),
-        current: 1,
-        size: 1000
-      };
-      console.log('请求参数:', requestParams);
-
-      console.log('调用 attachmentService.getAttachmentList...');
       const attachmentResponse = await attachmentService.getAttachmentList(requestParams);
-
-      console.log('=== API响应详情 ===');
-      console.log('响应类型:', typeof attachmentResponse);
-      console.log('响应是否为null:', attachmentResponse === null);
-      console.log('响应是否为undefined:', attachmentResponse === undefined);
-      console.log('响应的构造函数:', attachmentResponse?.constructor?.name);
-      console.log('响应的所有属性:', Object.keys(attachmentResponse || {}));
-      console.log('完整响应:', JSON.stringify(attachmentResponse, null, 2));
 
       // 检查响应数据是否有效
       // attachmentService.getAttachmentList 现在返回的是 PageResponse.data 部分
       if (attachmentResponse && attachmentResponse.records) {
-        console.log('=== 响应数据分析 ===');
-        console.log('- 响应存在:', true);
-        console.log('- 有records字段:', 'records' in attachmentResponse);
-        console.log('- records值:', attachmentResponse.records);
-        console.log('- records类型:', typeof attachmentResponse.records);
-        console.log('- records是数组:', Array.isArray(attachmentResponse.records));
-        console.log('- records长度:', attachmentResponse.records?.length);
-
         const records = attachmentResponse.records || [];
-        console.log('提取的records:', records);
 
         if (Array.isArray(records) && records.length > 0) {
-          console.log('=== 数据处理 ===');
-          console.log('找到附件数量:', records.length);
-          console.log('第一个附件示例:', records[0]);
-
           // 转换API数据格式
           const formattedAttachments: Attachment[] = records.map((attachment: AttachmentApi.AttachmentListItem) => ({
             courseId: attachment.courseId,
@@ -169,44 +130,25 @@ function Component() {
             uploadTime: attachment.uploadTime
           }));
 
-          console.log('格式化后的附件:', formattedAttachments);
           setAttachments(formattedAttachments);
           setFilteredAttachments(formattedAttachments);
           message.success(`成功加载 ${formattedAttachments.length} 个附件`);
         } else {
-          console.log('=== 空数据处理 ===');
-          console.log('没有找到有效的附件数据');
-          console.log('records值:', records);
-          console.log('records长度:', records?.length);
           setAttachments([]);
           setFilteredAttachments([]);
           // 没有附件时不显示提示消息，保持静默
         }
       } else {
-        console.log('=== 响应为空处理 ===');
-        console.log('API响应为空或未定义');
-        console.log('attachmentResponse:', attachmentResponse);
         setAttachments([]);
         setFilteredAttachments([]);
         // 响应为空时不显示提示消息，保持静默
       }
     } catch (error: any) {
-      console.log('=== 错误处理 ===');
-      console.error('获取数据失败:', error);
-      console.error('错误类型:', error?.constructor?.name);
-      console.error('错误消息:', error?.message);
-      console.error('错误代码:', error?.code);
-      console.error('错误响应:', error?.response);
-      console.error('错误请求:', error?.request);
-      console.error('错误配置:', error?.config);
-      console.error('完整错误堆栈:', error?.stack);
-
       message.error(`获取附件数据失败: ${error?.message || '未知错误'}`);
       // 确保在错误情况下也设置空数组
       setAttachments([]);
       setFilteredAttachments([]);
     } finally {
-      console.log('=== 数据获取完成 ===');
       setLoading(false);
     }
   };
@@ -463,20 +405,20 @@ function Component() {
             下载
           </Button>
           {isSuperAdmin() && (
-          <Popconfirm
-            cancelText="取消"
-            okText="确定"
-            title="确定要删除这个文件吗？"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              type="link"
+            <Popconfirm
+              cancelText="取消"
+              okText="确定"
+              title="确定要删除这个文件吗？"
+              onConfirm={() => handleDelete(record.id)}
             >
-              删除
-            </Button>
-          </Popconfirm>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                type="link"
+              >
+                删除
+              </Button>
+            </Popconfirm>
           )}
         </Space>
       )
@@ -527,13 +469,13 @@ function Component() {
               onSearch={handleSearch}
             />
             {isSuperAdmin() && (
-            <Button
-              icon={<CloudDownloadOutlined />}
-              type="primary"
-              onClick={showUploadModal}
-            >
-              上传文件
-            </Button>
+              <Button
+                icon={<CloudDownloadOutlined />}
+                type="primary"
+                onClick={showUploadModal}
+              >
+                上传文件
+              </Button>
             )}
           </div>
         </div>

@@ -400,7 +400,7 @@ const UserManage = () => {
   const { checkedRowKeys, generalPopupOperation, handleAdd, handleEdit, onBatchDeleted, onDeleted, rowSelection } =
     useTableOperate(data, run, async (res: any, type) => {
       if (type === 'add') {
-                try {
+        try {
           // 获取所有角色数据，将角色代码转换为角色ID
           const roleCodes = [res.positionRole, res.permissionRole || 'employee'].filter(Boolean);
           const roleIds: number[] = [];
@@ -408,14 +408,11 @@ const UserManage = () => {
           // 获取所有角色数据
           try {
             const [positionRolesResponse, permissionRolesResponse] = await Promise.all([
-              fetchGetRoleList({ current: 1, size: 100, roleType: 'position' }),
-              fetchGetRoleList({ current: 1, size: 100, roleType: 'permission' })
+              fetchGetRoleList({ current: 1, roleType: 'position', size: 100 }),
+              fetchGetRoleList({ current: 1, roleType: 'permission', size: 100 })
             ]);
 
-            const allRoles = [
-              ...(positionRolesResponse?.records || []),
-              ...(permissionRolesResponse?.records || [])
-            ];
+            const allRoles = [...(positionRolesResponse?.records || []), ...(permissionRolesResponse?.records || [])];
 
             // 根据角色代码查找角色ID
             for (const roleCode of roleCodes) {
@@ -445,15 +442,12 @@ const UserManage = () => {
             nickName: res.nickName,
             password: res.password,
             phone: res.userPhone,
-            roleIds: roleIds, // 使用角色ID而不是角色代码
+            roleIds, // 使用角色ID而不是角色代码
             status: getStatusValue(res.status),
             tim: res.tim,
             userName: res.userName,
             wechat: res.wechat
           };
-
-          console.log('创建用户数据:', createData);
-          console.log('角色映射:', { roleCodes, roleIds });
 
           await apiClient.post('/system/users', createData);
 
@@ -467,9 +461,6 @@ const UserManage = () => {
       } else {
         // edit request 调用编辑的接口
         try {
-          console.log('编辑数据调试:', res);
-          console.log('编辑用户ID:', editingUserId);
-
           if (!editingUserId) {
             window.$message?.error('用户ID缺失，无法更新');
             console.error('编辑失败：用户ID缺失', { editingUserId, res });
@@ -496,7 +487,6 @@ const UserManage = () => {
             wechat: res.wechat
           };
 
-          console.log('更新用户数据:', { id: editingUserId, updateData });
           await employeeService.updateEmployee(editingUserId, updateData);
 
           window.$message?.success('更新成功');

@@ -297,7 +297,6 @@ const Component: React.FC = () => {
       setParticipantsLoading(true);
       try {
         const detail = await meetingService.getMeetingDetail(record.id);
-        console.log('获取到的会议详情:', detail); // 调试日志
 
         let participantsData: Array<{ id: number; name: string }> = [];
 
@@ -311,7 +310,6 @@ const Component: React.FC = () => {
               name: user?.nickName || user?.userName || `参与人员${participant.id}`
             };
           });
-          console.log('从participants提取到的数据:', participantsData); // 调试日志
         } else if ((detail as any).participantIds && Array.isArray((detail as any).participantIds)) {
           // 如果有participantIds，通过已加载的用户列表获取名称
           participantsData = (detail as any).participantIds.map((participantId: number) => {
@@ -321,14 +319,12 @@ const Component: React.FC = () => {
               name: user ? user.nickName || user.userName : `用户${participantId}`
             };
           });
-          console.log('从participantIds提取到的数据:', participantsData); // 调试日志
         } else {
           // 如果都没有，生成占位数据但使用更友好的提示
           participantsData = Array.from({ length: record.participantCount }, (_, index) => ({
             id: index + 1,
             name: `参与者${index + 1}（详情暂不可用）`
           }));
-          console.log('生成的占位数据:', participantsData); // 调试日志
         }
 
         // 更新当前会议的参与人员信息
