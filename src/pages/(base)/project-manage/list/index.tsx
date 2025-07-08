@@ -331,16 +331,12 @@ const TaskManagement = () => {
   // 获取客户数据
   const fetchCustomerData = async (currentTargets?: Record<TaskType, number>) => {
     try {
-      console.log('🔄 开始获取客户数据...');
-
       // 获取当前用户管理的所有客户数据
       const customerData = await customerService.getCustomerList({
         current: 1,
         scope: 'own', // 只获取当前用户管理的客户
         size: 1000
       });
-
-      console.log('📋 客户列表数据:', customerData);
 
       // 转换数据格式以匹配前端类型
       const formattedCustomers = customerData.records.map(customer => ({
@@ -360,7 +356,6 @@ const TaskManagement = () => {
       // 根据客户数据生成任务统计，传入最新的目标数据
       generateTasksFromCustomers(formattedCustomers, currentTargets);
     } catch (error) {
-      console.error('❌ 获取客户数据失败:', error);
       message.error('获取数据失败');
     }
   };
@@ -370,7 +365,6 @@ const TaskManagement = () => {
     try {
       // 这里应该调用后端API更新客户跟进状态
       // 暂时模拟API调用
-      console.log('🔄 更新客户跟进状态:', { customerId, newStatus });
 
       // 模拟API调用成功
       message.success('跟进状态更新成功');
@@ -397,21 +391,12 @@ const TaskManagement = () => {
       const month = currentDate.getMonth() + 1;
       const week = getCurrentWeekNumber();
 
-      console.log('🔍 请求参数:', {
-        month: selectedPeriod === 'month' ? month : undefined,
-        period: selectedPeriod,
-        week: selectedPeriod === 'week' ? week : undefined,
-        year
-      });
-
       const stats = await taskStatsService.getUserTaskStats(
         year,
         selectedPeriod === 'month' ? month : undefined,
         selectedPeriod === 'week' ? week : undefined,
         selectedPeriod
       );
-
-      console.log('🔍 API原始返回数据:', stats);
 
       const newTargets = {
         [TaskType.CONSULT]: stats.targets.consultTarget,
@@ -421,12 +406,6 @@ const TaskManagement = () => {
       };
 
       setTaskTargets(newTargets);
-      console.log('📊 任务目标加载成功:', {
-        originalTargets: stats.targets,
-        period: selectedPeriod,
-        periodInfo: stats.period,
-        targets: newTargets
-      });
       return newTargets;
     } catch (error) {
       console.error('❌ 加载目标数据失败:', error);
@@ -474,9 +453,7 @@ const TaskManagement = () => {
         size: response.pagination.size,
         total: response.pagination.total
       });
-      console.log('📊 团队任务统计:', { period: selectedPeriod, periodInfo: response.period, stats: response });
     } catch (error) {
-      console.error('获取团队任务统计失败:', error);
       message.error('获取团队任务统计失败');
     } finally {
       setTeamStatsLoading(false);
@@ -520,7 +497,6 @@ const TaskManagement = () => {
   // 监听周期变化，重新加载数据
   useEffect(() => {
     const reloadDataOnPeriodChange = async () => {
-      console.log('🔄 周期切换，重新加载数据:', selectedPeriod);
       // 重新加载目标数据
       const currentTargets = await loadTaskTargets();
       // 重新获取客户数据并生成任务
@@ -692,9 +668,7 @@ const TaskManagement = () => {
           await updateCustomerFollowStatus(selectedCustomer.id, values.followStatus);
         }
       })
-      .catch(info => {
-        console.log('Validate Failed:', info);
-      });
+      .catch(info => {});
   };
 
   // 提交备注

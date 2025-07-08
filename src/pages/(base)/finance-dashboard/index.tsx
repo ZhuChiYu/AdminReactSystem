@@ -104,7 +104,6 @@ const FinanceDashboard = () => {
       });
       setEmployeeData(data);
     } catch (error) {
-      console.error('获取员工业绩数据失败:', error);
     } finally {
       setEmployeeDataLoading(false);
     }
@@ -114,8 +113,6 @@ const FinanceDashboard = () => {
   const fetchRealFinancialData = async () => {
     setChartLoading(true);
     try {
-      console.log('🔄 开始获取财务数据，年份:', selectedYear, '月份:', selectedMonth);
-
       const [
         monthlyTrendResponse,
         expenseDistributionResponse,
@@ -141,20 +138,11 @@ const FinanceDashboard = () => {
         })
       ]);
 
-      console.log('📊 API响应数据:');
-      console.log('- 月度趋势:', monthlyTrendResponse);
-      console.log('- 支出分布:', expenseDistributionResponse);
-      console.log('- 收入分布:', incomeDistributionResponse);
-      console.log('- 支出记录:', expenseRecordsResponse);
-      console.log('- 收入记录:', incomeRecordsResponse);
-
       // 处理月度趋势数据
       if (monthlyTrendResponse && Array.isArray(monthlyTrendResponse)) {
-        console.log('✅ 设置月度趋势数据:', monthlyTrendResponse);
         setRealChartData(monthlyTrendResponse);
         setRealMonthlyExpenseData(monthlyTrendResponse);
       } else {
-        console.log('❌ 月度趋势数据为空或格式错误:', monthlyTrendResponse);
         setRealChartData([]);
         setRealMonthlyExpenseData([]);
       }
@@ -170,10 +158,8 @@ const FinanceDashboard = () => {
           type: item.category,
           value: item.amount
         }));
-        console.log('✅ 格式化后的支出分布数据:', formattedExpenseData);
         setRealExpenseTypeData(formattedExpenseData);
       } else {
-        console.log('❌ 支出分布响应为空:', expenseDistributionResponse);
         setRealExpenseTypeData([]);
       }
 
@@ -188,42 +174,35 @@ const FinanceDashboard = () => {
           type: item.category,
           value: item.amount
         }));
-        console.log('✅ 格式化后的收入分布数据:', formattedIncomeData);
         setRealIncomeTypeData(formattedIncomeData);
       } else {
-        console.log('❌ 收入分布响应为空:', incomeDistributionResponse);
         setRealIncomeTypeData([]);
       }
 
       // 处理支出记录数据
       if (expenseRecordsResponse && expenseRecordsResponse.records) {
-        console.log('✅ 支出记录数据:', expenseRecordsResponse.records.length, expenseRecordsResponse.records);
         setExpenseRecords(expenseRecordsResponse.records);
         setExpensePagination(prev => ({
           ...prev,
           total: expenseRecordsResponse.total
         }));
       } else {
-        console.log('❌ 支出记录响应为空:', expenseRecordsResponse);
         setExpenseRecords([]);
         setExpensePagination(prev => ({ ...prev, total: 0 }));
       }
 
       // 处理收入记录数据
       if (incomeRecordsResponse && incomeRecordsResponse.records) {
-        console.log('✅ 收入记录数据:', incomeRecordsResponse.records.length, incomeRecordsResponse.records);
         setIncomeRecords(incomeRecordsResponse.records);
         setIncomePagination(prev => ({
           ...prev,
           total: incomeRecordsResponse.total
         }));
       } else {
-        console.log('❌ 收入记录响应为空:', incomeRecordsResponse);
         setIncomeRecords([]);
         setIncomePagination(prev => ({ ...prev, total: 0 }));
       }
     } catch (error) {
-      console.error('❌ 获取财务数据失败:', error);
       // 如果获取失败，设置空数据
       setRealChartData([]);
       setRealExpenseTypeData([]);
@@ -304,20 +283,17 @@ const FinanceDashboard = () => {
   // 计算当月总支出
   const totalExpense = useMemo(() => {
     const total = expenseTypeData.reduce((sum, item) => sum + item.value, 0);
-    console.log('计算的总支出:', total, '支出数据:', expenseTypeData);
     return total;
   }, [expenseTypeData]);
 
   // 计算当月总收入
   const totalIncome = useMemo(() => {
     const total = incomeTypeData.reduce((sum, item) => sum + item.value, 0);
-    console.log('计算的总收入:', total, '收入数据:', incomeTypeData);
     return total;
   }, [incomeTypeData]);
 
   // 饼图配置 - 支出类型分布
   const { domRef: expenseTypePieRef, updateOptions: updateExpenseTypePie } = useEcharts(() => {
-    console.log('🍰 支出饼图配置更新，当前数据:', expenseTypeData);
     return {
       legend: {
         data: expenseTypeData.map(item => item.name),
@@ -357,7 +333,6 @@ const FinanceDashboard = () => {
 
   // 饼图配置 - 收入类型分布
   const { domRef: incomeTypePieRef, updateOptions: updateIncomeTypePie } = useEcharts(() => {
-    console.log('🍰 收入饼图配置更新，当前数据:', incomeTypeData);
     return {
       legend: {
         data: incomeTypeData.map(item => item.name),
@@ -397,7 +372,6 @@ const FinanceDashboard = () => {
 
   // 月度支出趋势堆叠折线图
   const { domRef: monthlyExpenseTrendRef, updateOptions: updateMonthlyTrend } = useEcharts(() => {
-    console.log('📈 月度支出趋势图表配置更新，当前数据:', realChartData);
     return {
       grid: {
         bottom: '10%',
@@ -664,7 +638,6 @@ const FinanceDashboard = () => {
   // 财务图表
   const { domRef: financialChartRef, updateOptions } = useEcharts(
     () => {
-      console.log('📊 年度财务图表配置更新，当前数据:', realChartData);
       return {
         grid: {
           bottom: '3%',
@@ -735,7 +708,6 @@ const FinanceDashboard = () => {
     // 使用更长的延迟确保图表容器完全就绪
     setTimeout(() => {
       if (activeTab === 'dataChart') {
-        console.log('🎯 初始化年度财务图表');
         updateOptions(() => ({
           grid: {
             bottom: '3%',
@@ -895,16 +867,10 @@ const FinanceDashboard = () => {
   // 当真实数据变化时更新图表
   useEffect(() => {
     if (activeTab === 'analysis') {
-      console.log('📊 数据变化，更新图表...');
-      console.log('- 支出数据:', realExpenseTypeData);
-      console.log('- 收入数据:', realIncomeTypeData);
-      console.log('- 年度数据:', realChartData);
-
       // 强制更新饼图
       setTimeout(() => {
         // 更新支出饼图
         if (realExpenseTypeData.length > 0) {
-          console.log('🔄 更新支出饼图');
           updateExpenseTypePie(() => ({
             legend: {
               data: realExpenseTypeData.map(item => item.name),
@@ -944,7 +910,6 @@ const FinanceDashboard = () => {
 
         // 更新收入饼图
         if (realIncomeTypeData.length > 0) {
-          console.log('🔄 更新收入饼图');
           updateIncomeTypePie(() => ({
             legend: {
               data: realIncomeTypeData.map(item => item.name),
@@ -984,7 +949,6 @@ const FinanceDashboard = () => {
 
         // 更新月度支出趋势图表
         if (realChartData.length > 0) {
-          console.log('🔄 更新月度支出趋势图表');
           updateMonthlyTrend(() => ({
             grid: {
               bottom: '10%',
@@ -1065,13 +1029,9 @@ const FinanceDashboard = () => {
         }
       }, 100);
     } else if (activeTab === 'dataChart') {
-      console.log('📊 年度数据变化，更新年度图表...');
-      console.log('- 年度数据:', realChartData);
-
       // 更新年度财务图表
       if (realChartData.length > 0) {
         setTimeout(() => {
-          console.log('🔄 更新年度财务图表');
           updateOptions(() => ({
             grid: {
               bottom: '3%',

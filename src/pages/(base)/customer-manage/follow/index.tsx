@@ -1,4 +1,11 @@
-import { CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  CopyOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  HistoryOutlined,
+  PlusOutlined
+} from '@ant-design/icons';
 import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
@@ -95,6 +102,19 @@ const CustomerFollow = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+
+  // 状态历史相关状态
+  const [isHistoryModalVisible, setIsHistoryModalVisible] = useState(false);
+  const [selectedCustomerForHistory, setSelectedCustomerForHistory] = useState<CustomerApi.CustomerListItem | null>(
+    null
+  );
+  const [historyData, setHistoryData] = useState<CustomerApi.CustomerStatusHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPagination, setHistoryPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
 
   // 添加分页状态管理
   const [pagination, setPagination] = useState({
@@ -485,6 +505,67 @@ const CustomerFollow = () => {
     });
   };
 
+  // 查看状态变更历史
+  const handleViewHistory = async (customer: CustomerApi.CustomerListItem) => {
+    setSelectedCustomerForHistory(customer);
+    setIsHistoryModalVisible(true);
+    setHistoryLoading(true);
+
+    try {
+      const response = await customerService.getCustomerStatusHistory(customer.id, {
+        current: 1,
+        size: 10
+      });
+      setHistoryData(response.records);
+      setHistoryPagination({
+        current: response.current,
+        pageSize: response.size,
+        total: response.total
+      });
+    } catch (error) {
+      console.error('❌ 获取状态历史失败:', error);
+      message.error('获取状态历史失败');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // 历史弹窗分页变化
+  const handleHistoryTableChange = async (page: number, pageSize?: number) => {
+    if (!selectedCustomerForHistory) return;
+
+    setHistoryLoading(true);
+    try {
+      const response = await customerService.getCustomerStatusHistory(selectedCustomerForHistory.id, {
+        current: page,
+        size: pageSize || historyPagination.pageSize
+      });
+      setHistoryData(response.records);
+      setHistoryPagination({
+        current: response.current,
+        pageSize: response.size,
+        total: response.total
+      });
+    } catch (error) {
+      console.error('❌ 获取状态历史失败:', error);
+      message.error('获取状态历史失败');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // 关闭历史弹窗
+  const handleHistoryModalClose = () => {
+    setIsHistoryModalVisible(false);
+    setSelectedCustomerForHistory(null);
+    setHistoryData([]);
+    setHistoryPagination({
+      current: 1,
+      pageSize: 10,
+      total: 0
+    });
+  };
+
   // 表格列定义
   const columns: ColumnsType<CustomerApi.CustomerListItem> = [
     {
@@ -618,7 +699,7 @@ const CustomerFollow = () => {
     },
     {
       key: 'action',
-      ...getActionColumnConfig(120),
+      ...getActionColumnConfig(isSuper ? 150 : 120),
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -630,14 +711,24 @@ const CustomerFollow = () => {
             编辑
           </Button>
           <Button
-            danger
-            icon={<DeleteOutlined />}
+            icon={<HistoryOutlined />}
             size="small"
             type="link"
-            onClick={() => handleDelete(record.id)}
+            onClick={() => handleViewHistory(record)}
           >
-            删除
+            历史
           </Button>
+          {isSuper && (
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              type="link"
+              onClick={() => handleDelete(record.id)}
+            >
+              删除
+            </Button>
+          )}
         </Space>
       ),
       title: '操作'
@@ -1023,6 +1114,77 @@ const CustomerFollow = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 状态变更历史弹窗 */}
+      <Modal
+        cancelText="关闭"
+        footer={null}
+        open={isHistoryModalVisible}
+        title={`客户状态变更历史 - ${selectedCustomerForHistory?.customerName}`}
+        width={800}
+        onCancel={handleHistoryModalClose}
+      >
+        <Table
+          dataSource={historyData}
+          loading={historyLoading}
+          rowKey="id"
+          size="small"
+          columns={[
+            {
+              dataIndex: 'createdAt',
+              key: 'createdAt',
+              render: (text: string) => {
+                const date = new Date(text);
+                return date
+                  .toLocaleString('zh-CN', {
+                    day: '2-digit',
+                    hour: '2-digit',
+                    hour12: false,
+                    minute: '2-digit',
+                    month: '2-digit',
+                    second: '2-digit',
+                    year: 'numeric'
+                  })
+                  .replace(/\//g, '-');
+              },
+              title: '变更时间',
+              width: 150
+            },
+            {
+              dataIndex: 'oldStatus',
+              key: 'oldStatus',
+              render: (status: string | null) => {
+                if (!status) return <Tag color="default">新建</Tag>;
+                return <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>;
+              },
+              title: '原状态',
+              width: 100
+            },
+            {
+              dataIndex: 'newStatus',
+              key: 'newStatus',
+              render: (status: string) => <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>,
+              title: '新状态',
+              width: 100
+            },
+            {
+              dataIndex: 'operatorName',
+              key: 'operatorName',
+              title: '操作人',
+              width: 120
+            }
+          ]}
+          pagination={{
+            current: historyPagination.current,
+            onChange: handleHistoryTableChange,
+            pageSize: historyPagination.pageSize,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+            total: historyPagination.total
+          }}
+        />
       </Modal>
     </div>
   );

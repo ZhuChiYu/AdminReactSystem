@@ -687,47 +687,6 @@ const ItemList = () => {
 
     const permissions = checkUserPermissions(currentUser, task);
 
-    console.log('权限检查:', {
-      currentExecutor: {
-        id: getCurrentExecutor(task.currentStage, task)?.id,
-        nickName: getCurrentExecutor(task.currentStage, task)?.nickName,
-        userName: getCurrentExecutor(task.currentStage, task)?.userName
-      },
-      currentStage: task.currentStage,
-      currentUser: {
-        nickName: currentUser.nickName,
-        roles: currentUser.roles,
-        userId: currentUser.userId,
-        userName: currentUser.userName
-      },
-      permissions: {
-        canPerformAction: permissions.canPerformAction,
-        isAdmin: permissions.isAdmin,
-        isCurrentExecutor: permissions.isCurrentExecutor,
-        isResponsiblePerson: permissions.isResponsiblePerson,
-        isSuperAdmin: permissions.isSuperAdmin
-      },
-      taskInfo: {
-        consultant: {
-          id: task.consultant?.id,
-          nickName: task.consultant?.nickName,
-          userName: task.consultant?.userName
-        },
-        marketManager: {
-          id: task.marketManager?.id,
-          nickName: task.marketManager?.nickName,
-          userName: task.marketManager?.userName
-        },
-        responsiblePerson: {
-          id: task.responsiblePerson?.id,
-          nickName: task.responsiblePerson?.nickName,
-          userName: task.responsiblePerson?.userName
-        }
-      },
-      taskName: task.projectName,
-      userIdNumber: Number.parseInt(currentUser.userId, 10)
-    });
-
     if (!permissions.canPerformAction) {
       return []; // 没有权限，返回空操作列表
     }

@@ -61,6 +61,7 @@ model User {
   employeeTargets                 EmployeeTarget[]          @relation("EmployeeTargets")
   managedTargets                  EmployeeTarget[]          @relation("ManagerTargets")
   loginRecords                    LoginRecord[]             @relation("UserLoginRecords")
+  customerStatusHistoryOperations CustomerStatusHistory[]   @relation("CustomerStatusHistoryOperator")
   department                      Department?               @relation(fields: [departmentId], references: [id])
 
   @@map("users")
@@ -171,6 +172,7 @@ model Customer {
   assignedBy          User?                @relation("AssignedByUser", fields: [assignedById], references: [id])
   createdBy           User?                @relation("CreatedByUser", fields: [createdById], references: [id])
   followRecords       FollowRecord[]
+  statusHistories     CustomerStatusHistory[]
 
   @@map("customers")
 }
@@ -189,6 +191,23 @@ model FollowRecord {
   followUser     User      @relation(fields: [followUserId], references: [id])
 
   @@map("follow_records")
+}
+
+model CustomerStatusHistory {
+  id             Int      @id @default(autoincrement())
+  customerId     Int      @map("customer_id")
+  oldStatus      String?  @map("old_status") @db.VarChar(50)
+  newStatus      String   @map("new_status") @db.VarChar(50)
+  changeReason   String?  @map("change_reason")
+  operatorId     Int      @map("operator_id")
+  operatorName   String   @map("operator_name") @db.VarChar(100)
+  createdAt      DateTime @default(now()) @map("created_at")
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  operator       User     @relation("CustomerStatusHistoryOperator", fields: [operatorId], references: [id])
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("customer_status_history")
 }
 
 model CourseCategory {

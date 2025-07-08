@@ -273,6 +273,31 @@ export class CustomerService {
       throw error;
     }
   }
+
+  /** 获取客户状态变更历史 */
+  async getCustomerStatusHistory(
+    customerId: number,
+    params: { current?: number; size?: number } = {}
+  ): Promise<{
+    current: number;
+    pages: number;
+    records: CustomerApi.CustomerStatusHistoryItem[];
+    size: number;
+    total: number;
+  }> {
+    try {
+      const response = await apiClient.get(`/customers/${customerId}/status-history`, {
+        params: {
+          current: params.current || 1,
+          size: params.size || 10
+        }
+      });
+      return response;
+    } catch (error) {
+      console.error('获取客户状态变更历史失败:', error);
+      throw error;
+    }
+  }
 }
 
 // 导出客户服务实例

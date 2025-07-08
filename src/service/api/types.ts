@@ -235,6 +235,19 @@ export namespace CustomerApi {
     wechat?: string;
   }
 
+  export interface CustomerStatusHistoryItem {
+    changeTime: string;
+    createdAt: string;
+    id: number;
+    newStatus: string;
+    oldStatus: string | null;
+    operator: {
+      id: number;
+      name: string;
+    } | null;
+    operatorName: string;
+  }
+
   export interface CreateCustomerRequest {
     address?: string;
     company?: string;

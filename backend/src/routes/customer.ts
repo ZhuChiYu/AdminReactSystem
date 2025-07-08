@@ -383,6 +383,40 @@ router.put('/:id', permissionMiddleware('customer:update'), asyncErrorHandler(cu
 
 /**
  * @swagger
+ * /api/customers/{id}/status-history:
+ *   get:
+ *     summary: 获取客户状态变更历史
+ *     tags: [客户管理]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 客户ID
+ *       - in: query
+ *         name: current
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: 当前页码
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: 每页大小
+ *     responses:
+ *       200:
+ *         description: 查询成功
+ */
+router.get('/:id/status-history', permissionMiddleware('customer:list'), asyncErrorHandler(customerController.getCustomerStatusHistory));
+
+/**
+ * @swagger
  * /api/customers/{id}:
  *   delete:
  *     summary: 删除客户

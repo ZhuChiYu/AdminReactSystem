@@ -106,7 +106,7 @@ class CustomerController {
 
       // 构建排序条件 - 根据用户角色决定排序方式
       let orderBy: any[];
-      
+
       if (user?.roles?.includes('super_admin')) {
         // 超级管理员：直接按修改时间倒序排列，最近修改的在前面
         orderBy = [
@@ -593,40 +593,64 @@ class CustomerController {
         throw new NotFoundError('您没有权限修改此客户');
       }
 
-      const customer = await prisma.customer.update({
-        data: {
-          company,
-          customerName,
-          gender,
-          email,
-          followStatus,
-          industry,
-          level: level ? Number(level) : undefined,
-          mobile,
-          phone,
-          position,
-          remark,
-          source,
-          wechat
-        },
-        include: {
-          assignedTo: {
-            select: {
-              id: true,
-              nickName: true,
-              userName: true
+      // 检查跟进状态是否有变化，如果有变化则记录历史
+      const statusChanged = followStatus && followStatus !== existingCustomer.followStatus;
+
+      // 使用事务同时更新客户信息和状态历史
+      const result = await prisma.$transaction(async (prisma) => {
+        // 更新客户信息
+        const customer = await prisma.customer.update({
+          data: {
+            company,
+            customerName,
+            gender,
+            email,
+            followStatus,
+            industry,
+            level: level ? Number(level) : undefined,
+            mobile,
+            phone,
+            position,
+            remark,
+            source,
+            wechat
+          },
+          include: {
+            assignedTo: {
+              select: {
+                id: true,
+                nickName: true,
+                userName: true
+              }
+            },
+            createdBy: {
+              select: {
+                id: true,
+                nickName: true,
+                userName: true
+              }
             }
           },
-          createdBy: {
-            select: {
-              id: true,
-              nickName: true,
-              userName: true
+          where: { id: Number(id) }
+        });
+
+        // 如果状态有变化，记录状态变更历史
+        if (statusChanged && req.user) {
+          await prisma.customerStatusHistory.create({
+            data: {
+              customerId: Number(id),
+              oldStatus: existingCustomer.followStatus,
+              newStatus: followStatus,
+              operatorId: req.user.id,
+              operatorName: req.user.nickName || req.user.userName
             }
-          }
-        },
-        where: { id: Number(id) }
+          });
+        }
+
+        return customer;
       });
+
+      const customer = result;
 
       logger.info(`用户 ${req.user.userName} 更新客户: ${customer.customerName}`, {
         customerId: customer.id,
@@ -1274,6 +1298,99 @@ class CustomerController {
     } catch (error) {
       logger.error('取消客户分配失败:', error);
       res.status(500).json(createErrorResponse(500, '取消分配失败', null, req.path));
+    }
+  }
+
+  /** 获取客户状态变更历史 */
+  async getCustomerStatusHistory(req: Request, res: Response) {
+    const { id } = req.params;
+    const { current = 1, size = 10 } = req.query;
+
+    const page = Number(current);
+    const pageSize = Number(size);
+    const skip = (page - 1) * pageSize;
+
+    if (!req.user) {
+      throw new ValidationError('用户未认证');
+    }
+
+    try {
+      // 检查客户是否存在并且用户有权限查看
+      const customer = await prisma.customer.findUnique({
+        where: { id: Number(id) }
+      });
+
+      if (!customer) {
+        throw new NotFoundError('客户不存在');
+      }
+
+      // 权限控制：超级管理员可以查看所有历史，其他用户只能查看自己相关的客户历史
+      const isSuperAdmin = req.user.roles?.includes('super_admin');
+      const isCreator = customer.createdById === req.user.id;
+      const isAssignedUser = customer.assignedToId === req.user.id;
+
+      if (!isSuperAdmin && !isCreator && !isAssignedUser) {
+        throw new NotFoundError('您没有权限查看此客户的历史记录');
+      }
+
+      // 获取总数
+      const total = await prisma.customerStatusHistory.count({
+        where: { customerId: Number(id) }
+      });
+
+      // 获取历史记录
+      const histories = await prisma.customerStatusHistory.findMany({
+        where: { customerId: Number(id) },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              nickName: true,
+              userName: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize
+      });
+
+      // 格式化返回数据
+      const records = histories.map(history => ({
+        id: history.id,
+        oldStatus: history.oldStatus,
+        newStatus: history.newStatus,
+        operatorName: history.operatorName,
+        operator: history.operator ? {
+          id: history.operator.id,
+          name: history.operator.nickName || history.operator.userName
+        } : null,
+        createdAt: history.createdAt,
+        changeTime: history.createdAt.toISOString()
+      }));
+
+      const pages = Math.ceil(total / pageSize);
+
+      res.json(
+        createSuccessResponse(
+          {
+            current: page,
+            pages,
+            records,
+            size: pageSize,
+            total
+          },
+          '查询成功',
+          req.path
+        )
+      );
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        res.status(404).json(createErrorResponse(404, error.message, null, req.path));
+      } else {
+        logger.error('获取客户状态变更历史失败:', error);
+        res.status(500).json(createErrorResponse(500, '获取状态变更历史失败', null, req.path));
+      }
     }
   }
 
