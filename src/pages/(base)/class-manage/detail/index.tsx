@@ -6,6 +6,7 @@ import {
   InboxOutlined,
   LoadingOutlined,
   PaperClipOutlined,
+  ReloadOutlined,
   UploadOutlined,
   UserAddOutlined
 } from '@ant-design/icons';
@@ -415,6 +416,27 @@ const ClassDetail = () => {
     fetchClassInfo();
     fetchStudentList();
   }, [classId]);
+
+  // 添加页面焦点事件监听，当页面重新获得焦点时刷新学员数据
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const handleFocus = () => {
+      // 使用防抖，避免频繁请求
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        // 当页面重新获得焦点时，刷新学员列表以获取最新数据
+        fetchStudentList(studentPagination.current, studentPagination.pageSize, searchText);
+      }, 500); // 500ms 防抖
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearTimeout(timeoutId);
+    };
+  }, [fetchStudentList, studentPagination.current, studentPagination.pageSize, searchText]);
 
   // 获取状态标签颜色
   const getStatusColor = (status: ClassStatus) => {
@@ -1130,8 +1152,31 @@ const ClassDetail = () => {
     });
   };
 
-  // 处理附件下载
-  const handleDownloadAttachment = async (attachment: any) => {
+  // 处理课程附件下载
+  const handleDownloadCourseAttachment = async (attachment: any) => {
+    try {
+      // 使用课程附件服务的下载方法
+      const response = await attachmentService.downloadAttachment(attachment.id);
+
+      // 创建下载链接
+      const url = window.URL.createObjectURL(new Blob([response]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.name || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      message.success(`下载成功: ${attachment.name}`);
+    } catch (error) {
+      console.error('下载课程附件失败:', error);
+      message.error('下载失败，请重试');
+    }
+  };
+
+  // 处理通知附件下载
+  const handleDownloadNotificationAttachment = async (attachment: any) => {
     if (!currentAnnounce?.id) {
       message.error('通知ID无效');
       return;
@@ -1191,7 +1236,7 @@ const ClassDetail = () => {
         message.success('通知已更新');
       } else {
         // 新建模式 - 调用API创建通知
-        const result = await notificationService.createNotification(announceData);
+        const _result = await notificationService.createNotification(announceData);
 
         // 重新获取通知列表
         const announcementsResponse = await notificationService.getNotificationList({
@@ -1528,6 +1573,13 @@ const ClassDetail = () => {
               onClick={openCustomerSelectModal}
             >
               导入学员
+            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              title="刷新学员信息"
+              onClick={() => fetchStudentList(studentPagination.current, studentPagination.pageSize, searchText)}
+            >
+              刷新
             </Button>
             {isSuperAdminUser && <Button onClick={handleExportStudents}>导出学员</Button>}
             {selectedRowKeys.length > 0 && (
@@ -2183,7 +2235,7 @@ const ClassDetail = () => {
                             icon={<DownloadOutlined />}
                             size="small"
                             type="primary"
-                            onClick={() => handleDownloadAttachment(record)}
+                            onClick={() => handleDownloadCourseAttachment(record)}
                           >
                             下载
                           </Button>
@@ -2750,7 +2802,7 @@ const ClassDetail = () => {
                             icon={<DownloadOutlined />}
                             size="small"
                             type="primary"
-                            onClick={() => handleDownloadAttachment(record)}
+                            onClick={() => handleDownloadNotificationAttachment(record)}
                           >
                             下载
                           </Button>

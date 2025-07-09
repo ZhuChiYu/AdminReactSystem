@@ -596,7 +596,7 @@ class CustomerController {
       // 检查跟进状态是否有变化，如果有变化则记录历史
       const statusChanged = followStatus && followStatus !== existingCustomer.followStatus;
 
-      // 使用事务同时更新客户信息和状态历史
+      // 使用事务同时更新客户信息、状态历史和相关班级学员信息
       const result = await prisma.$transaction(async (prisma) => {
         // 更新客户信息
         const customer = await prisma.customer.update({
@@ -645,6 +645,57 @@ class CustomerController {
               operatorName: req.user.nickName || req.user.userName
             }
           });
+        }
+
+        // 同步更新班级学员信息
+        // 根据客户姓名和公司匹配班级学员记录进行更新
+        if (customerName || company || phone || mobile || gender || position) {
+          try {
+            // 查找可能匹配的班级学员
+            const matchingStudents = await prisma.classStudent.findMany({
+              where: {
+                OR: [
+                  // 按姓名和公司匹配
+                  {
+                    name: existingCustomer.customerName,
+                    company: existingCustomer.company
+                  },
+                  // 按姓名和电话匹配（处理公司名称可能有变化的情况）
+                  {
+                    name: existingCustomer.customerName,
+                    phone: existingCustomer.phone || existingCustomer.mobile
+                  }
+                ]
+              }
+            });
+
+            // 更新匹配的学员信息
+            for (const student of matchingStudents) {
+              await prisma.classStudent.update({
+                where: { id: student.id },
+                data: {
+                  ...(customerName && { name: customerName }),
+                  ...(company && { company }),
+                  ...(phone && { phone }),
+                  ...(mobile && !phone && { phone: mobile }), // 如果没有固定电话，用手机号更新
+                  ...(gender && { gender }),
+                  ...(position && { position }),
+                  ...(email && { email })
+                }
+              });
+            }
+
+            if (matchingStudents.length > 0) {
+              logger.info(`已同步更新 ${matchingStudents.length} 个班级学员的信息`, {
+                customerId: Number(id),
+                customerName: existingCustomer.customerName,
+                updatedStudentIds: matchingStudents.map(s => s.id)
+              });
+            }
+          } catch (syncError) {
+            // 学员信息同步失败不应该影响客户信息更新
+            logger.warn('同步班级学员信息失败，但客户信息更新成功:', syncError);
+          }
         }
 
         return customer;

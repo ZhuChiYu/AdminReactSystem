@@ -96,7 +96,7 @@ function Component() {
       // 获取课程信息（如果失败则使用fallback）
       try {
         const courseResponse = await courseService.getCourseDetail(Number.parseInt(courseId, 10));
-        setCourse(courseData);
+        setCourse(courseResponse);
       } catch (courseError) {
         console.error('获取课程详情失败:', courseError);
         message.warning(`课程 ${courseId} 不存在，使用默认名称`);
@@ -109,6 +109,11 @@ function Component() {
       }
 
       // 获取附件列表
+      const requestParams = {
+        courseId: Number.parseInt(courseId, 10),
+        current: 1,
+        size: 1000 // 获取所有附件，前端进行分页
+      };
       const attachmentResponse = await attachmentService.getAttachmentList(requestParams);
 
       // 检查响应数据是否有效
