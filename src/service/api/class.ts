@@ -197,21 +197,11 @@ export const classService = {
   },
 
   /** 获取班级学生列表 */
-  async getClassStudentList(params: { classId: number; current?: number; size?: number }) {
-    try {
-      const response = await apiClient.get('/classes/students', {
-        params
-      });
-      return response;
-    } catch {
-      return {
-        current: params?.current || 1,
-        pages: 0,
-        records: [],
-        size: params?.size || 10,
-        total: 0
-      };
-    }
+  async getClassStudentList(params: { classId: number; current?: number; keyword?: string; size?: number }) {
+    const response = await apiClient.get('/classes/students', {
+      params
+    });
+    return response;
   },
 
   /** 获取课程列表（用于班级关联） */

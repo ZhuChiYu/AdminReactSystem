@@ -159,13 +159,18 @@ router.get('/', asyncErrorHandler(classController.getClasses));
  *           maximum: 100
  *           default: 10
  *         description: 每页大小
+ *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: 搜索关键词（支持姓名和单位搜索）
  *     responses:
  *       200:
  *         description: 查询成功
  */
 router.get('/students', async (req, res) => {
   try {
-    const { classId, current = 1, size = 10 } = req.query;
+    const { classId, current = 1, size = 10, keyword } = req.query;
     const user = req.user;
 
     // 检查用户是否为超级管理员
@@ -185,6 +190,28 @@ router.get('/students', async (req, res) => {
     const pageSize = Number.parseInt(size as string);
     const skip = (page - 1) * pageSize;
 
+    // 构建搜索条件
+    const where: any = { classId: Number.parseInt(classId as string) };
+
+    // 如果有搜索关键词，添加搜索条件
+    if (keyword && typeof keyword === 'string' && keyword.trim()) {
+      const searchKeyword = keyword.trim();
+      where.OR = [
+        {
+          name: {
+            contains: searchKeyword,
+            mode: 'insensitive'
+          }
+        },
+        {
+          company: {
+            contains: searchKeyword,
+            mode: 'insensitive'
+          }
+        }
+      ];
+    }
+
     const [students, total] = await Promise.all([
       prisma.classStudent.findMany({
         include: {
@@ -199,10 +226,10 @@ router.get('/students', async (req, res) => {
         orderBy: { createdAt: 'desc' },
         skip,
         take: pageSize,
-        where: { classId: Number.parseInt(classId as string) }
+        where
       }),
       prisma.classStudent.count({
-        where: { classId: Number.parseInt(classId as string) }
+        where
       })
     ]);
 

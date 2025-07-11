@@ -1466,9 +1466,20 @@ const ClassDetail = () => {
     });
   };
 
+  // 处理搜索输入变化
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchText(value);
+
+    // 如果搜索框被清空，自动重新加载数据
+    if (value === '') {
+      setStudentPagination({ current: 1, pageSize: 20, total: 0 });
+      fetchStudentList(1, 20, '');
+    }
+  };
+
   // 处理搜索
   const handleSearch = (value: string) => {
-    setSearchText(value);
     setStudentPagination({ current: 1, pageSize: 20, total: 0 });
     fetchStudentList(1, 20, value);
   };
@@ -1603,7 +1614,8 @@ const ClassDetail = () => {
             placeholder="请输入姓名或单位进行搜索"
             size="large"
             style={{ maxWidth: 400 }}
-            onChange={e => handleSearch(e.target.value)}
+            value={searchText}
+            onChange={handleSearchChange}
             onSearch={handleSearch}
           />
         </div>
