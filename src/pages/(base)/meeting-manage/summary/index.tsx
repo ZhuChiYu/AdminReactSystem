@@ -1,39 +1,13 @@
-import {
-  CalendarOutlined,
-  CheckCircleOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  EyeOutlined,
-  FileTextOutlined,
-  PlusOutlined,
-  UserOutlined
-} from '@ant-design/icons';
-import {
-  Avatar,
-  Button,
-  Card,
-  DatePicker,
-  Divider,
-  Form,
-  Input,
-  List,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  message
-} from 'antd';
+import { DeleteOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 
 import { fetchGetUserList, meetingService } from '@/service/api';
-import type { MeetingApi } from '@/service/api/types';
-import { getCurrentUserId } from '@/utils/auth';
+import { getCurrentUserId, isSuperAdmin } from '@/utils/auth';
 import { getActionColumnConfig, getCenterColumnConfig, getFullTableConfig } from '@/utils/table';
 
-const { Paragraph, Text, Title } = Typography;
+const { Text, Title } = Typography;
 const { TextArea } = Input;
 
 interface MeetingSummary {
@@ -278,6 +252,50 @@ const MeetingSummaryPage = () => {
     }
   };
 
+  // 删除会议总结
+  const handleDelete = (summary: MeetingSummary) => {
+    Modal.confirm({
+      content: '确定要删除这条会议总结吗？此操作不可恢复。',
+      onOk: async () => {
+        try {
+          await meetingService.deleteMeetingSummary(Number(summary.id));
+          message.success('会议总结已删除');
+          fetchSummaries(); // 重新获取列表
+        } catch (error) {
+          console.error('删除会议总结失败:', error);
+          message.error('删除会议总结失败');
+        }
+      },
+      title: '确认删除'
+    });
+  };
+
+  // 导出会议总结
+  const handleExport = async (summary: MeetingSummary) => {
+    try {
+      message.loading({ content: '正在准备导出...', key: 'export' });
+
+      const blob = await meetingService.exportMeetingSummary(Number(summary.id));
+
+      // 创建下载链接
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `会议总结-${summary.meetingTitle}-${summary.meetingDate}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // 清理URL对象
+      window.URL.revokeObjectURL(downloadUrl);
+
+      message.success({ content: '会议总结导出成功', key: 'export' });
+    } catch (error) {
+      console.error('导出会议总结失败:', error);
+      message.error({ content: '导出失败，请重试', key: 'export' });
+    }
+  };
+
   const columns = [
     {
       dataIndex: 'meetingTitle',
@@ -332,7 +350,7 @@ const MeetingSummaryPage = () => {
     {
       key: 'action',
       title: '操作',
-      ...getActionColumnConfig(120),
+      ...getActionColumnConfig(isSuperAdmin() ? 200 : 120),
       render: (_: any, record: MeetingSummary) => (
         <Space>
           <Button
@@ -342,6 +360,23 @@ const MeetingSummaryPage = () => {
           >
             查看详情
           </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            type="link"
+            onClick={() => handleExport(record)}
+          >
+            导出
+          </Button>
+          {isSuperAdmin() && (
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              type="link"
+              onClick={() => handleDelete(record)}
+            >
+              删除
+            </Button>
+          )}
         </Space>
       )
     }

@@ -345,13 +345,46 @@ const Component: React.FC = () => {
   };
 
   const handleDeleteRecord = (id: string) => {
-    const updatedRecords = records.filter(record => record.id !== id);
-    setRecords(updatedRecords);
-    message.success('会议记录已删除');
+    Modal.confirm({
+      content: '确定要删除这条会议记录吗？此操作不可恢复。',
+      onOk: async () => {
+        try {
+          await meetingService.deleteMeetingRecord(Number(id));
+          message.success('会议记录已删除');
+          // 重新获取会议记录列表
+          await fetchRecords();
+        } catch (error) {
+          console.error('删除会议记录失败:', error);
+          message.error('删除会议记录失败');
+        }
+      },
+      title: '确认删除'
+    });
   };
 
-  const handleExportRecord = (record: MeetingRecord) => {
-    message.success('会议记录导出功能尚未实现');
+  const handleExportRecord = async (record: MeetingRecord) => {
+    try {
+      message.loading({ content: '正在准备导出...', key: 'export' });
+
+      const blob = await meetingService.exportMeetingRecord(Number(record.id));
+
+      // 创建下载链接
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `会议记录-${record.meetingTitle}-${record.recordDate}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // 清理URL对象
+      window.URL.revokeObjectURL(downloadUrl);
+
+      message.success({ content: '会议记录导出成功', key: 'export' });
+    } catch (error) {
+      console.error('导出会议记录失败:', error);
+      message.error({ content: '导出失败，请重试', key: 'export' });
+    }
   };
 
   // 添加参与者记录

@@ -1093,6 +1093,136 @@ router.put('/records/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// 删除会议记录
+router.delete('/records/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 检查会议记录是否存在
+    const existingRecord = await prisma.meetingRecord.findUnique({
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!existingRecord) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '会议记录不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    await prisma.meetingRecord.delete({
+      where: { id: Number.parseInt(id) }
+    });
+
+    res.json({
+      code: 0,
+      data: null,
+      message: '会议记录删除成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('删除会议记录失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '删除会议记录失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 导出会议记录
+router.get('/records/:id/export', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const record = await prisma.meetingRecord.findUnique({
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        recorder: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      },
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!record) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '会议记录不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+        // 格式化日期
+    const formatDate = (date: Date | string) => {
+      try {
+        const d = new Date(date);
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD 格式
+      } catch {
+        return '未知日期';
+      }
+    };
+
+    // 这里可以集成实际的文档生成库（如 docx 或其他）
+    // 暂时返回一个简单的文本文件
+    const content = `
+会议记录
+
+会议标题：${record.meeting.title}
+会议时间：${formatDate(record.meeting.startTime)} - ${formatDate(record.meeting.endTime)}
+会议地点：${record.meeting.location || '未指定'}
+记录人：${record.recorder.nickName || record.recorder.userName}
+记录日期：${formatDate(record.createdAt)}
+
+记录内容：
+${record.content}
+
+${record.keyPoints ? `关键要点：\n${record.keyPoints}\n` : ''}
+${record.actionItems ? `行动项目：\n${record.actionItems}\n` : ''}
+${record.decisions ? `决策内容：\n${record.decisions}\n` : ''}
+${record.nextSteps ? `下一步行动：\n${record.nextSteps}` : ''}
+    `;
+
+    const fileName = `会议记录-${record.meeting.title.replace(/[<>:"/\\|?*]/g, '-')}-${formatDate(record.createdAt)}.txt`;
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+    // 返回文本内容
+    res.send(content);
+
+  } catch (error: any) {
+    logger.error('导出会议记录失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '导出会议记录失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
 // ==================== 会议总结相关API ====================
 
 // 获取会议总结列表
@@ -1293,6 +1423,134 @@ router.put('/summaries/:id', authMiddleware, async (req, res) => {
       code: 500,
       data: null,
       message: '更新会议总结失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 删除会议总结
+router.delete('/summaries/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 检查会议总结是否存在
+    const existingSummary = await prisma.meetingSummary.findUnique({
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!existingSummary) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '会议总结不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    await prisma.meetingSummary.delete({
+      where: { id: Number.parseInt(id) }
+    });
+
+    res.json({
+      code: 0,
+      data: null,
+      message: '会议总结删除成功',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('删除会议总结失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '删除会议总结失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 导出会议总结
+router.get('/summaries/:id/export', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const summary = await prisma.meetingSummary.findUnique({
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            location: true
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      },
+      where: { id: Number.parseInt(id) }
+    });
+
+    if (!summary) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '会议总结不存在',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+        // 格式化日期
+    const formatDate = (date: Date | string) => {
+      try {
+        const d = new Date(date);
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD 格式
+      } catch {
+        return '未知日期';
+      }
+    };
+
+    // 这里可以集成实际的文档生成库（如 docx 或其他）
+    // 暂时返回一个简单的文本文件
+    const content = `
+会议总结
+
+会议标题：${summary.meeting.title}
+会议时间：${formatDate(summary.meeting.startTime)} - ${formatDate(summary.meeting.endTime)}
+会议地点：${summary.meeting.location || '未指定'}
+总结人：${summary.creator.nickName || summary.creator.userName}
+总结日期：${formatDate(summary.createdAt)}
+
+总结内容：
+${summary.content}
+
+${summary.conclusion ? `会议结论：\n${summary.conclusion}\n` : ''}
+${summary.nextSteps ? `下一步行动：\n${summary.nextSteps}` : ''}
+    `;
+
+    const fileName = `会议总结-${summary.meeting.title.replace(/[<>:"/\\|?*]/g, '-')}-${formatDate(summary.createdAt)}.txt`;
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+    // 返回文本内容
+    res.send(content);
+
+  } catch (error: any) {
+    logger.error('导出会议总结失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '导出会议总结失败',
       path: req.path,
       timestamp: Date.now()
     });

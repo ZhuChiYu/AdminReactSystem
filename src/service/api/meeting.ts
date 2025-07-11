@@ -185,13 +185,13 @@ export class MeetingService {
 
   /** 创建会议记录 */
   async createMeetingRecord(data: {
-    meetingId: number;
-    content: string;
-    title?: string;
-    keyPoints?: string;
     actionItems?: string;
+    content: string;
     decisions?: string;
+    keyPoints?: string;
+    meetingId: number;
     nextSteps?: string;
+    title?: string;
   }) {
     try {
       const response = await apiClient.post<ApiResponse<any>>('/meetings/records', data);
@@ -225,12 +225,12 @@ export class MeetingService {
   async updateMeetingRecord(
     recordId: number,
     data: {
-      title?: string;
-      content?: string;
-      keyPoints?: string;
       actionItems?: string;
+      content?: string;
       decisions?: string;
+      keyPoints?: string;
       nextSteps?: string;
+      title?: string;
     }
   ) {
     try {
@@ -238,6 +238,52 @@ export class MeetingService {
       return response;
     } catch (error) {
       console.error('更新会议记录失败:', error);
+      throw error;
+    }
+  }
+
+  /** 删除会议记录 */
+  async deleteMeetingRecord(recordId: number): Promise<void> {
+    try {
+      await apiClient.delete(`/meetings/records/${recordId}`);
+    } catch (error) {
+      console.error('删除会议记录失败:', error);
+      throw error;
+    }
+  }
+
+  /** 删除会议总结 */
+  async deleteMeetingSummary(summaryId: number): Promise<void> {
+    try {
+      await apiClient.delete(`/meetings/summaries/${summaryId}`);
+    } catch (error) {
+      console.error('删除会议总结失败:', error);
+      throw error;
+    }
+  }
+
+  /** 导出会议记录 */
+  async exportMeetingRecord(recordId: number): Promise<Blob> {
+    try {
+      const response = await apiClient.get(`/meetings/records/${recordId}/export`, {
+        responseType: 'blob'
+      });
+      return response;
+    } catch (error) {
+      console.error('导出会议记录失败:', error);
+      throw error;
+    }
+  }
+
+  /** 导出会议总结 */
+  async exportMeetingSummary(summaryId: number): Promise<Blob> {
+    try {
+      const response = await apiClient.get(`/meetings/summaries/${summaryId}/export`, {
+        responseType: 'blob'
+      });
+      return response;
+    } catch (error) {
+      console.error('导出会议总结失败:', error);
       throw error;
     }
   }
