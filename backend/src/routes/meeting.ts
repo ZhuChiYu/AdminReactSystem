@@ -429,16 +429,21 @@ router.post('/', authMiddleware, async (req, res) => {
       }
     });
 
-    // 添加参与者
+    // 添加参与者（过滤掉组织者，避免重复插入）
     if (actualParticipants.length > 0) {
-      await prisma.meetingParticipant.createMany({
-        data: actualParticipants.map((participantId: number) => ({
-          meetingId: meeting.id,
-          role: 'participant',
-          status: 1,
-          userId: participantId // 待确认
-        }))
-      });
+      // 过滤掉组织者，避免唯一约束冲突
+      const filteredParticipants = actualParticipants.filter((participantId: number) => participantId !== actualOrganizerId);
+
+      if (filteredParticipants.length > 0) {
+        await prisma.meetingParticipant.createMany({
+          data: filteredParticipants.map((participantId: number) => ({
+            meetingId: meeting.id,
+            role: 'participant',
+            status: 1,
+            userId: participantId // 待确认
+          }))
+        });
+      }
 
       // 添加组织者为参与者
       await prisma.meetingParticipant.create({

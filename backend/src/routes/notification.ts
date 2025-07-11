@@ -5,6 +5,7 @@ import express from 'express';
 import multer from 'multer';
 
 import { prisma } from '@/config/database';
+import { authMiddleware } from '@/middleware/auth';
 import { logger } from '@/utils/logger';
 import { createErrorResponse, createSuccessResponse } from '@/utils/response';
 
@@ -77,7 +78,7 @@ function getFileExtension(filename: string): string {
 }
 
 // 获取通知列表
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { current = 1, readStatus, relatedId, relatedType, size = 10, title, type } = req.query;
 
@@ -213,7 +214,7 @@ router.get('/', async (req, res) => {
 });
 
 // 标记通知为已读
-router.put('/:id/read', async (req, res) => {
+router.put('/:id/read', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const currentUserId = (req as any).user?.id;
@@ -277,7 +278,7 @@ router.put('/:id/read', async (req, res) => {
 });
 
 // 标记所有通知为已读
-router.put('/read-all', async (req, res) => {
+router.put('/read-all', authMiddleware, async (req, res) => {
   try {
     const currentUserId = (req as any).user?.id;
 
@@ -326,7 +327,7 @@ router.put('/read-all', async (req, res) => {
 });
 
 // 创建通知
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
     const { content, relatedId, relatedType, targetUserIds = [], title, type } = req.body;
 
@@ -387,7 +388,7 @@ router.post('/', async (req, res) => {
 });
 
 // 删除通知
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const currentUserId = (req as any).user?.id;
@@ -444,7 +445,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // 获取未读通知数量
-router.get('/unread-count', async (req, res) => {
+router.get('/unread-count', authMiddleware, async (req, res) => {
   try {
     const currentUserId = (req as any).user?.id;
 

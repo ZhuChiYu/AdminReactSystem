@@ -94,12 +94,17 @@ const NotificationsPage: React.FC = () => {
   // 标记所有通知为已读
   const markAllAsRead = async () => {
     try {
-      await notificationService.markAllAsRead();
+      const response = await notificationService.markAllAsRead();
 
       const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
       setNotifications(updatedNotifications);
       filterNotifications(updatedNotifications, activeTab);
       message.success('所有通知已标记为已读');
+
+      // 重新获取通知列表以确保数据同步
+      setTimeout(() => {
+        fetchNotifications();
+      }, 500);
     } catch (error) {
       message.error('标记失败');
     }

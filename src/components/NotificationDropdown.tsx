@@ -69,7 +69,6 @@ const NotificationDropdown: React.FC = () => {
       setNotifications(notifications.map(n => (n.id === id ? { ...n, read: true } : n)));
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('标记已读失败:', error);
       message.error('标记已读失败');
     }
   };
@@ -77,13 +76,17 @@ const NotificationDropdown: React.FC = () => {
   // 标记所有为已读
   const markAllAsRead = async () => {
     try {
-      await notificationService.markAllAsRead();
+      const response = await notificationService.markAllAsRead();
 
       setNotifications(notifications.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
       message.success('全部已标记为已读');
+
+      // 重新获取通知列表以确保数据同步
+      setTimeout(() => {
+        fetchNotifications();
+      }, 500);
     } catch (error) {
-      console.error('标记全部已读失败:', error);
       message.error('标记全部已读失败');
     }
   };
