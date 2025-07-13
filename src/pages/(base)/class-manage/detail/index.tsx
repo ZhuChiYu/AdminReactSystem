@@ -1002,6 +1002,14 @@ const ClassDetail = () => {
               message.loading({ content: '导出完成中 (90%)...', key });
 
               setTimeout(() => {
+                // 性别转换函数
+                const formatGender = (gender: string) => {
+                  if (!gender) return '-';
+                  if (gender === 'male') return '男';
+                  if (gender === 'female') return '女';
+                  return gender;
+                };
+
                 // 构建CSV内容
                 const headers = ['学员ID', '姓名', '性别', '单位', '职务', '电话', '座机号', '邮箱', '加入日期'];
                 const csvContent = [
@@ -1010,7 +1018,7 @@ const ClassDetail = () => {
                     [
                       student.studentId,
                       student.name,
-                      student.gender,
+                      formatGender(student.gender),
                       student.company,
                       student.position,
                       student.phone,
