@@ -1387,27 +1387,35 @@ class TaskController {
    */
   private getCurrentWeekNumber(): number {
     const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const pastDaysOfYear = (now.getTime() - startOfYear.getTime()) / 86400000;
-    return Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+    return this.getISOWeekNumber(now);
   }
 
   /**
-   * 获取指定年份和周数的日期范围
+   * 计算 ISO 周数
+   */
+  private getISOWeekNumber(date: Date): number {
+    const target = new Date(date.valueOf());
+    const dayNumber = (date.getDay() + 6) % 7;
+    target.setDate(target.getDate() - dayNumber + 3);
+    const jan4 = new Date(target.getFullYear(), 0, 4);
+    const dayDiff = (target.getTime() - jan4.getTime()) / 86400000;
+    return Math.ceil(dayDiff / 7) + 1;
+  }
+
+  /**
+   * 获取指定年份和周数的日期范围（ISO周数）
    */
   private getWeekDateRange(year: number, weekNumber: number): { start: Date; end: Date } {
-    // 获取该年第一天
-    const firstDayOfYear = new Date(year, 0, 1);
+    // 获取该年的1月4日（ISO周数计算的基准日期）
+    const jan4 = new Date(year, 0, 4);
 
-    // 计算第一周的开始日期（周一）
-    const firstMonday = new Date(firstDayOfYear);
-    const dayOfWeek = firstDayOfYear.getDay();
-    const daysToAdd = dayOfWeek === 0 ? 1 : 8 - dayOfWeek; // 如果是周日，加1天；否则加到下周一
-    firstMonday.setDate(firstDayOfYear.getDate() + daysToAdd);
+    // 计算1月4日所在周的周一
+    const jan4WeekStart = new Date(jan4);
+    jan4WeekStart.setDate(jan4.getDate() - (jan4.getDay() + 6) % 7);
 
-    // 计算目标周的开始日期
-    const targetWeekStart = new Date(firstMonday);
-    targetWeekStart.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+    // 计算目标周的开始日期（周一）
+    const targetWeekStart = new Date(jan4WeekStart);
+    targetWeekStart.setDate(jan4WeekStart.getDate() + (weekNumber - 1) * 7);
 
     // 计算目标周的结束日期（周日 23:59:59）
     const targetWeekEnd = new Date(targetWeekStart);

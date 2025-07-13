@@ -106,39 +106,46 @@ router.get('/user-stats', async (req: Request, res: Response) => {
  * 获取当前周数（ISO周数）
  */
 function getCurrentWeekNumber(): number {
-  const today = new Date();
-  // 获取年初第一天
-  const firstDay = new Date(today.getFullYear(), 0, 1);
-  // 计算今天是一年中的第几天
-  const dayOfYear = Math.floor((today.getTime() - firstDay.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-  // 计算周数
-  return Math.ceil(dayOfYear / 7);
+  const now = new Date();
+  return getISOWeekNumber(now);
 }
 
 /**
- * 根据年份和周数获取日期范围
+ * 计算 ISO 周数
+ */
+function getISOWeekNumber(date: Date): number {
+  const target = new Date(date.valueOf());
+  const dayNumber = (date.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNumber + 3);
+  const jan4 = new Date(target.getFullYear(), 0, 4);
+  const dayDiff = (target.getTime() - jan4.getTime()) / 86400000;
+  return Math.ceil(dayDiff / 7) + 1;
+}
+
+/**
+ * 根据年份和周数获取日期范围（ISO周数）
  */
 function getWeekDateRange(year: number, weekNumber: number): { start: Date; end: Date } {
-  // 获取指定年份的1月1日
-  const firstDay = new Date(year, 0, 1);
+  // 获取该年的1月4日（ISO周数计算的基准日期）
+  const jan4 = new Date(year, 0, 4);
 
-  // 获取1月1日是星期几（0=周日，1=周一...）
-  const firstDayOfWeek = firstDay.getDay();
+  // 计算1月4日所在周的周一
+  const jan4WeekStart = new Date(jan4);
+  jan4WeekStart.setDate(jan4.getDate() - (jan4.getDay() + 6) % 7);
 
-  // 计算第一个完整周的开始日期（周一）
-  const firstMonday = new Date(firstDay);
-  firstMonday.setDate(firstDay.getDate() + (firstDayOfWeek === 0 ? 1 : 8 - firstDayOfWeek));
+  // 计算目标周的开始日期（周一）
+  const targetWeekStart = new Date(jan4WeekStart);
+  targetWeekStart.setDate(jan4WeekStart.getDate() + (weekNumber - 1) * 7);
 
-  // 计算指定周的开始日期
-  const weekStart = new Date(firstMonday);
-  weekStart.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+  // 计算目标周的结束日期（周日 23:59:59）
+  const targetWeekEnd = new Date(targetWeekStart);
+  targetWeekEnd.setDate(targetWeekStart.getDate() + 6);
+  targetWeekEnd.setHours(23, 59, 59, 999);
 
-  // 计算周结束日期（周日）
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  weekEnd.setHours(23, 59, 59, 999);
-
-  return { start: weekStart, end: weekEnd };
+  return {
+    start: targetWeekStart,
+    end: targetWeekEnd
+  };
 }
 
 /**
@@ -146,53 +153,84 @@ function getWeekDateRange(year: number, weekNumber: number): { start: Date; end:
  */
 async function getCustomerTaskStats(userId: number, startDate: Date, endDate: Date) {
   try {
-
-    // 方法1：基于客户的修改时间统计（主要逻辑）
-    const customers = await prisma.customer.findMany({
+    // 方案1：基于客户表的updatedAt字段（客户信息更新时间）
+    const customerUpdates = await prisma.customer.findMany({
       where: {
-        responsiblePersonId: userId,
+        assignedToId: userId,
         updatedAt: {
           gte: startDate,
           lte: endDate
         }
       },
       select: {
-        id: true,
-        status: true,
+        followStatus: true,
         updatedAt: true
       }
     });
 
-    // 按客户状态统计数量
-    let consultCount = 0;    // 咨询
-    let followUpCount = 0;   // 回访
-    let developCount = 0;    // 开发
-    let registerCount = 0;   // 报名
+    // 方案2：基于跟进记录表的创建时间（更准确的跟进活动时间）
+    const followRecords = await prisma.followRecord.findMany({
+      where: {
+        customer: {
+          assignedToId: userId
+        },
+        createdAt: {
+          gte: startDate,
+          lte: endDate
+        }
+      },
+      include: {
+        customer: {
+          select: {
+            followStatus: true
+          }
+        }
+      }
+    });
 
-    for (const customer of customers) {
+    // 合并两种统计方式，优先使用跟进记录，补充客户更新
+    const allActivities = new Map<string, string>();
 
-      switch (customer.status) {
+    // 添加跟进记录活动
+    followRecords.forEach(record => {
+      const key = `${record.customerId}-${record.createdAt.toISOString()}`;
+      allActivities.set(key, record.customer.followStatus);
+    });
+
+    // 添加客户更新活动（如果没有对应的跟进记录）
+    customerUpdates.forEach(customer => {
+      const key = `${customer.followStatus}-${customer.updatedAt.toISOString()}`;
+      if (!allActivities.has(key)) {
+        allActivities.set(key, customer.followStatus);
+      }
+    });
+
+    // 根据状态统计任务完成情况
+    const statusCounts = {
+      consultCount: 0,
+      followUpCount: 0,
+      developCount: 0,
+      registerCount: 0
+    };
+
+    Array.from(allActivities.values()).forEach(status => {
+      switch (status) {
         case 'consult':
-          consultCount++;
+          statusCounts.consultCount++;
           break;
         case 'effective_visit':
-          followUpCount++;
+          statusCounts.followUpCount++;
           break;
         case 'new_develop':
-          developCount++;
+          statusCounts.developCount++;
           break;
         case 'registered':
-          registerCount++;
+          statusCounts.registerCount++;
           break;
       }
-    }
+    });
 
-    return {
-      consultCount,
-      followUpCount,
-      developCount,
-      registerCount
-    };
+    return statusCounts;
   } catch (error) {
     logger.error('获取客户任务统计失败:', error);
     return {
