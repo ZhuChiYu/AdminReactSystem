@@ -58,6 +58,13 @@ const CustomerAssignManagement = () => {
   const [assignRemark, setAssignRemark] = useState('');
   const [editingAssignment, setEditingAssignment] = useState<CustomerAssignment | null>(null);
 
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
+
   // 检查权限
   useEffect(() => {
     if (!isSuperAdmin()) {
@@ -65,6 +72,26 @@ const CustomerAssignManagement = () => {
       navigate('/home');
     }
   }, [navigate]);
+
+  // 获取分配数据的函数
+  const fetchAssignments = async () => {
+    try {
+      setLoading(true);
+      const assignmentResponse = await customerService.getCustomerAssignments({
+        current: pagination.current,
+        size: pagination.pageSize
+      });
+      setAssignments(assignmentResponse.records);
+      setPagination(prev => ({
+        ...prev,
+        total: assignmentResponse.total
+      }));
+    } catch (error) {
+      message.error('获取分配数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 加载数据
   useEffect(() => {
@@ -82,13 +109,7 @@ const CustomerAssignManagement = () => {
         // 获取员工列表
         const employeeResponse = await employeeService.getEmployeeList({ current: 1, size: 1000 });
         setEmployees(employeeResponse.records);
-
-        // 获取客户分配记录
-        const assignmentResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
-        // 初始加载分配数据完成
-        setAssignments(assignmentResponse.records);
       } catch (error) {
-        // 获取数据失败
         message.error('获取数据失败');
       } finally {
         setLoading(false);
@@ -97,6 +118,11 @@ const CustomerAssignManagement = () => {
 
     fetchData();
   }, []);
+
+  // 分页变化时重新获取数据
+  useEffect(() => {
+    fetchAssignments();
+  }, [pagination.current, pagination.pageSize]);
 
   // 获取当前用户管理的员工
   const getManagedEmployees = () => {
@@ -150,8 +176,7 @@ const CustomerAssignManagement = () => {
       }
 
       // 重新获取分配列表
-      const assignmentsResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
-      setAssignments(assignmentsResponse.records || []);
+      fetchAssignments();
 
       // 清空选择
       setSelectedCustomers([]);
@@ -176,8 +201,7 @@ const CustomerAssignManagement = () => {
       message.success('删除成功');
 
       // 重新获取分配列表
-      const assignmentsResponse = await customerService.getCustomerAssignments({ current: 1, size: 1000 });
-      setAssignments(assignmentsResponse.records || []);
+      fetchAssignments();
     } catch (error) {
       // 删除失败
       message.error('删除失败');
@@ -204,6 +228,15 @@ const CustomerAssignManagement = () => {
   const getEmployeeRoleName = (employee: EmployeeApi.EmployeeListItem) => {
     const roleCode = employee.roles?.[0]?.code || '';
     return roleNames[roleCode as keyof typeof roleNames] || roleCode || '未知角色';
+  };
+
+  // 分页处理函数
+  const handleTableChange = (page: number, pageSize?: number) => {
+    setPagination(prev => ({
+      ...prev,
+      current: page,
+      pageSize: pageSize || prev.pageSize
+    }));
   };
 
   // 表格列定义
@@ -281,7 +314,7 @@ const CustomerAssignManagement = () => {
   ];
 
   return (
-    <div className="h-full min-h-500px flex-col-stretch gap-16px overflow-hidden">
+    <div className="h-full min-h-500px flex-col-stretch gap-16px overflow-auto">
       <Card
         title="客户分配管理"
         extra={
@@ -307,7 +340,16 @@ const CustomerAssignManagement = () => {
           loading={loading}
           rowKey="id"
           scroll={{ x: 'max-content' }}
-          {...getFullTableConfig(10)}
+          pagination={{
+            current: pagination.current,
+            onChange: handleTableChange,
+            onShowSizeChange: handleTableChange,
+            pageSize: pagination.pageSize,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+            total: pagination.total
+          }}
         />
       </Card>
 

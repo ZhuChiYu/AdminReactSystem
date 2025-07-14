@@ -73,6 +73,17 @@ class ClassController {
           return sum + fee;
         }, 0);
 
+        // 动态计算班级状态
+        const now = new Date();
+        const start = new Date(classItem.startDate);
+        const end = new Date(classItem.endDate);
+        let currentStatus = 0; // 未开始
+        if (now >= start && now <= end) {
+          currentStatus = 1; // 进行中
+        } else if (now > end) {
+          currentStatus = 2; // 已结束
+        }
+
         return {
           categoryId: classItem.categoryId,
           categoryName: classItem.category?.name || '',
@@ -85,7 +96,7 @@ class ClassController {
           id: classItem.id,
           name: classItem.name,
           startDate: classItem.startDate.toISOString().split('T')[0],
-          status: classItem.status,
+          status: currentStatus,
           studentCount,
           trainingFee: totalTrainingFee.toFixed(2),
           updatedAt: classItem.updatedAt.toISOString().replace('T', ' ').substring(0, 19)
@@ -142,6 +153,17 @@ class ClassController {
         return sum + fee;
       }, 0);
 
+      // 动态计算班级状态
+      const now = new Date();
+      const start = new Date(classItem.startDate);
+      const end = new Date(classItem.endDate);
+      let currentStatus = 0; // 未开始
+      if (now >= start && now <= end) {
+        currentStatus = 1; // 进行中
+      } else if (now > end) {
+        currentStatus = 2; // 已结束
+      }
+
       const formattedClass = {
         categoryId: classItem.categoryId,
         categoryName: classItem.category?.name || '',
@@ -154,7 +176,7 @@ class ClassController {
         id: classItem.id,
         name: classItem.name,
         startDate: classItem.startDate.toISOString().split('T')[0],
-        status: classItem.status,
+        status: currentStatus,
         studentCount,
         students: classItem.students.map((student: any) => {
           // 基础信息（所有用户都能看到）
