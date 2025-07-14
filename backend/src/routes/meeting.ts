@@ -177,28 +177,47 @@ router.get('/', async (req, res) => {
     // 获取总数
     const total = await prisma.meeting.count({ where });
 
-    const records = meetings.map(meeting => ({
-      approvalStatus: meeting.approvalStatus,
-      createdAt: meeting.createdAt,
-      description: meeting.description,
-      endTime: meeting.endTime,
-      id: meeting.id,
-      location: meeting.location,
-      meetingType: meeting.meetingType,
-      organizer: meeting.organizer,
-      participantCount: meeting._count.participants,
-      participants: meeting.participants.map(p => ({
-        id: p.id,
-        role: p.role,
-        status: p.status,
-        user: p.user
-      })),
-      room: meeting.room,
-      startTime: meeting.startTime,
-      status: meeting.status,
-      title: meeting.title,
-      updatedAt: meeting.updatedAt
-    }));
+    const records = meetings.map(meeting => {
+      // 动态计算会议状态
+      const now = new Date();
+      const startTime = new Date(meeting.startTime);
+      const endTime = new Date(meeting.endTime);
+      let currentStatus = meeting.status;
+
+      // 只对非取消状态的会议进行动态计算
+      if (meeting.status !== -1) {
+        if (now < startTime) {
+          currentStatus = 0; // 待开始
+        } else if (now >= startTime && now <= endTime) {
+          currentStatus = 1; // 进行中
+        } else if (now > endTime) {
+          currentStatus = 2; // 已结束
+        }
+      }
+
+      return {
+        approvalStatus: meeting.approvalStatus,
+        createdAt: meeting.createdAt,
+        description: meeting.description,
+        endTime: meeting.endTime,
+        id: meeting.id,
+        location: meeting.location,
+        meetingType: meeting.meetingType,
+        organizer: meeting.organizer,
+        participantCount: meeting._count.participants,
+        participants: meeting.participants.map(p => ({
+          id: p.id,
+          role: p.role,
+          status: p.status,
+          user: p.user
+        })),
+        room: meeting.room,
+        startTime: meeting.startTime,
+        status: currentStatus,
+        title: meeting.title,
+        updatedAt: meeting.updatedAt
+      };
+    });
 
     res.json({
       code: 0,
