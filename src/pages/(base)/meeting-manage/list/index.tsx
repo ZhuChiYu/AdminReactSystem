@@ -633,7 +633,7 @@ const Component: React.FC = () => {
               <strong>会议标题：</strong> {currentMeeting?.title}
             </p>
             <p>
-              <strong>会议时间：</strong> {currentMeeting?.startTime} 至 {currentMeeting?.endTime}
+              <strong>会议时间：</strong> {dayjs(currentMeeting?.startTime).format('YYYY-MM-DD HH:mm')} 至 {dayjs(currentMeeting?.endTime).format('YYYY-MM-DD HH:mm')}
             </p>
             <p>
               <strong>会议地点：</strong> {currentMeeting?.location}
@@ -671,7 +671,7 @@ const Component: React.FC = () => {
               <strong>会议标题：</strong> {currentMeeting?.title}
             </p>
             <p>
-              <strong>会议时间：</strong> {currentMeeting?.startTime} 至 {currentMeeting?.endTime}
+              <strong>会议时间：</strong> {dayjs(currentMeeting?.startTime).format('YYYY-MM-DD HH:mm')} 至 {dayjs(currentMeeting?.endTime).format('YYYY-MM-DD HH:mm')}
             </p>
             <p>
               <strong>会议地点：</strong> {currentMeeting?.location}
