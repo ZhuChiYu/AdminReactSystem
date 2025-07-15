@@ -87,7 +87,8 @@ const EmployeeManagerManagement = () => {
   const canManageTargets = isAdminUser || isSuperAdminUser;
 
   // 状态管理
-  const [relations, setRelations] = useState<EmployeeManagerRelation[]>([]);
+  const [relations, setRelations] = useState<EmployeeManagerRelation[]>([]); // 用于表格显示的分页数据
+  const [allRelations, setAllRelations] = useState<EmployeeManagerRelation[]>([]); // 用于业务逻辑的全量数据
   const [employees, setEmployees] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [managers, setManagers] = useState<EmployeeApi.EmployeeListItem[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -122,7 +123,23 @@ const EmployeeManagerManagement = () => {
     total: 0
   });
 
-  // 获取员工分配关系数据（支持分页）
+  // 获取所有员工分配关系数据（用于业务逻辑判断）
+  const fetchAllRelationsData = async () => {
+    if (!canManageTargets) return;
+
+    try {
+      const relationsResponse = await employeeService.getEmployeeManagerRelations({
+        current: 1,
+        size: 1000 // 获取所有关系数据
+      });
+      setAllRelations(relationsResponse.records || []);
+    } catch (error) {
+      console.error('获取所有员工分配关系失败:', error);
+      message.error('获取员工分配关系失败');
+    }
+  };
+
+  // 获取员工分配关系数据（支持分页，用于表格显示）
   const fetchRelationsData = async () => {
     if (!canManageTargets) return;
 
@@ -158,12 +175,6 @@ const EmployeeManagerManagement = () => {
       // 设置所有员工数据
       setEmployees(allEmployees);
 
-      // 调试：查找当前用户在员工列表中的信息
-      const userInfo = localStg.get('userInfo');
-      const currentUserInEmployees = allEmployees.find(
-        emp => emp.userName === userInfo?.userName || emp.userName === 'manager1'
-      );
-
       // 过滤出管理员角色的员工
       const managerList = allEmployees.filter(emp =>
         emp.roles?.some(role => role.code === 'admin' || role.code === '管理员')
@@ -172,7 +183,10 @@ const EmployeeManagerManagement = () => {
 
       // 获取员工-管理员关系记录（所有管理员都需要）
       if (canManageTargets) {
-        await fetchRelationsData();
+        await Promise.all([
+          fetchAllRelationsData(), // 获取所有关系数据用于业务逻辑
+          fetchRelationsData() // 获取分页数据用于表格显示
+        ]);
       }
     } catch (error) {
       console.error('获取数据失败:', error);
@@ -264,7 +278,7 @@ const EmployeeManagerManagement = () => {
     const currentUserId = getCurrentUserIdForAdmin();
     const currentUserIdNum = Number(currentUserId);
 
-    const managedEmployeeIds = relations
+    const managedEmployeeIds = allRelations
       .filter(relation => relation.managerId === currentUserIdNum)
       .map(relation => relation.employeeId);
 
@@ -273,7 +287,6 @@ const EmployeeManagerManagement = () => {
 
   // 获取管理的员工列表（用于目标设置）- 支持分页
   const getManagedEmployeesWithPagination = () => {
-
     let allEmployees: EmployeeApi.EmployeeListItem[] = [];
 
     if (isSuperAdminUser) {
@@ -301,7 +314,6 @@ const EmployeeManagerManagement = () => {
     try {
       setTargetLoading(true);
       const { employees: paginatedEmployees, total } = getManagedEmployeesWithPagination();
-      const userInfo = localStg.get('userInfo');
       setManagedEmployees(paginatedEmployees);
 
       // 更新分页状态
@@ -326,7 +338,7 @@ const EmployeeManagerManagement = () => {
   }, []);
 
   useEffect(() => {
-    if (canManageTargets && employees.length > 0 && relations.length >= 0) {
+    if (canManageTargets && employees.length > 0 && allRelations.length >= 0) {
       fetchManagedEmployees();
     }
   }, [
@@ -336,7 +348,7 @@ const EmployeeManagerManagement = () => {
     targetType,
     canManageTargets,
     employees,
-    relations,
+    allRelations, // 使用allRelations而不是relations
     targetPagination.current,
     targetPagination.pageSize
   ]);
@@ -367,8 +379,8 @@ const EmployeeManagerManagement = () => {
       return employeeList;
     }
 
-    // 如果是新增模式，过滤掉已经分配的员工
-    return employeeList.filter(emp => !relations.some(r => r.employeeId === emp.id));
+    // 如果是新增模式，过滤掉已经分配的员工（使用全量关系数据）
+    return employeeList.filter(emp => !allRelations.some(r => r.employeeId === emp.id));
   };
 
   // 分配员工给管理员

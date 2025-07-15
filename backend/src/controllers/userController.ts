@@ -40,6 +40,16 @@ class UserController {
     const pageSize = Number(size);
     const skip = (page - 1) * pageSize;
 
+    // 获取当前用户的角色信息
+    const currentUser = (req as any).user;
+    const currentUserRoles = await prisma.userRole.findMany({
+      where: { userId: currentUser.id },
+      include: { role: true }
+    });
+
+    const isSuperAdmin = currentUserRoles.some(ur => ur.role.roleCode === 'super_admin');
+    const isAdmin = currentUserRoles.some(ur => ur.role.roleCode === 'admin' || ur.role.roleCode === '管理员');
+
     // 构建查询条件 - 显示所有用户，包括没有角色的用户
     const where: any = {};
 
@@ -116,42 +126,88 @@ class UserController {
         }
       });
 
-      // 格式化返回数据
-      const records = employees.map(employee => ({
-        address: employee.address,
-        bankCard: employee.bankCard,
-        contractEndDate: employee.contractEndDate,
-        contractStartDate: employee.contractStartDate,
-        contractYears: employee.contractYears,
-        createdAt: employee.createdAt,
-        department: employee.department
-          ? {
-              id: employee.department.id,
-              name: employee.department.name
-            }
-          : null,
-        email: employee.email,
-        gender: employee.gender === 1 ? 'male' : employee.gender === 2 ? 'female' : null,
-        id: employee.id,
-        idCard: employee.idCard,
-        nickName: employee.nickName,
-        password: employee.displayPassword || '123456',
-        phone: employee.phone,
-        position: employee.position,
-        roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
-        roles:
-          employee.userRoles.length > 0
-            ? employee.userRoles.map(ur => ({
-                code: ur.role.roleCode,
-                name: ur.role.roleName
-              }))
-            : [{ code: 'no_role', name: '未分配角色' }],
-        status: employee.status === 1 ? 'active' : employee.status === 0 ? 'inactive' : 'active',
-        tim: employee.tim,
-        updatedAt: employee.updatedAt,
-        userName: employee.userName,
-        wechat: employee.wechat
-      }));
+      // 根据用户权限格式化返回数据
+      const records = employees.map(employee => {
+        // 基础信息（所有角色都能看到）
+        const baseInfo = {
+          createdAt: employee.createdAt,
+          department: employee.department
+            ? {
+                id: employee.department.id,
+                name: employee.department.name
+              }
+            : null,
+          gender: employee.gender === 1 ? 'male' : employee.gender === 2 ? 'female' : null,
+          id: employee.id,
+          nickName: employee.nickName,
+          position: employee.position,
+          roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
+          roles:
+            employee.userRoles.length > 0
+              ? employee.userRoles.map(ur => ({
+                  code: ur.role.roleCode,
+                  name: ur.role.roleName
+                }))
+              : [{ code: 'no_role', name: '未分配角色' }],
+          status: employee.status === 1 ? 'active' : employee.status === 0 ? 'inactive' : 'active',
+          updatedAt: employee.updatedAt,
+          userName: employee.userName
+        };
+
+        // 超级管理员：可以看到所有信息（包括敏感信息）
+        if (isSuperAdmin) {
+          return {
+            ...baseInfo,
+            address: employee.address,
+            bankCard: employee.bankCard,
+            contractEndDate: employee.contractEndDate,
+            contractStartDate: employee.contractStartDate,
+            contractYears: employee.contractYears,
+            email: employee.email,
+            idCard: employee.idCard,
+            password: employee.displayPassword || '123456',
+            phone: employee.phone,
+            tim: employee.tim,
+            wechat: employee.wechat
+          };
+        }
+
+        // 管理员：可以看到部分信息（不包括密码、身份证、银行卡等敏感信息）
+        if (isAdmin) {
+          return {
+            ...baseInfo,
+            contractEndDate: employee.contractEndDate,
+            contractStartDate: employee.contractStartDate,
+            contractYears: employee.contractYears,
+            email: employee.email ? employee.email.replace(/(.{2}).*(@.*)/, '$1***$2') : null, // 邮箱脱敏
+            phone: employee.phone ? employee.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : null, // 手机号脱敏
+            // 不返回敏感信息
+            address: null,
+            bankCard: null,
+            idCard: null,
+            password: null,
+            tim: null,
+            wechat: null
+          };
+        }
+
+        // 普通员工：只能看到基础信息
+        return {
+          ...baseInfo,
+          // 不返回任何敏感信息
+          address: null,
+          bankCard: null,
+          contractEndDate: null,
+          contractStartDate: null,
+          contractYears: null,
+          email: null,
+          idCard: null,
+          password: null,
+          phone: null,
+          tim: null,
+          wechat: null
+        };
+      });
 
       const pages = Math.ceil(total / pageSize);
 
@@ -1538,42 +1594,91 @@ class UserController {
         where
       });
 
-      // 格式化返回数据
-      const records = employees.map(employee => ({
-        address: employee.address,
-        bankCard: employee.bankCard,
-        contractEndDate: employee.contractEndDate,
-        contractStartDate: employee.contractStartDate,
-        contractYears: employee.contractYears,
-        createdAt: employee.createdAt,
-        department: employee.department
-          ? {
-              id: employee.department.id,
-              name: employee.department.name
-            }
-          : null,
-        email: employee.email,
-        gender: employee.gender === 1 ? 'male' : employee.gender === 2 ? 'female' : null,
-        id: employee.id,
-        idCard: employee.idCard,
-        nickName: employee.nickName,
-        password: employee.displayPassword || '123456',
-        phone: employee.phone,
-        position: employee.position,
-        roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
-        roles:
-          employee.userRoles.length > 0
-            ? employee.userRoles.map(ur => ({
-                code: ur.role.roleCode,
-                name: ur.role.roleName
-              }))
-            : [{ code: 'no_role', name: '未分配角色' }],
-        status: employee.status === 1 ? 'active' : employee.status === 0 ? 'inactive' : 'active',
-        tim: employee.tim,
-        updatedAt: employee.updatedAt,
-        userName: employee.userName,
-        wechat: employee.wechat
-      }));
+      // 检查当前用户是否为管理员（用于数据脱敏）
+      const isAdmin = userRoles.some(ur => ur.role.roleCode === 'admin' || ur.role.roleCode === '管理员');
+
+      // 根据用户权限格式化返回数据
+      const records = employees.map(employee => {
+        // 基础信息（所有角色都能看到）
+        const baseInfo = {
+          createdAt: employee.createdAt,
+          department: employee.department
+            ? {
+                id: employee.department.id,
+                name: employee.department.name
+              }
+            : null,
+          gender: employee.gender === 1 ? 'male' : employee.gender === 2 ? 'female' : null,
+          id: employee.id,
+          nickName: employee.nickName,
+          position: employee.position,
+          roleNames: employee.userRoles.length > 0 ? employee.userRoles.map(ur => ur.role.roleName) : ['未分配角色'],
+          roles:
+            employee.userRoles.length > 0
+              ? employee.userRoles.map(ur => ({
+                  code: ur.role.roleCode,
+                  name: ur.role.roleName
+                }))
+              : [{ code: 'no_role', name: '未分配角色' }],
+          status: employee.status === 1 ? 'active' : employee.status === 0 ? 'inactive' : 'active',
+          updatedAt: employee.updatedAt,
+          userName: employee.userName
+        };
+
+        // 超级管理员：可以看到所有信息（包括敏感信息）
+        if (isSuperAdmin) {
+          return {
+            ...baseInfo,
+            address: employee.address,
+            bankCard: employee.bankCard,
+            contractEndDate: employee.contractEndDate,
+            contractStartDate: employee.contractStartDate,
+            contractYears: employee.contractYears,
+            email: employee.email,
+            idCard: employee.idCard,
+            password: employee.displayPassword || '123456',
+            phone: employee.phone,
+            tim: employee.tim,
+            wechat: employee.wechat
+          };
+        }
+
+        // 管理员：可以看到部分信息（不包括密码、身份证、银行卡等敏感信息）
+        if (isAdmin) {
+          return {
+            ...baseInfo,
+            contractEndDate: employee.contractEndDate,
+            contractStartDate: employee.contractStartDate,
+            contractYears: employee.contractYears,
+            email: employee.email ? employee.email.replace(/(.{2}).*(@.*)/, '$1***$2') : null, // 邮箱脱敏
+            phone: employee.phone ? employee.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : null, // 手机号脱敏
+            // 不返回敏感信息
+            address: null,
+            bankCard: null,
+            idCard: null,
+            password: null,
+            tim: null,
+            wechat: null
+          };
+        }
+
+        // 普通员工：只能看到基础信息
+        return {
+          ...baseInfo,
+          // 不返回任何敏感信息
+          address: null,
+          bankCard: null,
+          contractEndDate: null,
+          contractStartDate: null,
+          contractYears: null,
+          email: null,
+          idCard: null,
+          password: null,
+          phone: null,
+          tim: null,
+          wechat: null
+        };
+      });
 
       const pages = Math.ceil(total / pageSize);
 

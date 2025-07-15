@@ -196,26 +196,26 @@ router.get('/', async (req, res) => {
       }
 
       return {
-        approvalStatus: meeting.approvalStatus,
-        createdAt: meeting.createdAt,
-        description: meeting.description,
-        endTime: meeting.endTime,
-        id: meeting.id,
-        location: meeting.location,
-        meetingType: meeting.meetingType,
-        organizer: meeting.organizer,
-        participantCount: meeting._count.participants,
-        participants: meeting.participants.map(p => ({
-          id: p.id,
-          role: p.role,
-          status: p.status,
-          user: p.user
-        })),
-        room: meeting.room,
-        startTime: meeting.startTime,
+      approvalStatus: meeting.approvalStatus,
+      createdAt: meeting.createdAt,
+      description: meeting.description,
+      endTime: meeting.endTime,
+      id: meeting.id,
+      location: meeting.location,
+      meetingType: meeting.meetingType,
+      organizer: meeting.organizer,
+      participantCount: meeting._count.participants,
+      participants: meeting.participants.map(p => ({
+        id: p.id,
+        role: p.role,
+        status: p.status,
+        user: p.user
+      })),
+      room: meeting.room,
+      startTime: meeting.startTime,
         status: currentStatus,
-        title: meeting.title,
-        updatedAt: meeting.updatedAt
+      title: meeting.title,
+      updatedAt: meeting.updatedAt
       };
     });
 
