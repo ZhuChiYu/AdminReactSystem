@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger';
 class CustomerController {
   /** 获取客户列表 */
   async getCustomers(req: Request, res: Response) {
-    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source, phone, mobile, assignedToName } = req.query;
+    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source, phone, mobile, assignedToName, remark, nameOrCompany } = req.query;
 
     const user = (req as any).user; // 获取当前登录用户
     const page = Number(current);
@@ -42,18 +42,32 @@ class CustomerController {
     // 合并权限条件到where中
     Object.assign(where, permissionConditions);
 
-    if (customerName) {
-      where.customerName = {
-        contains: customerName as string,
-        mode: 'insensitive'
-      };
-    }
+    // 合并搜索：客户姓名或单位名称
+    if (nameOrCompany) {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { customerName: { contains: nameOrCompany as string, mode: 'insensitive' } },
+            { company: { contains: nameOrCompany as string, mode: 'insensitive' } }
+          ]
+        }
+      ];
+    } else {
+      // 原有的单独搜索逻辑保持不变以支持向后兼容
+      if (customerName) {
+        where.customerName = {
+          contains: customerName as string,
+          mode: 'insensitive'
+        };
+      }
 
-    if (company) {
-      where.company = {
-        contains: company as string,
-        mode: 'insensitive'
-      };
+      if (company) {
+        where.company = {
+          contains: company as string,
+          mode: 'insensitive'
+        };
+      }
     }
 
     if (followStatus) {
@@ -97,6 +111,14 @@ class CustomerController {
           contains: assignedToName as string,
           mode: 'insensitive'
         }
+      };
+    }
+
+    // 添加跟进内容搜索条件
+    if (remark) {
+      where.remark = {
+        contains: remark as string,
+        mode: 'insensitive'
       };
     }
 

@@ -178,7 +178,9 @@ export namespace CustomerApi {
     followStatus?: string;
     industry?: string;
     mobile?: string;
+    nameOrCompany?: string; // 合并搜索：客户姓名或单位名称
     phone?: string;
+    remark?: string; // 跟进内容搜索
     scope?: 'all' | 'own';
     source?: string; // 数据范围: all-所有数据, own-自己的数据
   }

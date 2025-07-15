@@ -160,10 +160,9 @@ const CustomerFollow = () => {
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
     assignedToName: '',
-    company: '',
-    customerName: '',
-    followStatus: '',
-    phone: ''
+    nameOrCompany: '', // 合并搜索：客户姓名或单位名称
+    phone: '',
+    remark: '' // 跟进内容搜索
   });
 
   // 获取跟进数据 - 支持分页、状态筛选和搜索
@@ -181,11 +180,11 @@ const CustomerFollow = () => {
       // 构建查询参数
       const queryParams: any = {
         assignedToName: searchParams.assignedToName || undefined,
-        company: searchParams.company || undefined,
         current: currentPage,
-        customerName: searchParams.customerName || undefined,
         mobile: searchParams.phone || undefined,
+        nameOrCompany: searchParams.nameOrCompany || undefined,
         phone: searchParams.phone || undefined,
+        remark: searchParams.remark || undefined,
         scope: 'own',
         size: currentPageSize
       };
@@ -193,8 +192,6 @@ const CustomerFollow = () => {
       // 如果有状态筛选且不是'all'，添加筛选条件
       if (currentStatus && currentStatus !== 'all') {
         queryParams.followStatus = currentStatus;
-      } else if (searchParams.followStatus) {
-        queryParams.followStatus = searchParams.followStatus;
       }
 
       // 获取客户列表数据，支持分页和筛选
@@ -274,10 +271,9 @@ const CustomerFollow = () => {
   const resetSearch = () => {
     setSearchParams({
       assignedToName: '',
-      company: '',
-      customerName: '',
-      followStatus: '',
-      phone: ''
+      nameOrCompany: '',
+      phone: '',
+      remark: ''
     });
     setPagination(prev => ({ ...prev, current: 1 }));
     fetchFollowData(1, pagination.pageSize);
@@ -805,10 +801,10 @@ const CustomerFollow = () => {
         <div className="mb-4 flex flex-wrap items-center gap-4">
           <Input
             allowClear
-            placeholder="客户姓名"
-            style={{ width: 150 }}
-            value={searchParams.customerName}
-            onChange={e => setSearchParams({ ...searchParams, customerName: e.target.value })}
+            placeholder="客户姓名或单位名称"
+            style={{ width: 180 }}
+            value={searchParams.nameOrCompany}
+            onChange={e => setSearchParams({ ...searchParams, nameOrCompany: e.target.value })}
           />
           <Input
             allowClear
@@ -819,10 +815,10 @@ const CustomerFollow = () => {
           />
           <Input
             allowClear
-            placeholder="单位名称"
+            placeholder="跟进内容"
             style={{ width: 160 }}
-            value={searchParams.company}
-            onChange={e => setSearchParams({ ...searchParams, company: e.target.value })}
+            value={searchParams.remark}
+            onChange={e => setSearchParams({ ...searchParams, remark: e.target.value })}
           />
           <Input
             allowClear
@@ -831,22 +827,6 @@ const CustomerFollow = () => {
             value={searchParams.assignedToName}
             onChange={e => setSearchParams({ ...searchParams, assignedToName: e.target.value })}
           />
-          <Select
-            allowClear
-            placeholder="跟进状态"
-            style={{ width: 150 }}
-            value={searchParams.followStatus}
-            onChange={value => setSearchParams({ ...searchParams, followStatus: value })}
-          >
-            {followUpStatusOptions.slice(1).map(option => (
-              <Select.Option
-                key={option.value}
-                value={option.value}
-              >
-                {option.label}
-              </Select.Option>
-            ))}
-          </Select>
           <Button
             type="primary"
             onClick={handleSearch}
