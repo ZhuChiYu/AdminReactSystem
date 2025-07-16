@@ -179,6 +179,7 @@ export namespace CustomerApi {
     industry?: string;
     mobile?: string;
     nameOrCompany?: string; // 合并搜索：客户姓名或单位名称
+    nameOrPosition?: string; // 合并搜索：客户姓名或职务
     phone?: string;
     remark?: string; // 跟进内容搜索
     scope?: 'all' | 'own';

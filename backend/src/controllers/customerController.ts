@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger';
 class CustomerController {
   /** 获取客户列表 */
   async getCustomers(req: Request, res: Response) {
-    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source, phone, mobile, assignedToName, remark, nameOrCompany } = req.query;
+    const { company, current = 1, customerName, followStatus, industry, scope, size = 10, source, phone, mobile, assignedToName, remark, nameOrCompany, nameOrPosition } = req.query;
 
     const user = (req as any).user; // 获取当前登录用户
     const page = Number(current);
@@ -42,7 +42,20 @@ class CustomerController {
     // 合并权限条件到where中
     Object.assign(where, permissionConditions);
 
-    // 合并搜索：客户姓名或单位名称
+    // 合并搜索：客户姓名或职务
+    if (nameOrPosition) {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { customerName: { contains: nameOrPosition as string, mode: 'insensitive' } },
+            { position: { contains: nameOrPosition as string, mode: 'insensitive' } }
+          ]
+        }
+      ];
+    }
+
+    // 合并搜索：客户姓名或单位名称（保持向后兼容）
     if (nameOrCompany) {
       where.AND = [
         ...(where.AND || []),
@@ -53,21 +66,21 @@ class CustomerController {
           ]
         }
       ];
-    } else {
-      // 原有的单独搜索逻辑保持不变以支持向后兼容
-      if (customerName) {
-        where.customerName = {
-          contains: customerName as string,
-          mode: 'insensitive'
-        };
-      }
+    }
 
-      if (company) {
-        where.company = {
-          contains: company as string,
-          mode: 'insensitive'
-        };
-      }
+    // 单独搜索逻辑
+    if (customerName) {
+      where.customerName = {
+        contains: customerName as string,
+        mode: 'insensitive'
+      };
+    }
+
+    if (company) {
+      where.company = {
+        contains: company as string,
+        mode: 'insensitive'
+      };
     }
 
     if (followStatus) {

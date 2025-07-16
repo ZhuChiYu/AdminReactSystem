@@ -160,7 +160,8 @@ const CustomerFollow = () => {
   // 搜索条件
   const [searchParams, setSearchParams] = useState({
     assignedToName: '',
-    nameOrCompany: '', // 合并搜索：客户姓名或单位名称
+    company: '', // 单位名称搜索
+    nameOrPosition: '', // 合并搜索：客户姓名或职务
     phone: '',
     remark: '' // 跟进内容搜索
   });
@@ -180,9 +181,10 @@ const CustomerFollow = () => {
       // 构建查询参数
       const queryParams: any = {
         assignedToName: searchParams.assignedToName || undefined,
+        company: searchParams.company || undefined,
         current: currentPage,
         mobile: searchParams.phone || undefined,
-        nameOrCompany: searchParams.nameOrCompany || undefined,
+        nameOrPosition: searchParams.nameOrPosition || undefined,
         phone: searchParams.phone || undefined,
         remark: searchParams.remark || undefined,
         scope: 'own',
@@ -271,7 +273,8 @@ const CustomerFollow = () => {
   const resetSearch = () => {
     setSearchParams({
       assignedToName: '',
-      nameOrCompany: '',
+      company: '',
+      nameOrPosition: '',
       phone: '',
       remark: ''
     });
@@ -801,10 +804,17 @@ const CustomerFollow = () => {
         <div className="mb-4 flex flex-wrap items-center gap-4">
           <Input
             allowClear
-            placeholder="客户姓名或单位名称"
-            style={{ width: 180 }}
-            value={searchParams.nameOrCompany}
-            onChange={e => setSearchParams({ ...searchParams, nameOrCompany: e.target.value })}
+            placeholder="客户姓名或职务"
+            style={{ width: 160 }}
+            value={searchParams.nameOrPosition}
+            onChange={e => setSearchParams({ ...searchParams, nameOrPosition: e.target.value })}
+          />
+          <Input
+            allowClear
+            placeholder="单位名称"
+            style={{ width: 160 }}
+            value={searchParams.company}
+            onChange={e => setSearchParams({ ...searchParams, company: e.target.value })}
           />
           <Input
             allowClear
