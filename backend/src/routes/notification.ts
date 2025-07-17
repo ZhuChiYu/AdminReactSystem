@@ -392,6 +392,8 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const currentUserId = (req as any).user?.id;
+    const userRoles = (req as any).user?.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
 
     if (!currentUserId) {
       return res.status(401).json({
@@ -403,12 +405,36 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       });
     }
 
-    // 检查通知是否属于当前用户（系统通知不允许删除）
-    const notification = await prisma.notification.findFirst({
-      where: {
+    // 构建权限查询条件
+    let whereCondition: any;
+
+    if (isSuperAdmin) {
+      // 超级管理员可以删除：
+      // 1. 自己创建的通知
+      // 2. 班级相关的系统通知（class_announcement类型）
+      whereCondition = {
         id: Number.parseInt(id),
-        userId: currentUserId // 只能删除自己的通知，不能删除系统通知
-      }
+        OR: [
+          { userId: currentUserId }, // 自己的通知
+          {
+            AND: [
+              { userId: 0 }, // 系统通知
+              { type: 'class_announcement' }, // 班级通知类型
+              { relatedType: 'class' } // 班级相关
+            ]
+          }
+        ]
+      };
+    } else {
+      // 普通用户只能删除自己的通知
+      whereCondition = {
+        id: Number.parseInt(id),
+        userId: currentUserId
+      };
+    }
+
+    const notification = await prisma.notification.findFirst({
+      where: whereCondition
     });
 
     if (!notification) {

@@ -253,7 +253,7 @@ const CourseList = () => {
         description: `${values.name}课程`,
         duration: 30,
         endDate: values.date.add(30, 'day').format('YYYY-MM-DD'),
-        instructor: '系统管理员',
+        instructor: '',
         // 默认30天后结束
         location: '线上课程',
         maxStudents: 50,

@@ -223,6 +223,7 @@ const ClassList = () => {
       // 打开编辑模态框并填充表单
       form.setFieldsValue({
         categoryId: classDetail.categoryId,
+        courseId: classDetail.courseId, // 添加课程ID字段
         description: classDetail.description,
         endDate: dayjs(classDetail.endDate),
         name: classDetail.name,
@@ -500,7 +501,7 @@ const ClassList = () => {
             onChange: (page, pageSize) => {
               loadClassList({ current: page, size: pageSize });
             },
-            onShowSizeChange: (current, size) => {
+            onShowSizeChange: (_current, size) => {
               loadClassList({ current: 1, size });
             },
             pageSize: pagination.size,

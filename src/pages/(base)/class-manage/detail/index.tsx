@@ -138,6 +138,12 @@ const ClassDetail = () => {
   const [announceUploading, setAnnounceUploading] = useState(false);
   const [announceUploadProgress, setAnnounceUploadProgress] = useState(0);
 
+  // 课程选择相关状态
+  const [courseSelectModalVisible, setCourseSelectModalVisible] = useState(false);
+  const [availableCourses, setAvailableCourses] = useState<any[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [courseSelectLoading, setCourseSelectLoading] = useState(false);
+
   // 搜索相关状态
   const [searchText, setSearchText] = useState('');
 
@@ -282,6 +288,7 @@ const ClassDetail = () => {
       // 获取班级基本信息
       const classResponse = await classService.getClassDetail(Number.parseInt(classId, 10));
       setClassInfo({
+        categoryId: classResponse.categoryId || 1,
         categoryName: classResponse.categoryName || '未分类',
         courseName: classResponse.courseName || '',
         coursePrice: classResponse.coursePrice || 0,
@@ -305,13 +312,26 @@ const ClassDetail = () => {
 
       setCourseList(coursesResponse.records);
 
-      // 获取通知公告列表
+      // 获取班级相关的通知公告列表
       const announceResponse = await notificationService.getNotificationList({
         current: 1,
+        relatedId: Number.parseInt(classId, 10),
+        relatedType: 'class',
         size: 1000
       });
 
-      setAnnounceList(announceResponse.records);
+      // 格式化通知数据，保持数据结构一致性
+      const formattedAnnouncements = announceResponse.records.map(
+        (announcement: NotificationApi.NotificationListItem) => ({
+          content: announcement.content,
+          id: announcement.id,
+          importance: 1, // 默认重要程度
+          publishDate: dayjs(announcement.createTime).format('YYYY-MM-DD HH:mm:ss'),
+          status: 1,
+          title: announcement.title
+        })
+      );
+      setAnnounceList(formattedAnnouncements);
     } catch (error) {
       console.error('获取班级数据失败:', error);
     } finally {
@@ -855,45 +875,82 @@ const ClassDetail = () => {
   const handleEditCourse = (course: any) => {
     setCurrentCourse(course);
 
-    // 设置表单初值
+    // 只设置授课教师字段的初值，兼容instructor和teacher字段
     courseForm.setFieldsValue({
-      classroom: course.classroom,
-      endDate: dayjs(course.endDate),
-      name: course.name,
-      schedule: course.schedule,
-      startDate: dayjs(course.startDate),
-      teacher: course.teacher
+      teacher: course.instructor || course.teacher || ''
     });
 
     setCourseModalVisible(true);
   };
 
-  // 删除课程
-  const handleRemoveCourse = async (courseId: number) => {
-    Modal.confirm({
-      content: '确定要删除这门课程吗？',
-      onOk: async () => {
-        try {
-          await courseService.deleteCourse(courseId);
-          message.success('课程删除成功');
+  // 获取可用课程列表
+  const fetchAvailableCourses = async () => {
+    setCourseSelectLoading(true);
+    try {
+      const response = await courseService.getCourseList({
+        current: 1,
+        size: 1000
+      });
 
-          // 重新获取课程列表
-          const coursesResponse = await courseService.getClassCourseList({
-            classId: Number.parseInt(classId!, 10),
-            current: 1,
-            size: 1000
-          });
-          setCourseList(coursesResponse.records || []);
-        } catch (error) {
-          console.error('删除课程失败:', error);
-          message.error('删除课程失败');
+      if (response && response.records) {
+        setAvailableCourses(response.records);
+        if (response.records.length === 0) {
+          message.info('暂无可用的课程，请先在课程管理中创建课程');
         }
-      },
-      title: '确认删除'
-    });
+      } else {
+        setAvailableCourses([]);
+        message.warning('获取课程列表响应格式异常');
+      }
+    } catch (error: any) {
+      console.error('获取课程列表失败:', error);
+
+      if (error?.message?.includes('401') || error?.response?.status === 401) {
+        message.error('登录已过期，请重新登录');
+      } else if (error?.message?.includes('network') || error?.code === 'NETWORK_ERROR') {
+        message.error('网络连接失败，请检查网络设置');
+      } else {
+        message.error(`获取课程列表失败: ${error?.message || '未知错误'}`);
+      }
+      setAvailableCourses([]);
+    } finally {
+      setCourseSelectLoading(false);
+    }
   };
 
-  // 添加课程
+  // 确认选择课程并替换
+  const handleConfirmCourseSelect = async () => {
+    if (!selectedCourseId) {
+      message.warning('请选择一个课程');
+      return;
+    }
+
+    try {
+      // 调用API关联课程到班级，需要传入完整的班级信息
+      const updateData = {
+        categoryId: classInfo?.categoryId || 1,
+        courseId: selectedCourseId,
+        description: classInfo?.description || '',
+        endDate: classInfo?.endDate || '',
+        name: classInfo?.name || '',
+        startDate: classInfo?.startDate || ''
+      };
+
+      await classService.updateClass(Number.parseInt(classId!, 10), updateData);
+      message.success('课程更换成功');
+
+      // 重新获取班级数据
+      await fetchClassInfo();
+
+      // 关闭弹窗并重置状态
+      setCourseSelectModalVisible(false);
+      setSelectedCourseId(null);
+    } catch (error) {
+      console.error('更换课程失败:', error);
+      message.error('更换课程失败');
+    }
+  };
+
+  // 添加/更换课程
   const handleAddCourse = () => {
     // 如果班级已有课程，提醒用户将会替换现有课程
     if (courseList.length > 0) {
@@ -911,74 +968,43 @@ const ClassDetail = () => {
         ),
         okText: '确定替换',
         onOk: () => {
-          courseForm.resetFields();
-          setCourseModalVisible(true);
+          fetchAvailableCourses();
+          setCourseSelectModalVisible(true);
         },
         title: '确认添加课程'
       });
     } else {
-      courseForm.resetFields();
-      setCourseModalVisible(true);
+      fetchAvailableCourses();
+      setCourseSelectModalVisible(true);
     }
   };
 
-  // 保存课程
+  // 保存课程（只更新授课教师）
   const handleSaveCourse = async () => {
     try {
       const values = await courseForm.validateFields();
 
       if (currentCourse) {
-        // 编辑现有课程
+        // 只传递需要更新的字段，避免数据库字段冲突
         const courseData = {
-          categoryId: currentCourse.categoryId || 1,
-          classId: Number.parseInt(classId!, 10),
-          courseCode: currentCourse.courseCode,
-          courseName: values.name,
-          description: values.description || currentCourse.description || '',
-          duration: values.duration || currentCourse.duration || 30,
-          endDate: values.endDate?.format('YYYY-MM-DD') || currentCourse.endDate,
-          instructor: values.teacher,
-          location: values.classroom || '线上',
-          maxStudents: values.maxStudents || currentCourse.maxStudents || 50,
-          originalPrice: values.price || currentCourse.originalPrice || 0,
-          price: values.price || currentCourse.price || 0,
-          startDate: values.startDate?.format('YYYY-MM-DD') || currentCourse.startDate
+          instructor: values.teacher
         };
 
         await courseService.updateCourse(currentCourse.id, courseData);
-        message.success('课程更新成功');
+        message.success('授课教师更新成功');
+
+        setCourseModalVisible(false);
+        courseForm.resetFields();
+        setCurrentCourse(null);
+
+        // 重新获取所有班级数据，确保课程列表更新
+        await fetchClassInfo();
       } else {
-        // 创建新课程
-        const courseData = {
-          categoryId: 1,
-          classId: Number.parseInt(classId!, 10),
-          courseCode: `COURSE_${Date.now()}`,
-          courseName: values.name,
-          description: values.description || '',
-          duration: values.duration || 30,
-          endDate: values.endDate?.format('YYYY-MM-DD') || dayjs().add(30, 'day').format('YYYY-MM-DD'),
-          instructor: values.teacher,
-          location: values.classroom || '线上',
-          maxStudents: values.maxStudents || 50,
-          originalPrice: values.price || 0,
-          price: values.price || 0,
-          startDate: values.startDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
-        };
-
-        await courseService.createCourse(courseData);
-        message.success('课程添加成功');
+        message.error('无法找到课程信息');
       }
-
-      setCourseModalVisible(false);
-      courseForm.resetFields();
-      setCurrentCourse(null);
-
-      // 重新获取所有班级数据，确保课程列表更新
-      await fetchClassInfo();
     } catch (error) {
-      const errorMessage = currentCourse ? '更新课程失败' : '添加课程失败';
-      message.error(errorMessage);
-      console.error(`${errorMessage}:`, error);
+      message.error('更新授课教师失败');
+      console.error('更新授课教师失败:', error);
     }
   };
 
@@ -1259,7 +1285,7 @@ const ClassDetail = () => {
             content: announcement.content,
             id: announcement.id,
             importance: values.importance || 0,
-            publishDate: announcement.createTime,
+            publishDate: dayjs(announcement.createTime).format('YYYY-MM-DD HH:mm:ss'),
             status: 1,
             title: announcement.title
           })
@@ -1309,9 +1335,9 @@ const ClassDetail = () => {
             (notification: NotificationApi.NotificationListItem) => ({
               content: notification.content,
               id: notification.id,
-              importance: 1,
-              publishDate: notification.createTime,
-              title: notification.title // 默认重要程度
+              importance: 1, // 默认重要程度
+              publishDate: dayjs(notification.createTime).format('YYYY-MM-DD HH:mm:ss'),
+              title: notification.title
             })
           );
 
@@ -1964,38 +1990,22 @@ const ClassDetail = () => {
   const courseColumns = [
     {
       align: 'center' as const,
-      dataIndex: 'id',
-      key: 'id',
-      title: 'ID',
-      width: 50
-    },
-    {
-      align: 'center' as const,
       dataIndex: 'name',
       key: 'name',
+      render: (name: string) => {
+        // 显示具体的培训课程名称
+        return classInfo?.courseName || name || '-';
+      },
       title: '课程名称',
-      width: 150
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'teacher',
-      key: 'teacher',
-      title: '任课老师',
-      width: 120
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'schedule',
-      key: 'schedule',
-      title: '上课时间',
       width: 200
     },
     {
       align: 'center' as const,
-      dataIndex: 'classroom',
-      key: 'classroom',
-      title: '教室',
-      width: 100
+      dataIndex: 'instructor',
+      key: 'instructor',
+      render: (instructor: string, record: any) => instructor || record.teacher || '-',
+      title: '任课老师',
+      width: 120
     },
     {
       align: 'center' as const,
@@ -2010,16 +2020,6 @@ const ClassDetail = () => {
       key: 'endDate',
       title: '结束日期',
       width: 120
-    },
-    {
-      align: 'center' as const,
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: number) => (
-        <Tag color={status === 1 ? 'processing' : 'default'}>{status === 1 ? '进行中' : '未开始'}</Tag>
-      ),
-      title: '状态',
-      width: 100
     },
     {
       align: 'center' as const,
@@ -2043,11 +2043,10 @@ const ClassDetail = () => {
                   编辑
                 </Button>
                 <Button
-                  danger
                   type="link"
-                  onClick={() => handleRemoveCourse(record.id)}
+                  onClick={handleAddCourse}
                 >
-                  移除
+                  更换课程
                 </Button>
               </>
             )}
@@ -2055,7 +2054,7 @@ const ClassDetail = () => {
         );
       },
       title: '操作',
-      width: 180
+      width: 200
     }
   ];
 
@@ -2064,16 +2063,6 @@ const ClassDetail = () => {
     return (
       <Card
         variant="borderless"
-        extra={
-          isSuperAdminUser && (
-            <Button
-              type="primary"
-              onClick={handleAddCourse}
-            >
-              {courseList.length > 0 ? '更换课程' : '添加课程'}
-            </Button>
-          )
-        }
         title={
           <div className="flex items-center gap-2">
             <span>班级课程</span>
@@ -2097,7 +2086,7 @@ const ClassDetail = () => {
             dataSource={courseList}
             loading={loading}
             rowKey="id"
-            scroll={{ x: 1200 }}
+            scroll={{ x: 800 }}
           />
         )}
 
@@ -2119,20 +2108,22 @@ const ClassDetail = () => {
           {currentCourse && (
             <>
               <Descriptions
+                bordered
                 column={2}
+                size="small"
                 title="基本信息"
               >
-                <Descriptions.Item label="课程名称">{currentCourse.name}</Descriptions.Item>
-                <Descriptions.Item label="授课教师">{currentCourse.teacher}</Descriptions.Item>
-                <Descriptions.Item label="上课地点">{currentCourse.classroom}</Descriptions.Item>
-                <Descriptions.Item label="上课时间">{currentCourse.schedule}</Descriptions.Item>
-                <Descriptions.Item label="开始日期">{currentCourse.startDate}</Descriptions.Item>
-                <Descriptions.Item label="结束日期">{currentCourse.endDate}</Descriptions.Item>
-                <Descriptions.Item label="状态">
-                  <Tag color={currentCourse.status === 1 ? 'processing' : 'default'}>
-                    {currentCourse.status === 1 ? '进行中' : '未开始'}
-                  </Tag>
+                <Descriptions.Item
+                  label="课程名称"
+                  span={2}
+                >
+                  {classInfo?.courseName || currentCourse.name || '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="授课教师">
+                  {currentCourse.instructor || currentCourse.teacher || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="开始日期">{currentCourse.startDate || '-'}</Descriptions.Item>
+                <Descriptions.Item label="结束日期">{currentCourse.endDate || '-'}</Descriptions.Item>
               </Descriptions>
 
               <div className="mt-6">
@@ -2281,10 +2272,10 @@ const ClassDetail = () => {
           )}
         </Modal>
 
-        {/* 课程编辑/添加模态框 */}
+        {/* 课程编辑模态框 */}
         <Modal
           open={courseModalVisible}
-          title={currentCourse ? '编辑课程' : '添加课程'}
+          title="编辑课程"
           onCancel={() => setCourseModalVisible(false)}
           onOk={handleSaveCourse}
         >
@@ -2295,88 +2286,107 @@ const ClassDetail = () => {
             wrapperCol={{ span: 16 }}
           >
             <Form.Item
-              label="课程名称"
-              name="name"
-              rules={[{ message: '请输入课程名称', required: true }]}
-            >
-              <Input placeholder="请输入课程名称" />
-            </Form.Item>
-            <Form.Item
-              label="课程描述"
-              name="description"
-            >
-              <Input.TextArea
-                placeholder="请输入课程描述"
-                rows={3}
-              />
-            </Form.Item>
-            <Form.Item
               label="授课教师"
               name="teacher"
               rules={[{ message: '请输入授课教师', required: true }]}
             >
               <Input placeholder="请输入授课教师姓名" />
             </Form.Item>
-            <Form.Item
-              label="上课地点"
-              name="classroom"
-              rules={[{ message: '请输入上课地点', required: true }]}
-            >
-              <Input placeholder="请输入上课地点" />
-            </Form.Item>
-            <Form.Item
-              label="课程时长"
-              name="duration"
-              rules={[{ message: '请输入课程时长', required: true }]}
-            >
-              <InputNumber
-                addonAfter="天"
-                max={365}
-                min={1}
-                placeholder="请输入课程时长"
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="课程价格"
-              name="price"
-              rules={[{ message: '请输入课程价格', required: true }]}
-            >
-              <InputNumber
-                addonBefore="¥"
-                min={0}
-                placeholder="请输入课程价格"
-                precision={2}
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="最大学员数"
-              name="maxStudents"
-              rules={[{ message: '请输入最大学员数', required: true }]}
-            >
-              <InputNumber
-                max={1000}
-                min={1}
-                placeholder="请输入最大学员数"
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="开始日期"
-              name="startDate"
-              rules={[{ message: '请选择开始日期', required: true }]}
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
-            <Form.Item
-              label="结束日期"
-              name="endDate"
-              rules={[{ message: '请选择结束日期', required: true }]}
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
           </Form>
+        </Modal>
+
+        {/* 课程选择模态框 */}
+        <Modal
+          cancelText="取消"
+          okText="确认选择"
+          open={courseSelectModalVisible}
+          title="选择课程"
+          width={800}
+          onOk={handleConfirmCourseSelect}
+          onCancel={() => {
+            setCourseSelectModalVisible(false);
+            setSelectedCourseId(null);
+          }}
+        >
+          <div className="mb-4">
+            <Typography.Text type="secondary">请从下列课程中选择一个作为班级的培训课程：</Typography.Text>
+          </div>
+
+          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            <Table
+              dataSource={availableCourses}
+              loading={courseSelectLoading}
+              pagination={false}
+              rowKey="id"
+              columns={[
+                {
+                  dataIndex: 'courseName',
+                  ellipsis: true,
+                  key: 'courseName',
+                  title: '课程名称',
+                  width: 180
+                },
+                {
+                  dataIndex: 'instructor',
+                  key: 'instructor',
+                  render: (instructor: string) => instructor || '-',
+                  title: '任课老师',
+                  width: 120
+                },
+                {
+                  dataIndex: 'price',
+                  key: 'price',
+                  render: (price: number | string) => {
+                    const priceNum = typeof price === 'string' ? Number.parseFloat(price) : price;
+                    return `¥${priceNum?.toFixed(2) || '0.00'}`;
+                  },
+                  title: '价格',
+                  width: 100
+                },
+                {
+                  dataIndex: 'startDate',
+                  key: 'startDate',
+                  render: (date: string) => {
+                    if (!date) return '-';
+                    try {
+                      return dayjs(date).format('YYYY-MM-DD');
+                    } catch {
+                      return date;
+                    }
+                  },
+                  title: '开始日期',
+                  width: 100
+                },
+                {
+                  dataIndex: 'endDate',
+                  key: 'endDate',
+                  render: (date: string) => {
+                    if (!date) return '-';
+                    try {
+                      return dayjs(date).format('YYYY-MM-DD');
+                    } catch {
+                      return date;
+                    }
+                  },
+                  title: '结束日期',
+                  width: 100
+                }
+              ]}
+              rowSelection={{
+                onChange: keys => {
+                  setSelectedCourseId((keys[0] as number) || null);
+                },
+                selectedRowKeys: selectedCourseId ? [selectedCourseId] : [],
+                type: 'radio'
+              }}
+            />
+          </div>
+
+          {availableCourses.length === 0 && !courseSelectLoading && (
+            <div className="py-8 text-center">
+              <Typography.Text type="secondary">暂无可用的课程，请先在课程管理中创建课程</Typography.Text>
+            </div>
+          )}
         </Modal>
 
         {/* 文件上传模态框 */}
