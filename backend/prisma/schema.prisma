@@ -63,6 +63,7 @@ model User {
   loginRecords                    LoginRecord[]             @relation("UserLoginRecords")
   customerStatusHistoryOperations CustomerStatusHistory[]   @relation("CustomerStatusHistoryOperator")
   department                      Department?               @relation(fields: [departmentId], references: [id])
+  userReadStatuses                UserNotificationReadStatus[]
 
   @@map("users")
 }
@@ -506,8 +507,23 @@ model Notification {
   relatedType String?                  @map("related_type") @db.VarChar(50)
   createTime  String                   @map("create_time")
   attachments NotificationAttachment[]
+  userReadStatuses UserNotificationReadStatus[]
 
   @@map("notifications")
+}
+
+model UserNotificationReadStatus {
+  id             Int          @id @default(autoincrement())
+  userId         Int          @map("user_id")
+  notificationId Int          @map("notification_id")
+  readStatus     Int          @default(0) @map("read_status")
+  readTime       DateTime?    @map("read_time")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationId])
+  @@map("user_notification_read_statuses")
 }
 
 model NotificationAttachment {

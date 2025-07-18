@@ -84,10 +84,12 @@ const ClassDetail = () => {
 
       setCourseList(formattedCourses);
 
-      // 获取公告列表
+      // 获取公告列表（只获取班级通知公告，不包含系统通知）
       const announcementsResponse = await notificationService.getNotificationList({
         current: 1,
         relatedId: Number.parseInt(classId, 10),
+        relatedType: 'class',
+        // 只获取班级通知公告
         size: 1000,
         type: 'class_announcement'
       });

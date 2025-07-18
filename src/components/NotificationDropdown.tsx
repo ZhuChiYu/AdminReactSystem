@@ -11,9 +11,11 @@ interface Notification {
   content: string;
   id: string;
   read: boolean;
+  relatedId?: number;
+  relatedType?: string;
   time: string;
   title: string;
-  type: 'error' | 'info' | 'meeting' | 'success' | 'warning';
+  type: 'class_announcement_system' | 'course_attachment' | 'error' | 'info' | 'meeting' | 'success' | 'warning';
 }
 
 const NotificationDropdown: React.FC = () => {
@@ -39,9 +41,18 @@ const NotificationDropdown: React.FC = () => {
           content: notification.content,
           id: notification.id.toString(),
           read: notification.readStatus === 1,
+          relatedId: notification.relatedId,
+          relatedType: notification.relatedType,
           time: new Date(notification.createTime).toLocaleString(),
           title: notification.title,
-          type: notification.type as 'error' | 'info' | 'meeting' | 'success' | 'warning'
+          type: notification.type as
+            | 'class_announcement_system'
+            | 'course_attachment'
+            | 'error'
+            | 'info'
+            | 'meeting'
+            | 'success'
+            | 'warning'
         }));
         setNotifications(formattedNotifications);
         setUnreadCount(formattedNotifications.filter(n => !n.read).length);
@@ -49,7 +60,7 @@ const NotificationDropdown: React.FC = () => {
         setNotifications([]);
         setUnreadCount(0);
       }
-    } catch (error) {
+    } catch (_error) {
       setNotifications([]);
       setUnreadCount(0);
     } finally {
@@ -68,7 +79,7 @@ const NotificationDropdown: React.FC = () => {
 
       setNotifications(notifications.map(n => (n.id === id ? { ...n, read: true } : n)));
       setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
+    } catch (_error) {
       message.error('标记已读失败');
     }
   };
@@ -76,7 +87,7 @@ const NotificationDropdown: React.FC = () => {
   // 标记所有为已读
   const markAllAsRead = async () => {
     try {
-      const response = await notificationService.markAllAsRead();
+      const _response = await notificationService.markAllAsRead();
 
       setNotifications(notifications.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
@@ -86,7 +97,7 @@ const NotificationDropdown: React.FC = () => {
       setTimeout(() => {
         fetchNotifications();
       }, 500);
-    } catch (error) {
+    } catch (_error) {
       message.error('标记全部已读失败');
     }
   };
@@ -106,6 +117,11 @@ const NotificationDropdown: React.FC = () => {
     // 根据通知类型导航到相应页面
     if (notification.type === 'meeting') {
       navigate('/meeting-manage/approve');
+    } else if (notification.type === 'course_attachment') {
+      navigate('/course-manage/list');
+    } else if (notification.type === 'class_announcement_system' && notification.relatedId) {
+      // 班级通知公告系统通知，跳转到班级详情页面
+      navigate(`/class-manage/detail/${notification.relatedId}`);
     } else {
       // 显示通知详情
     }

@@ -22,8 +22,10 @@ interface Notification {
   datetime: string;
   id: string;
   read: boolean;
+  relatedId?: number;
+  relatedType?: string;
   title: string;
-  type: 'course_attachment' | 'info' | 'meeting' | 'success' | 'warning';
+  type: 'class_announcement_system' | 'course_attachment' | 'info' | 'meeting' | 'success' | 'warning';
 }
 
 const NotificationsPage: React.FC = () => {
@@ -51,20 +53,32 @@ const NotificationsPage: React.FC = () => {
     try {
       const response = await notificationService.getNotificationList({
         current: 1,
-        size: 100
+        size: 100,
+        // 明确排除课程附件通知，系统通知中心只显示真正的系统通知
+        type: isSuper ? undefined : undefined // 让后端权限控制处理
       });
 
-      // 转换API数据格式
-      const formattedNotifications: Notification[] = response.records.map(
-        (notification: NotificationApi.NotificationListItem) => ({
+      // 转换API数据格式，并过滤掉具体的班级通知公告内容
+      const formattedNotifications: Notification[] = response.records
+        .filter(
+          (notification: NotificationApi.NotificationListItem) => notification.type !== 'class_announcement' // 在前端也过滤掉具体的班级通知公告内容，但保留课程附件通知
+        )
+        .map((notification: NotificationApi.NotificationListItem) => ({
           content: notification.content,
           datetime: notification.createTime,
           id: notification.id.toString(),
           read: notification.readStatus === 1,
+          relatedId: notification.relatedId,
+          relatedType: notification.relatedType,
           title: notification.title,
-          type: notification.type as 'course_attachment' | 'info' | 'meeting' | 'success' | 'warning'
-        })
-      );
+          type: notification.type as
+            | 'class_announcement_system'
+            | 'course_attachment'
+            | 'info'
+            | 'meeting'
+            | 'success'
+            | 'warning'
+        }));
 
       setNotifications(formattedNotifications);
       filterNotifications(formattedNotifications, activeTab);
@@ -189,6 +203,9 @@ const NotificationsPage: React.FC = () => {
       navigate('/meeting-manage/approve');
     } else if (notification.type === 'course_attachment') {
       navigate('/course-manage/list');
+    } else if (notification.type === 'class_announcement_system' && notification.relatedId) {
+      // 班级通知公告系统通知，跳转到班级详情页面
+      navigate(`/class-manage/detail/${notification.relatedId}`);
     }
     // 其他类型可以在这里添加更多处理逻辑
   };
@@ -206,6 +223,8 @@ const NotificationsPage: React.FC = () => {
         return <ClockCircleOutlined style={{ color: '#722ed1' }} />;
       case 'course_attachment':
         return <FileOutlined style={{ color: '#eb2f96' }} />;
+      case 'class_announcement_system':
+        return <BellOutlined style={{ color: '#f5222d' }} />;
       default:
         return <BellOutlined />;
     }

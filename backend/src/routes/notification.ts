@@ -92,6 +92,7 @@ router.get('/', authMiddleware, async (req, res) => {
     if (currentUserId) {
       if (isSuperAdmin) {
         // 超级管理员可以看到自己的通知、系统通知以及审批类通知，以及所有事项相关通知
+        // 但排除具体的班级通知公告内容，它们应该在班级管理页面中显示
         where.OR = [
           { userId: currentUserId }, // 当前用户的通知
           { userId: 0 }, // 系统通知
@@ -102,6 +103,8 @@ router.get('/', authMiddleware, async (req, res) => {
           { type: 'warning' }, // 警告通知
           { type: 'task' }, // 任务通知
           { type: 'project_task' }, // 项目任务通知
+          { type: 'class_announcement_system' }, // 班级通知公告系统通知
+          { type: 'course_attachment' }, // 课程附件通知
           {
             AND: [
               { type: 'meeting' },
@@ -109,15 +112,24 @@ router.get('/', authMiddleware, async (req, res) => {
             ]
           }
         ];
+
+        // 如果没有明确指定type，才排除某些类型的通知
+        if (!type) {
+          // 明确排除具体的班级通知公告内容（只在班级详情页面显示）
+          where.AND = [
+            ...(where.AND || []),
+            { type: { not: 'class_announcement' } }
+          ];
+        }
       } else {
-        // 普通用户只能看到自己的通知和系统通知，但排除审批类通知
+        // 普通用户只能看到自己的通知和系统通知，但排除审批类通知和具体的班级通知公告内容
         where.OR = [
           {
             AND: [
               { userId: currentUserId },
               {
                 OR: [
-                  { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类通知
+                  { type: { notIn: ['expense', 'meeting', 'class_announcement'] } }, // 排除报销、会议和班级通知公告通知，但保留课程附件通知
                   {
                     AND: [
                       { type: 'meeting' },
@@ -133,7 +145,7 @@ router.get('/', authMiddleware, async (req, res) => {
               { userId: 0 }, // 系统通知
               {
                 OR: [
-                  { type: { notIn: ['expense', 'meeting'] } }, // 排除报销和会议类系统通知
+                  { type: { notIn: ['expense', 'meeting', 'class_announcement'] } }, // 排除报销、会议和班级通知公告系统通知，但保留课程附件通知
                   {
                     AND: [
                       { type: 'meeting' },
@@ -145,44 +157,84 @@ router.get('/', authMiddleware, async (req, res) => {
             ]
           }
         ];
+
+        // 如果明确指定了type（如班级详情页面指定class_announcement），则允许获取
+        if (type === 'class_announcement') {
+          // 重新构建查询条件，允许获取指定班级的通知公告
+          where.OR = [
+            {
+              AND: [
+                { userId: currentUserId },
+                { type: type as string }
+              ]
+            },
+            {
+              AND: [
+                { userId: 0 },
+                { type: type as string }
+              ]
+            }
+          ];
+        }
       }
     } else {
-      // 如果没有用户信息，只显示非审批类的系统通知
-      where.AND = [
-        { userId: 0 },
-        { type: { notIn: ['expense', 'meeting_approval'] } }
-      ];
+      // 如果没有用户信息，只显示非审批类的系统通知，但排除具体的班级通知公告内容
+      if (!type) {
+        where.AND = [
+          { userId: 0 },
+          { type: { notIn: ['expense', 'meeting_approval', 'class_announcement'] } } // 保留课程附件通知
+        ];
+      } else {
+        // 如果明确指定了type，允许获取
+        where.AND = [
+          { userId: 0 },
+          { type: type as string }
+        ];
+      }
     }
 
-    // 构建查询条件
+    // 构建额外的查询条件，与权限条件进行AND组合
+    const additionalConditions: any = {};
+
     if (type) {
-      where.type = type as string;
-    }
-
-    if (readStatus !== undefined) {
-      where.readStatus = Number.parseInt(readStatus as string);
+      additionalConditions.type = type as string;
     }
 
     if (title) {
-      where.title = {
+      additionalConditions.title = {
         contains: title as string,
         mode: 'insensitive'
       };
     }
 
     if (relatedId) {
-      where.relatedId = Number.parseInt(relatedId as string);
+      additionalConditions.relatedId = Number.parseInt(relatedId as string);
     }
 
     if (relatedType) {
-      where.relatedType = relatedType as string;
+      additionalConditions.relatedType = relatedType as string;
+    }
+
+    // 将额外条件与权限条件组合
+    if (Object.keys(additionalConditions).length > 0) {
+      where.AND = [
+        ...(where.AND || []),
+        additionalConditions
+      ];
     }
 
     const skip = (Number.parseInt(current as string) - 1) * Number.parseInt(size as string);
     const take = Number.parseInt(size as string);
 
-    // 获取通知列表
+    // 获取通知列表，同时获取当前用户的已读状态
     const notifications = await prisma.notification.findMany({
+      include: {
+        userReadStatuses: {
+          where: {
+            userId: currentUserId
+          }
+        }
+      },
       orderBy: {
         createTime: 'desc'
       },
@@ -194,14 +246,33 @@ router.get('/', authMiddleware, async (req, res) => {
     // 获取总数
     const total = await prisma.notification.count({ where });
 
+    // 转换数据格式，包含用户的已读状态
+    const formattedNotifications = notifications.map(notification => {
+      const userReadStatus = notification.userReadStatuses[0];
+      return {
+        ...notification,
+        readStatus: userReadStatus ? userReadStatus.readStatus : 0,
+        readTime: userReadStatus ? userReadStatus.readTime?.toISOString() : null
+      };
+    });
+
+    // 如果指定了readStatus过滤条件，需要在这里进行过滤
+    let finalNotifications = formattedNotifications;
+    if (readStatus !== undefined) {
+      const targetReadStatus = Number.parseInt(readStatus as string);
+      finalNotifications = formattedNotifications.filter(notification =>
+        notification.readStatus === targetReadStatus
+      );
+    }
+
     res.json({
       code: 0,
       data: {
         current: Number.parseInt(current as string),
         pages: Math.ceil(total / Number.parseInt(size as string)),
-        records: notifications,
+        records: finalNotifications.map(({ userReadStatuses, ...notification }) => notification),
         size: Number.parseInt(size as string),
-        total
+        total: finalNotifications.length
       },
       message: '获取通知列表成功',
       path: req.path,
@@ -235,7 +306,7 @@ router.put('/:id/read', authMiddleware, async (req, res) => {
       });
     }
 
-    // 检查通知是否属于当前用户或是系统通知
+    // 检查通知是否存在且用户有权访问
     const notification = await prisma.notification.findFirst({
       where: {
         id: Number.parseInt(id),
@@ -256,12 +327,24 @@ router.put('/:id/read', authMiddleware, async (req, res) => {
       });
     }
 
-    await prisma.notification.update({
-      data: {
-        readStatus: 1,
-        readTime: new Date().toISOString()
+    // 使用upsert来创建或更新用户的已读状态
+    await prisma.userNotificationReadStatus.upsert({
+      where: {
+        userId_notificationId: {
+          userId: currentUserId,
+          notificationId: Number.parseInt(id)
+        }
       },
-      where: { id: Number.parseInt(id) }
+      update: {
+        readStatus: 1,
+        readTime: new Date()
+      },
+      create: {
+        userId: currentUserId,
+        notificationId: Number.parseInt(id),
+        readStatus: 1,
+        readTime: new Date()
+      }
     });
 
     res.json({
@@ -287,6 +370,8 @@ router.put('/:id/read', authMiddleware, async (req, res) => {
 router.put('/read-all', authMiddleware, async (req, res) => {
   try {
     const currentUserId = (req as any).user?.id;
+    const userRoles = (req as any).user?.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
 
     if (!currentUserId) {
       return res.status(401).json({
@@ -298,20 +383,102 @@ router.put('/read-all', authMiddleware, async (req, res) => {
       });
     }
 
-    // 只标记当前用户的通知和系统通知为已读
-    await prisma.notification.updateMany({
-      data: {
-        readStatus: 1,
-        readTime: new Date().toISOString()
-      },
-      where: {
-        OR: [
-          { userId: currentUserId },
-          { userId: 0 } // 系统通知
-        ],
-        readStatus: 0 // 只更新未读的通知
-      }
+    // 构建查询条件，与获取通知列表的逻辑保持一致
+    const where: any = {};
+
+    if (isSuperAdmin) {
+      // 超级管理员可以标记的通知类型
+      where.OR = [
+        { userId: currentUserId },
+        { userId: 0 },
+        { type: 'expense' },
+        { type: 'meeting_approval' },
+        { type: 'info' },
+        { type: 'success' },
+        { type: 'warning' },
+        { type: 'task' },
+        { type: 'project_task' },
+        { type: 'class_announcement_system' },
+        { type: 'course_attachment' }, // 重新允许课程附件通知
+        {
+          AND: [
+            { type: 'meeting' },
+            { title: { contains: '审批' } }
+          ]
+        }
+      ];
+
+      // 排除具体的班级通知公告内容（在系统通知中心的情况）
+      where.AND = [
+        { type: { not: 'class_announcement' } }
+      ];
+    } else {
+      // 普通用户的通知
+      where.OR = [
+        {
+          AND: [
+            { userId: currentUserId },
+            {
+              OR: [
+                { type: { notIn: ['expense', 'meeting', 'class_announcement'] } }, // 重新允许课程附件通知
+                {
+                  AND: [
+                    { type: 'meeting' },
+                    { title: { not: { contains: '审批' } } }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          AND: [
+            { userId: 0 },
+            {
+              OR: [
+                { type: { notIn: ['expense', 'meeting', 'class_announcement'] } }, // 重新允许课程附件通知
+                {
+                  AND: [
+                    { type: 'meeting' },
+                    { title: { not: { contains: '审批' } } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ];
+    }
+
+    // 获取所有符合条件的通知ID
+    const notifications = await prisma.notification.findMany({
+      select: { id: true },
+      where
     });
+
+    // 为这些通知创建或更新用户的已读状态
+    const upsertPromises = notifications.map(notification =>
+      prisma.userNotificationReadStatus.upsert({
+        where: {
+          userId_notificationId: {
+            userId: currentUserId,
+            notificationId: notification.id
+          }
+        },
+        update: {
+          readStatus: 1,
+          readTime: new Date()
+        },
+        create: {
+          userId: currentUserId,
+          notificationId: notification.id,
+          readStatus: 1,
+          readTime: new Date()
+        }
+      })
+    );
+
+    await Promise.all(upsertPromises);
 
     res.json({
       code: 0,
@@ -336,6 +503,10 @@ router.put('/read-all', authMiddleware, async (req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { content, relatedId, relatedType, targetUserIds = [], title, type } = req.body;
+    const currentUserId = (req as any).user?.id;
+    const userRoles = (req as any).user?.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
+    const operatorName = (req as any).user?.nickName || (req as any).user?.userName || '管理员';
 
     const notifications = [];
 
@@ -372,6 +543,43 @@ router.post('/', authMiddleware, async (req, res) => {
         }
       });
       notifications.push(notification);
+    }
+
+    // 如果是超级管理员发布班级通知公告，创建系统通知
+    if (isSuperAdmin && type === 'class_announcement' && relatedType === 'class' && relatedId) {
+      try {
+        // 获取班级信息
+        const classInfo = await prisma.class.findUnique({
+          where: { id: relatedId },
+          select: { name: true }
+        });
+
+        if (classInfo) {
+          // 创建系统通知
+          await prisma.notification.create({
+            data: {
+              title: '班级通知公告更新',
+              content: `${operatorName}在班级"${classInfo.name}"中发布了新的通知公告："${title}"，点击查看详情。`,
+              type: 'class_announcement_system',
+              userId: 0, // 系统通知
+              readStatus: 0,
+              relatedId: relatedId,
+              relatedType: 'class',
+              createTime: new Date().toISOString()
+            }
+          });
+
+          logger.info(`已创建班级通知公告系统通知`, {
+            classId: relatedId,
+            className: classInfo.name,
+            notificationTitle: title,
+            operator: operatorName
+          });
+        }
+      } catch (systemNotificationError) {
+        logger.error('创建班级通知公告系统通知失败:', systemNotificationError);
+        // 不影响主通知创建，继续执行
+      }
     }
 
     res.json({
@@ -427,7 +635,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
           {
             AND: [
               { userId: 0 }, // 系统通知
-              { type: { in: ['class_announcement'] } }
+              { type: { in: ['class_announcement', 'class_announcement_system'] } } // 包含班级通知公告系统通知
             ]
           },
           {
@@ -700,6 +908,7 @@ router.get('/unread-count', authMiddleware, async (req, res) => {
         { type: 'warning' }, // 警告通知
         { type: 'task' }, // 任务通知
         { type: 'project_task' }, // 项目任务通知
+        { type: 'class_announcement_system' }, // 班级通知公告系统通知
         {
           AND: [
             { type: 'meeting' },

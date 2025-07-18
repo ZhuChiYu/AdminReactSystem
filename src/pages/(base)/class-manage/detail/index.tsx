@@ -312,12 +312,14 @@ const ClassDetail = () => {
 
       setCourseList(coursesResponse.records);
 
-      // 获取班级相关的通知公告列表
+      // 获取班级相关的通知公告列表（只获取真正的班级通知，不包含系统通知）
       const announceResponse = await notificationService.getNotificationList({
         current: 1,
         relatedId: Number.parseInt(classId, 10),
         relatedType: 'class',
-        size: 1000
+        // 只获取班级通知公告，不包含系统通知
+        size: 1000,
+        type: 'class_announcement'
       });
 
       // 格式化通知数据，保持数据结构一致性
@@ -325,7 +327,6 @@ const ClassDetail = () => {
         (announcement: NotificationApi.NotificationListItem) => ({
           content: announcement.content,
           id: announcement.id,
-          importance: 1, // 默认重要程度
           publishDate: dayjs(announcement.createTime).format('YYYY-MM-DD HH:mm:ss'),
           status: 1,
           title: announcement.title
@@ -472,19 +473,7 @@ const ClassDetail = () => {
     return '已结束';
   };
 
-  // 获取通知重要性标签颜色
-  const getImportanceColor = (importance: number) => {
-    if (importance === 2) return 'red';
-    if (importance === 1) return 'orange';
-    return 'blue';
-  };
 
-  // 获取通知重要性文本
-  const getImportanceText = (importance: number) => {
-    if (importance === 2) return '紧急';
-    if (importance === 1) return '重要';
-    return '普通';
-  };
 
   // 返回列表页
   const handleBack = () => {
@@ -1262,7 +1251,6 @@ const ClassDetail = () => {
         const updatedAnnounce = {
           ...currentAnnounce,
           ...values,
-          importance: values.importance || 0,
           publishDate: new Date().toLocaleString()
         };
 
@@ -1272,10 +1260,12 @@ const ClassDetail = () => {
         // 新建模式 - 调用API创建通知
         const _result = await notificationService.createNotification(announceData);
 
-        // 重新获取通知列表
+        // 重新获取通知列表（只获取班级通知公告，不包含系统通知）
         const announcementsResponse = await notificationService.getNotificationList({
           current: 1,
           relatedId: Number.parseInt(classId!, 10),
+          relatedType: 'class',
+          // 只获取班级通知公告
           size: 1000,
           type: 'class_announcement'
         });
@@ -1284,7 +1274,7 @@ const ClassDetail = () => {
           (announcement: NotificationApi.NotificationListItem) => ({
             content: announcement.content,
             id: announcement.id,
-            importance: values.importance || 0,
+
             publishDate: dayjs(announcement.createTime).format('YYYY-MM-DD HH:mm:ss'),
             status: 1,
             title: announcement.title
@@ -1308,7 +1298,6 @@ const ClassDetail = () => {
     setCurrentAnnounce(announce);
     announceForm.setFieldsValue({
       content: announce.content,
-      importance: announce.importance,
       title: announce.title
     });
     setAnnounceModalVisible(true);
@@ -1323,19 +1312,20 @@ const ClassDetail = () => {
           await notificationService.deleteNotification(announceId);
           message.success('通知删除成功');
 
-          // 重新获取通知列表
+          // 重新获取通知列表（只获取班级通知公告，不包含系统通知）
           const notificationsResponse = await notificationService.getNotificationList({
             current: 1,
             relatedId: Number.parseInt(classId!, 10),
             relatedType: 'class',
-            size: 1000
+            // 只获取班级通知公告
+            size: 1000,
+            type: 'class_announcement'
           });
 
           const formattedAnnouncements = notificationsResponse.records.map(
             (notification: NotificationApi.NotificationListItem) => ({
               content: notification.content,
               id: notification.id,
-              importance: 1, // 默认重要程度
               publishDate: dayjs(notification.createTime).format('YYYY-MM-DD HH:mm:ss'),
               title: notification.title
             })
@@ -2656,12 +2646,7 @@ const ClassDetail = () => {
                     <div className="mt-2 text-gray-400">发布时间：{item.publishDate}</div>
                   </div>
                 }
-                title={
-                  <Space>
-                    <span>{item.title}</span>
-                    <Tag color={getImportanceColor(item.importance)}>{getImportanceText(item.importance)}</Tag>
-                  </Space>
-                }
+                title={item.title}
               />
             </List.Item>
           )}
@@ -2689,11 +2674,6 @@ const ClassDetail = () => {
                 title="通知信息"
               >
                 <Descriptions.Item label="通知标题">{currentAnnounce.title}</Descriptions.Item>
-                <Descriptions.Item label="重要程度">
-                  <Tag color={getImportanceColor(currentAnnounce.importance)}>
-                    {getImportanceText(currentAnnounce.importance)}
-                  </Tag>
-                </Descriptions.Item>
                 <Descriptions.Item label="发布时间">{currentAnnounce.publishDate}</Descriptions.Item>
                 <Descriptions.Item label="状态">
                   <Tag color="processing">已发布</Tag>
@@ -2879,17 +2859,7 @@ const ClassDetail = () => {
             >
               <Input placeholder="请输入通知标题" />
             </Form.Item>
-            <Form.Item
-              label="重要程度"
-              name="importance"
-              rules={[{ message: '请选择重要程度', required: true }]}
-            >
-              <Select placeholder="请选择重要程度">
-                <Select.Option value={0}>普通</Select.Option>
-                <Select.Option value={1}>重要</Select.Option>
-                <Select.Option value={2}>紧急</Select.Option>
-              </Select>
-            </Form.Item>
+
             <Form.Item
               label="通知内容"
               name="content"

@@ -13,43 +13,27 @@ import { logger } from '@/utils/logger';
 const router = express.Router();
 
 /**
- * 给所有用户发送通知
+ * 创建课程附件系统通知
  */
-async function sendNotificationToAllUsers(excludeUserId: number, title: string, content: string, type: string = 'course_attachment', relatedId?: number, relatedType?: string) {
+async function createCourseAttachmentSystemNotification(title: string, content: string, relatedId?: number, relatedType?: string) {
   try {
-    // 获取所有活跃用户（排除当前操作用户）
-    const allUsers = await prisma.user.findMany({
-      where: {
-        status: 1, // 只获取活跃用户
-        id: {
-          not: excludeUserId // 排除当前操作用户
-        }
-      },
-      select: {
-        id: true
+    // 创建一条系统通知，所有用户都能看到
+    await prisma.notification.create({
+      data: {
+        title,
+        content,
+        type: 'course_attachment',
+        userId: 0, // 系统通知
+        readStatus: 0,
+        relatedId: relatedId || null,
+        relatedType: relatedType || null,
+        createTime: new Date().toISOString()
       }
     });
 
-    // 批量创建通知
-    const notifications = allUsers.map(user => ({
-      title,
-      content,
-      type,
-      userId: user.id,
-      readStatus: 0,
-      relatedId: relatedId || null,
-      relatedType: relatedType || null,
-      createTime: new Date().toISOString()
-    }));
-
-    if (notifications.length > 0) {
-      await prisma.notification.createMany({
-        data: notifications
-      });
-      logger.info(`成功给 ${notifications.length} 个用户发送了通知: ${title}`);
-    }
+    logger.info(`成功创建课程附件系统通知: ${title}`);
   } catch (error) {
-    logger.error('发送通知失败:', error);
+    logger.error('创建课程附件系统通知失败:', error);
     // 不抛出错误，避免影响主要业务流程
   }
 }
@@ -200,11 +184,9 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const notificationContent = `${uploaderName} 在课程"${course.courseName}"中上传了新附件："${req.file.originalname}"，请及时查看。`;
 
     // 异步发送通知，不阻塞响应
-    sendNotificationToAllUsers(
-      uploaderId,
+    createCourseAttachmentSystemNotification(
       notificationTitle,
       notificationContent,
-      'course_attachment',
       course.id,
       'course'
     ).catch(error => {
@@ -411,11 +393,9 @@ router.delete('/:id', async (req, res) => {
     const notificationContent = `${currentUserName} 删除了课程"${attachment.course?.courseName || '未知课程'}"中的附件："${attachment.originalName || attachment.fileName}"。`;
 
     // 异步发送通知，不阻塞响应
-    sendNotificationToAllUsers(
-      currentUserId,
+    createCourseAttachmentSystemNotification(
       notificationTitle,
       notificationContent,
-      'course_attachment',
       attachment.course?.id,
       'course'
     ).catch(error => {
