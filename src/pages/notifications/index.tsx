@@ -2,15 +2,18 @@ import {
   BellOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  DeleteOutlined,
+  FileOutlined,
   InfoCircleOutlined,
   WarningOutlined
 } from '@ant-design/icons';
-import { Avatar, Button, Card, Empty, List, Radio, Space, Tabs, Tag, Typography, message } from 'antd';
+import { Avatar, Button, Card, Checkbox, Empty, List, Modal, Space, Tabs, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { notificationService } from '@/service/api';
 import type { NotificationApi } from '@/service/api/types';
+import { isSuperAdmin } from '@/utils/auth';
 
 const { Text, Title } = Typography;
 
@@ -20,7 +23,7 @@ interface Notification {
   id: string;
   read: boolean;
   title: string;
-  type: 'info' | 'meeting' | 'success' | 'warning';
+  type: 'course_attachment' | 'info' | 'meeting' | 'success' | 'warning';
 }
 
 const NotificationsPage: React.FC = () => {
@@ -28,11 +31,23 @@ const NotificationsPage: React.FC = () => {
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [selectedNotifications, setSelectedNotifications] = useState<string[]>([]);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const isSuper = isSuperAdmin();
+
+  // 根据Tab过滤通知
+  const filterNotifications = (notificationList: Notification[], tab: string) => {
+    if (tab === 'all') {
+      setFilteredNotifications(notificationList);
+    } else if (tab === 'unread') {
+      setFilteredNotifications(notificationList.filter(n => !n.read));
+    } else {
+      setFilteredNotifications(notificationList.filter(n => n.type === tab));
+    }
+  };
 
   // 获取通知数据
   const fetchNotifications = async () => {
-    setLoading(true);
     try {
       const response = await notificationService.getNotificationList({
         current: 1,
@@ -47,16 +62,14 @@ const NotificationsPage: React.FC = () => {
           id: notification.id.toString(),
           read: notification.readStatus === 1,
           title: notification.title,
-          type: notification.type as 'info' | 'meeting' | 'success' | 'warning'
+          type: notification.type as 'course_attachment' | 'info' | 'meeting' | 'success' | 'warning'
         })
       );
 
       setNotifications(formattedNotifications);
       filterNotifications(formattedNotifications, activeTab);
-    } catch (error) {
+    } catch {
       message.error('获取通知列表失败');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -64,21 +77,10 @@ const NotificationsPage: React.FC = () => {
     fetchNotifications();
   }, []);
 
-  // 根据Tab过滤通知
-  const filterNotifications = (notifications: Notification[], tab: string) => {
-    if (tab === 'all') {
-      setFilteredNotifications(notifications);
-    } else if (tab === 'unread') {
-      setFilteredNotifications(notifications.filter(n => !n.read));
-    } else {
-      setFilteredNotifications(notifications.filter(n => n.type === tab));
-    }
-  };
-
   // 标记通知为已读
   const markAsRead = async (id: string) => {
     try {
-      await notificationService.markAsRead(Number.parseInt(id));
+      await notificationService.markAsRead(Number.parseInt(id, 10));
 
       const updatedNotifications = notifications.map(notification =>
         notification.id === id ? { ...notification, read: true } : notification
@@ -86,7 +88,7 @@ const NotificationsPage: React.FC = () => {
       setNotifications(updatedNotifications);
       filterNotifications(updatedNotifications, activeTab);
       message.success('已标记为已读');
-    } catch (error) {
+    } catch {
       message.error('标记失败');
     }
   };
@@ -94,7 +96,7 @@ const NotificationsPage: React.FC = () => {
   // 标记所有通知为已读
   const markAllAsRead = async () => {
     try {
-      const response = await notificationService.markAllAsRead();
+      await notificationService.markAllAsRead();
 
       const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
       setNotifications(updatedNotifications);
@@ -105,8 +107,73 @@ const NotificationsPage: React.FC = () => {
       setTimeout(() => {
         fetchNotifications();
       }, 500);
-    } catch (error) {
+    } catch {
       message.error('标记失败');
+    }
+  };
+
+  // 删除单个通知
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      await notificationService.deleteNotification(Number.parseInt(notificationId, 10));
+
+      const updatedNotifications = notifications.filter(n => n.id !== notificationId);
+      setNotifications(updatedNotifications);
+      filterNotifications(updatedNotifications, activeTab);
+      message.success('通知已删除');
+    } catch {
+      message.error('删除失败');
+    }
+  };
+
+  // 批量删除通知
+  const batchDeleteNotifications = async () => {
+    if (selectedNotifications.length === 0) {
+      message.warning('请选择要删除的通知');
+      return;
+    }
+
+    Modal.confirm({
+      content: `确定要删除选中的 ${selectedNotifications.length} 条通知吗？`,
+      onOk: async () => {
+        try {
+          await notificationService.batchDeleteNotifications(selectedNotifications.map(id => Number.parseInt(id, 10)));
+
+          const updatedNotifications = notifications.filter(n => !selectedNotifications.includes(n.id));
+          setNotifications(updatedNotifications);
+          filterNotifications(updatedNotifications, activeTab);
+          setSelectedNotifications([]);
+          setIsSelectMode(false);
+          message.success(`成功删除 ${selectedNotifications.length} 条通知`);
+        } catch {
+          message.error('批量删除失败');
+        }
+      },
+      title: '确认删除'
+    });
+  };
+
+  // 切换选择模式
+  const toggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode);
+    setSelectedNotifications([]);
+  };
+
+  // 处理通知选择
+  const handleNotificationSelect = (notificationId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedNotifications([...selectedNotifications, notificationId]);
+    } else {
+      setSelectedNotifications(selectedNotifications.filter(id => id !== notificationId));
+    }
+  };
+
+  // 全选/取消全选
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedNotifications(filteredNotifications.map(n => n.id));
+    } else {
+      setSelectedNotifications([]);
     }
   };
 
@@ -120,6 +187,8 @@ const NotificationsPage: React.FC = () => {
     // 根据通知类型导航
     if (notification.type === 'meeting') {
       navigate('/meeting-manage/approve');
+    } else if (notification.type === 'course_attachment') {
+      navigate('/course-manage/list');
     }
     // 其他类型可以在这里添加更多处理逻辑
   };
@@ -135,6 +204,8 @@ const NotificationsPage: React.FC = () => {
         return <WarningOutlined style={{ color: '#faad14' }} />;
       case 'meeting':
         return <ClockCircleOutlined style={{ color: '#722ed1' }} />;
+      case 'course_attachment':
+        return <FileOutlined style={{ color: '#eb2f96' }} />;
       default:
         return <BellOutlined />;
     }
@@ -146,96 +217,387 @@ const NotificationsPage: React.FC = () => {
     filterNotifications(notifications, key);
   };
 
-  const tabItems = [
-    {
-      children: (
-        <List
-          dataSource={filteredNotifications}
-          itemLayout="horizontal"
-          locale={{ emptyText: <Empty description="暂无通知" /> }}
-          renderItem={item => (
-            <List.Item
-              className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
-              actions={[
-                !item.read ? (
-                  <Button
-                    size="small"
-                    type="link"
-                    onClick={e => {
-                      e.stopPropagation();
-                      markAsRead(item.id);
-                    }}
-                  >
-                    标为已读
-                  </Button>
-                ) : null
-              ]}
-              onClick={() => viewNotification(item)}
-            >
-              <List.Item.Meta
-                avatar={<Avatar icon={getNotificationIcon(item.type)} />}
-                title={<Text strong>{item.title}</Text>}
-                description={
-                  <Space
-                    direction="vertical"
-                    size={1}
-                  >
-                    <Text>{item.content}</Text>
-                    <Space size={8}>
-                      <Text
-                        style={{ fontSize: '12px' }}
-                        type="secondary"
-                      >
-                        {item.datetime}
-                      </Text>
-                      {!item.read && <Tag color="blue">未读</Tag>}
-                    </Space>
-                  </Space>
-                }
-              />
-            </List.Item>
-          )}
-        />
-      ),
-      key: 'all',
-      label: `全部通知 (${notifications.length})`
-    },
-    {
-      children: <></>, // 内容与全部通知相同，由activeTab控制过滤
-      key: 'unread',
-      label: `未读通知 (${notifications.filter(n => !n.read).length})`
-    },
-    {
-      children: <></>, // 内容与全部通知相同，由activeTab控制过滤
-      key: 'meeting',
-      label: '会议通知'
-    },
-    {
-      children: <></>, // 内容与全部通知相同，由activeTab控制过滤
-      key: 'info',
-      label: '普通通知'
-    }
-  ];
-
   return (
-    <div className="p-4">
-      <Card>
+    <div
+      className="p-4"
+      style={{ height: '100vh', overflow: 'hidden' }}
+    >
+      <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div className="mb-4 flex items-center justify-between">
           <Title level={4}>通知中心</Title>
-          <Button
-            disabled={!notifications.some(n => !n.read)}
-            type="primary"
-            onClick={markAllAsRead}
-          >
-            全部标为已读
-          </Button>
+          <Space>
+            {isSuper && (
+              <>
+                <Button onClick={toggleSelectMode}>{isSelectMode ? '取消选择' : '选择删除'}</Button>
+                {isSelectMode && (
+                  <>
+                    <Checkbox
+                      checked={
+                        selectedNotifications.length === filteredNotifications.length &&
+                        filteredNotifications.length > 0
+                      }
+                      indeterminate={
+                        selectedNotifications.length > 0 && selectedNotifications.length < filteredNotifications.length
+                      }
+                      onChange={e => handleSelectAll(e.target.checked)}
+                    >
+                      全选
+                    </Checkbox>
+                    <Button
+                      danger
+                      disabled={selectedNotifications.length === 0}
+                      icon={<DeleteOutlined />}
+                      onClick={batchDeleteNotifications}
+                    >
+                      删除选中 ({selectedNotifications.length})
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+            <Button
+              disabled={!notifications.some(n => !n.read)}
+              type="primary"
+              onClick={markAllAsRead}
+            >
+              全部标为已读
+            </Button>
+          </Space>
         </div>
 
-        <Tabs
-          activeKey={activeTab}
-          items={tabItems}
-          onChange={handleTabChange}
-        />
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <Tabs
+            activeKey={activeTab}
+            style={{ height: '100%' }}
+            items={[
+              {
+                children: (
+                  <div style={{ height: 'calc(100vh - 200px)', overflow: 'auto' }}>
+                    <List
+                      dataSource={filteredNotifications}
+                      locale={{ emptyText: <Empty description="暂无通知" /> }}
+                      renderItem={item => (
+                        <List.Item
+                          className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
+                          actions={[
+                            ...(isSelectMode && isSuper
+                              ? [
+                                  <Checkbox
+                                    checked={selectedNotifications.includes(item.id)}
+                                    key="select"
+                                    onChange={e => handleNotificationSelect(item.id, e.target.checked)}
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                ]
+                              : []),
+                            ...(isSuper && !isSelectMode
+                              ? [
+                                  <Button
+                                    danger
+                                    key="delete"
+                                    size="small"
+                                    type="link"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      deleteNotification(item.id);
+                                    }}
+                                  >
+                                    删除
+                                  </Button>
+                                ]
+                              : []),
+                            !item.read ? (
+                              <Button
+                                key="read"
+                                size="small"
+                                type="link"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  markAsRead(item.id);
+                                }}
+                              >
+                                标为已读
+                              </Button>
+                            ) : null
+                          ].filter(Boolean)}
+                          onClick={() => !isSelectMode && viewNotification(item)}
+                        >
+                          <List.Item.Meta
+                            avatar={<Avatar icon={getNotificationIcon(item.type)} />}
+                            title={<Text strong>{item.title}</Text>}
+                            description={
+                              <Space
+                                direction="vertical"
+                                size={1}
+                              >
+                                <Text>{item.content}</Text>
+                                <Space size={8}>
+                                  <Text
+                                    style={{ fontSize: '12px' }}
+                                    type="secondary"
+                                  >
+                                    {item.datetime}
+                                  </Text>
+                                  {!item.read && <Tag color="blue">未读</Tag>}
+                                </Space>
+                              </Space>
+                            }
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                ),
+                key: 'all',
+                label: `全部通知 (${notifications.length})`
+              },
+              {
+                children: (
+                  <div style={{ height: 'calc(100vh - 200px)', overflow: 'auto' }}>
+                    <List
+                      dataSource={filteredNotifications}
+                      locale={{ emptyText: <Empty description="暂无未读通知" /> }}
+                      renderItem={item => (
+                        <List.Item
+                          className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
+                          actions={[
+                            ...(isSelectMode && isSuper
+                              ? [
+                                  <Checkbox
+                                    checked={selectedNotifications.includes(item.id)}
+                                    key="select"
+                                    onChange={e => handleNotificationSelect(item.id, e.target.checked)}
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                ]
+                              : []),
+                            ...(isSuper && !isSelectMode
+                              ? [
+                                  <Button
+                                    danger
+                                    key="delete"
+                                    size="small"
+                                    type="link"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      deleteNotification(item.id);
+                                    }}
+                                  >
+                                    删除
+                                  </Button>
+                                ]
+                              : []),
+                            !item.read ? (
+                              <Button
+                                key="read"
+                                size="small"
+                                type="link"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  markAsRead(item.id);
+                                }}
+                              >
+                                标为已读
+                              </Button>
+                            ) : null
+                          ].filter(Boolean)}
+                          onClick={() => !isSelectMode && viewNotification(item)}
+                        >
+                          <List.Item.Meta
+                            avatar={<Avatar icon={getNotificationIcon(item.type)} />}
+                            title={<Text strong>{item.title}</Text>}
+                            description={
+                              <Space
+                                direction="vertical"
+                                size={1}
+                              >
+                                <Text>{item.content}</Text>
+                                <Space size={8}>
+                                  <Text
+                                    style={{ fontSize: '12px' }}
+                                    type="secondary"
+                                  >
+                                    {item.datetime}
+                                  </Text>
+                                  {!item.read && <Tag color="blue">未读</Tag>}
+                                </Space>
+                              </Space>
+                            }
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                ),
+                key: 'unread',
+                label: `未读通知 (${notifications.filter(n => !n.read).length})`
+              },
+              {
+                children: (
+                  <div style={{ height: 'calc(100vh - 200px)', overflow: 'auto' }}>
+                    <List
+                      dataSource={filteredNotifications}
+                      locale={{ emptyText: <Empty description="暂无会议通知" /> }}
+                      renderItem={item => (
+                        <List.Item
+                          className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
+                          actions={[
+                            ...(isSelectMode && isSuper
+                              ? [
+                                  <Checkbox
+                                    checked={selectedNotifications.includes(item.id)}
+                                    key="select"
+                                    onChange={e => handleNotificationSelect(item.id, e.target.checked)}
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                ]
+                              : []),
+                            ...(isSuper && !isSelectMode
+                              ? [
+                                  <Button
+                                    danger
+                                    key="delete"
+                                    size="small"
+                                    type="link"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      deleteNotification(item.id);
+                                    }}
+                                  >
+                                    删除
+                                  </Button>
+                                ]
+                              : []),
+                            !item.read ? (
+                              <Button
+                                key="read"
+                                size="small"
+                                type="link"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  markAsRead(item.id);
+                                }}
+                              >
+                                标为已读
+                              </Button>
+                            ) : null
+                          ].filter(Boolean)}
+                          onClick={() => !isSelectMode && viewNotification(item)}
+                        >
+                          <List.Item.Meta
+                            avatar={<Avatar icon={getNotificationIcon(item.type)} />}
+                            title={<Text strong>{item.title}</Text>}
+                            description={
+                              <Space
+                                direction="vertical"
+                                size={1}
+                              >
+                                <Text>{item.content}</Text>
+                                <Space size={8}>
+                                  <Text
+                                    style={{ fontSize: '12px' }}
+                                    type="secondary"
+                                  >
+                                    {item.datetime}
+                                  </Text>
+                                  {!item.read && <Tag color="blue">未读</Tag>}
+                                </Space>
+                              </Space>
+                            }
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                ),
+                key: 'meeting',
+                label: '会议通知'
+              },
+              {
+                children: (
+                  <div style={{ height: 'calc(100vh - 200px)', overflow: 'auto' }}>
+                    <List
+                      dataSource={filteredNotifications}
+                      locale={{ emptyText: <Empty description="暂无普通通知" /> }}
+                      renderItem={item => (
+                        <List.Item
+                          className={`cursor-pointer ${!item.read ? 'bg-blue-50' : ''}`}
+                          actions={[
+                            ...(isSelectMode && isSuper
+                              ? [
+                                  <Checkbox
+                                    checked={selectedNotifications.includes(item.id)}
+                                    key="select"
+                                    onChange={e => handleNotificationSelect(item.id, e.target.checked)}
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                ]
+                              : []),
+                            ...(isSuper && !isSelectMode
+                              ? [
+                                  <Button
+                                    danger
+                                    key="delete"
+                                    size="small"
+                                    type="link"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      deleteNotification(item.id);
+                                    }}
+                                  >
+                                    删除
+                                  </Button>
+                                ]
+                              : []),
+                            !item.read ? (
+                              <Button
+                                key="read"
+                                size="small"
+                                type="link"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  markAsRead(item.id);
+                                }}
+                              >
+                                标为已读
+                              </Button>
+                            ) : null
+                          ].filter(Boolean)}
+                          onClick={() => !isSelectMode && viewNotification(item)}
+                        >
+                          <List.Item.Meta
+                            avatar={<Avatar icon={getNotificationIcon(item.type)} />}
+                            title={<Text strong>{item.title}</Text>}
+                            description={
+                              <Space
+                                direction="vertical"
+                                size={1}
+                              >
+                                <Text>{item.content}</Text>
+                                <Space size={8}>
+                                  <Text
+                                    style={{ fontSize: '12px' }}
+                                    type="secondary"
+                                  >
+                                    {item.datetime}
+                                  </Text>
+                                  {!item.read && <Tag color="blue">未读</Tag>}
+                                </Space>
+                              </Space>
+                            }
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                ),
+                key: 'info',
+                label: '普通通知'
+              }
+            ]}
+            onChange={handleTabChange}
+          />
+        </div>
       </Card>
     </div>
   );

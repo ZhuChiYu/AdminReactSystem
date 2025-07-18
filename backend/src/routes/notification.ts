@@ -90,12 +90,18 @@ router.get('/', authMiddleware, async (req, res) => {
     const isSuperAdmin = userRoles.includes('super_admin');
 
     if (currentUserId) {
-            if (isSuperAdmin) {
-        // 超级管理员可以看到自己的通知、系统通知以及审批类通知
+      if (isSuperAdmin) {
+        // 超级管理员可以看到自己的通知、系统通知以及审批类通知，以及所有事项相关通知
         where.OR = [
           { userId: currentUserId }, // 当前用户的通知
           { userId: 0 }, // 系统通知
           { type: 'expense' }, // 报销审批通知
+          { type: 'meeting_approval' }, // 会议审批通知
+          { type: 'info' }, // 事项通知
+          { type: 'success' }, // 成功通知
+          { type: 'warning' }, // 警告通知
+          { type: 'task' }, // 任务通知
+          { type: 'project_task' }, // 项目任务通知
           {
             AND: [
               { type: 'meeting' },
@@ -410,8 +416,10 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
     if (isSuperAdmin) {
       // 超级管理员可以删除：
-      // 1. 自己创建的通知
-      // 2. 班级相关的系统通知（class_announcement类型）
+      // 1. 自己的通知
+      // 2. 系统通知（班级相关等）
+      // 3. 会议相关通知（无论发送给谁）
+      // 4. 课程附件通知（无论发送给谁）
       whereCondition = {
         id: Number.parseInt(id),
         OR: [
@@ -419,9 +427,14 @@ router.delete('/:id', authMiddleware, async (req, res) => {
           {
             AND: [
               { userId: 0 }, // 系统通知
-              { type: 'class_announcement' }, // 班级通知类型
-              { relatedType: 'class' } // 班级相关
+              { type: { in: ['class_announcement'] } }
             ]
+          },
+          {
+            type: { in: ['meeting', 'meeting_approval'] } // 会议相关通知（超级管理员可删除任何会议通知）
+          },
+          {
+            type: { in: ['course_attachment'] } // 课程附件通知（超级管理员可删除任何课程附件通知）
           }
         ]
       };
@@ -447,9 +460,27 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       });
     }
 
-    await prisma.notification.delete({
-      where: { id: Number.parseInt(id) }
-    });
+    // 如果是超级管理员删除课程附件通知，删除所有相关的课程附件通知
+    if (isSuperAdmin && notification.type === 'course_attachment' && notification.relatedId && notification.relatedType) {
+      // 删除所有相同课程的附件通知
+      await prisma.notification.deleteMany({
+        where: {
+          type: 'course_attachment',
+          relatedId: notification.relatedId,
+          relatedType: notification.relatedType
+        }
+      });
+
+      logger.info(`超级管理员删除了课程附件通知，已删除所有相关通知`, {
+        relatedId: notification.relatedId,
+        relatedType: notification.relatedType
+      });
+    } else {
+      // 普通删除
+      await prisma.notification.delete({
+        where: { id: Number.parseInt(id) }
+      });
+    }
 
     res.json({
       code: 0,
@@ -464,6 +495,169 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       code: 500,
       data: null,
       message: '删除通知失败',
+      path: req.path,
+      timestamp: Date.now()
+    });
+  }
+});
+
+// 批量删除通知
+router.post('/batch-delete', authMiddleware, async (req, res) => {
+  try {
+    const { notificationIds } = req.body;
+    const currentUserId = (req as any).user?.id;
+    const userRoles = (req as any).user?.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        code: 401,
+        data: null,
+        message: '用户未认证',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '请选择要删除的通知',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 构建权限查询条件
+    let whereCondition: any;
+
+    if (isSuperAdmin) {
+      // 超级管理员可以删除：
+      // 1. 自己的通知
+      // 2. 系统通知（班级相关等）
+      // 3. 会议相关通知（无论发送给谁）
+      // 4. 课程附件通知（无论发送给谁）
+      whereCondition = {
+        id: { in: notificationIds.map(id => Number.parseInt(id)) },
+        OR: [
+          { userId: currentUserId }, // 自己的通知
+          {
+            AND: [
+              { userId: 0 }, // 系统通知
+              { type: { in: ['class_announcement'] } }
+            ]
+          },
+          {
+            type: { in: ['meeting', 'meeting_approval'] } // 会议相关通知（超级管理员可删除任何会议通知）
+          },
+          {
+            type: { in: ['course_attachment'] } // 课程附件通知（超级管理员可删除任何课程附件通知）
+          }
+        ]
+      };
+    } else {
+      // 普通用户只能删除自己的通知
+      whereCondition = {
+        id: { in: notificationIds.map(id => Number.parseInt(id)) },
+        userId: currentUserId
+      };
+    }
+
+    // 查找可删除的通知
+    const deletableNotifications = await prisma.notification.findMany({
+      where: whereCondition,
+      select: { id: true, title: true, type: true, relatedId: true, relatedType: true }
+    });
+
+    if (deletableNotifications.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        data: null,
+        message: '没有找到可删除的通知',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    let deleteResult;
+
+    // 如果是超级管理员且包含课程附件通知，需要特殊处理
+    if (isSuperAdmin) {
+      const courseAttachmentNotifications = deletableNotifications.filter(
+        n => n.type === 'course_attachment' && n.relatedId && n.relatedType
+      );
+
+      if (courseAttachmentNotifications.length > 0) {
+        // 获取所有需要删除的课程附件通知的relatedId
+        const relatedIds = [...new Set(courseAttachmentNotifications.map(n => n.relatedId).filter((id): id is number => id !== null))];
+
+        // 删除所有相关的课程附件通知
+        const courseAttachmentDeleteResult = await prisma.notification.deleteMany({
+          where: {
+            type: 'course_attachment',
+            relatedId: { in: relatedIds },
+            relatedType: 'course'
+          }
+        });
+
+        // 删除其他非课程附件通知
+        const otherNotificationIds = deletableNotifications
+          .filter(n => n.type !== 'course_attachment')
+          .map(n => n.id);
+
+        let otherDeleteResult = { count: 0 };
+        if (otherNotificationIds.length > 0) {
+          otherDeleteResult = await prisma.notification.deleteMany({
+            where: {
+              id: { in: otherNotificationIds }
+            }
+          });
+        }
+
+        deleteResult = {
+          count: courseAttachmentDeleteResult.count + otherDeleteResult.count
+        };
+
+        logger.info(`超级管理员批量删除通知，包含课程附件通知`, {
+          totalDeleted: deleteResult.count,
+          courseAttachmentDeleted: courseAttachmentDeleteResult.count,
+          otherDeleted: otherDeleteResult.count,
+          relatedIds
+        });
+      } else {
+        // 没有课程附件通知，正常删除
+        deleteResult = await prisma.notification.deleteMany({
+          where: {
+            id: { in: deletableNotifications.map(n => n.id) }
+          }
+        });
+      }
+    } else {
+      // 普通用户批量删除
+      deleteResult = await prisma.notification.deleteMany({
+        where: {
+          id: { in: deletableNotifications.map(n => n.id) }
+        }
+      });
+    }
+
+    res.json({
+      code: 0,
+      data: {
+        deletedCount: deleteResult.count,
+        deletedNotifications: deletableNotifications
+      },
+      message: `成功删除 ${deleteResult.count} 条通知`,
+      path: req.path,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    logger.error('批量删除通知失败:', error);
+    res.status(500).json({
+      code: 500,
+      data: null,
+      message: '批量删除通知失败',
       path: req.path,
       timestamp: Date.now()
     });
@@ -494,12 +688,18 @@ router.get('/unread-count', authMiddleware, async (req, res) => {
       readStatus: 0
     };
 
-        if (isSuperAdmin) {
-      // 超级管理员可以看到自己的通知、系统通知以及审批类通知
+    if (isSuperAdmin) {
+      // 超级管理员可以看到自己的通知、系统通知以及审批类通知，以及所有事项相关通知
       whereCondition.OR = [
         { userId: currentUserId },
         { userId: 0 }, // 系统通知
         { type: 'expense' }, // 报销审批通知
+        { type: 'meeting_approval' }, // 会议审批通知
+        { type: 'info' }, // 事项通知
+        { type: 'success' }, // 成功通知
+        { type: 'warning' }, // 警告通知
+        { type: 'task' }, // 任务通知
+        { type: 'project_task' }, // 项目任务通知
         {
           AND: [
             { type: 'meeting' },

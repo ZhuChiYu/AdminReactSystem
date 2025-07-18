@@ -5,11 +5,54 @@ import { PrismaClient } from '@prisma/client';
 import express from 'express';
 import multer from 'multer';
 
-import { logger } from '../utils/logger';
-import { createErrorResponse, createSuccessResponse } from '../utils/response';
+import { prisma } from '@/config/database';
+import { authMiddleware } from '@/middleware/auth';
+import { createErrorResponse, createSuccessResponse } from '@/utils/response';
+import { logger } from '@/utils/logger';
 
 const router = express.Router();
-const prisma = new PrismaClient();
+
+/**
+ * 给所有用户发送通知
+ */
+async function sendNotificationToAllUsers(excludeUserId: number, title: string, content: string, type: string = 'course_attachment', relatedId?: number, relatedType?: string) {
+  try {
+    // 获取所有活跃用户（排除当前操作用户）
+    const allUsers = await prisma.user.findMany({
+      where: {
+        status: 1, // 只获取活跃用户
+        id: {
+          not: excludeUserId // 排除当前操作用户
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    // 批量创建通知
+    const notifications = allUsers.map(user => ({
+      title,
+      content,
+      type,
+      userId: user.id,
+      readStatus: 0,
+      relatedId: relatedId || null,
+      relatedType: relatedType || null,
+      createTime: new Date().toISOString()
+    }));
+
+    if (notifications.length > 0) {
+      await prisma.notification.createMany({
+        data: notifications
+      });
+      logger.info(`成功给 ${notifications.length} 个用户发送了通知: ${title}`);
+    }
+  } catch (error) {
+    logger.error('发送通知失败:', error);
+    // 不抛出错误，避免影响主要业务流程
+  }
+}
 
 // 确保上传目录存在
 const uploadsDir = 'uploads/attachments';
@@ -105,6 +148,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     // 获取当前用户ID（从认证中间件）
     const uploaderId = (req as any).user?.id || 1; // 默认用户ID为1
 
+    // 获取上传者信息
+    const uploader = await prisma.user.findUnique({
+      where: { id: uploaderId },
+      select: { nickName: true, userName: true }
+    });
+    const uploaderName = uploader?.nickName || uploader?.userName || '未知用户';
+
     // 创建附件记录
     const attachment = await prisma.attachment.create({
       data: {
@@ -144,6 +194,22 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     };
 
     logger.info(`附件上传成功: ${req.file.originalname}, 课程ID: ${courseId}`);
+
+    // 发送通知给所有用户
+    const notificationTitle = '课程附件新增提醒';
+    const notificationContent = `${uploaderName} 在课程"${course.courseName}"中上传了新附件："${req.file.originalname}"，请及时查看。`;
+
+    // 异步发送通知，不阻塞响应
+    sendNotificationToAllUsers(
+      uploaderId,
+      notificationTitle,
+      notificationContent,
+      'course_attachment',
+      course.id,
+      'course'
+    ).catch(error => {
+      logger.error('发送附件上传通知失败:', error);
+    });
 
     res.json(createSuccessResponse(result, '文件上传成功', req.path));
   } catch (error) {
@@ -313,15 +379,47 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     const attachment = await prisma.attachment.findUnique({
-      where: { id: Number.parseInt(id) }
+      where: { id: Number.parseInt(id) },
+      include: {
+        course: {
+          select: {
+            id: true,
+            courseName: true
+          }
+        }
+      }
     });
 
     if (!attachment) {
       return res.status(404).json(createErrorResponse(404, '附件不存在', null, req.path));
     }
 
+    // 获取当前用户信息
+    const currentUserId = (req as any).user?.id || 1;
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { nickName: true, userName: true }
+    });
+    const currentUserName = currentUser?.nickName || currentUser?.userName || '未知用户';
+
     await prisma.attachment.delete({
       where: { id: Number.parseInt(id) }
+    });
+
+    // 发送通知给所有用户
+    const notificationTitle = '课程附件删除提醒';
+    const notificationContent = `${currentUserName} 删除了课程"${attachment.course?.courseName || '未知课程'}"中的附件："${attachment.originalName || attachment.fileName}"。`;
+
+    // 异步发送通知，不阻塞响应
+    sendNotificationToAllUsers(
+      currentUserId,
+      notificationTitle,
+      notificationContent,
+      'course_attachment',
+      attachment.course?.id,
+      'course'
+    ).catch(error => {
+      logger.error('发送附件删除通知失败:', error);
     });
 
     res.json(createSuccessResponse(null, '删除附件成功', req.path));

@@ -265,6 +265,54 @@ export const createTask = async (req: Request, res: Response) => {
       }
     });
 
+    // 通知超级管理员有新的项目事项创建
+    try {
+      const superAdmins = await prismaClient.user.findMany({
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        },
+        where: {
+          userRoles: {
+            some: {
+              role: {
+                roleCode: 'super_admin'
+              }
+            }
+          }
+        }
+      });
+
+      // 为每个超级管理员创建通知
+      const notifications = superAdmins.map(admin => ({
+        content: `${operatorName}创建了新的项目事项："${projectName}"（${projectType}），负责人：${task.responsiblePerson?.nickName || task.responsiblePerson?.userName || '未知'}，优先级：${priority}，请关注项目进展。`,
+        createTime: new Date().toISOString(),
+        relatedId: task.id,
+        relatedType: 'project_task',
+        title: '新项目事项创建通知',
+        type: 'info',
+        userId: admin.id,
+        readStatus: 0
+      }));
+
+      if (notifications.length > 0) {
+        await prismaClient.notification.createMany({
+          data: notifications
+        });
+
+        console.info(`已为${notifications.length}个超级管理员创建项目事项通知`, {
+          taskId: task.id,
+          projectName: projectName
+        });
+      }
+    } catch (notificationError) {
+      console.error('创建项目事项通知失败:', notificationError);
+      // 不影响主流程，继续执行
+    }
+
     res.status(201).json({
       code: 0,
       message: '创建成功',

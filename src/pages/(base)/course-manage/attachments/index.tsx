@@ -137,7 +137,6 @@ function Component() {
 
           setAttachments(formattedAttachments);
           setFilteredAttachments(formattedAttachments);
-          message.success(`成功加载 ${formattedAttachments.length} 个附件`);
         } else {
           setAttachments([]);
           setFilteredAttachments([]);

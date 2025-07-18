@@ -51,6 +51,14 @@ class NotificationService {
     return response;
   }
 
+  /** 批量删除通知 */
+  async batchDeleteNotifications(notificationIds: number[]) {
+    const response = await apiClient.post<ApiResponse>(`${this.baseURL}/batch-delete`, {
+      notificationIds
+    });
+    return response;
+  }
+
   /** 获取未读通知数量 */
   async getUnreadCount() {
     const response = await apiClient.get<ApiResponse<{ count: number }>>(`${this.baseURL}/unread-count`);
