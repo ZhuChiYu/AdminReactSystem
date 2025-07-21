@@ -24,13 +24,13 @@ interface CourseItem {
   price: number;
   startDate: string;
   status: string;
+  updatedAt: string;
 }
 
 const CourseList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [courseList, setCourseList] = useState<CourseItem[]>([]);
-  const [filteredList, setFilteredList] = useState<CourseItem[]>([]);
   const [searchName, setSearchName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
@@ -53,6 +53,13 @@ const CourseList = () => {
   const [canCreateCourse, setCanCreateCourse] = useState(false);
   const currentUserId = getCurrentUserId();
 
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
+
   // 获取用户权限
   const fetchUserPermissions = async () => {
     // 临时解决方案：直接检查用户角色
@@ -71,13 +78,35 @@ const CourseList = () => {
   };
 
   // 获取课程列表
-  const fetchCourseList = async () => {
+  const fetchCourseList = async (page = pagination.current, size = pagination.pageSize) => {
     setLoading(true);
     try {
-      const response = await courseService.getCourseList({
-        current: 1,
-        size: 1000
-      });
+      // 构建筛选参数
+      const params: any = {
+        current: page,
+        size
+      };
+
+      // 添加筛选条件
+      if (searchName) {
+        params.courseName = searchName;
+      }
+
+      if (selectedCategory) {
+        const categoryId = categories.find(cat => cat.name === selectedCategory)?.id;
+        if (categoryId) {
+          params.categoryId = categoryId;
+        }
+      }
+
+      const response = await courseService.getCourseList(params);
+
+      // 更新分页信息
+      setPagination(prev => ({
+        ...prev,
+        current: response.current || page,
+        total: response.total || 0
+      }));
 
       // 先转换基本的课程数据
       const basicCourses: CourseItem[] = response.records.map((course: CourseApi.CourseListItem) => ({
@@ -92,12 +121,17 @@ const CourseList = () => {
         name: course.courseName,
         price: typeof course.price === 'string' ? Number.parseFloat(course.price) : course.price,
         startDate: course.startDate || '',
-        status: course.status === 1 ? '已上线' : '未上线'
+        status: course.status === 1 ? '已上线' : '未上线',
+        updatedAt: course.updatedAt || course.createTime || course.createdAt || new Date().toISOString()
       }));
 
+      // 按修改时间降序排序
+      const sortedCourses = basicCourses.sort((a, b) =>
+        new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+      );
+
       // 先设置基本数据，让用户看到列表
-      setCourseList(basicCourses);
-      setFilteredList(basicCourses);
+      setCourseList(sortedCourses);
 
       // 批量获取附件数量（并发限制为5个）
       const batchSize = 5;
@@ -128,9 +162,11 @@ const CourseList = () => {
 
         await Promise.all(batchPromises);
 
-        // 每完成一批就更新界面
-        setCourseList([...updatedCourses]);
-        setFilteredList([...updatedCourses]);
+                // 每完成一批就更新界面，并保持排序
+        const sortedUpdatedCourses = [...updatedCourses].sort((a, b) =>
+          new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+        );
+        setCourseList(sortedUpdatedCourses);
       }
     } catch (error) {
       message.error('获取课程列表失败');
@@ -158,42 +194,18 @@ const CourseList = () => {
 
   // 应用筛选
   const applyFilters = () => {
-    let result = [...courseList];
-
-    // 按课程名称筛选
-    if (searchName) {
-      result = result.filter(course => course.name.toLowerCase().includes(searchName.toLowerCase()));
-    }
-
-    // 按分类筛选
-    if (selectedCategory) {
-      result = result.filter(course => course.category === selectedCategory);
-    }
-
-    // 按日期范围筛选
-    if (dateRange && dateRange[0] && dateRange[1]) {
-      const startDate = dateRange[0].format('YYYY-MM-DD');
-      const endDate = dateRange[1].format('YYYY-MM-DD');
-
-      result = result.filter(course => {
-        return course.date >= startDate && course.date <= endDate;
-      });
-    }
-
-    setFilteredList(result);
+    // 重置到第一页并重新获取数据
+    setPagination(prev => ({ ...prev, current: 1 }));
+    fetchCourseList(1, pagination.pageSize);
   };
-
-  // 监听筛选条件变化时应用筛选
-  useEffect(() => {
-    applyFilters();
-  }, [searchName, selectedCategory, dateRange, courseList]);
 
   // 重置筛选
   const resetFilters = () => {
     setSearchName('');
     setSelectedCategory('');
     setDateRange(null);
-    setFilteredList(courseList);
+    setPagination(prev => ({ ...prev, current: 1 }));
+    fetchCourseList(1, pagination.pageSize);
   };
 
   // 获取状态标签颜色
@@ -389,9 +401,9 @@ const CourseList = () => {
       render: (count: number) => <Tag color={count > 0 ? 'green' : 'gray'}>{count || 0} 个</Tag>
     },
     {
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      title: '创建时间',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      title: '修改时间',
       ...getCenterColumnConfig(),
       render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss')
     },
@@ -495,14 +507,29 @@ const CourseList = () => {
         {/* 表格 */}
         <Table
           columns={columns}
-          dataSource={filteredList}
+          dataSource={courseList}
           loading={loading}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+            onChange: (page, size) => {
+              if (size !== pagination.pageSize) {
+                setPagination(prev => ({ ...prev, pageSize: size }));
+                fetchCourseList(1, size);
+              } else {
+                fetchCourseList(page, size);
+              }
+            }
+          }}
           rowKey="id"
           rowSelection={{
             onChange: setSelectedRowKeys,
             selectedRowKeys
           }}
-          {...getFullTableConfig(10)}
         />
 
         {/* 删除确认对话框 */}

@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { courseService } from '@/service/api';
-import { getFullTableConfig } from '@/utils/table';
 import { isSuperAdmin } from '@/utils/auth';
 
 interface CategoryItem {
@@ -22,6 +21,13 @@ const CourseCategory = () => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
+
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
 
   // 模态框状态
   const [modalVisible, setModalVisible] = useState(false);
@@ -47,8 +53,15 @@ const CourseCategory = () => {
       }));
 
       setCategories(formattedCategories);
+
+      // 更新分页总数
+      setPagination(prev => ({
+        ...prev,
+        total: formattedCategories.length
+      }));
     } catch (error) {
       message.error('获取分类列表失败');
+      console.error('获取分类列表失败:', error);
     } finally {
       setLoading(false);
     }
@@ -107,7 +120,8 @@ const CourseCategory = () => {
 
       setModalVisible(false);
       fetchCategories(); // 重新获取列表
-    } catch (error) {
+    } catch (err) {
+      console.error('操作分类失败:', err);
       if (currentCategory) {
         message.error('分类更新失败');
       } else {
@@ -124,7 +138,8 @@ const CourseCategory = () => {
       await courseService.deleteCategory(id);
       message.success('删除成功');
       fetchCategories(); // 重新获取列表
-    } catch (error) {
+    } catch (err) {
+      console.error('删除分类失败:', err);
       message.error('删除失败');
     }
   };
@@ -171,21 +186,21 @@ const CourseCategory = () => {
         <Space>
           {isSuperAdmin() && (
             <>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => showEditModal(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            danger
-            size="small"
-            type="link"
-            onClick={() => handleDelete(record.id)}
-          >
-            删除
-          </Button>
+              <Button
+                size="small"
+                type="link"
+                onClick={() => showEditModal(record)}
+              >
+                编辑
+              </Button>
+              <Button
+                danger
+                size="small"
+                type="link"
+                onClick={() => handleDelete(record.id)}
+              >
+                删除
+              </Button>
             </>
           )}
         </Space>
@@ -202,13 +217,13 @@ const CourseCategory = () => {
         variant="borderless"
         extra={
           isSuperAdmin() && (
-          <Button
-            icon={<PlusOutlined />}
-            type="primary"
-            onClick={showAddModal}
-          >
-            新增分类
-          </Button>
+            <Button
+              icon={<PlusOutlined />}
+              type="primary"
+              onClick={showAddModal}
+            >
+              新增分类
+            </Button>
           )
         }
       >
@@ -217,7 +232,21 @@ const CourseCategory = () => {
           dataSource={categories}
           loading={loading}
           rowKey="id"
-          {...getFullTableConfig(10)}
+          pagination={{
+            current: pagination.current,
+            onChange: (page, size) => {
+              setPagination(prev => ({
+                ...prev,
+                current: page,
+                pageSize: size || prev.pageSize
+              }));
+            },
+            pageSize: pagination.pageSize,
+            showQuickJumper: true,
+            showSizeChanger: true,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+            total: pagination.total
+          }}
         />
       </Card>
 
