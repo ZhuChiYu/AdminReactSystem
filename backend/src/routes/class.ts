@@ -163,7 +163,7 @@ router.get('/', asyncErrorHandler(classController.getClasses));
  *         name: keyword
  *         schema:
  *           type: string
- *         description: 搜索关键词（支持姓名和单位搜索）
+ *         description: 搜索关键词（支持姓名、单位和导入人搜索）
  *     responses:
  *       200:
  *         description: 查询成功
@@ -207,6 +207,24 @@ router.get('/students', async (req, res) => {
           company: {
             contains: searchKeyword,
             mode: 'insensitive'
+          }
+        },
+        {
+          createdBy: {
+            OR: [
+              {
+                nickName: {
+                  contains: searchKeyword,
+                  mode: 'insensitive'
+                }
+              },
+              {
+                userName: {
+                  contains: searchKeyword,
+                  mode: 'insensitive'
+                }
+              }
+            ]
           }
         }
       ];
