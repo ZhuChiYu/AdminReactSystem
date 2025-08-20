@@ -161,13 +161,19 @@ const ClassList = () => {
       params.status = Number(selectedStatus);
     }
 
+    // 添加日期范围筛选
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      params.startDate = dateRange[0].format('YYYY-MM-DD');
+      params.endDate = dateRange[1].format('YYYY-MM-DD');
+    }
+
     loadClassList(params);
   };
 
   // 监听筛选条件变化时应用筛选
   useEffect(() => {
     applyFilters();
-  }, [searchName, selectedCategory, selectedStatus]);
+  }, [searchName, selectedCategory, selectedStatus, dateRange]);
 
   // 重置筛选
   const resetFilters = () => {

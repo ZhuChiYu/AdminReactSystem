@@ -99,6 +99,12 @@ const CourseList = () => {
         }
       }
 
+      // 添加日期范围筛选
+      if (dateRange && dateRange.length === 2) {
+        params.startDate = dateRange[0].format('YYYY-MM-DD');
+        params.endDate = dateRange[1].format('YYYY-MM-DD');
+      }
+
       const response = await courseService.getCourseList(params);
 
       // 更新分页信息

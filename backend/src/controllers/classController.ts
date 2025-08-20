@@ -10,7 +10,7 @@ class ClassController {
   /** 获取班级列表 */
   async getClasses(req: Request, res: Response) {
     try {
-      const { categoryId, current = 1, name, size = 10, status } = req.query;
+      const { categoryId, current = 1, name, size = 10, status, startDate, endDate } = req.query;
 
       const page = Number(current);
       const pageSize = Number(size);
@@ -32,6 +32,30 @@ class ClassController {
 
       if (status !== undefined && status !== '') {
         where.status = Number(status);
+      }
+
+      // 添加日期范围筛选
+      if (startDate && endDate) {
+        const filterStartDate = new Date(String(startDate));
+        const filterEndDate = new Date(String(endDate));
+
+        // 设置结束日期到当天的23:59:59
+        filterEndDate.setHours(23, 59, 59, 999);
+
+        // 筛选条件：班级时间与筛选时间有重叠
+        // 班级开始时间 <= 筛选结束时间 AND 班级结束时间 >= 筛选开始时间
+        where.AND = [
+          {
+            startDate: {
+              lte: filterEndDate
+            }
+          },
+          {
+            endDate: {
+              gte: filterStartDate
+            }
+          }
+        ];
       }
 
       // 查询班级列表

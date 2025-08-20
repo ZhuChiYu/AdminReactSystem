@@ -6,8 +6,10 @@ import { apiClient } from './client';
 export interface ClassQueryParams {
   categoryId?: number;
   current?: number;
+  endDate?: string;
   name?: string;
   size?: number;
+  startDate?: string;
   status?: number;
 }
 

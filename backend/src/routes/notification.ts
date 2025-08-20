@@ -11,6 +11,32 @@ import { createErrorResponse, createSuccessResponse } from '@/utils/response';
 
 const router = express.Router();
 
+/**
+ * 创建通知附件系统通知
+ */
+async function createNotificationAttachmentSystemNotification(title: string, content: string, relatedId?: number, relatedType?: string) {
+  try {
+    // 创建一条系统通知，所有用户都能看到
+    await prisma.notification.create({
+      data: {
+        title,
+        content,
+        type: 'notification_attachment',
+        userId: 0, // 系统通知
+        readStatus: 0,
+        relatedId: relatedId || null,
+        relatedType: relatedType || null,
+        createTime: new Date().toISOString()
+      }
+    });
+
+    logger.info(`成功创建通知附件系统通知: ${title}`);
+  } catch (error) {
+    logger.error('创建通知附件系统通知失败:', error);
+    // 不抛出错误，避免影响主要业务流程
+  }
+}
+
 // 配置通知附件上传
 const uploadsDir = 'uploads/notification-attachments';
 if (!fs.existsSync(uploadsDir)) {
@@ -1148,7 +1174,28 @@ router.post('/:id/attachments/upload', upload.single('file'), async (req, res) =
       uploadTime: attachment.uploadTime.toISOString()
     };
 
+    // 获取上传者信息
+    const uploader = await prisma.user.findUnique({
+      where: { id: uploaderId },
+      select: { nickName: true, userName: true }
+    });
+    const uploaderName = uploader?.nickName || uploader?.userName || '未知用户';
+
     logger.info(`通知附件上传成功: ${req.file.originalname}, 通知ID: ${id}`);
+
+    // 发送通知给所有用户
+    const notificationTitle = '通知附件新增提醒';
+    const notificationContent = `${uploaderName} 在通知"${notification.title}"中上传了新附件："${req.file.originalname}"，请及时查看。`;
+
+    // 异步发送通知，不阻塞响应
+    createNotificationAttachmentSystemNotification(
+      notificationTitle,
+      notificationContent,
+      notification.id,
+      'notification'
+    ).catch(error => {
+      logger.error('发送通知附件上传通知失败:', error);
+    });
 
     res.json(createSuccessResponse(result, '通知附件上传成功', req.path));
   } catch (error) {

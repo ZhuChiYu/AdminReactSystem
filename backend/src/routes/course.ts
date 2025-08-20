@@ -48,6 +48,18 @@ const router = Router();
  *         schema:
  *           type: integer
  *         description: 课程状态
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 筛选开始日期（按修改时间）
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 筛选结束日期（按修改时间）
  *     responses:
  *       200:
  *         description: 查询成功
@@ -82,10 +94,17 @@ router.get('/', async (req, res) => {
       where.status = Number.parseInt(status as string);
     }
 
+    // 按修改时间筛选
     if (startDate && endDate) {
-      where.startDate = {
-        gte: new Date(startDate as string),
-        lte: new Date(endDate as string)
+      const filterStartDate = new Date(startDate as string);
+      const filterEndDate = new Date(endDate as string);
+
+      // 设置结束日期到当天的23:59:59
+      filterEndDate.setHours(23, 59, 59, 999);
+
+      where.updatedAt = {
+        gte: filterStartDate,
+        lte: filterEndDate
       };
     }
 
