@@ -94,7 +94,7 @@ router.get('/', async (req, res) => {
       where.status = Number.parseInt(status as string);
     }
 
-    // 按修改时间筛选
+    // 按开课时间筛选
     if (startDate && endDate) {
       const filterStartDate = new Date(startDate as string);
       const filterEndDate = new Date(endDate as string);
@@ -102,7 +102,7 @@ router.get('/', async (req, res) => {
       // 设置结束日期到当天的23:59:59
       filterEndDate.setHours(23, 59, 59, 999);
 
-      where.updatedAt = {
+      where.startDate = {
         gte: filterStartDate,
         lte: filterEndDate
       };

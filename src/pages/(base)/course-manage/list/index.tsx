@@ -407,6 +407,13 @@ const CourseList = () => {
       render: (count: number) => <Tag color={count > 0 ? 'green' : 'gray'}>{count || 0} 个</Tag>
     },
     {
+      dataIndex: 'startDate',
+      key: 'startDate',
+      title: '开课时间',
+      ...getCenterColumnConfig(),
+      render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : '-'
+    },
+    {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       title: '修改时间',
