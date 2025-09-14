@@ -584,11 +584,22 @@ router.post('/students', async (req, res) => {
     const { classId, name, gender, company, position, phone, landline, email, joinDate, trainingFee } = req.body;
 
     // 验证必填字段
-    if (!classId || !name || !company || !phone) {
+    if (!classId || !name || !company) {
       return res.status(400).json({
         code: 400,
         data: null,
-        message: '缺少必填字段：班级ID、姓名、单位、电话',
+        message: '缺少必填字段：班级ID、姓名、单位',
+        path: req.path,
+        timestamp: Date.now()
+      });
+    }
+
+    // 验证至少需要电话或手机其中一个
+    if (!phone && !landline) {
+      return res.status(400).json({
+        code: 400,
+        data: null,
+        message: '至少需要提供电话或手机号其中一个',
         path: req.path,
         timestamp: Date.now()
       });

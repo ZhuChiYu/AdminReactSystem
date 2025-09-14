@@ -393,6 +393,19 @@ const ClassDetail = () => {
         return;
       }
 
+      // 检查是否所有有效客户都有至少一个联系方式（电话或手机）
+      const customersWithoutContact: string[] = [];
+      validCustomers.forEach(customer => {
+        if (!customer.phone && !customer.mobile) {
+          customersWithoutContact.push(customer.customerName);
+        }
+      });
+
+      if (customersWithoutContact.length > 0) {
+        message.error(`以下客户缺少联系方式（电话或手机号），无法导入：${customersWithoutContact.join('、')}`);
+        return;
+      }
+
       // 批量导入有效客户为学员
       const importPromises = validCustomers.map(customer => {
         const studentData = {
@@ -401,9 +414,9 @@ const ClassDetail = () => {
           email: customer.email || '',
           gender: customer.gender || '',
           joinDate: dayjs().format('YYYY-MM-DD'),
-          landline: customer.landline || '',
+          landline: customer.mobile || '',  // 手机号存储在landline字段
           name: customer.customerName,
-          phone: customer.phone || customer.mobile || '',
+          phone: customer.phone || '',       // 电话号码存储在phone字段
           position: customer.position || '',
           trainingFee: customerTrainingFees[customer.id] || 0
         };
@@ -758,6 +771,13 @@ const ClassDetail = () => {
             dataIndex: 'phone',
             key: 'phone',
             title: '电话',
+            width: 120
+          },
+          {
+            align: 'center' as const,
+            dataIndex: 'landline',
+            key: 'landline',
+            title: '手机',
             width: 120
           },
           {
@@ -1649,7 +1669,7 @@ const ClassDetail = () => {
           dataSource={studentList}
           loading={loading}
           rowKey="id"
-          scroll={{ x: isSuperAdmin() ? 1200 : 500 }}
+          scroll={{ x: isSuperAdmin() ? 1320 : 500 }}
           pagination={{
             current: studentPagination.current,
             onChange: handleStudentPaginationChange,
@@ -1935,15 +1955,36 @@ const ClassDetail = () => {
             <Form.Item
               label="电话"
               name="phone"
-              rules={[{ message: '请输入电话', required: true }]}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const landline = getFieldValue('landline');
+                    if (!value && !landline) {
+                      return Promise.reject(new Error('请至少填写电话或手机号其中一个'));
+                    }
+                    return Promise.resolve();
+                  }
+                })
+              ]}
             >
               <Input placeholder="请输入电话" />
             </Form.Item>
             <Form.Item
-              label="座机号"
+              label="手机号"
               name="landline"
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const phone = getFieldValue('phone');
+                    if (!value && !phone) {
+                      return Promise.reject(new Error('请至少填写电话或手机号其中一个'));
+                    }
+                    return Promise.resolve();
+                  }
+                })
+              ]}
             >
-              <Input placeholder="请输入座机号" />
+              <Input placeholder="请输入手机号" />
             </Form.Item>
             <Form.Item
               label="邮箱"
