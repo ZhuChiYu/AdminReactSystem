@@ -101,6 +101,9 @@ export default defineConfig(configEnv => {
       proxy: createViteProxy(viteEnv, enableProxy),
       warmup: {
         clientFiles: ['./index.html', './src/{pages,components}/*']
+      },
+      hmr: {
+        overlay: false // 禁用错误覆盖层，避免在某些情况下出现路径解析错误
       }
     }
   };
