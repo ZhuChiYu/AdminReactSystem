@@ -1655,7 +1655,7 @@ const ClassDetail = () => {
           <Input.Search
             allowClear
             enterButton="搜索"
-            placeholder="请输入姓名、单位或导入人进行搜索"
+            placeholder={isSuperAdminUser ? "请输入姓名、单位或导入人进行搜索" : "请输入姓名进行搜索"}
             size="large"
             style={{ maxWidth: 400 }}
             value={searchText}

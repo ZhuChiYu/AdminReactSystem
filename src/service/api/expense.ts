@@ -118,6 +118,37 @@ class ExpenseService {
     );
     return response;
   }
+
+  /** 数据迁移：将历史已通过的报销申请同步到财务记录 */
+  async migrateToFinancial() {
+    const response = await apiClient.post<{
+      debugInfo?: Array<{
+        applicationNo: string;
+        applicationStatus: number;
+        approvalTime?: string;
+        createdAt: string;
+        expenseType: string;
+        id: number;
+        totalAmount: number;
+      }>;
+      details?: Array<{
+        amount?: number;
+        applicationNo: string;
+        error?: string;
+        expenseType?: string;
+        reason?: string;
+        status: string;
+      }>;
+      message?: string;
+      migratedCount: number;
+      skippedCount: number;
+      statusCounts?: Record<number, number>;
+      statusMapping?: Record<number, string>;
+      totalApplications?: number;
+      totalProcessed?: number;
+    }>(`${this.baseURL}/migrate-to-financial`);
+    return response;
+  }
 }
 
 export const expenseService = new ExpenseService();

@@ -9,13 +9,17 @@ const router = express.Router();
 // 支出类型映射
 const expenseTypes = [
   { value: 'travel', label: '差旅费', color: '#5470c6' },
+  { value: 'transportation', label: '交通费', color: '#ff7875' },
   { value: 'accommodation', label: '住宿费', color: '#fac858' },
   { value: 'office_supplies', label: '办公费', color: '#ee6666' },
+  { value: 'office', label: '办公用品', color: '#ee6666' },
   { value: 'meal', label: '餐费', color: '#73c0de' },
   { value: 'entertainment', label: '招待费', color: '#3ba272' },
   { value: 'training', label: '培训费', color: '#fc8452' },
+  { value: 'communication', label: '通讯费', color: '#9a60b4' },
   { value: 'phone', label: '话费', color: '#9a60b4' },
   { value: 'property', label: '物业费', color: '#ea7ccc' },
+  { value: 'medical', label: '医疗费', color: '#ff85c0' },
   { value: 'other', label: '其他', color: '#5d6c8c' },
   // 新增支出类型
   { value: 'rent', label: '房租', color: '#f5222d' },
@@ -24,10 +28,7 @@ const expenseTypes = [
   { value: 'salary', label: '工资', color: '#1890ff' },
   { value: 'social_insurance', label: '社保', color: '#722ed1' },
   { value: 'training_supplement', label: '补培训费', color: '#13c2c2' },
-  // 兼容数据库中已存在的中文分类
-  { value: '设备采购', label: '设备采购', color: '#eb2f96' },
-  { value: '办公费用', label: '办公费', color: '#ee6666' },
-  { value: '员工工资', label: '工资', color: '#1890ff' }
+  { value: 'equipment_purchase', label: '设备采购', color: '#eb2f96' }
 ];
 
 // 收入类型映射

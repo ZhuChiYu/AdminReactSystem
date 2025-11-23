@@ -6,7 +6,7 @@ import type { Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useEcharts } from '@/hooks/common/echarts';
-import { financialService, statisticsService } from '@/service/api';
+import { expenseService, financialService, statisticsService } from '@/service/api';
 import type { FinancialRecord } from '@/service/api/financial';
 import type { EmployeePerformance } from '@/service/api/statistics';
 import { isSuperAdmin } from '@/utils/auth';
@@ -16,13 +16,17 @@ import FinancialRecordModal from './components/FinancialRecordModal';
 // 支出类型数据
 const expenseTypes = [
   { color: '#5470c6', label: '差旅费', value: 'travel' },
+  { color: '#ff7875', label: '交通费', value: 'transportation' },
   { color: '#fac858', label: '住宿费', value: 'accommodation' },
   { color: '#ee6666', label: '办公费', value: 'office_supplies' },
+  { color: '#ee6666', label: '办公用品', value: 'office' },
   { color: '#73c0de', label: '餐费', value: 'meal' },
   { color: '#3ba272', label: '招待费', value: 'entertainment' },
   { color: '#fc8452', label: '培训费', value: 'training' },
+  { color: '#9a60b4', label: '通讯费', value: 'communication' },
   { color: '#9a60b4', label: '话费', value: 'phone' },
   { color: '#ea7ccc', label: '物业费', value: 'property' },
+  { color: '#ff85c0', label: '医疗费', value: 'medical' },
   { color: '#5d6c8c', label: '其他', value: 'other' },
   // 新增支出类型
   { color: '#f5222d', label: '房租', value: 'rent' },
@@ -31,8 +35,7 @@ const expenseTypes = [
   { color: '#1890ff', label: '工资', value: 'salary' },
   { color: '#722ed1', label: '社保', value: 'social_insurance' },
   { color: '#13c2c2', label: '补培训费', value: 'training_supplement' },
-  // 添加数据库中存在的中文分类
-  { color: '#eb2f96', label: '设备采购', value: '设备采购' }
+  { color: '#eb2f96', label: '设备采购', value: 'equipment_purchase' }
 ];
 
 // 收入类型数据
@@ -229,6 +232,44 @@ const FinanceDashboard = () => {
     setModalRecordType(2); // 支出
     setEditRecord(null);
     setModalVisible(true);
+  };
+
+  // 数据迁移：将已通过的报销申请同步到财务记录
+  const handleMigrateData = async () => {
+    try {
+      const hideLoading = message.loading('正在迁移数据...', 0);
+      const result = await expenseService.migrateToFinancial();
+      hideLoading();
+
+      console.log('迁移结果:', result);
+
+      if (result.migratedCount > 0) {
+        message.success(
+          `数据迁移完成！成功迁移${result.migratedCount}条记录，跳过${result.skippedCount}条记录`
+        );
+        // 刷新数据
+        fetchRealData();
+      } else if (result.skippedCount > 0) {
+        message.info(`所有${result.skippedCount}条记录已存在，无需迁移`);
+      } else {
+        // 显示详细的调试信息
+        if (result.debugInfo && result.debugInfo.length > 0) {
+          console.table(result.debugInfo);
+          console.log('状态统计:', result.statusCounts);
+          console.log('状态映射:', result.statusMapping);
+          
+          message.warning({
+            content: result.message || '没有需要迁移的数据。请打开浏览器控制台查看详细信息。',
+            duration: 5
+          });
+        } else {
+          message.info('没有需要迁移的数据');
+        }
+      }
+    } catch (error) {
+      message.error('数据迁移失败');
+      console.error('数据迁移失败:', error);
+    }
   };
 
   const handleEditRecord = (record: FinancialRecord) => {
@@ -1346,13 +1387,23 @@ const FinanceDashboard = () => {
                 title="支出类型明细"
                 variant="borderless"
                 extra={
-                  <Button
-                    icon={<PlusOutlined />}
-                    type="primary"
-                    onClick={handleCreateExpenseRecord}
-                  >
-                    新增支出记录
-                  </Button>
+                  <Space>
+                    {isSuperAdminUser && (
+                      <Button
+                        type="default"
+                        onClick={handleMigrateData}
+                      >
+                        同步报销数据
+                      </Button>
+                    )}
+                    <Button
+                      icon={<PlusOutlined />}
+                      type="primary"
+                      onClick={handleCreateExpenseRecord}
+                    >
+                      新增支出记录
+                    </Button>
+                  </Space>
                 }
               >
                 <Table

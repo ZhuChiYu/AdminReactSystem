@@ -196,38 +196,48 @@ router.get('/students', async (req, res) => {
     // 如果有搜索关键词，添加搜索条件
     if (keyword && typeof keyword === 'string' && keyword.trim()) {
       const searchKeyword = keyword.trim();
-      where.OR = [
-        {
-          name: {
-            contains: searchKeyword,
-            mode: 'insensitive'
-          }
-        },
-        {
-          company: {
-            contains: searchKeyword,
-            mode: 'insensitive'
-          }
-        },
-        {
-          createdBy: {
-            OR: [
-              {
-                nickName: {
-                  contains: searchKeyword,
-                  mode: 'insensitive'
+
+      // 对于非超级管理员，只能根据姓名检索
+      if (!isSuperAdmin) {
+        where.name = {
+          contains: searchKeyword,
+          mode: 'insensitive'
+        };
+      } else {
+        // 超级管理员可以根据姓名、单位和导入人检索
+        where.OR = [
+          {
+            name: {
+              contains: searchKeyword,
+              mode: 'insensitive'
+            }
+          },
+          {
+            company: {
+              contains: searchKeyword,
+              mode: 'insensitive'
+            }
+          },
+          {
+            createdBy: {
+              OR: [
+                {
+                  nickName: {
+                    contains: searchKeyword,
+                    mode: 'insensitive'
+                  }
+                },
+                {
+                  userName: {
+                    contains: searchKeyword,
+                    mode: 'insensitive'
+                  }
                 }
-              },
-              {
-                userName: {
-                  contains: searchKeyword,
-                  mode: 'insensitive'
-                }
-              }
-            ]
+              ]
+            }
           }
-        }
-      ];
+        ];
+      }
     }
 
     const [students, total] = await Promise.all([
@@ -255,6 +265,11 @@ router.get('/students', async (req, res) => {
       current: page,
       pages: Math.ceil(total / pageSize),
       records: students.map(student => {
+        // 对非超级管理员，姓名脱敏处理（只显示姓+*）
+        const displayName = isSuperAdmin
+          ? student.name
+          : (student.name ? student.name.charAt(0) + '*' : '*');
+
         // 基础信息（所有用户都能看到）
         const basicInfo = {
           attendanceRate: student.attendanceRate,
@@ -268,7 +283,7 @@ router.get('/students', async (req, res) => {
           gender: student.gender,
           id: student.id,
           joinDate: student.joinDate.toISOString().split('T')[0],
-          name: student.name,
+          name: displayName,
           status: student.status,
           trainingFee: student.trainingFee ? student.trainingFee.toString() : null
         };

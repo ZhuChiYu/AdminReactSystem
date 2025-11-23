@@ -20,13 +20,17 @@ interface FinancialRecordModalProps {
 // 支出类型选项
 const expenseTypes = [
   { label: '差旅费', value: 'travel' },
+  { label: '交通费', value: 'transportation' },
   { label: '住宿费', value: 'accommodation' },
   { label: '办公费', value: 'office_supplies' },
+  { label: '办公用品', value: 'office' },
   { label: '餐费', value: 'meal' },
   { label: '招待费', value: 'entertainment' },
   { label: '培训费', value: 'training' },
+  { label: '通讯费', value: 'communication' },
   { label: '话费', value: 'phone' },
   { label: '物业费', value: 'property' },
+  { label: '医疗费', value: 'medical' },
   { label: '其他', value: 'other' },
   // 新增支出类型
   { label: '房租', value: 'rent' },

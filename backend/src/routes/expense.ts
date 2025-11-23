@@ -472,6 +472,34 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
       // 不影响主流程，继续执行
     }
 
+    // 如果审批通过，自动创建财务支出记录
+    if (Number(status) === 1) {
+      try {
+        await prisma.financialRecord.create({
+          data: {
+            type: 2, // 2表示支出
+            category: updatedApplication.expenseType,
+            amount: updatedApplication.totalAmount,
+            recordDate: new Date(),
+            description: `报销申请审批通过 (编号: ${updatedApplication.applicationNo}) - 来自报销申请，审批人：${approverName}${remark ? `，审批意见：${remark}` : ''}`,
+            relatedId: updatedApplication.id,
+            relatedType: 'expense_application',
+            createdById: userId
+          }
+        });
+
+        logger.info(`审批通过，已自动创建财务支出记录`, {
+          applicationId: updatedApplication.id,
+          applicationNo: updatedApplication.applicationNo,
+          amount: updatedApplication.totalAmount,
+          expenseType: updatedApplication.expenseType
+        });
+      } catch (financialError) {
+        logger.error('创建财务支出记录失败:', financialError);
+        // 不影响主流程，继续执行
+      }
+    }
+
     const result = {
       amount: Number(updatedApplication.totalAmount),
       applicant: {
@@ -860,6 +888,181 @@ router.delete('/:id/attachments/:fileName', authMiddleware, async (req, res) => 
   } catch (error) {
     logger.error('删除费用申请附件失败:', error);
     res.status(500).json(createErrorResponse(500, '删除费用申请附件失败', error, req.path));
+  }
+});
+
+// 调试接口：查看所有报销申请的状态
+router.get('/debug-status', authMiddleware, async (req, res) => {
+  try {
+    const allApplications = await prisma.expenseApplication.findMany({
+      select: {
+        id: true,
+        applicationNo: true,
+        applicationStatus: true,
+        totalAmount: true,
+        expenseType: true,
+        approvalTime: true,
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(createSuccessResponse({
+      applications: allApplications,
+      count: allApplications.length,
+      statusMapping: {
+        0: '待审批',
+        1: '已通过',
+        2: '已拒绝'
+      }
+    }, '获取报销申请状态成功', req.path));
+  } catch (error) {
+    logger.error('获取报销申请状态失败:', error);
+    res.status(500).json(createErrorResponse(500, '获取报销申请状态失败', error, req.path));
+  }
+});
+
+// 数据迁移：为历史已通过的报销申请创建财务记录
+router.post('/migrate-to-financial', authMiddleware, async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    const userRoles = (req as any).user?.roles || [];
+
+    // 只有超级管理员可以执行数据迁移
+    if (!userRoles.includes('super_admin')) {
+      return res.status(403).json(createErrorResponse(403, '只有超级管理员可以执行数据迁移', null, req.path));
+    }
+
+    // 先查询所有报销申请的状态，用于调试
+    const allApplications = await prisma.expenseApplication.findMany({
+      select: {
+        id: true,
+        applicationNo: true,
+        applicationStatus: true,
+        totalAmount: true,
+        expenseType: true
+      }
+    });
+    
+    logger.info('所有报销申请状态:', allApplications);
+
+    // 查找所有已通过的报销申请（状态为1）
+    const approvedApplications = await prisma.expenseApplication.findMany({
+      where: {
+        applicationStatus: 1 // 1表示已通过
+      },
+      include: {
+        approver: {
+          select: {
+            id: true,
+            nickName: true,
+            userName: true
+          }
+        }
+      }
+    });
+
+    logger.info(`找到 ${approvedApplications.length} 条已通过的报销申请`);
+
+    if (approvedApplications.length === 0) {
+      // 提供调试信息
+      const statusCounts = allApplications.reduce((acc: any, app) => {
+        acc[app.applicationStatus] = (acc[app.applicationStatus] || 0) + 1;
+        return acc;
+      }, {});
+
+      return res.json(createSuccessResponse({ 
+        migratedCount: 0,
+        skippedCount: 0,
+        totalApplications: allApplications.length,
+        statusCounts,
+        statusMapping: {
+          0: '待审批',
+          1: '已通过',
+          2: '已拒绝'
+        },
+        debugInfo: allApplications,
+        message: `没有找到已通过(状态=1)的报销申请。数据库中共有${allApplications.length}条报销记录。`
+      }, '数据迁移完成', req.path));
+    }
+
+    let migratedCount = 0;
+    let skippedCount = 0;
+    const migrationDetails = [];
+
+    for (const application of approvedApplications) {
+      // 检查是否已存在对应的财务记录
+      const existingRecord = await prisma.financialRecord.findFirst({
+        where: {
+          relatedType: 'expense_application',
+          relatedId: application.id
+        }
+      });
+
+      if (existingRecord) {
+        skippedCount++;
+        migrationDetails.push({
+          applicationNo: application.applicationNo,
+          status: 'skipped',
+          reason: '已存在财务记录'
+        });
+        continue;
+      }
+
+      // 创建财务支出记录
+      try {
+        const approverName = application.approver?.nickName || application.approver?.userName || '系统';
+        
+        await prisma.financialRecord.create({
+          data: {
+            type: 2, // 2表示支出
+            category: application.expenseType,
+            amount: application.totalAmount,
+            recordDate: application.approvalTime || application.createdAt,
+            description: `报销申请审批通过 (编号: ${application.applicationNo}) - [数据迁移] 来自历史报销申请，审批人：${approverName}${application.approvalComment ? `，审批意见：${application.approvalComment}` : ''}`,
+            relatedId: application.id,
+            relatedType: 'expense_application',
+            createdById: application.currentApproverId || userId
+          }
+        });
+
+        migratedCount++;
+        migrationDetails.push({
+          applicationNo: application.applicationNo,
+          amount: Number(application.totalAmount),
+          expenseType: application.expenseType,
+          status: 'success'
+        });
+
+        logger.info(`已为历史报销申请创建财务记录`, {
+          applicationId: application.id,
+          applicationNo: application.applicationNo,
+          amount: application.totalAmount
+        });
+      } catch (error) {
+        logger.error(`为报销申请创建财务记录失败:`, {
+          applicationNo: application.applicationNo,
+          error
+        });
+        migrationDetails.push({
+          applicationNo: application.applicationNo,
+          status: 'failed',
+          error: error instanceof Error ? error.message : '未知错误'
+        });
+      }
+    }
+
+    res.json(createSuccessResponse({
+      migratedCount,
+      skippedCount,
+      totalProcessed: approvedApplications.length,
+      details: migrationDetails
+    }, `数据迁移完成：成功迁移${migratedCount}条记录，跳过${skippedCount}条记录`, req.path));
+  } catch (error) {
+    logger.error('数据迁移失败:', error);
+    res.status(500).json(createErrorResponse(500, '数据迁移失败', error, req.path));
   }
 });
 
