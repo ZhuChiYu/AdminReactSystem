@@ -62,9 +62,8 @@ const router = Router();
  *         schema:
  *           type: integer
  *           minimum: 1
- *           maximum: 100
  *           default: 10
- *         description: 每页大小
+ *         description: 每页大小（导出时可使用大数值获取全部数据）
  *       - in: query
  *         name: customerName
  *         schema:
@@ -121,7 +120,6 @@ router.get(
  *         schema:
  *           type: integer
  *           minimum: 1
- *           maximum: 100
  *           default: 10
  *         description: 每页大小
  *     responses:
@@ -406,7 +404,6 @@ router.put('/:id', permissionMiddleware('customer:update'), asyncErrorHandler(cu
  *         schema:
  *           type: integer
  *           minimum: 1
- *           maximum: 100
  *           default: 10
  *         description: 每页大小
  *     responses:

@@ -419,8 +419,29 @@ const CustomerFollow = () => {
 
     setExportLoading(true);
     try {
+      // 获取所有符合条件的客户数据（不分页）
+      const queryParams: any = {
+        assignedToName: searchParams.assignedToName || undefined,
+        company: searchParams.company || undefined,
+        current: 1,
+        mobile: searchParams.phone || undefined,
+        nameOrPosition: searchParams.nameOrPosition || undefined,
+        phone: searchParams.phone || undefined,
+        remark: searchParams.remark || undefined,
+        scope: 'own',
+        size: 10000000 // 使用1000万作为上限，足够容纳海量数据
+      };
+
+      // 如果有状态筛选且不是'all'，添加筛选条件
+      if (selectedFollowStatus && selectedFollowStatus !== 'all') {
+        queryParams.followStatus = selectedFollowStatus;
+      }
+
+      // 获取所有客户数据
+      const allCustomerData = await customerService.getCustomerList(queryParams);
+
       // 准备导出数据
-      const exportData = filteredRecords.map((record, index) => ({
+      const exportData = allCustomerData.records.map((record, index) => ({
         公司: record.company,
         创建时间: record.createdAt ? new Date(record.createdAt).toLocaleString('zh-CN') : '-',
         客户姓名: record.customerName,

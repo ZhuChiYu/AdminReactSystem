@@ -318,10 +318,10 @@ const CustomerManagement = () => {
       // 动态导入xlsx库
       const XLSX = await import('xlsx');
 
-      // 获取所有客户数据
+      // 获取所有客户数据 - 使用足够大的数量确保能获取所有数据
       const allCustomersData = await customerService.getCustomerList({
         current: 1,
-        size: 10000, // 获取大量数据
+        size: 10000000, // 使用1000万作为上限，足够容纳海量数据
         ...searchParams
       });
 

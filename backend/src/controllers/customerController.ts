@@ -11,6 +11,7 @@ class CustomerController {
 
     const user = (req as any).user; // 获取当前登录用户
     const page = Number(current);
+    // 移除分页大小限制，支持导出全部数据
     const pageSize = Number(size);
     const skip = (page - 1) * pageSize;
 
