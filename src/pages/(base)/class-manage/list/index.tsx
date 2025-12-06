@@ -138,7 +138,40 @@ const ClassList = () => {
 
   // 初始加载数据
   useEffect(() => {
-    loadClassList();
+    // 尝试从 sessionStorage 恢复页面状态
+    const savedState = sessionStorage.getItem('classListState');
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        setPagination(state.pagination || pagination);
+        setSearchName(state.searchName || '');
+        setSelectedCategory(state.selectedCategory ?? '');
+        setSelectedStatus(state.selectedStatus ?? '');
+        if (state.dateRange) {
+          setDateRange([
+            state.dateRange[0] ? dayjs(state.dateRange[0]) : null,
+            state.dateRange[1] ? dayjs(state.dateRange[1]) : null
+          ]);
+        }
+        // 清除保存的状态
+        sessionStorage.removeItem('classListState');
+        
+        // 使用恢复的状态加载数据
+        loadClassList({
+          current: state.pagination?.current || 1,
+          name: state.searchName || undefined,
+          categoryId: state.selectedCategory !== '' ? Number(state.selectedCategory) : undefined,
+          status: state.selectedStatus !== '' ? Number(state.selectedStatus) : undefined,
+          startDate: state.dateRange?.[0] || undefined,
+          endDate: state.dateRange?.[1] || undefined
+        });
+      } catch (error) {
+        console.error('恢复页面状态失败:', error);
+        loadClassList();
+      }
+    } else {
+      loadClassList();
+    }
     fetchUserPermissions(); // 获取用户权限
   }, [currentUserId]);
 
@@ -217,12 +250,38 @@ const ClassList = () => {
 
   // 查看班级详情
   const handleViewDetail = (classId: number) => {
+    // 保存当前页面状态到 sessionStorage
+    const currentState = {
+      pagination,
+      searchName,
+      selectedCategory,
+      selectedStatus,
+      dateRange: dateRange ? [
+        dateRange[0]?.format('YYYY-MM-DD') || null,
+        dateRange[1]?.format('YYYY-MM-DD') || null
+      ] : null
+    };
+    sessionStorage.setItem('classListState', JSON.stringify(currentState));
+    
     navigate(`/class-manage/detail/${classId}`);
   };
 
   // 编辑班级
   const handleEdit = async (classId: number) => {
     try {
+      // 保存当前页面状态到 sessionStorage（编辑不跳转页面，但以防万一）
+      const currentState = {
+        pagination,
+        searchName,
+        selectedCategory,
+        selectedStatus,
+        dateRange: dateRange ? [
+          dateRange[0]?.format('YYYY-MM-DD') || null,
+          dateRange[1]?.format('YYYY-MM-DD') || null
+        ] : null
+      };
+      sessionStorage.setItem('classListState', JSON.stringify(currentState));
+      
       // 从API获取班级详情
       const classDetail = await classService.getClassDetail(classId);
 

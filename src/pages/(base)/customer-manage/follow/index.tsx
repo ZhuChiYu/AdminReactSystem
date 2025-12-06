@@ -97,7 +97,7 @@ const CustomerFollow = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerApi.CustomerListItem | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [_selectedRows, setSelectedRows] = useState<CustomerApi.CustomerListItem[]>([]);
+  const [, setSelectedRows] = useState<CustomerApi.CustomerListItem[]>([]);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportProgressVisible, setExportProgressVisible] = useState(false);
@@ -349,7 +349,7 @@ const CustomerFollow = () => {
         return;
       }
 
-      const updateData = {
+      await customerService.updateCustomer(editingCustomer.id, {
         company: values.company,
         customerName: values.customerName,
         followStatus: values.followStatus,
@@ -358,9 +358,7 @@ const CustomerFollow = () => {
         phone: values.phone,
         position: values.position,
         remark: values.followContent
-      };
-
-      await customerService.updateCustomer(editingCustomer.id, updateData);
+      });
 
       message.success('编辑成功');
       setIsEditModalVisible(false);
@@ -396,20 +394,10 @@ const CustomerFollow = () => {
 
   // 表格行选择配置
   const rowSelection = {
-    onChange: (selectedRowKeys: React.Key[], selectedRows: CustomerApi.CustomerListItem[]) => {
-      setSelectedRowKeys(selectedRowKeys);
-      setSelectedRows(selectedRows);
+    onChange: (keys: React.Key[], rows: CustomerApi.CustomerListItem[]) => {
+      setSelectedRowKeys(keys);
+      setSelectedRows(rows);
     },
-    onSelect: (
-      record: CustomerApi.CustomerListItem,
-      selected: boolean,
-      selectedRows: CustomerApi.CustomerListItem[]
-    ) => {},
-    onSelectAll: (
-      selected: boolean,
-      selectedRows: CustomerApi.CustomerListItem[],
-      changeRows: CustomerApi.CustomerListItem[]
-    ) => {},
     selectedRowKeys
   };
 
@@ -467,7 +455,7 @@ const CustomerFollow = () => {
 
         // 判断是否还有更多数据
         hasMore = currentPage * batchSize < batchData.total;
-        currentPage++;
+        currentPage += 1;
       }
 
       setExportProgress(85);
