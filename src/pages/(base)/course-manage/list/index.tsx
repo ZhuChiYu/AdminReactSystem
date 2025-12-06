@@ -206,13 +206,16 @@ const CourseList = () => {
   useEffect(() => {
     // 先获取分类数据
     fetchCategories();
-    
+
     // 尝试从 sessionStorage 恢复页面状态
     const savedState = sessionStorage.getItem('courseListState');
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
-        setPagination(state.pagination || pagination);
+        console.log('恢复课程列表状态:', state); // 调试日志
+
+        // 先恢复所有状态
+        setPagination(state.pagination || { current: 1, pageSize: 10, total: 0 });
         setSearchName(state.searchName || '');
         setSelectedCategory(state.selectedCategory || '');
         if (state.dateRange) {
@@ -221,10 +224,11 @@ const CourseList = () => {
             state.dateRange[1] ? dayjs(state.dateRange[1]) : null
           ] as [dayjs.Dayjs, dayjs.Dayjs] | null);
         }
+
         // 清除保存的状态
         sessionStorage.removeItem('courseListState');
-        
-        // 构建筛选参数
+
+        // 构建筛选参数 - 直接从 savedState 读取，不依赖 state
         const filters: any = {};
         if (state.searchName) {
           filters.courseName = state.searchName;
@@ -233,15 +237,25 @@ const CourseList = () => {
           filters.startDate = state.dateRange[0];
           filters.endDate = state.dateRange[1];
         }
-        // 注意：categoryId 需要等 categories 加载完成后才能转换，这里先跳过
-        
+
+        console.log('使用参数加载课程列表:', {
+          page: state.pagination?.current || 1,
+          size: state.pagination?.pageSize || 10,
+          filters
+        }); // 调试日志
+
         // 使用恢复的状态加载数据
-        fetchCourseList(state.pagination?.current || 1, state.pagination?.pageSize || 10, filters);
+        fetchCourseList(
+          state.pagination?.current || 1,
+          state.pagination?.pageSize || 10,
+          filters
+        );
       } catch (error) {
         console.error('恢复页面状态失败:', error);
         fetchCourseList();
       }
     } else {
+      console.log('没有保存的状态，加载默认数据'); // 调试日志
       fetchCourseList();
     }
     fetchUserPermissions(); // 获取用户权限
@@ -300,7 +314,7 @@ const CourseList = () => {
       ] : null
     };
     sessionStorage.setItem('courseListState', JSON.stringify(currentState));
-    
+
     setCurrentCourse(course);
     editForm.setFieldsValue({
       category: course.category,
@@ -428,7 +442,7 @@ const CourseList = () => {
       ] : null
     };
     sessionStorage.setItem('courseListState', JSON.stringify(currentState));
-    
+
     setCourseToDelete(course);
     setDeleteModalVisible(true);
   };
@@ -445,8 +459,9 @@ const CourseList = () => {
         dateRange[1]?.format('YYYY-MM-DD') || null
       ] : null
     };
+    console.log('保存课程列表状态:', currentState); // 调试日志
     sessionStorage.setItem('courseListState', JSON.stringify(currentState));
-    
+
     navigate(`/course-manage/detail/${courseId}`);
   };
 
@@ -462,8 +477,9 @@ const CourseList = () => {
         dateRange[1]?.format('YYYY-MM-DD') || null
       ] : null
     };
+    console.log('保存课程列表状态(附件):', currentState); // 调试日志
     sessionStorage.setItem('courseListState', JSON.stringify(currentState));
-    
+
     navigate(`/course-manage/attachments/${courseId}`);
   };
 
