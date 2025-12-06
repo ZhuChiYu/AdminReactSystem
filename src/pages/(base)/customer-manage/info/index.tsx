@@ -134,7 +134,7 @@ const CustomerManagement = () => {
     }
   };
 
-  // 初始化加载数据 - 使用独立的 useEffect 避免依赖问题
+  // 初始化加载数据 - 首次加载时恢复状态
   useEffect(() => {
     if (isFirstLoadRef.current) {
       isFirstLoadRef.current = false;
@@ -146,21 +146,21 @@ const CustomerManagement = () => {
           const state = JSON.parse(savedState);
           isRestoringStateRef.current = true;
 
-          // 直接调用 fetchCustomers，传入恢复的完整参数
+          // 先设置状态（不会触发 useEffect，因为我们会手动调用 fetchCustomers）
+          if (state.searchParams) {
+            setSearchParams(state.searchParams);
+          }
+
+          // 直接调用 fetchCustomers，传入恢复的参数，避免等待 state 更新
           fetchCustomers({
             current: state.pagination?.current || 1,
             pageSize: state.pagination?.pageSize || 10,
             searchParams: state.searchParams || searchParams
-          }).then(() => {
-            // 数据加载完成后，再更新 UI 状态，此时不会触发额外的请求
-            if (state.searchParams) {
-              setSearchParams(state.searchParams);
-            }
           }).finally(() => {
             isRestoringStateRef.current = false;
           });
 
-          return; // 阻止执行下面的默认加载
+          return; // 直接返回，不执行下面的正常加载
         } catch (error) {
           console.error('恢复客户资料状态失败:', error);
           isRestoringStateRef.current = false;
@@ -169,12 +169,8 @@ const CustomerManagement = () => {
 
       // 如果没有保存的状态，正常加载
       fetchCustomers();
-    }
-  }, []); // 空依赖数组，只在组件挂载时执行一次
-
-  // 监听分页变化（非首次加载）
-  useEffect(() => {
-    if (!isFirstLoadRef.current && !isRestoringStateRef.current) {
+    } else {
+      // 非首次加载时正常获取数据
       fetchCustomers();
     }
   }, [pagination.current, pagination.pageSize]);
