@@ -26,6 +26,7 @@ import {
 import { authMiddleware } from '../middleware/auth';
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { createSuccessResponse, createErrorResponse } from '../utils/response';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -189,6 +190,90 @@ router.delete('/:id',
     param('id').isInt({ min: 1 }).withMessage('项目事项ID必须是正整数')
   ],
   deleteTask
+);
+
+/**
+ * @route PUT /api/tasks/:id/stage-history
+ * @desc 更新项目事项操作历史
+ * @access Private
+ */
+router.put('/:id/stage-history',
+  authMiddleware,
+  [
+    param('id').isInt({ min: 1 }).withMessage('项目事项ID必须是正整数'),
+    body('stageHistory').isArray().withMessage('操作历史必须是数组')
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { stageHistory } = req.body;
+      const userId = (req as any).user?.id;
+      const userRoles = (req as any).user?.roles || [];
+
+      // 检查任务是否存在
+      const task = await prisma.task.findUnique({
+        where: { id: Number(id) },
+        include: {
+          responsiblePerson: true
+        }
+      });
+
+      if (!task) {
+        return res.status(404).json(createErrorResponse(404, '项目事项不存在', null, req.path));
+      }
+
+      // 权限检查：超级管理员或负责人可以删除历史记录
+      const isSuperAdmin = userRoles.includes('super_admin');
+      const isResponsiblePerson = task.responsiblePersonId === userId;
+
+      if (!isSuperAdmin && !isResponsiblePerson) {
+        return res.status(403).json(createErrorResponse(403, '无权限修改操作历史', null, req.path));
+      }
+
+      // 更新操作历史
+      const updatedTask = await prisma.task.update({
+        where: { id: Number(id) },
+        data: {
+          stageHistory: stageHistory
+        },
+        include: {
+          responsiblePerson: {
+            select: {
+              id: true,
+              userName: true,
+              nickName: true
+            }
+          },
+          executor: {
+            select: {
+              id: true,
+              userName: true,
+              nickName: true
+            }
+          },
+          consultant: {
+            select: {
+              id: true,
+              userName: true,
+              nickName: true
+            }
+          },
+          marketManager: {
+            select: {
+              id: true,
+              userName: true,
+              nickName: true
+            }
+          }
+        }
+      });
+
+      return res.json(createSuccessResponse(updatedTask, '操作历史更新成功', req.path));
+    } catch (error) {
+      console.error('更新操作历史失败:', error);
+      return res.status(500).json(createErrorResponse(500, '更新操作历史失败', error, req.path));
+    }
+  }
 );
 
 // 阶段操作路由

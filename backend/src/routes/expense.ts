@@ -626,6 +626,8 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user.id;
+    const userRoles = (req as any).user.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
 
     const application = await prisma.expenseApplication.findUnique({
       where: { id: Number(id) }
@@ -635,18 +637,34 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json(createErrorResponse(404, '费用申请不存在', null, req.path));
     }
 
-    if (application.applicantId !== userId) {
+    // 权限检查：超级管理员或申请人本人可以删除
+    if (!isSuperAdmin && application.applicantId !== userId) {
       return res.status(403).json(createErrorResponse(403, '无权限删除此申请', null, req.path));
     }
 
-    if (application.applicationStatus !== 0) {
-      return res.status(400).json(createErrorResponse(400, '已审批的申请无法删除', null, req.path));
+    // 允许删除任何状态的申请（待审批、已通过、已拒绝）
+
+    // 删除附件文件
+    try {
+      const attachments = (application.attachments as any[]) || [];
+      for (const attachment of attachments) {
+        const filePath = path.join(uploadsDir, attachment.fileName);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          logger.info(`删除附件文件: ${attachment.fileName}`);
+        }
+      }
+    } catch (error) {
+      logger.error('删除附件文件失败:', error);
+      // 继续删除数据库记录，即使文件删除失败
     }
 
+    // 删除费用申请
     await prisma.expenseApplication.delete({
       where: { id: Number(id) }
     });
 
+    logger.info(`费用申请删除成功，ID: ${id}, 已删除 ${((application.attachments as any[]) || []).length} 个附件文件`);
     res.json(createSuccessResponse(null, '费用申请删除成功', req.path));
   } catch (error) {
     logger.error('删除费用申请失败:', error);
@@ -945,7 +963,7 @@ router.post('/migrate-to-financial', authMiddleware, async (req, res) => {
         expenseType: true
       }
     });
-    
+
     logger.info('所有报销申请状态:', allApplications);
 
     // 查找所有已通过的报销申请（状态为1）
@@ -973,7 +991,7 @@ router.post('/migrate-to-financial', authMiddleware, async (req, res) => {
         return acc;
       }, {});
 
-      return res.json(createSuccessResponse({ 
+      return res.json(createSuccessResponse({
         migratedCount: 0,
         skippedCount: 0,
         totalApplications: allApplications.length,
@@ -1014,7 +1032,7 @@ router.post('/migrate-to-financial', authMiddleware, async (req, res) => {
       // 创建财务支出记录
       try {
         const approverName = application.approver?.nickName || application.approver?.userName || '系统';
-        
+
         await prisma.financialRecord.create({
           data: {
             type: 2, // 2表示支出

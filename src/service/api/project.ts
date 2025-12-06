@@ -249,5 +249,16 @@ export const projectService = {
       console.error('上传方案失败:', error);
       throw error;
     }
+  },
+
+  /** 更新项目事项操作历史 */
+  async updateTaskStageHistory(taskId: number, stageHistory: any[]): Promise<TaskApi.TaskListItem> {
+    try {
+      const response = await apiClient.put(`/tasks/${taskId}/stage-history`, { stageHistory });
+      return response;
+    } catch (error) {
+      console.error('更新操作历史失败:', error);
+      throw error;
+    }
   }
 };

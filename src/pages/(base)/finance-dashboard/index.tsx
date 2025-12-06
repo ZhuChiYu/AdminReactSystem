@@ -125,19 +125,23 @@ const FinanceDashboard = () => {
       ] = await Promise.all([
         financialService.getMonthlyTrend({ year: selectedYear }),
         financialService.getExpenseTypeDistribution({ month: selectedMonth, year: selectedYear }),
-        // 获取收入分布数据
+        // 获取收入分布数据（整个月的聚合数据）
         financialService.getIncomeTypeDistribution({ month: selectedMonth, year: selectedYear }),
-        // 获取支出记录
+        // 获取支出记录（按月筛选）
         financialService.getFinancialRecords({
           current: expensePagination.current,
+          month: selectedMonth,
           size: expensePagination.pageSize,
-          type: 2
+          type: 2,
+          year: selectedYear
         }),
-        // 获取收入记录
+        // 获取收入记录（按月筛选）
         financialService.getFinancialRecords({
           current: incomePagination.current,
+          month: selectedMonth,
           size: incomePagination.pageSize,
-          type: 1
+          type: 1,
+          year: selectedYear
         })
       ]);
 
@@ -166,6 +170,22 @@ const FinanceDashboard = () => {
         setRealExpenseTypeData([]);
       }
 
+      // 处理收入类型分布数据（使用API返回的聚合数据）
+      if (incomeDistributionResponse && Array.isArray(incomeDistributionResponse)) {
+        const formattedIncomeData = incomeDistributionResponse.map(item => ({
+          amount: item.amount,
+          itemStyle: {
+            color: item.color
+          },
+          name: item.category,
+          type: item.category,
+          value: item.amount
+        }));
+        setRealIncomeTypeData(formattedIncomeData);
+      } else {
+        setRealIncomeTypeData([]);
+      }
+
       // 处理收入记录数据
       if (incomeRecordsResponse && incomeRecordsResponse.records) {
         setIncomeRecords(incomeRecordsResponse.records);
@@ -173,41 +193,9 @@ const FinanceDashboard = () => {
           ...prev,
           total: incomeRecordsResponse.total
         }));
-
-        // 从收入记录直接计算收入类型分布（与明细表格数据源一致）
-        const incomeTypeMap = new Map<string, number>();
-        
-        // 统计每种收入类型的总金额
-        incomeRecordsResponse.records.forEach((record: FinancialRecord) => {
-          const category = record.category;
-          const amount = record.amount;
-          if (incomeTypeMap.has(category)) {
-            incomeTypeMap.set(category, incomeTypeMap.get(category)! + amount);
-          } else {
-            incomeTypeMap.set(category, amount);
-          }
-        });
-
-        // 转换为图表数据格式
-        const formattedIncomeData = Array.from(incomeTypeMap.entries()).map(([category, amount]) => {
-          // 查找对应的颜色
-          const incomeTypeConfig = incomeTypes.find(t => t.value === category || t.label === category);
-          return {
-            amount,
-            itemStyle: {
-              color: incomeTypeConfig?.color || '#52c41a'
-            },
-            name: incomeTypeConfig?.label || category,
-            type: category,
-            value: amount
-          };
-        });
-
-        setRealIncomeTypeData(formattedIncomeData);
       } else {
         setIncomeRecords([]);
         setIncomePagination(prev => ({ ...prev, total: 0 }));
-        setRealIncomeTypeData([]);
       }
 
       // 处理支出记录数据
@@ -273,7 +261,7 @@ const FinanceDashboard = () => {
           console.table(result.debugInfo);
           console.log('状态统计:', result.statusCounts);
           console.log('状态映射:', result.statusMapping);
-          
+
           message.warning({
             content: result.message || '没有需要迁移的数据。请打开浏览器控制台查看详细信息。',
             duration: 5
@@ -348,6 +336,18 @@ const FinanceDashboard = () => {
     const total = incomeTypeData.reduce((sum, item) => sum + item.value, 0);
     return total;
   }, [incomeTypeData]);
+
+  // 计算年度总收入、总支出、总利润
+  const yearlyTotals = useMemo(() => {
+    const totalYearIncome = realChartData.reduce((sum, item) => sum + (item.income || 0), 0);
+    const totalYearExpense = realChartData.reduce((sum, item) => sum + (item.expense || 0), 0);
+    const totalYearProfit = totalYearIncome - totalYearExpense;
+    return {
+      totalYearExpense,
+      totalYearIncome,
+      totalYearProfit
+    };
+  }, [realChartData]);
 
   // 饼图配置 - 支出类型分布
   const { domRef: expenseTypePieRef, updateOptions: updateExpenseTypePie } = useEcharts(() => {
@@ -832,6 +832,7 @@ const FinanceDashboard = () => {
   // 处理月份选择变化
   const handleMonthChange = (date: Dayjs | null) => {
     if (date) {
+      setSelectedYear(date.year());
       setSelectedMonth(date.month() + 1);
     }
   };
@@ -907,13 +908,16 @@ const FinanceDashboard = () => {
   // 年份或月份变化时重新获取数据
   useEffect(() => {
     if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
+      // 重置分页到第一页
+      setIncomePagination(prev => ({ ...prev, current: 1 }));
+      setExpensePagination(prev => ({ ...prev, current: 1 }));
       fetchRealFinancialData();
     }
     // 员工业绩数据也需要在年份/月份变化时重新获取
     if (activeTab === 'employee') {
       fetchEmployeePerformance();
     }
-  }, [selectedYear, selectedMonth, isSuperAdminUser, activeTab]);
+  }, [selectedYear, selectedMonth]);
 
   // 年份或月份变化时更新图表
   useEffect(() => {
@@ -1217,6 +1221,44 @@ const FinanceDashboard = () => {
       children: (
         <div className="mt-4">
           <Row gutter={[16, 16]}>
+            {/* 年度总体统计 */}
+            <Col span={24}>
+              <Card
+                title={`${selectedYear}年度财务总览`}
+                variant="borderless"
+              >
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Statistic
+                      precision={1}
+                      prefix="¥"
+                      title="年度总收入"
+                      value={yearlyTotals.totalYearIncome}
+                      valueStyle={{ color: '#3f8600' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      precision={1}
+                      prefix="¥"
+                      title="年度总支出"
+                      value={yearlyTotals.totalYearExpense}
+                      valueStyle={{ color: '#cf1322' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      precision={1}
+                      prefix="¥"
+                      title="年度总利润"
+                      value={yearlyTotals.totalYearProfit}
+                      valueStyle={{ color: yearlyTotals.totalYearProfit >= 0 ? '#3f8600' : '#cf1322' }}
+                    />
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+
             <Col span={24}>
               <Card
                 title={`${selectedYear}年财务数据图表`}
@@ -1287,7 +1329,7 @@ const FinanceDashboard = () => {
                 <Row gutter={16}>
                   <Col span={8}>
                     <Statistic
-                      precision={2}
+                      precision={1}
                       prefix="¥"
                       title="本月收入"
                       value={totalIncome}
@@ -1296,7 +1338,7 @@ const FinanceDashboard = () => {
                   </Col>
                   <Col span={8}>
                     <Statistic
-                      precision={2}
+                      precision={1}
                       prefix="¥"
                       title="本月支出"
                       value={totalExpense}
@@ -1305,7 +1347,7 @@ const FinanceDashboard = () => {
                   </Col>
                   <Col span={8}>
                     <Statistic
-                      precision={2}
+                      precision={1}
                       prefix="¥"
                       title="本月利润"
                       value={totalIncome - totalExpense}

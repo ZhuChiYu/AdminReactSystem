@@ -149,6 +149,18 @@ const Component: React.FC = () => {
     fetchHistory();
   };
 
+  // 删除已提交的申请（包括数据库中的附件文件）
+  const handleDeleteApplication = async (record: HistoryItem) => {
+    try {
+      await expenseService.deleteExpense(record.id);
+      message.success('申请删除成功');
+      fetchHistory();
+    } catch (err: any) {
+      console.error('删除申请失败:', err);
+      message.error(err.message || '删除申请失败');
+    }
+  };
+
   // 提交草稿
   const handleSubmitDraft = async (record: HistoryItem) => {
     try {
@@ -315,7 +327,7 @@ const Component: React.FC = () => {
           >
             详情
           </Button>
-          {record.isDraft && (
+          {record.isDraft ? (
             <>
               <Button
                 icon={<SendOutlined />}
@@ -341,6 +353,23 @@ const Component: React.FC = () => {
                 </Button>
               </Popconfirm>
             </>
+          ) : (
+            // 已提交的申请也可以删除（超级管理员或申请人本人）
+            <Popconfirm
+              cancelText="取消"
+              okText="确定"
+              title="确定删除这个申请吗？删除后将无法恢复，包括所有附件文件。"
+              onConfirm={() => handleDeleteApplication(record)}
+            >
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                type="link"
+              >
+                删除
+              </Button>
+            </Popconfirm>
           )}
         </Space>
       )

@@ -1,5 +1,5 @@
-import { EyeOutlined } from '@ant-design/icons';
-import { Button, Card, Descriptions, List, Modal, Steps, Table, Tag, message } from 'antd';
+import { DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { Button, Card, Descriptions, List, Modal, Popconfirm, Space, Steps, Table, Tag, message } from 'antd';
 import dayjs from 'dayjs';
 import React, { useEffect, useState } from 'react';
 
@@ -121,6 +121,19 @@ const ArchivedProjectPage: React.FC = () => {
 
     // 获取该任务的附件
     await fetchTaskAttachments(task.id);
+  };
+
+  // 删除历史项目
+  const handleDelete = async (id: number) => {
+    try {
+      await projectService.deleteTask(id);
+      message.success('删除成功');
+      // 重新加载当前页
+      await fetchArchivedTasks(pagination.current, pagination.pageSize);
+    } catch (error) {
+      console.error('删除失败:', error);
+      message.error('删除失败，请重试');
+    }
   };
 
   // 下载附件
@@ -250,16 +263,34 @@ const ArchivedProjectPage: React.FC = () => {
       fixed: 'right' as const,
       key: 'action',
       render: (_: any, record: TaskApi.TaskListItem) => (
-        <Button
-          icon={<EyeOutlined />}
-          type="link"
-          onClick={() => handleViewDetail(record)}
-        >
-          详情
-        </Button>
+        <Space size="small">
+          <Button
+            icon={<EyeOutlined />}
+            size="small"
+            type="link"
+            onClick={() => handleViewDetail(record)}
+          >
+            详情
+          </Button>
+          <Popconfirm
+            cancelText="取消"
+            okText="确定"
+            title="确定要删除这个历史项目吗？删除后将无法恢复。"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              type="link"
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
       title: '操作',
-      width: 100
+      width: 160
     }
   ];
 
