@@ -6,7 +6,7 @@ import {
   HistoryOutlined,
   PlusOutlined
 } from '@ant-design/icons';
-import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, message } from 'antd';
+import { Button, Card, Col, Form, Input, Modal, Progress, Row, Select, Space, Statistic, Table, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 
@@ -99,6 +99,9 @@ const CustomerFollow = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [_selectedRows, setSelectedRows] = useState<CustomerApi.CustomerListItem[]>([]);
   const [exportLoading, setExportLoading] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportProgressVisible, setExportProgressVisible] = useState(false);
+  const [exportProgressText, setExportProgressText] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -418,30 +421,60 @@ const CustomerFollow = () => {
     }
 
     setExportLoading(true);
-    try {
-      // 获取所有符合条件的客户数据（不分页）
-      const queryParams: any = {
-        assignedToName: searchParams.assignedToName || undefined,
-        company: searchParams.company || undefined,
-        current: 1,
-        mobile: searchParams.phone || undefined,
-        nameOrPosition: searchParams.nameOrPosition || undefined,
-        phone: searchParams.phone || undefined,
-        remark: searchParams.remark || undefined,
-        scope: 'own',
-        size: 10000000 // 使用1000万作为上限，足够容纳海量数据
-      };
+    setExportProgressVisible(true);
+    setExportProgress(0);
+    setExportProgressText('准备导出...');
 
-      // 如果有状态筛选且不是'all'，添加筛选条件
-      if (selectedFollowStatus && selectedFollowStatus !== 'all') {
-        queryParams.followStatus = selectedFollowStatus;
+    try {
+      // 分批获取所有符合条件的客户数据
+      const batchSize = 5000; // 每批获取5000条
+      let allRecords: CustomerApi.CustomerListItem[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      let totalRecords = 0;
+
+      // 循环获取所有数据
+      while (hasMore) {
+        const queryParams: any = {
+          assignedToName: searchParams.assignedToName || undefined,
+          company: searchParams.company || undefined,
+          current: currentPage,
+          mobile: searchParams.phone || undefined,
+          nameOrPosition: searchParams.nameOrPosition || undefined,
+          phone: searchParams.phone || undefined,
+          remark: searchParams.remark || undefined,
+          scope: 'own',
+          size: batchSize
+        };
+
+        // 如果有状态筛选且不是'all'，添加筛选条件
+        if (selectedFollowStatus && selectedFollowStatus !== 'all') {
+          queryParams.followStatus = selectedFollowStatus;
+        }
+
+        const batchData = await customerService.getCustomerList(queryParams);
+
+        if (currentPage === 1) {
+          totalRecords = batchData.total;
+        }
+
+        allRecords = [...allRecords, ...batchData.records];
+
+        // 计算进度
+        const progress = Math.min(Math.floor((allRecords.length / totalRecords) * 80), 80); // 数据获取占80%
+        setExportProgress(progress);
+        setExportProgressText(`正在获取数据: ${allRecords.length}/${totalRecords} 条`);
+
+        // 判断是否还有更多数据
+        hasMore = currentPage * batchSize < batchData.total;
+        currentPage++;
       }
 
-      // 获取所有客户数据
-      const allCustomerData = await customerService.getCustomerList(queryParams);
+      setExportProgress(85);
+      setExportProgressText('正在生成CSV文件...');
 
       // 准备导出数据
-      const exportData = allCustomerData.records.map((record, index) => ({
+      const exportData = allRecords.map((record, index) => ({
         公司: record.company,
         创建时间: record.createdAt ? new Date(record.createdAt).toLocaleString('zh-CN') : '-',
         客户姓名: record.customerName,
@@ -453,6 +486,9 @@ const CustomerFollow = () => {
         跟进内容: record.remark || '暂无跟进内容',
         跟进状态: getStatusLabel(record.followStatus)
       }));
+
+      setExportProgress(95);
+      setExportProgressText('正在写入文件...');
 
       // 转换为CSV格式
       const headers = Object.keys(exportData[0] || {});
@@ -474,10 +510,18 @@ const CustomerFollow = () => {
       link.click();
       document.body.removeChild(link);
 
-      message.success(`成功导出 ${exportData.length} 条客户数据`);
+      setExportProgress(100);
+      setExportProgressText('导出完成！');
+
+      // 延迟关闭进度条
+      setTimeout(() => {
+        setExportProgressVisible(false);
+        message.success(`成功导出 ${exportData.length} 条客户数据`);
+      }, 500);
     } catch (error) {
       console.error('❌ 导出失败:', error);
       message.error('导出失败');
+      setExportProgressVisible(false);
     } finally {
       setExportLoading(false);
     }
@@ -1196,6 +1240,30 @@ const CustomerFollow = () => {
             total: historyPagination.total
           }}
         />
+      </Modal>
+
+      {/* 导出进度弹窗 */}
+      <Modal
+        closable={false}
+        footer={null}
+        maskClosable={false}
+        open={exportProgressVisible}
+        title="导出进度"
+        width={400}
+      >
+        <div style={{ padding: '20px 0' }}>
+          <Progress
+            percent={exportProgress}
+            status={exportProgress === 100 ? 'success' : 'active'}
+            strokeColor={{
+              '0%': '#108ee9',
+              '100%': '#87d068',
+            }}
+          />
+          <div style={{ marginTop: 16, textAlign: 'center', color: '#666' }}>
+            {exportProgressText}
+          </div>
+        </div>
       </Modal>
     </div>
   );

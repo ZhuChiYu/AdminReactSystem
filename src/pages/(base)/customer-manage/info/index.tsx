@@ -1,5 +1,5 @@
 import { CopyOutlined, DownloadOutlined, UserAddOutlined, UserSwitchOutlined } from '@ant-design/icons';
-import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
+import { App, Button, Card, Form, Input, Modal, Progress, Select, Space, Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { customerService, employeeService } from '@/service/api';
@@ -56,6 +56,9 @@ const CustomerManagement = () => {
 
   // 导出相关状态
   const [exportLoading, setExportLoading] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportProgressVisible, setExportProgressVisible] = useState(false);
+  const [exportProgressText, setExportProgressText] = useState('');
 
   // 数据状态
   const [customers, setCustomers] = useState<CustomerApi.CustomerListItem[]>([]);
@@ -314,19 +317,50 @@ const CustomerManagement = () => {
     }
 
     setExportLoading(true);
+    setExportProgressVisible(true);
+    setExportProgress(0);
+    setExportProgressText('准备导出...');
+
     try {
       // 动态导入xlsx库
       const XLSX = await import('xlsx');
 
-      // 获取所有客户数据 - 使用足够大的数量确保能获取所有数据
-      const allCustomersData = await customerService.getCustomerList({
-        current: 1,
-        size: 10000000, // 使用1000万作为上限，足够容纳海量数据
-        ...searchParams
-      });
+      // 分批获取所有客户数据
+      const batchSize = 5000; // 每批获取5000条
+      let allRecords: CustomerApi.CustomerListItem[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      let totalRecords = 0;
+
+      // 循环获取所有数据
+      while (hasMore) {
+        const batchData = await customerService.getCustomerList({
+          current: currentPage,
+          size: batchSize,
+          ...searchParams
+        });
+
+        if (currentPage === 1) {
+          totalRecords = batchData.total;
+        }
+
+        allRecords = [...allRecords, ...batchData.records];
+
+        // 计算进度
+        const progress = Math.min(Math.floor((allRecords.length / totalRecords) * 80), 80); // 数据获取占80%
+        setExportProgress(progress);
+        setExportProgressText(`正在获取数据: ${allRecords.length}/${totalRecords} 条`);
+
+        // 判断是否还有更多数据
+        hasMore = currentPage * batchSize < batchData.total;
+        currentPage++;
+      }
+
+      setExportProgress(85);
+      setExportProgressText('正在生成Excel文件...');
 
       // 准备导出的数据
-      const exportData = allCustomersData.records.map((customer, index) => ({
+      const exportData = allRecords.map((customer, index) => ({
         创建时间: customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '',
         单位名称: customer.company || '',
         备注: customer.remark || '',
@@ -342,6 +376,9 @@ const CustomerManagement = () => {
         跟进状态: followUpStatusNames[customer.followStatus as FollowUpStatus] || customer.followStatus,
         邮箱: customer.email || ''
       }));
+
+      setExportProgress(95);
+      setExportProgressText('正在写入文件...');
 
       // 创建工作簿
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -373,10 +410,18 @@ const CustomerManagement = () => {
       // 下载文件
       XLSX.writeFile(workbook, fileName);
 
-      message.success(`成功导出 ${exportData.length} 条客户数据`);
+      setExportProgress(100);
+      setExportProgressText('导出完成！');
+
+      // 延迟关闭进度条
+      setTimeout(() => {
+        setExportProgressVisible(false);
+        message.success(`成功导出 ${exportData.length} 条客户数据`);
+      }, 500);
     } catch (error) {
       console.error('导出客户数据失败:', error);
       message.error('导出失败，请重试');
+      setExportProgressVisible(false);
     } finally {
       setExportLoading(false);
     }
@@ -880,6 +925,30 @@ const CustomerManagement = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 导出进度弹窗 */}
+      <Modal
+        closable={false}
+        footer={null}
+        maskClosable={false}
+        open={exportProgressVisible}
+        title="导出进度"
+        width={400}
+      >
+        <div style={{ padding: '20px 0' }}>
+          <Progress
+            percent={exportProgress}
+            status={exportProgress === 100 ? 'success' : 'active'}
+            strokeColor={{
+              '0%': '#108ee9',
+              '100%': '#87d068',
+            }}
+          />
+          <div style={{ marginTop: 16, textAlign: 'center', color: '#666' }}>
+            {exportProgressText}
+          </div>
+        </div>
       </Modal>
     </div>
   );
