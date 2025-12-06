@@ -78,7 +78,12 @@ const CourseList = () => {
   };
 
   // 获取课程列表
-  const fetchCourseList = async (page = pagination.current, size = pagination.pageSize) => {
+  const fetchCourseList = async (page = pagination.current, size = pagination.pageSize, filters?: {
+    courseName?: string;
+    categoryId?: number;
+    startDate?: string;
+    endDate?: string;
+  }) => {
     setLoading(true);
     try {
       // 构建筛选参数
@@ -87,22 +92,27 @@ const CourseList = () => {
         size
       };
 
-      // 添加筛选条件
-      if (searchName) {
-        params.courseName = searchName;
-      }
-
-      if (selectedCategory) {
-        const categoryId = categories.find(cat => cat.name === selectedCategory)?.id;
-        if (categoryId) {
-          params.categoryId = categoryId;
+      // 如果提供了 filters 参数，使用它；否则使用当前 state
+      if (filters) {
+        Object.assign(params, filters);
+      } else {
+        // 添加筛选条件
+        if (searchName) {
+          params.courseName = searchName;
         }
-      }
 
-      // 添加日期范围筛选
-      if (dateRange && dateRange.length === 2) {
-        params.startDate = dateRange[0].format('YYYY-MM-DD');
-        params.endDate = dateRange[1].format('YYYY-MM-DD');
+        if (selectedCategory) {
+          const categoryId = categories.find(cat => cat.name === selectedCategory)?.id;
+          if (categoryId) {
+            params.categoryId = categoryId;
+          }
+        }
+
+        // 添加日期范围筛选
+        if (dateRange && dateRange.length === 2) {
+          params.startDate = dateRange[0].format('YYYY-MM-DD');
+          params.endDate = dateRange[1].format('YYYY-MM-DD');
+        }
       }
 
       const response = await courseService.getCourseList(params);
@@ -192,9 +202,48 @@ const CourseList = () => {
     }
   };
 
+  // 初始加载数据
   useEffect(() => {
-    fetchCourseList();
+    // 先获取分类数据
     fetchCategories();
+    
+    // 尝试从 sessionStorage 恢复页面状态
+    const savedState = sessionStorage.getItem('courseListState');
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        setPagination(state.pagination || pagination);
+        setSearchName(state.searchName || '');
+        setSelectedCategory(state.selectedCategory || '');
+        if (state.dateRange) {
+          setDateRange([
+            state.dateRange[0] ? dayjs(state.dateRange[0]) : null,
+            state.dateRange[1] ? dayjs(state.dateRange[1]) : null
+          ] as [dayjs.Dayjs, dayjs.Dayjs] | null);
+        }
+        // 清除保存的状态
+        sessionStorage.removeItem('courseListState');
+        
+        // 构建筛选参数
+        const filters: any = {};
+        if (state.searchName) {
+          filters.courseName = state.searchName;
+        }
+        if (state.dateRange && state.dateRange[0] && state.dateRange[1]) {
+          filters.startDate = state.dateRange[0];
+          filters.endDate = state.dateRange[1];
+        }
+        // 注意：categoryId 需要等 categories 加载完成后才能转换，这里先跳过
+        
+        // 使用恢复的状态加载数据
+        fetchCourseList(state.pagination?.current || 1, state.pagination?.pageSize || 10, filters);
+      } catch (error) {
+        console.error('恢复页面状态失败:', error);
+        fetchCourseList();
+      }
+    } else {
+      fetchCourseList();
+    }
     fetchUserPermissions(); // 获取用户权限
   }, [currentUserId]);
 
@@ -240,6 +289,18 @@ const CourseList = () => {
 
   // 打开编辑课程模态框
   const showEditModal = (course: CourseItem) => {
+    // 保存当前页面状态到 sessionStorage（编辑不跳转页面，但以防万一）
+    const currentState = {
+      pagination,
+      searchName,
+      selectedCategory,
+      dateRange: dateRange ? [
+        dateRange[0]?.format('YYYY-MM-DD') || null,
+        dateRange[1]?.format('YYYY-MM-DD') || null
+      ] : null
+    };
+    sessionStorage.setItem('courseListState', JSON.stringify(currentState));
+    
     setCurrentCourse(course);
     editForm.setFieldsValue({
       category: course.category,
@@ -356,17 +417,53 @@ const CourseList = () => {
 
   // 显示删除确认
   const showDeleteConfirm = (course: CourseItem) => {
+    // 保存当前页面状态到 sessionStorage
+    const currentState = {
+      pagination,
+      searchName,
+      selectedCategory,
+      dateRange: dateRange ? [
+        dateRange[0]?.format('YYYY-MM-DD') || null,
+        dateRange[1]?.format('YYYY-MM-DD') || null
+      ] : null
+    };
+    sessionStorage.setItem('courseListState', JSON.stringify(currentState));
+    
     setCourseToDelete(course);
     setDeleteModalVisible(true);
   };
 
   // 导航到课程详情页
   const goToDetail = (courseId: number) => {
+    // 保存当前页面状态到 sessionStorage
+    const currentState = {
+      pagination,
+      searchName,
+      selectedCategory,
+      dateRange: dateRange ? [
+        dateRange[0]?.format('YYYY-MM-DD') || null,
+        dateRange[1]?.format('YYYY-MM-DD') || null
+      ] : null
+    };
+    sessionStorage.setItem('courseListState', JSON.stringify(currentState));
+    
     navigate(`/course-manage/detail/${courseId}`);
   };
 
   // 导航到课程附件页
   const goToAttachments = (courseId: number) => {
+    // 保存当前页面状态到 sessionStorage
+    const currentState = {
+      pagination,
+      searchName,
+      selectedCategory,
+      dateRange: dateRange ? [
+        dateRange[0]?.format('YYYY-MM-DD') || null,
+        dateRange[1]?.format('YYYY-MM-DD') || null
+      ] : null
+    };
+    sessionStorage.setItem('courseListState', JSON.stringify(currentState));
+    
     navigate(`/course-manage/attachments/${courseId}`);
   };
 
