@@ -851,20 +851,42 @@ const FinanceDashboard = () => {
     }
   };
 
-  // 组件首次挂载和激活标签变化时初始化图表
+  // 组件首次挂载时初始化
   useEffect(() => {
-    if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
-      // 获取真实财务数据
+    if (isSuperAdminUser) {
+      // 获取真实财务数据，然后初始化图表
       fetchRealFinancialData().then(() => {
-        initChart();
+        // 确保数据加载完成后再初始化图表
+        setTimeout(() => {
+          if (activeTab === 'dataChart' || activeTab === 'analysis') {
+            initChart();
+          }
+        }, 300);
       });
     }
     // 获取员工业绩数据
     if (activeTab === 'employee') {
       fetchEmployeePerformance();
     }
-    return undefined;
-  }, [isSuperAdminUser, activeTab]);
+  }, []); // 只在组件挂载时执行一次
+
+  // 激活标签变化时的处理
+  useEffect(() => {
+    if (isSuperAdminUser && (activeTab === 'dataChart' || activeTab === 'analysis')) {
+      // 如果数据已经加载过，只需要初始化/更新图表
+      if (realChartData.length > 0 || realExpenseTypeData.length > 0 || realIncomeTypeData.length > 0) {
+        setTimeout(() => {
+          if (activeTab === 'dataChart') {
+            updateOptions();
+          } else if (activeTab === 'analysis') {
+            updateExpenseTypePie();
+            updateIncomeTypePie();
+            updateMonthlyTrend();
+          }
+        }, 100);
+      }
+    }
+  }, [activeTab]);
 
   // 年份或月份变化时重新获取数据
   useEffect(() => {
@@ -907,8 +929,8 @@ const FinanceDashboard = () => {
 
   // 当真实数据变化时更新图表
   useEffect(() => {
-    if (activeTab === 'analysis') {
-      // 强制更新饼图
+    // 只在数据真正有变化且图表容器已准备好时更新
+    if (!chartLoading && activeTab === 'analysis') {
       setTimeout(() => {
         // 更新支出饼图
         if (realExpenseTypeData.length > 0) {
@@ -1068,8 +1090,8 @@ const FinanceDashboard = () => {
             }
           }));
         }
-      }, 100);
-    } else if (activeTab === 'dataChart') {
+      }, 200);
+    } else if (!chartLoading && activeTab === 'dataChart') {
       // 更新年度财务图表
       if (realChartData.length > 0) {
         setTimeout(() => {
@@ -1127,10 +1149,10 @@ const FinanceDashboard = () => {
               }
             ]
           }));
-        }, 100);
+        }, 200);
       }
     }
-  }, [realExpenseTypeData, realIncomeTypeData, realChartData, activeTab]);
+  }, [realExpenseTypeData, realIncomeTypeData, realChartData, activeTab, chartLoading]);
 
   // 财务看板Tab页配置
   const tabItems: TabsProps['items'] = [
