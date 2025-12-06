@@ -88,18 +88,22 @@ const CustomerManagement = () => {
   const isFirstLoadRef = useRef(true);
 
   // 获取客户数据
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (customParams?: { current?: number; pageSize?: number; searchParams?: typeof searchParams }) => {
     setLoading(true);
     try {
+      // 使用传入的参数或当前状态
+      const currentPagination = customParams || { current: pagination.current, pageSize: pagination.pageSize };
+      const currentSearchParams = customParams?.searchParams || searchParams;
+
       const params: CustomerApi.CustomerQueryParams = {
-        assignedToName: searchParams.assignedToName || undefined,
-        company: searchParams.company || undefined,
-        current: pagination.current,
-        customerName: searchParams.customerName || undefined,
-        followStatus: searchParams.followStatus || undefined,
-        mobile: searchParams.phone || undefined,
-        phone: searchParams.phone || undefined, // 使用同一个搜索框搜索手机和电话
-        size: pagination.pageSize
+        assignedToName: currentSearchParams.assignedToName || undefined,
+        company: currentSearchParams.company || undefined,
+        current: currentPagination.current || pagination.current,
+        customerName: currentSearchParams.customerName || undefined,
+        followStatus: currentSearchParams.followStatus || undefined,
+        mobile: currentSearchParams.phone || undefined,
+        phone: currentSearchParams.phone || undefined,
+        size: currentPagination.pageSize || pagination.pageSize
       };
 
       const response = await customerService.getCustomerList(params);
@@ -118,7 +122,7 @@ const CustomerManagement = () => {
             pageSize: response.size,
             total: response.total
           },
-          searchParams
+          searchParams: currentSearchParams
         };
         localStorage.setItem('customerInfoState', JSON.stringify(stateToSave));
       }
@@ -134,31 +138,37 @@ const CustomerManagement = () => {
   useEffect(() => {
     if (isFirstLoadRef.current) {
       isFirstLoadRef.current = false;
-      
+
       // 尝试从 localStorage 恢复状态
       const savedState = localStorage.getItem('customerInfoState');
       if (savedState) {
         try {
           const state = JSON.parse(savedState);
           isRestoringStateRef.current = true;
-          
-          // 恢复分页和搜索状态
-          if (state.pagination) {
-            setPagination(state.pagination);
-          }
+
+          // 先设置状态（不会触发 useEffect，因为我们会手动调用 fetchCustomers）
           if (state.searchParams) {
             setSearchParams(state.searchParams);
           }
-          
-          // 标记恢复完成
-          setTimeout(() => {
+
+          // 直接调用 fetchCustomers，传入恢复的参数，避免等待 state 更新
+          fetchCustomers({
+            current: state.pagination?.current || 1,
+            pageSize: state.pagination?.pageSize || 10,
+            searchParams: state.searchParams || searchParams
+          }).finally(() => {
             isRestoringStateRef.current = false;
-          }, 100);
+          });
+
+          return; // 直接返回，不执行下面的正常加载
         } catch (error) {
           console.error('恢复客户资料状态失败:', error);
           isRestoringStateRef.current = false;
         }
       }
+
+      // 如果没有保存的状态，正常加载
+      fetchCustomers();
     } else {
       // 非首次加载时正常获取数据
       fetchCustomers();
