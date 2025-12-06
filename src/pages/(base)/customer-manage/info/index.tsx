@@ -1,6 +1,6 @@
 import { CopyOutlined, DownloadOutlined, UserAddOutlined, UserSwitchOutlined } from '@ant-design/icons';
 import { App, Button, Card, Form, Input, Modal, Progress, Select, Space, Table, Tag } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { customerService, employeeService } from '@/service/api';
 import type { CustomerApi, EmployeeApi } from '@/service/api/types';
@@ -82,11 +82,6 @@ const CustomerManagement = () => {
     phone: ''
   });
 
-  // 标记是否正在恢复状态
-  const isRestoringStateRef = useRef(false);
-  // 标记是否是首次加载
-  const isFirstLoadRef = useRef(true);
-
   // 获取客户数据
   const fetchCustomers = async () => {
     setLoading(true);
@@ -109,19 +104,6 @@ const CustomerManagement = () => {
         pageSize: response.size,
         total: response.total
       });
-
-      // 保存状态到 localStorage（只在非恢复状态时保存）
-      if (!isRestoringStateRef.current) {
-        const stateToSave = {
-          pagination: {
-            current: response.current,
-            pageSize: response.size,
-            total: response.total
-          },
-          searchParams
-        };
-        localStorage.setItem('customerInfoState', JSON.stringify(stateToSave));
-      }
     } catch (error) {
       message.error('获取客户数据失败');
       console.error('获取客户数据失败:', error);
@@ -130,39 +112,9 @@ const CustomerManagement = () => {
     }
   };
 
-  // 初始化加载数据 - 首次加载时恢复状态
+  // 初始化加载数据
   useEffect(() => {
-    if (isFirstLoadRef.current) {
-      isFirstLoadRef.current = false;
-      
-      // 尝试从 localStorage 恢复状态
-      const savedState = localStorage.getItem('customerInfoState');
-      if (savedState) {
-        try {
-          const state = JSON.parse(savedState);
-          isRestoringStateRef.current = true;
-          
-          // 恢复分页和搜索状态
-          if (state.pagination) {
-            setPagination(state.pagination);
-          }
-          if (state.searchParams) {
-            setSearchParams(state.searchParams);
-          }
-          
-          // 标记恢复完成
-          setTimeout(() => {
-            isRestoringStateRef.current = false;
-          }, 100);
-        } catch (error) {
-          console.error('恢复客户资料状态失败:', error);
-          isRestoringStateRef.current = false;
-        }
-      }
-    } else {
-      // 非首次加载时正常获取数据
-      fetchCustomers();
-    }
+    fetchCustomers();
   }, [pagination.current, pagination.pageSize]);
 
   // 获取管理员管理的员工
