@@ -212,7 +212,6 @@ const CourseList = () => {
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
-        console.log('恢复课程列表状态:', state); // 调试日志
 
         // 先恢复所有状态
         setPagination(state.pagination || { current: 1, pageSize: 10, total: 0 });
@@ -238,12 +237,6 @@ const CourseList = () => {
           filters.endDate = state.dateRange[1];
         }
 
-        console.log('使用参数加载课程列表:', {
-          page: state.pagination?.current || 1,
-          size: state.pagination?.pageSize || 10,
-          filters
-        }); // 调试日志
-
         // 使用恢复的状态加载数据
         fetchCourseList(
           state.pagination?.current || 1,
@@ -255,7 +248,6 @@ const CourseList = () => {
         fetchCourseList();
       }
     } else {
-      console.log('没有保存的状态，加载默认数据'); // 调试日志
       fetchCourseList();
     }
     fetchUserPermissions(); // 获取用户权限
@@ -459,7 +451,6 @@ const CourseList = () => {
         dateRange[1]?.format('YYYY-MM-DD') || null
       ] : null
     };
-    console.log('保存课程列表状态:', currentState); // 调试日志
     sessionStorage.setItem('courseListState', JSON.stringify(currentState));
 
     navigate(`/course-manage/detail/${courseId}`);
@@ -477,7 +468,6 @@ const CourseList = () => {
         dateRange[1]?.format('YYYY-MM-DD') || null
       ] : null
     };
-    console.log('保存课程列表状态(附件):', currentState); // 调试日志
     sessionStorage.setItem('courseListState', JSON.stringify(currentState));
 
     navigate(`/course-manage/attachments/${courseId}`);
