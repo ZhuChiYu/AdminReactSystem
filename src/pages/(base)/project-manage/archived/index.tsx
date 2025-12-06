@@ -7,6 +7,7 @@ import { projectService } from '@/service/api';
 import { taskAttachmentService } from '@/service/api/taskAttachment';
 import type { TaskAttachmentListItem } from '@/service/api/taskAttachment';
 import type { TaskApi } from '@/service/api/types';
+import { isSuperAdmin } from '@/utils/auth';
 
 const ArchivedProjectPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -20,6 +21,9 @@ const ArchivedProjectPage: React.FC = () => {
     pageSize: 10,
     total: 0
   });
+
+  // 检查是否是超级管理员
+  const isAdmin = isSuperAdmin();
 
   // 优先级映射
   const priorityMap = {
@@ -272,21 +276,23 @@ const ArchivedProjectPage: React.FC = () => {
           >
             详情
           </Button>
-          <Popconfirm
-            cancelText="取消"
-            okText="确定"
-            title="确定要删除这个历史项目吗？删除后将无法恢复。"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              size="small"
-              type="link"
+          {isAdmin && (
+            <Popconfirm
+              cancelText="取消"
+              okText="确定"
+              title="确定要删除这个历史项目吗？删除后将无法恢复。"
+              onConfirm={() => handleDelete(record.id)}
             >
-              删除
-            </Button>
-          </Popconfirm>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                type="link"
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
       title: '操作',

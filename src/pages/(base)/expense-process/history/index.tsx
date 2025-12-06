@@ -47,7 +47,8 @@ const Component: React.FC = () => {
   const [currentItem, setCurrentItem] = useState<any>(null);
   const navigate = useNavigate();
 
-  // 检查权限 - 移除这个检查，因为员工也应该能查看自己的申请历史
+  // 检查是否是超级管理员
+  const isAdmin = isSuperAdmin();
 
   // 获取申请历史
   const fetchHistory = async () => {
@@ -337,11 +338,32 @@ const Component: React.FC = () => {
               >
                 提交
               </Button>
+              {isAdmin && (
+                <Popconfirm
+                  cancelText="取消"
+                  okText="确定"
+                  title="确定删除这个草稿吗？"
+                  onConfirm={() => handleDeleteDraft(record)}
+                >
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    size="small"
+                    type="link"
+                  >
+                    删除
+                  </Button>
+                </Popconfirm>
+              )}
+            </>
+          ) : (
+            // 已提交的申请删除按钮（仅超级管理员可见）
+            isAdmin && (
               <Popconfirm
                 cancelText="取消"
                 okText="确定"
-                title="确定删除这个草稿吗？"
-                onConfirm={() => handleDeleteDraft(record)}
+                title="确定删除这个申请吗？删除后将无法恢复，包括所有附件文件。"
+                onConfirm={() => handleDeleteApplication(record)}
               >
                 <Button
                   danger
@@ -352,24 +374,7 @@ const Component: React.FC = () => {
                   删除
                 </Button>
               </Popconfirm>
-            </>
-          ) : (
-            // 已提交的申请也可以删除（超级管理员或申请人本人）
-            <Popconfirm
-              cancelText="取消"
-              okText="确定"
-              title="确定删除这个申请吗？删除后将无法恢复，包括所有附件文件。"
-              onConfirm={() => handleDeleteApplication(record)}
-            >
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                size="small"
-                type="link"
-              >
-                删除
-              </Button>
-            </Popconfirm>
+            )
           )}
         </Space>
       )
