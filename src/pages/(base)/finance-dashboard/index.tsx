@@ -166,19 +166,47 @@ const FinanceDashboard = () => {
         setRealExpenseTypeData([]);
       }
 
-      // 处理收入类型分布数据
-      if (incomeDistributionResponse && Array.isArray(incomeDistributionResponse)) {
-        const formattedIncomeData = incomeDistributionResponse.map(item => ({
-          amount: item.amount,
-          itemStyle: {
-            color: item.color
-          },
-          name: item.category,
-          type: item.category,
-          value: item.amount
+      // 处理收入记录数据
+      if (incomeRecordsResponse && incomeRecordsResponse.records) {
+        setIncomeRecords(incomeRecordsResponse.records);
+        setIncomePagination(prev => ({
+          ...prev,
+          total: incomeRecordsResponse.total
         }));
+
+        // 从收入记录直接计算收入类型分布（与明细表格数据源一致）
+        const incomeTypeMap = new Map<string, number>();
+        
+        // 统计每种收入类型的总金额
+        incomeRecordsResponse.records.forEach((record: FinancialRecord) => {
+          const category = record.category;
+          const amount = record.amount;
+          if (incomeTypeMap.has(category)) {
+            incomeTypeMap.set(category, incomeTypeMap.get(category)! + amount);
+          } else {
+            incomeTypeMap.set(category, amount);
+          }
+        });
+
+        // 转换为图表数据格式
+        const formattedIncomeData = Array.from(incomeTypeMap.entries()).map(([category, amount]) => {
+          // 查找对应的颜色
+          const incomeTypeConfig = incomeTypes.find(t => t.value === category || t.label === category);
+          return {
+            amount,
+            itemStyle: {
+              color: incomeTypeConfig?.color || '#52c41a'
+            },
+            name: incomeTypeConfig?.label || category,
+            type: category,
+            value: amount
+          };
+        });
+
         setRealIncomeTypeData(formattedIncomeData);
       } else {
+        setIncomeRecords([]);
+        setIncomePagination(prev => ({ ...prev, total: 0 }));
         setRealIncomeTypeData([]);
       }
 
@@ -192,18 +220,6 @@ const FinanceDashboard = () => {
       } else {
         setExpenseRecords([]);
         setExpensePagination(prev => ({ ...prev, total: 0 }));
-      }
-
-      // 处理收入记录数据
-      if (incomeRecordsResponse && incomeRecordsResponse.records) {
-        setIncomeRecords(incomeRecordsResponse.records);
-        setIncomePagination(prev => ({
-          ...prev,
-          total: incomeRecordsResponse.total
-        }));
-      } else {
-        setIncomeRecords([]);
-        setIncomePagination(prev => ({ ...prev, total: 0 }));
       }
     } catch (error) {
       // 如果获取失败，设置空数据
