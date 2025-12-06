@@ -119,12 +119,25 @@ const ClassList = () => {
   const loadClassList = async (params: ClassQueryParams = {}) => {
     try {
       setLoading(true);
-      const response = await classService.getClassList({
-        current: pagination.current,
-        size: pagination.size,
-        ...params
-      });
+      
+      // 构建请求参数，优先使用 params 中的值
+      const requestParams = {
+        current: params.current ?? pagination.current,
+        size: params.size ?? pagination.size,
+        ...params // 其他筛选参数
+      };
+      
+      console.log('【班级列表】loadClassList 请求参数:', requestParams);
+      
+      const response = await classService.getClassList(requestParams);
 
+      console.log('【班级列表】loadClassList 响应:', {
+        current: response.current,
+        size: response.size,
+        total: response.total,
+        records: response.records?.length
+      });
+      
       setFilteredList(response.records || []);
       setPagination({
         current: response.current || 1,
@@ -132,7 +145,7 @@ const ClassList = () => {
         total: response.total || 0
       });
     } catch (error) {
-      console.error('获取班级列表失败:', error);
+      console.error('【班级列表】获取班级列表失败:', error);
       message.error('获取班级列表失败');
     } finally {
       setLoading(false);
@@ -141,11 +154,14 @@ const ClassList = () => {
 
   // 初始加载数据
   useEffect(() => {
+    console.log('【班级列表】组件加载，currentUserId:', currentUserId);
     // 尝试从 sessionStorage 恢复页面状态
     const savedState = sessionStorage.getItem('classListState');
+    console.log('【班级列表】读取保存的状态:', savedState);
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
+        console.log('【班级列表】解析后的状态:', state);
         // 设置恢复状态标记，防止触发自动筛选
         setIsRestoringState(true);
         setPagination(state.pagination || pagination);
@@ -161,6 +177,13 @@ const ClassList = () => {
         // 清除保存的状态
         sessionStorage.removeItem('classListState');
         
+        console.log('【班级列表】使用参数加载数据:', {
+          current: state.pagination?.current,
+          name: state.searchName,
+          categoryId: state.selectedCategory !== '' ? Number(state.selectedCategory) : undefined,
+          status: state.selectedStatus !== '' ? Number(state.selectedStatus) : undefined
+        });
+        
         // 使用恢复的状态加载数据
         loadClassList({
           current: state.pagination?.current || 1,
@@ -171,14 +194,16 @@ const ClassList = () => {
           endDate: state.dateRange?.[1] || undefined
         }).finally(() => {
           // 数据加载完成后，取消恢复状态标记
+          console.log('【班级列表】数据加载完成，取消恢复标记');
           setIsRestoringState(false);
         });
       } catch (error) {
-        console.error('恢复页面状态失败:', error);
+        console.error('【班级列表】恢复页面状态失败:', error);
         loadClassList();
         setIsRestoringState(false);
       }
     } else {
+      console.log('【班级列表】没有保存的状态，加载默认数据');
       loadClassList();
     }
     fetchUserPermissions(); // 获取用户权限
@@ -216,7 +241,10 @@ const ClassList = () => {
   useEffect(() => {
     // 如果正在恢复状态，不触发自动筛选
     if (!isRestoringState) {
+      console.log('【班级列表】筛选条件变化，触发自动筛选');
       applyFilters();
+    } else {
+      console.log('【班级列表】正在恢复状态，跳过自动筛选');
     }
   }, [searchName, selectedCategory, selectedStatus, dateRange, isRestoringState]);
 
@@ -273,6 +301,7 @@ const ClassList = () => {
         dateRange[1]?.format('YYYY-MM-DD') || null
       ] : null
     };
+    console.log('【班级列表】保存状态:', currentState);
     sessionStorage.setItem('classListState', JSON.stringify(currentState));
     
     navigate(`/class-manage/detail/${classId}`);
@@ -576,9 +605,11 @@ const ClassList = () => {
           pagination={{
             current: pagination.current,
             onChange: (page, pageSize) => {
+              console.log('【班级列表】分页变化:', { page, pageSize });
               loadClassList({ current: page, size: pageSize });
             },
             onShowSizeChange: (_current, size) => {
+              console.log('【班级列表】每页大小变化:', { size });
               loadClassList({ current: 1, size });
             },
             pageSize: pagination.size,
