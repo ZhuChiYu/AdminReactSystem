@@ -1,7 +1,7 @@
 import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { courseService } from '@/service/api';
@@ -65,8 +65,8 @@ const ClassList = () => {
   // 权限状态
   const [canCreateClass, setCanCreateClass] = useState(false);
   
-  // 标记是否正在恢复状态，防止触发自动筛选
-  const [isRestoringState, setIsRestoringState] = useState(false);
+  // 标记是否正在恢复状态，防止触发自动筛选 - 使用 ref 确保同步更新
+  const isRestoringStateRef = useRef(false);
 
   // 获取用户权限
   const fetchUserPermissions = async () => {
@@ -162,8 +162,10 @@ const ClassList = () => {
       try {
         const state = JSON.parse(savedState);
         console.log('【班级列表】解析后的状态:', state);
-        // 设置恢复状态标记，防止触发自动筛选
-        setIsRestoringState(true);
+        // ⭐ 关键修复：在设置任何 state 之前，先设置 ref 标记（同步的）
+        isRestoringStateRef.current = true;
+        console.log('【班级列表】设置恢复状态标记为 true');
+        
         setPagination(state.pagination || pagination);
         setSearchName(state.searchName || '');
         setSelectedCategory(state.selectedCategory ?? '');
@@ -195,12 +197,12 @@ const ClassList = () => {
         }).finally(() => {
           // 数据加载完成后，取消恢复状态标记
           console.log('【班级列表】数据加载完成，取消恢复标记');
-          setIsRestoringState(false);
+          isRestoringStateRef.current = false;
         });
       } catch (error) {
         console.error('【班级列表】恢复页面状态失败:', error);
+        isRestoringStateRef.current = false;
         loadClassList();
-        setIsRestoringState(false);
       }
     } else {
       console.log('【班级列表】没有保存的状态，加载默认数据');
@@ -239,14 +241,14 @@ const ClassList = () => {
 
   // 监听筛选条件变化时应用筛选
   useEffect(() => {
-    // 如果正在恢复状态，不触发自动筛选
-    if (!isRestoringState) {
+    // ⭐ 关键修复：检查 ref 而不是 state（ref 是同步的）
+    if (!isRestoringStateRef.current) {
       console.log('【班级列表】筛选条件变化，触发自动筛选');
       applyFilters();
     } else {
       console.log('【班级列表】正在恢复状态，跳过自动筛选');
     }
-  }, [searchName, selectedCategory, selectedStatus, dateRange, isRestoringState]);
+  }, [searchName, selectedCategory, selectedStatus, dateRange]);
 
   // 重置筛选
   const resetFilters = () => {
