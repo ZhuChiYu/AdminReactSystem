@@ -64,6 +64,9 @@ const ClassList = () => {
 
   // 权限状态
   const [canCreateClass, setCanCreateClass] = useState(false);
+  
+  // 标记是否正在恢复状态，防止触发自动筛选
+  const [isRestoringState, setIsRestoringState] = useState(false);
 
   // 获取用户权限
   const fetchUserPermissions = async () => {
@@ -143,6 +146,8 @@ const ClassList = () => {
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
+        // 设置恢复状态标记，防止触发自动筛选
+        setIsRestoringState(true);
         setPagination(state.pagination || pagination);
         setSearchName(state.searchName || '');
         setSelectedCategory(state.selectedCategory ?? '');
@@ -164,10 +169,14 @@ const ClassList = () => {
           status: state.selectedStatus !== '' ? Number(state.selectedStatus) : undefined,
           startDate: state.dateRange?.[0] || undefined,
           endDate: state.dateRange?.[1] || undefined
+        }).finally(() => {
+          // 数据加载完成后，取消恢复状态标记
+          setIsRestoringState(false);
         });
       } catch (error) {
         console.error('恢复页面状态失败:', error);
         loadClassList();
+        setIsRestoringState(false);
       }
     } else {
       loadClassList();
@@ -205,8 +214,11 @@ const ClassList = () => {
 
   // 监听筛选条件变化时应用筛选
   useEffect(() => {
-    applyFilters();
-  }, [searchName, selectedCategory, selectedStatus, dateRange]);
+    // 如果正在恢复状态，不触发自动筛选
+    if (!isRestoringState) {
+      applyFilters();
+    }
+  }, [searchName, selectedCategory, selectedStatus, dateRange, isRestoringState]);
 
   // 重置筛选
   const resetFilters = () => {
