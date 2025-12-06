@@ -24,16 +24,48 @@ class CustomerController {
       // 超级管理员：可以看到所有客户数据
       // 不添加任何限制条件
     } else if (user?.roles?.includes('admin')) {
-      // 管理员：可以看到自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+      // 管理员权限规则：
+      // 1. 分配给自己的客户（完全可见）
+      // 2. 分配给下属的客户（脱敏）
+      // 3. 下属创建的客户（脱敏）
+      // 4. 自己创建的客户 且 分配给下属（脱敏）
       const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
         where: { managerId: user.id },
         select: { employeeId: true }
       });
 
-      const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+      const managedEmployeeIdList = managedEmployeeIds.map(rel => rel.employeeId);
+
       permissionConditions.OR = [
-        { createdById: { in: allowedCreatorIds } },
-        { assignedToId: user.id }
+        // 1. 分配给自己的客户
+        { assignedToId: user.id },
+        // 2. 分配给下属的客户
+        { assignedToId: { in: managedEmployeeIdList } },
+        // 3. 下属创建的客户（只要不是分配给非自己和非下属的）
+        {
+          AND: [
+            { createdById: { in: managedEmployeeIdList } },
+            {
+              OR: [
+                { assignedToId: user.id },
+                { assignedToId: { in: managedEmployeeIdList } },
+                { assignedToId: null }
+              ]
+            }
+          ]
+        },
+        // 4. 自己创建的客户 且 分配给自己或下属
+        {
+          AND: [
+            { createdById: user.id },
+            {
+              OR: [
+                { assignedToId: user.id },
+                { assignedToId: { in: managedEmployeeIdList } }
+              ]
+            }
+          ]
+        }
       ];
     } else {
       // 普通员工：只能看到分配给自己的客户
@@ -204,8 +236,28 @@ class CustomerController {
         const isSuperAdmin = user?.roles?.includes('super_admin');
         const isAdmin = user?.roles?.includes('admin');
 
-        // 脱敏规则：超级管理员、创建者、分配给的员工都可以看到完整信息
-        const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer && !isAssignedToUser;
+        // 脱敏规则：
+        // 1. 超级管理员：看到所有完整信息
+        // 2. 管理员的完整信息条件：
+        //    - 分配给自己的客户（不论谁创建的）
+        //    - 自己创建且未分配的客户
+        // 3. 其他情况：脱敏
+        let shouldMaskSensitiveInfo = false;
+        
+        if (isSuperAdmin) {
+          // 超级管理员看到完整信息
+          shouldMaskSensitiveInfo = false;
+        } else if (isAdmin) {
+          // 管理员的脱敏规则
+          const isAssignedToMe = isAssignedToUser; // 分配给自己的
+          const isOwnUnassignedCustomer = isOwnCustomer && !customer.assignedToId; // 自己创建且未分配
+          
+          // 只有这两种情况看完整信息，其他都脱敏
+          shouldMaskSensitiveInfo = !(isAssignedToMe || isOwnUnassignedCustomer);
+        } else {
+          // 普通员工：只有分配给自己的才看完整信息
+          shouldMaskSensitiveInfo = !isAssignedToUser;
+        }
 
         // 编辑权限：超级管理员、创建者、分配给的员工都可以编辑
         const canEdit = isSuperAdmin || isOwnCustomer || isAssignedToUser;
@@ -290,16 +342,44 @@ class CustomerController {
         // 超级管理员：可以查看所有客户
         // 不添加任何限制条件
       } else if (user?.roles?.includes('admin')) {
-        // 管理员：可以查看自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+        // 管理员：同列表页的权限规则
         const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
           where: { managerId: user.id },
           select: { employeeId: true }
         });
 
-        const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+        const managedEmployeeIdList = managedEmployeeIds.map(rel => rel.employeeId);
+
         where.OR = [
-          { createdById: { in: allowedCreatorIds } },
-          { assignedToId: user.id }
+          // 1. 分配给自己的客户
+          { assignedToId: user.id },
+          // 2. 分配给下属的客户
+          { assignedToId: { in: managedEmployeeIdList } },
+          // 3. 下属创建的客户（只要不是分配给非自己和非下属的）
+          {
+            AND: [
+              { createdById: { in: managedEmployeeIdList } },
+              {
+                OR: [
+                  { assignedToId: user.id },
+                  { assignedToId: { in: managedEmployeeIdList } },
+                  { assignedToId: null }
+                ]
+              }
+            ]
+          },
+          // 4. 自己创建的客户 且 分配给自己或下属
+          {
+            AND: [
+              { createdById: user.id },
+              {
+                OR: [
+                  { assignedToId: user.id },
+                  { assignedToId: { in: managedEmployeeIdList } }
+                ]
+              }
+            ]
+          }
         ];
       } else {
         // 普通员工：只能查看分配给自己的客户
@@ -355,7 +435,21 @@ class CustomerController {
       const isOwnCustomer = customer.createdById === user?.id;
       const isAssignedToUser = customer.assignedToId === user?.id;
       const isSuperAdmin = user?.roles?.includes('super_admin');
-      const shouldMaskSensitiveInfo = !isSuperAdmin && !isOwnCustomer && !isAssignedToUser;
+      const isAdmin = user?.roles?.includes('admin');
+      
+      // 脱敏规则：
+      // 管理员：分配给自己的 或 自己创建且未分配的 -> 完整信息
+      let shouldMaskSensitiveInfo = false;
+      
+      if (isSuperAdmin) {
+        shouldMaskSensitiveInfo = false;
+      } else if (isAdmin) {
+        const isAssignedToMe = isAssignedToUser;
+        const isOwnUnassignedCustomer = isOwnCustomer && !customer.assignedToId;
+        shouldMaskSensitiveInfo = !(isAssignedToMe || isOwnUnassignedCustomer);
+      } else {
+        shouldMaskSensitiveInfo = !isAssignedToUser;
+      }
 
       const result = {
         assignedTime: customer.assignedTime,
@@ -849,16 +943,40 @@ class CustomerController {
         // 超级管理员：可以看到所有客户数据
         // 不添加任何限制条件
       } else if (user?.roles?.includes('admin')) {
-        // 管理员：可以看到自己创建的客户 + 其管理的员工创建的客户 + 分配给自己的客户
+        // 管理员：同列表页的权限规则
         const managedEmployeeIds = await prisma.employeeManagerRelation.findMany({
           where: { managerId: user.id },
           select: { employeeId: true }
         });
 
-        const allowedCreatorIds = [user.id, ...managedEmployeeIds.map(rel => rel.employeeId)];
+        const managedEmployeeIdList = managedEmployeeIds.map(rel => rel.employeeId);
+
         where.OR = [
-          { createdById: { in: allowedCreatorIds } },
-          { assignedToId: user.id }
+          { assignedToId: user.id },
+          { assignedToId: { in: managedEmployeeIdList } },
+          {
+            AND: [
+              { createdById: { in: managedEmployeeIdList } },
+              {
+                OR: [
+                  { assignedToId: user.id },
+                  { assignedToId: { in: managedEmployeeIdList } },
+                  { assignedToId: null }
+                ]
+              }
+            ]
+          },
+          {
+            AND: [
+              { createdById: user.id },
+              {
+                OR: [
+                  { assignedToId: user.id },
+                  { assignedToId: { in: managedEmployeeIdList } }
+                ]
+              }
+            ]
+          }
         ];
       } else {
         // 普通员工：只能看到分配给自己的客户
